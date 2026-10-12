@@ -9,6 +9,7 @@
  * ledger, the cascade and the child ids.
  */
 import type {
+  Admission,
   DocumentDigestReportDto,
   DocumentMemoryStepReason,
   MemoryContextDto,
@@ -44,6 +45,19 @@ const skip = (
 const contextOf = (ctx: Ctx): MemoryContextDto => ctx.context as unknown as MemoryContextDto;
 
 /**
+ * The admissions a document digest is drawn on: admitted, and judged below
+ * the bar yet not refuted — an artifact its validators passed, every memory a
+ * confirmed finding withholds still withheld (`endorsedMemories`). A document
+ * transcribes what someone stated, so a digest of it scored low for its
+ * writing loses a fact the corpus can never answer with again; the experience
+ * digest keeps the reader's strict default. Measured 2026-10-12: five of 103
+ * answers the operator gave at forms ended `revise` or `retry` on their
+ * one-section document — a figure without its unit, the unit of work "missed"
+ * — were stored nowhere, and each question was asked again at the next form.
+ */
+export const DOCUMENT_MEMORY_ADMITS: readonly Admission[] = ['admitted', 'fell-short'];
+
+/**
  * Digest the chunk; yields the digest run and what it endorsed, or nothing
  * with the reason — and a digest that was never judged (no rubric derived,
  * nothing produced) says that, never `not-accepted`. The report names the
@@ -66,9 +80,14 @@ export async function digest(ctx: Ctx): Promise<StepResult<DocumentMemoryOutputs
     maxIterations: ctx.request.maxIterations ?? DEFAULT_QUALITY_RUN_ITERATIONS,
   });
   if (!completed(child)) return runFailed(child);
-  const { admission, proposed, memories } = readDocumentDigest(outputsOf(child.trace), acceptAt);
+  const { admission, proposed, memories } = readDocumentDigest(
+    outputsOf(child.trace),
+    acceptAt,
+    DOCUMENT_MEMORY_ADMITS,
+  );
   const counts = { memories: proposed, kept: memories.length };
-  if (admission !== 'admitted') {
+  // Not drawn on at all — or drawn on below the bar and nothing survived the engine's gates.
+  if (admission !== 'admitted' && memories.length === 0) {
     return { status: 'complete', reason: UNADMITTED_REASON[admission], counts, report };
   }
   if (memories.length === 0) return { status: 'complete', reason: 'no-memories', counts, report };
@@ -76,6 +95,7 @@ export async function digest(ctx: Ctx): Promise<StepResult<DocumentMemoryOutputs
     status: 'complete',
     counts,
     report,
+    ...(admission === 'admitted' ? {} : { note: 'judged below the bar, not refuted: stored' }),
     output: { source: child, digested: { digestRunId: child.runId, memories } },
   };
 }

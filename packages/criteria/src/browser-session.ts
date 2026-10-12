@@ -81,6 +81,11 @@ export const BROWSER_SESSION_CRITERIA: readonly Criterion[] = [
     statement:
       'A session says what happened for whoever keeps a record of its units beyond it — started, unit opened, unit closed, ended — as declared bus topics carrying the engine-minted unit id, its declared identity and the session’s own lifetime, published on a queue of their own so a bus riding out a restart never holds a row behind it, the end said before the drain, the close waiting one window for them all and recording what stayed unsent; and a recorded session’s events can be published again from its rows.',
   },
+  {
+    id: 'BRW-17',
+    statement:
+      'An operator’s answer is taught under what its field asks — the label, then the words beside it, as one text the recall’s probe is searched with — as the subject’s answer to that question with where and when it was asked kept apart as provenance and a chosen draft said to be one, parsed through the guidance schema before it is taught; a field that asks nothing it can be told by is kept for the session and taught to nobody, and the step says so.',
+  },
   // Memory ingest (packages/memory-ingest)
   {
     id: 'ING-1',

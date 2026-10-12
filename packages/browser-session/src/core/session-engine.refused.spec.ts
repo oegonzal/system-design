@@ -72,7 +72,7 @@ describe('an answer the page refuses', () => {
     ]);
     expect(step3[1]?.payload).toMatchObject({ reply: 'read-back', outcome: 'ok' });
     expect(brain.taught).toHaveLength(1);
-    expect(brain.taught[0]?.parts[0]).toContain('the operator answered "No"');
+    expect(brain.taught[0]?.parts[0]).toContain('the subject answered "No"');
   });
 
   it('[BRW-3] stands once the declared asks are spent, and the fields after it are not attempted', async () => {

@@ -190,7 +190,7 @@ describe('the session service, end to end', () => {
     ]);
     expect(orchestrations[0]?.request.criteria).toEqual(rubric);
     expect(orchestrations[1]?.request.goal).toContain('Operator guidance');
-    expect(orchestrations[1]?.request.goal).toContain('"Work authorisation"');
+    expect(orchestrations[1]?.request.goal).toContain('Asked "Work authorisation');
 
     // Rows: the session, one unit of work, nine decisions each naming its run.
     const detail = await service.show(outcome.sessionId);

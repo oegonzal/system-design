@@ -95,6 +95,11 @@ describe('the memory point payload', () => {
     expect(
       fromPayload({ ...payload, evidence: [{ kind: 'paragraph', ref: 'p1' }] }, 0.5),
     ).toBeNull();
+    // [QL-69] A declared scope rides on the point and comes back as declared; a point written before scopes carries none.
+    const scoped = toPayload({ ...chunk, scope: 'unit' }, '2026-10-12T00:00:00.000Z');
+    expect(scoped.scope).toBe('unit');
+    expect(fromPayload(scoped, 0.5)?.scope).toBe('unit');
+    expect('scope' in (fromPayload(payload, 0.5) ?? {})).toBe(false);
   });
 
   it('[QL-60] carries the lineage of the cited iteration, reads a point written before it as null, and refuses a malformed one', () => {

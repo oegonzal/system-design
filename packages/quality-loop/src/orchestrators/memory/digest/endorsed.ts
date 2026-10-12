@@ -20,8 +20,15 @@
  * either endorsed through the same reader. The artifact is read as the seam
  * read the reply — leniently — so a lesson kept whole past its ceiling is
  * stored whole, never a digest refused for it.
+ *
+ * Which admissions a reader draws on is the caller's to declare. The default
+ * is `admitted` alone. A caller may also draw on a run judged below the bar,
+ * and then only where the engine's own gates held — an artifact present that
+ * the validators passed — with every memory a finding withholds still
+ * withheld: what the judges confirmed is honoured, what they merely scored is
+ * not a reason to lose a true fact.
  */
-import { parseLenient, type Admission } from '@sysdesign/contracts';
+import { parseLenient, type Admission, type MemoryScope } from '@sysdesign/contracts';
 import type { ZodType } from 'zod';
 
 import {
@@ -52,6 +59,8 @@ export interface MemoryToStore {
    * the one kind every memory had before any digest declared one.
    */
   kind?: string;
+  /** Where the fact holds, as the digest declared it; absent from a digest that declares no scope. */
+  scope?: MemoryScope;
 }
 
 export interface DigestReadout {
@@ -78,6 +87,7 @@ export interface DigestLike {
     appliesWhen: string;
     /** Declared by digests whose items differ in shape; absent from those whose do not. */
     kind?: string;
+    scope?: MemoryScope;
   }[];
 }
 
@@ -111,20 +121,33 @@ export interface DigestCodec<D extends DigestLike, I extends DigestIndexLike> {
 /** The location id of the memory at `position` (zero-based) — the place a finding is located at. */
 const memoryLocation = (position: number): string => `memory.${position + 1}`;
 
+/** The one admission every reader draws on unless it declares more. */
+export const ADMITTED_ONLY: readonly Admission[] = ['admitted'];
+
 export function endorsedMemories<D extends DigestLike, I extends DigestIndexLike>(
   outputs: RunOutputs,
   acceptAt: number,
   codec: DigestCodec<D, I>,
+  /** The admissions this reader draws on; a run admitted otherwise proposes its memories and endorses none. */
+  admits: readonly Admission[] = ADMITTED_ONLY,
 ): DigestReadout {
   const { best } = outputs;
   const digest = best === null ? null : parseLenient(codec.schema, best.artifact);
   const proposed = digest?.ok ? digest.value.memories.length : 0;
   const verdict = admission(outputs, acceptAt);
-  if (verdict !== 'admitted') return { admission: verdict, proposed, memories: [], withheld: [] };
+  if (!admits.includes(verdict))
+    return { admission: verdict, proposed, memories: [], withheld: [] };
   const index = codec.readIndex(outputs.trace.contract.goal);
-  // Admitted, yet not a digest this reader can resolve: nothing of it is drawn on.
+  // Drawn on, yet not a digest this reader can resolve: nothing of it is used.
   if (best === null || !digest?.ok || index === null) {
     return { admission: 'fell-short', proposed, memories: [], withheld: [] };
+  }
+  // Below the bar, a digest is drawn on only where the engine's own gates held.
+  if (
+    verdict !== 'admitted' &&
+    !(best.ledger.artifactPresent && best.decision.gates.validatorsPassed)
+  ) {
+    return { admission: verdict, proposed, memories: [], withheld: [] };
   }
   const withheld = withheldItems(
     best.ledger,
@@ -149,8 +172,9 @@ export function endorsedMemories<D extends DigestLike, I extends DigestIndexLike
           (a, b) => a - b,
         ),
         ...(memory.kind === undefined ? {} : { kind: memory.kind }),
+        ...(memory.scope === undefined ? {} : { scope: memory.scope }),
       },
     ];
   });
-  return { admission: 'admitted', proposed, memories, withheld };
+  return { admission: verdict, proposed, memories, withheld };
 }

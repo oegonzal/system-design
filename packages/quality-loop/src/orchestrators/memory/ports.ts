@@ -11,6 +11,7 @@ import type {
   ChunkFacetsDto,
   LlmAvailabilityDto,
   MemoryLineageDto,
+  MemoryScope,
   MemoryStoreAvailabilityDto,
 } from '@sysdesign/contracts';
 
@@ -89,6 +90,12 @@ export interface MemoryChunk {
   model: string;
   /** Absent on a chunk written before facets, and on one whose writer derives none. */
   facets?: ChunkFacets;
+  /**
+   * Where a document memory holds — of the subject wherever asked, or of the one
+   * unit of work it was recorded for. Absent on a chunk written before scopes
+   * and on one whose digest declares none; a reader takes the contracts' default.
+   */
+  scope?: MemoryScope;
 }
 
 /** A chunk with the texts it is indexed by — one per name in the collection. */

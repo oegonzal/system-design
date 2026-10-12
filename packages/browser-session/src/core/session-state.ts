@@ -107,7 +107,7 @@ export interface SessionState {
   pendingPass: { ids: readonly string[]; scope: 'session' | 'unit' } | null;
   /** What the last step did, as the next goal tells it; null before the first plan. */
   lastStep: LastStep | null;
-  /** The operator's answers this session, by what each field asks (`fieldKeyOf`). */
+  /** The operator's answers this session, by what each field asks (`fieldQuestionOf`). */
   operatorAnswers: Map<string, string>;
   /**
    * What this session settled into fields, by what each asks — filled, kept, or

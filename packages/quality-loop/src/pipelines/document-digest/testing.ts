@@ -28,6 +28,7 @@ export const sampleDocumentDigest = (overrides: Partial<DocumentDigest> = {}): D
   memories: [
     {
       kind: 'profile_fact' as const,
+      scope: 'subject' as const,
       evidence: ['section.2'],
       insight:
         'Alex Example worked as a Senior Software Engineer at Acme from 2020 to 2026, building TypeScript services on AWS Lambda and leading the move to event-driven order processing.',
@@ -36,6 +37,7 @@ export const sampleDocumentDigest = (overrides: Partial<DocumentDigest> = {}): D
     },
     {
       kind: 'profile_fact' as const,
+      scope: 'subject' as const,
       evidence: ['section.1'],
       insight: 'Alex Example lives in Lisbon, Portugal and can be reached at alex@example.test.',
       appliesWhen: "a form asks for the applicant's city, country of residence or email address",

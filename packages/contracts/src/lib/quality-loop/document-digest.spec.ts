@@ -20,9 +20,14 @@ import { z } from 'zod';
  * that growing it is a decision someone makes rather than a side effect they
  * ship; every byte here is a byte of content a chunk cannot carry.
  */
-const FIXED_GOAL_BYTES = 1571;
-/** The smallest `--chunk-bytes` worth packing to; below half of it a chunk is mostly instructions. */
-const MIN_SENSIBLE_CHUNK_BYTES = 3200;
+const FIXED_GOAL_BYTES = 1736;
+/**
+ * The smallest `--chunk-bytes` worth packing to; below half of it a chunk is
+ * mostly instructions. Raised from 3200 on 2026-10-12, when the scope rule
+ * added 165 bytes to the fixed text (1571 → 1736); the ingester's default
+ * chunk is 6000, so a chunk packed to this floor is still two parts content.
+ */
+const MIN_SENSIBLE_CHUNK_BYTES = 3600;
 
 describe('renderDocumentGoal', () => {
   it('[QL-40] writes one aliased section per part and an index naming each as section evidence', () => {

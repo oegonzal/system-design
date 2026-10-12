@@ -135,16 +135,40 @@ describe('the document-memory steps', () => {
     expect(faulted.output?.digested.memories.map((memory) => memory.position)).toEqual([2]);
   });
 
-  it('[QL-40] digest says why it endorsed nothing, and never calls an unjudged digest a shortfall', async () => {
+  it('[QL-69] digest draws on a run judged below the bar where the engine’s gates held, withholding what a finding withholds, and says so', async () => {
+    // A document transcribes what someone stated: a digest scored low for its
+    // writing is stored, not lost. Measured 2026-10-12: five taught answers
+    // ended `revise`/`retry` on a one-section document and were asked again.
     const belowTheBar = await digest(ctx(child(digestTrace('revise'))));
     expect(belowTheBar).toMatchObject({
       status: 'complete',
-      reason: 'not-accepted',
-      counts: { memories: 2, kept: 0 },
+      note: 'judged below the bar, not refuted: stored',
+      counts: { memories: 2, kept: 2 },
       report: { subject: 'Alex Example' },
     });
-    expect(belowTheBar.output).toBeUndefined();
+    expect(belowTheBar.reason).toBeUndefined();
+    expect(belowTheBar.output?.digested.memories.map((memory) => memory.position)).toEqual([1, 2]);
 
+    // What a confirmed finding withholds is withheld below the bar as above it.
+    const refuted = await digest(
+      ctx(child(digestTrace('revise', { findings: [faulting('invented_fact', ['memory.1'])] }))),
+    );
+    expect(refuted).toMatchObject({ status: 'complete', counts: { memories: 2, kept: 1 } });
+    expect(refuted.output?.digested.memories.map((memory) => memory.position)).toEqual([2]);
+
+    // Below the bar with a validator the artifact did not pass: nothing is drawn on.
+    const unvalidated = await digest(
+      ctx(child(digestTrace('revise', { validatorsPassed: false }))),
+    );
+    expect(unvalidated).toMatchObject({
+      status: 'complete',
+      reason: 'not-accepted',
+      counts: { memories: 2, kept: 0 },
+    });
+    expect(unvalidated.output).toBeUndefined();
+  });
+
+  it('[QL-40] digest says why it endorsed nothing, and never calls an unjudged digest a shortfall', async () => {
     const unjudged = digestTrace('escalate');
     expect(
       await digest(ctx(child({ ...unjudged, contract: { ...unjudged.contract, criteria: [] } }))),
@@ -235,6 +259,8 @@ describe('the document-memory steps', () => {
       });
       expect(point.digestRunId).toBe(point.source.runId);
       expect(point.evidence.map((item) => item.kind)).toEqual(['section']);
+      // The scope the digest declared rides on the point, for the form goals to render.
+      expect(point.scope).toBe('subject');
     }
     const [role] = sampleDocumentDigest().memories;
     expect(points[0].keys).toEqual({ condition: role.appliesWhen, lesson: role.insight });

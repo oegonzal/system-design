@@ -51,6 +51,29 @@ export const DOCUMENT_MEMORY_KIND_USES: Readonly<Record<DocumentMemoryKind, stri
     'a bound on what the subject may claim, for a field a careless answer would overstate',
 };
 
+/**
+ * Where a document memory holds: of the subject wherever a form asks, or only
+ * of the one employer, role or application it was recorded for. Declared by
+ * the digest, carried on the stored chunk and rendered beside the kind, so the
+ * form pipelines read it as data and never argue it from the wording of the
+ * fact. Measured 2026-10-12: answers taught as one application's events were
+ * recalled for the same question reworded, judged another application's, and
+ * the operator was asked again — the same fact five times across four
+ * sessions.
+ */
+export const MEMORY_SCOPES = ['subject', 'unit'] as const;
+export type MemoryScope = (typeof MEMORY_SCOPES)[number];
+
+/** What each scope means, rendered into the digest's schema and the form goals' legend. */
+export const MEMORY_SCOPE_USES: Readonly<Record<MemoryScope, string>> = {
+  subject:
+    'true of the subject wherever asked — their record, or their standing answer to a question any form may ask',
+  unit: 'about the one employer, role or application it was recorded for; settles only a question about that same unit of work',
+};
+
+/** Every document memory written before scopes were declared was a document's fact about the subject. */
+export const DEFAULT_MEMORY_SCOPE: MemoryScope = 'subject';
+
 /** Engine-assigned: the part's position, never anything the model wrote. */
 export const sectionAlias = (position: number): string => `section.${position + 1}`;
 export const SECTION_ALIAS = /^section\.\d+$/;
@@ -83,6 +106,7 @@ export const DOCUMENT_RULES: readonly string[] = [
   'An insight is a complete statement a form field could take or compute from: absolute dates and figures, names as the document spells them, the subject named.',
   'An appliesWhen names the situation a form puts the subject in — the field or question that calls for the fact.',
   "Where a cited section qualifies a claim — reported rather than audited, a design, a learning exercise or a planned project, an interpretation — the insight carries that qualifier in the section's own words; a section that states a fact plainly needs none.",
+  'A memory is scoped: subject where it holds of the subject wherever a form asks, unit where it holds only of the employer, role or application it was recorded for.',
 ];
 
 export const documentIndexSchema = z.strictObject({

@@ -10,6 +10,7 @@ import { createHash } from 'node:crypto';
 import {
   KNOWLEDGE_GROUNDINGS,
   KNOWLEDGE_POLARITIES,
+  MEMORY_SCOPES,
   SEVERITIES,
   TRANSITION_KINDS,
   type MemoryLineageDto,
@@ -152,6 +153,8 @@ const payloadSchema = chunkSourceSchema.extend({
   /** Absent on a point written before lineage was recorded: it reads as null until its run is re-indexed. */
   lineage: lineageSchema.nullable().default(null),
   storedAt: z.string(),
+  /** Where a document memory holds; absent on a point written before scopes, which a reader defaults. */
+  scope: z.enum(MEMORY_SCOPES).optional(),
   ...facetFields,
 });
 
@@ -168,6 +171,7 @@ export function toPayload(chunk: IndexedChunk, storedAt: string): ChunkPayload {
     digestRunId: chunk.digestRunId,
     lineage: chunk.lineage,
     storedAt,
+    ...(chunk.scope === undefined ? {} : { scope: chunk.scope }),
     ...(chunk.facets ?? {}),
   };
 }
@@ -202,6 +206,7 @@ export function fromPayload(payload: unknown, score: number): MemoryHit | null {
     grounding,
     severity,
     support,
+    scope,
     ...source
   } = parsed.data;
   // Neither is a fact about the hit: one is when it was written, the other is
@@ -230,5 +235,6 @@ export function fromPayload(payload: unknown, score: number): MemoryHit | null {
     source,
     score,
     ...(facets === undefined ? {} : { facets }),
+    ...(scope === undefined ? {} : { scope }),
   };
 }

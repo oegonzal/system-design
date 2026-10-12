@@ -1,6 +1,7 @@
 import {
   DOCUMENT_MEMORY_KINDS,
   EVIDENCE_TEXT_MAX_LENGTH,
+  fieldQuestionOf,
   MAX_EVIDENCE,
   type FieldSpec,
 } from '@sysdesign/contracts';
@@ -17,7 +18,6 @@ import {
   fieldProbes,
   HITS_PER_PROBE,
   MAX_FIELD_PROBES,
-  probeText,
   searchProbes,
 } from './probes';
 
@@ -41,11 +41,15 @@ const b = hitOf('Alex Example is authorised to work in Portugal', 'digest-1', 'm
 const c = hitOf('Alex Example lives in Lisbon', 'digest-2', 'memory.1');
 
 describe('the form recall’s probes', () => {
-  it('[QL-38] a field’s own label is its probe, with the help text beside it, and fields asking the same thing share one', () => {
+  it('[QL-38] what a field asks is its probe — the label, then the help text beside it, the one key its taught answer is written under — and fields asking the same thing share one', () => {
     expect(
-      probeText(field('e1', '  Years of  experience ', 'Whole years,\nprofessional only.')),
+      fieldQuestionOf(field('e1', '  Years of  experience ', 'Whole years,\nprofessional only.')),
     ).toBe('Years of experience. Whole years, professional only.');
-    expect(probeText(field('e2', 'Work authorisation'))).toBe('Work authorisation');
+    expect(fieldQuestionOf(field('e2', 'Work authorisation'))).toBe('Work authorisation');
+    expect(fieldQuestionOf(field('e5', '', 'Do you reside in the country?'))).toBe(
+      'Do you reside in the country?',
+    );
+    expect(fieldQuestionOf(field('e6', '   '))).toBeNull();
     const probes = fieldProbes([
       field('e1', 'City'),
       field('e2', 'Country'),
@@ -138,6 +142,8 @@ describe('the form recall’s probes', () => {
       alias: 'm1',
       text: a.text,
       when: '2026-09-06',
+      // A point written before scopes holds as every document fact did: of the subject.
+      scope: 'subject',
       source: {
         runId: 'digest-1',
         pipeline: 'system-design',
@@ -145,6 +151,8 @@ describe('the form recall’s probes', () => {
         kind: 'profile_fact',
       },
     });
+    // A point that declares its scope is read as it declared it.
+    expect(evidenceItems([{ ...fact(a, 'profile_fact'), scope: 'unit' }])[0]?.scope).toBe('unit');
     expect(items[1]?.source.kind).toBe('claim_boundary');
     expect(items[1].alias).toBe('m2');
     expect(items[1].text).toHaveLength(EVIDENCE_TEXT_MAX_LENGTH);

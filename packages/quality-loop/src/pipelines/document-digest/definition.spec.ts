@@ -1,6 +1,7 @@
 import {
   boundsAgainstMeasured,
   CRITERION_STATEMENT_BOUND,
+  DOCUMENT_MEMORY_KINDS,
   DOCUMENT_RULES,
   WITHHOLDINGS,
 } from '@sysdesign/contracts';
@@ -58,13 +59,22 @@ describe('the document-digest pipeline', () => {
     expect(DOCUMENT_DIGEST.evaluators[1].persona).toContain('not_applicable');
   });
 
-  it('[QL-40] facts and rules, two samples agreeing before a falsehood is withheld, and every persona names the pipeline and the places it cites', () => {
+  it('[QL-40] [QL-69] facts and rules, two samples agreeing before a falsehood is withheld, and every persona names the pipeline and the places it cites', () => {
     expect(Object.keys(DOCUMENT_DIGEST.task.criterionKinds)).toEqual(['fact', 'rule']);
     expect(DOCUMENT_DIGEST.policy.criterionKinds['rule'].gate).toBe(true);
     const gated = Object.entries(DOCUMENT_DIGEST.policy.findingTypes)
       .filter(([, mapped]) => mapped.gate)
       .map(([type]) => type);
-    expect(gated).toEqual(['invented_fact', 'misread_section']);
+    expect(gated).toEqual(['invented_fact', 'misread_section', 'misscoped_fact']);
+    // A wrong scope is a falsehood and withholds; a provenance leak is wording and withholds nothing.
+    expect(DOCUMENT_DIGEST.policy.findingTypes['misscoped_fact']?.withholds).toBe('every-ref');
+    expect(DOCUMENT_DIGEST.policy.findingTypes['provenance_leak']?.withholds).toBe('none');
+    expect(DOCUMENT_DIGEST.critics[0].persona).toContain('misscoped_fact');
+    expect(DOCUMENT_DIGEST.critics[2].persona).toContain('provenance_leak');
+    // The producer names the kinds as the schema spells them, never a word of its own.
+    for (const kind of DOCUMENT_MEMORY_KINDS) {
+      expect(DOCUMENT_DIGEST.producer.persona).toContain(kind);
+    }
     expect(DOCUMENT_DIGEST.policy.evidence.minHits).toBe(2);
     for (const lens of [...DOCUMENT_DIGEST.critics, ...DOCUMENT_DIGEST.evaluators]) {
       expect(lens.samples).toBe(2);
@@ -81,13 +91,13 @@ describe('the document-digest pipeline', () => {
       ['rule'],
     ]);
     expect(DOCUMENT_DIGEST.deriveCriteria.persona).toContain('document-digest');
-    // The operator's answer is the fact where a guidance document says otherwise.
-    for (const persona of [
-      DOCUMENT_DIGEST.producer.persona,
-      DOCUMENT_DIGEST.critics[0].persona,
-      DOCUMENT_DIGEST.evaluators[1].persona,
+    // Every lens knows a guidance document: the operator's answer is the fact, kept as given, and where it was asked is provenance.
+    for (const lens of [
+      DOCUMENT_DIGEST.producer,
+      ...DOCUMENT_DIGEST.critics,
+      ...DOCUMENT_DIGEST.evaluators,
     ]) {
-      expect(persona).toContain('guidance');
+      expect(lens.persona).toContain('guidance');
     }
     // A fact criterion quotes the section's own figures, so the bound sits above the contract's default.
     expect(describePipeline(DOCUMENT_DIGEST as never).task.maxStatementLength).toBeGreaterThan(
@@ -101,7 +111,7 @@ describe('the document-digest pipeline', () => {
     // quantifier over an empty table holds just as happily, and what saves it
     // today is the pins below — which a migration could move or rewrite while
     // leaving this one green.
-    expect(Object.keys(DOCUMENT_DIGEST.task.findingTypes)).toHaveLength(6);
+    expect(Object.keys(DOCUMENT_DIGEST.task.findingTypes)).toHaveLength(8);
     // A type with no declared withholds falls to the strict default and silently
     // costs facts. The other direction — a rule for a type the pipeline cannot
     // report — has no place to be written: the rule lives on the type's own record.
@@ -124,15 +134,18 @@ describe('the document-digest pipeline', () => {
       ]),
     );
     expect(declared).toEqual({
-      // These two say the fact is wrong — storing it would have the corpus assert
-      // what the subject's own documents do not — and they are the gated pair.
+      // These three say the fact is wrong — storing it would have the corpus
+      // assert what the subject's own documents do not, or assert one unit of
+      // work's answer of the subject everywhere — and they are the gated set.
       invented_fact: ['every-ref', true],
       misread_section: ['every-ref', true],
+      misscoped_fact: ['every-ref', true],
       // These say a true fact is written weakly. Dropping it loses a detail the
       // corpus can never answer with again, so it is kept and the wording stands.
       missed_fact: ['none', false],
       unusable_fact: ['none', false],
       vague_condition: ['none', false],
+      provenance_leak: ['none', false],
       // A duplicate set may hold a bystander, and a stored twin is recoverable
       // where a dropped fact is not, so every member stands.
       duplicate_fact: ['none', false],
@@ -171,7 +184,7 @@ describe('the document-digest pipeline', () => {
     }
     for (const alias of digest.unused) expect(ids).not.toContain(alias);
     expect(rendered).toContain(
-      '[memory.2] profile_fact on [section.1]: Alex Example lives in Lisbon',
+      '[memory.2] profile_fact · subject on [section.1]: Alex Example lives in Lisbon',
     );
     expect(documentDigestOutput.schema.safeParse(digest).success).toBe(true);
   });

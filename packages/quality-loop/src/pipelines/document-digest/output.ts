@@ -9,7 +9,9 @@
  * chunk's kind, so a probe can ask for the shape a field needs — a fact for a
  * short input, a story for one asking the subject to recount something, a
  * boundary for one a careless answer would overstate — instead of reading one
- * flat register and hoping rank sorts them.
+ * flat register and hoping rank sorts them; and its scope, carried on the
+ * chunk and rendered beside the kind, so a form's judges read where a fact
+ * holds as declared data rather than arguing it from the fact's wording.
  *
  * A location is a PLACE in the digest — the summary and each memory — never
  * a section, for the reason the experience digest learned the hard way: a
@@ -30,6 +32,8 @@ import {
   LESSON_APPLIES_WHEN_BOUND,
   LESSON_INSIGHT_BOUND,
   lessonText,
+  MEMORY_SCOPE_USES,
+  MEMORY_SCOPES,
   SECTION_ALIAS,
 } from '@sysdesign/contracts';
 import { z } from 'zod';
@@ -60,6 +64,9 @@ export const documentDigestSchema = z.strictObject({
         .describe(
           DOCUMENT_MEMORY_KINDS.map((k) => `${k}: ${DOCUMENT_MEMORY_KIND_USES[k]}`).join(' | '),
         ),
+      scope: z
+        .enum(MEMORY_SCOPES)
+        .describe(MEMORY_SCOPES.map((s) => `${s}: ${MEMORY_SCOPE_USES[s]}`).join(' | ')),
       evidence: bounded.list(MEMORY_EVIDENCE_BOUND, evidence, {
         min: 1,
         description: 'The sections this fact rests on; a section may back several facts.',
@@ -102,7 +109,7 @@ export const documentDigestOutput: OutputShape<DocumentDigest> = {
         'Memories',
         digest.memories.map(
           (memory, index) =>
-            `[memory.${index + 1}] ${memory.kind} on ${cited(memory.evidence)}: ${lessonText(memory)}`,
+            `[memory.${index + 1}] ${memory.kind} · ${memory.scope} on ${cited(memory.evidence)}: ${lessonText(memory)}`,
         ),
       ),
       ...section('Unused', digest.unused.length > 0 ? [cited(digest.unused)] : []),

@@ -340,4 +340,9 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
     statement:
       "Two read-only reports answer what the memory tier could not say about itself: for every run that recalled, what became of each defect the recall searched for, read from the engine's own transitions and attributed at run level because the curator's words are prose; and for every brief, the needs no recall could serve, kept against the brief taken bare so the same prompt groups once.",
   },
+  {
+    id: 'QL-69',
+    statement:
+      'A document memory declares where it holds — of the subject wherever asked, or of the one unit of work it was recorded for — by a closed scope the digest writes, the stored point carries, the form goals render beside the kind under one legend, and a point written before scopes reads as the default; a fact scoped where it does not hold is a gated falsehood that withholds every memory it names, and provenance leaking into a subject fact is wording that withholds nothing; and a document digest judged below the bar is still drawn on where the engine’s own gates held — an artifact present that the validators passed — with every memory a confirmed finding withholds still withheld, the step saying it stored what was judged and not refuted.',
+  },
 ];

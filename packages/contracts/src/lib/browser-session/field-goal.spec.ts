@@ -27,6 +27,7 @@ const evidence = (): EvidenceItem[] => [
     alias: evidenceAlias(0),
     text: 'Alex Example has 6 years of professional Python, 2020–2026.',
     when: '2026-10-02',
+    scope: 'subject',
     source: { runId: 'run-1', pipeline: 'document-digest', ref: 'memory.1', kind: 'profile_fact' },
   },
 ];
@@ -66,11 +67,14 @@ describe('composeFieldGoal', () => {
     if (split === null) throw new Error('the composed goal must split');
     const recalled = composeFieldGoal({ ...split, evidence: evidence() });
     expect(readFieldIndex(recalled)?.evidence).toEqual([{ alias: 'm1' }]);
-    // Each item says what the store holds it as, under one legend of the kinds.
+    // Each item says what the store holds it as and where it holds, under one legend of the kinds and one of the scopes.
     expect(recalled).toContain(
       `${FIELD_EVIDENCE_HEADING}\n\nKinds: profile_fact — one thing true of the subject`,
     );
-    expect(recalled).toContain('\n\n- [m1] profile_fact — Alex Example has 6 years');
+    expect(recalled).toContain(
+      '\nScopes: subject — true of the subject wherever asked — their record, or their standing answer to a question any form may ask; unit — ',
+    );
+    expect(recalled).toContain('\n\n- [m1] profile_fact · subject — Alex Example has 6 years');
     expect(splitFieldGoal(recalled)).toEqual(split);
     // Each pipeline's own index reader takes its own goals only.
     expect(readFencedIndex(recalled, fieldIndexSchemaFor('answer-suggestions'))).not.toBeNull();

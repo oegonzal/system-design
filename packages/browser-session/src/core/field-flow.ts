@@ -1,5 +1,5 @@
 import {
-  fieldKeyOf,
+  fieldQuestionOf,
   fieldSpecOf,
   type FieldAnswers,
   type FieldRoute,
@@ -84,7 +84,10 @@ async function ask(
           ...asking,
         };
         if (filled.outcome === 'ok') {
-          return { ...filled, guidance: remember(ctx, field.field, reply.text, observation) };
+          return {
+            ...filled,
+            guidance: remember(ctx, field.field, reply.text, observation, chosen),
+          };
         }
         if (asked >= ctx.options.asksAfterRefusal) return filled;
         const answered = quoted(excerpt(reply.text, REFUSED_ANSWER_QUOTED));
@@ -108,7 +111,7 @@ async function ask(
         return {
           ...result(field, 'fill', 'operator', value, 'read-back'),
           ...asking,
-          guidance: remember(ctx, field.field, value, observation),
+          guidance: remember(ctx, field.field, value, observation, chosen),
         };
       }
     }
@@ -214,7 +217,7 @@ const fieldsOf = (refs: readonly string[], observation: PageObservation): FieldS
 /** The fields still open: one that holds what this session settled for it is not a question. */
 const openOf = (fields: readonly FieldSpec[], filled: ReadonlyMap<string, string>): FieldSpec[] =>
   fields.filter((field) => {
-    const key = fieldKeyOf(field);
+    const key = fieldQuestionOf(field);
     return !(
       field.value !== null &&
       field.value !== '' &&

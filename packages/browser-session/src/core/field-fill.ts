@@ -1,6 +1,7 @@
 import {
   elementKind,
-  fieldKeyOf,
+  fieldLabelOf,
+  fieldQuestionOf,
   type BrowserDecisionSource,
   type FieldRoute,
   type FieldSpec,
@@ -78,14 +79,14 @@ export const result = (
 
 /** What the session settled for a field, kept by what the field asks; one that asks nothing it can be told by is kept by nothing. */
 export const settled = (into: Map<string, string>, field: FieldSpec, value: string): void => {
-  const key = fieldKeyOf(field);
+  const key = fieldQuestionOf(field);
   if (key !== null) into.set(key, value);
 };
 
-/** A field entry as its capture names it: the action as the history reads it, the field by what it asks. */
+/** A field entry as its capture names it: the action as the history reads it, the field by what a person calls it. */
 export const entryOf = (field: FieldSpec, action: BrowserAction, observation: PageObservation) => ({
   label: describeAction(action, observation),
-  touched: fieldKeyOf(field) ?? field.role,
+  touched: fieldLabelOf(field) ?? field.role,
 });
 
 /** The page refused the fill: the result says so, and the caller stops. */

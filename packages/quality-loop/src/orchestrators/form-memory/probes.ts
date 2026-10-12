@@ -1,17 +1,19 @@
 /**
  * What a form recall searches with, and what it makes of what comes back —
- * pure of every port. A field's label is a question the subject is asked,
- * and a stored fact's condition is written as that very question
- * (`appliesWhen`), so the label is the probe: no model is asked to derive
- * one. The search reads only what documents taught about the subject. Each
- * field's hits are fused on their own, then dealt out by rank under one cap —
- * every field's best before any field's second — so neither the first fields
- * nor the last are crowded out by a long page.
+ * pure of every port. What a field asks (`fieldQuestionOf`) is the probe: a
+ * taught answer's condition is written as that very text, so the stored
+ * condition and the next probe are one, and no model is asked to derive one.
+ * The search reads only what documents taught about the subject. Each field's
+ * hits are fused on their own, then dealt out by rank under one cap — every
+ * field's best before any field's second — so neither the first fields nor
+ * the last are crowded out by a long page.
  */
 import {
+  DEFAULT_MEMORY_SCOPE,
   DOCUMENT_MEMORY_KINDS,
   evidenceAlias,
   EVIDENCE_TEXT_MAX_LENGTH,
+  fieldQuestionOf,
   MAX_EVIDENCE,
   type DocumentMemoryKind,
   type EvidenceItem,
@@ -34,19 +36,13 @@ export interface FieldProbeSet {
   byField: (number | null)[];
 }
 
-const tidy = (text: string | null): string => text?.replace(/\s+/g, ' ').trim() ?? '';
-
-/** A field's probe: what it asks, in the words the form uses — its label, then the help text beside it. */
-export const probeText = (field: FieldSpec): string =>
-  [tidy(field.name), tidy(field.context)].filter((part) => part.length > 0).join('. ');
-
 /** One probe per distinct question the page asks, each field pointing at its own. */
 export function fieldProbes(fields: readonly FieldSpec[]): FieldProbeSet {
   const texts: string[] = [];
   const positions = new Map<string, number>();
   const byField = fields.map((field) => {
-    const text = probeText(field);
-    if (text.length === 0) return null;
+    const text = fieldQuestionOf(field);
+    if (text === null) return null;
     const known = positions.get(text);
     if (known !== undefined) return known;
     if (texts.length === MAX_FIELD_PROBES) return null;
@@ -128,6 +124,8 @@ export const evidenceItems = (hits: readonly MemoryHit[]): EvidenceItem[] =>
     alias: evidenceAlias(position),
     text: excerpt(hit.text, EVIDENCE_TEXT_MAX_LENGTH),
     when: hit.source.when,
+    // A point written before scopes holds as every document fact did: of the subject.
+    scope: hit.scope ?? DEFAULT_MEMORY_SCOPE,
     source: {
       runId: hit.source.runId,
       pipeline: hit.source.pipeline,

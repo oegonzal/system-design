@@ -21,7 +21,7 @@ describe('the field-answer input codec', () => {
       '- e1 · textbox "Years of experience with Python" · type number · required · at most 3 characters · context "Whole years, professional only."',
     );
     expect(goal).toContain(`${FIELD_EVIDENCE_HEADING}\n\nKinds: profile_fact — `);
-    expect(goal).toContain('\n\n- [m1] profile_fact — Alex Example has six years');
+    expect(goal).toContain('\n\n- [m1] profile_fact · subject — Alex Example has six years');
     expect(readIndex(goal)).toEqual({
       pipeline: 'field-answer',
       fields: sampleFields(),

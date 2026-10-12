@@ -10,7 +10,12 @@ import { z } from 'zod';
 
 import { bounded } from '../bounds';
 import { quoted, quotedJson } from '../text';
-import { DOCUMENT_MEMORY_KIND_USES, DOCUMENT_MEMORY_KINDS } from '../quality-loop/document-digest';
+import {
+  DOCUMENT_MEMORY_KIND_USES,
+  DOCUMENT_MEMORY_KINDS,
+  MEMORY_SCOPE_USES,
+  MEMORY_SCOPES,
+} from '../quality-loop/document-digest';
 import {
   GOAL_BUDGET_BYTES,
   readFencedIndex,
@@ -83,19 +88,37 @@ export const fieldSpecOf = (element: ObservedElement): FieldSpec => ({
   context: element.context,
 });
 
+const tidy = (text: string | null): string => text?.replace(/\s+/g, ' ').trim() ?? '';
+
 /**
- * What a field asks, as the session tells one field from another across
- * pages and forms: its name, else the words beside it — the question a radio
- * group's answers are named after — else nothing, and a field that asks
- * nothing it can be told by is never taken for another. Measured 2026-10-10:
- * every radio question of a form had an empty name, so an answer the operator
- * gave to one stood in for three questions on the next form they never saw.
+ * What a field asks, in the words the form uses: its label, then the words
+ * beside it — the question a radio group's answers are named after — as one
+ * sentence; null for a field that asks nothing it can be told by, which is
+ * never taken for another. The one key for the field: the session's cache is
+ * kept by it, a taught answer's condition is written as it, and the recall's
+ * probe is searched with it, so the stored condition and the next probe are
+ * the same text. Measured 2026-10-10: every radio question of a form had an
+ * empty name, so an answer the operator gave to one stood in for three
+ * questions on the next form they never saw.
  */
-export const fieldKeyOf = (field: Pick<FieldSpec, 'name' | 'context'>): string | null =>
-  field.name !== ''
-    ? field.name
-    : field.context !== null && field.context !== ''
-      ? field.context
+export const fieldQuestionOf = (field: Pick<FieldSpec, 'name' | 'context'>): string | null => {
+  const question = [tidy(field.name), tidy(field.context)]
+    .filter((part) => part.length > 0)
+    .join('. ');
+  return question === '' ? null : question;
+};
+
+/**
+ * What a person would call the field, for a capture's name and an entry's
+ * record: its label, else the words beside it, else nothing. Not the key —
+ * a name that reads well is a different thing from the one text a probe is
+ * searched with.
+ */
+export const fieldLabelOf = (field: Pick<FieldSpec, 'name' | 'context'>): string | null =>
+  tidy(field.name) !== ''
+    ? tidy(field.name)
+    : tidy(field.context) !== ''
+      ? tidy(field.context)
       : null;
 
 /**
@@ -155,6 +178,8 @@ export const evidenceItemSchema = z.strictObject({
   text: z.string().min(1).max(EVIDENCE_TEXT_MAX_LENGTH),
   /** The day it was stored. */
   when: z.string().max(40),
+  /** Where it holds: of the subject wherever asked, or of the one unit of work it was recorded for. */
+  scope: z.enum(MEMORY_SCOPES),
   source: z.strictObject({
     runId: z.string().min(1).max(80),
     pipeline: z.string().min(1).max(80),
@@ -191,6 +216,8 @@ export const FIELD_EVIDENCE_HEADING = '## Evidence about the subject';
 
 /** What each kind of evidence is, said once above the evidence so every stage reads the kind as declared. */
 const KIND_LEGEND = `Kinds: ${DOCUMENT_MEMORY_KINDS.map((kind) => `${kind} — ${DOCUMENT_MEMORY_KIND_USES[kind]}`).join('; ')}.`;
+/** Where each item holds, said once beside the kinds: a unit item is no evidence for another unit of work. */
+const SCOPE_LEGEND = `Scopes: ${MEMORY_SCOPES.map((scope) => `${scope} — ${MEMORY_SCOPE_USES[scope]}`).join('; ')}. A unit item settles only a field about the unit of work this goal names.`;
 
 /** Each form pipeline's words for an empty evidence list, and its limits. */
 const FORM_GOAL_TERMS: Readonly<
@@ -237,7 +264,7 @@ export function renderFieldLine(field: FieldSpec): string {
 }
 
 const evidenceLine = (item: EvidenceItem): string =>
-  `- [${item.alias}] ${item.source.kind} — ${item.text.trim()} · stored ${item.when} · ${item.source.pipeline} ${item.source.ref} (run ${item.source.runId})`;
+  `- [${item.alias}] ${item.source.kind} · ${item.scope} — ${item.text.trim()} · stored ${item.when} · ${item.source.pipeline} ${item.source.ref} (run ${item.source.runId})`;
 
 const indexOf = (input: FieldGoalInput): FieldIndex => ({
   pipeline: input.pipeline,
@@ -258,7 +285,7 @@ export function composeFieldGoal(input: FieldGoalInput, budget = GOAL_BUDGET_BYT
     FIELD_EVIDENCE_HEADING,
     '',
     ...(input.evidence.length > 0
-      ? [KIND_LEGEND, '', ...input.evidence.map(evidenceLine)]
+      ? [KIND_LEGEND, SCOPE_LEGEND, '', ...input.evidence.map(evidenceLine)]
       : [terms.noEvidence]),
     '',
     '## Limits',

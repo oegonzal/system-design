@@ -253,8 +253,8 @@ describe('the session engine', () => {
     // One guidance document the moment the operator answered, naming the field and the answer.
     expect(brain.taught).toHaveLength(1);
     expect(brain.taught[0]?.subject).toBe(SPEC_SUBJECT);
-    expect(brain.taught[0]?.parts[0]).toContain('"Work authorisation"');
-    expect(brain.taught[0]?.parts[0]).toContain('the operator answered "Yes"');
+    expect(brain.taught[0]?.parts[0]).toContain('Asked "Work authorisation');
+    expect(brain.taught[0]?.parts[0]).toContain('the subject answered "Yes"');
     // The teaching lands on the row the answer came from — not on the cached fill, which taught nothing new.
     expect(fields[1]?.teachOrchestrationId).toBe('fake-teach-1');
     expect(again?.teachOrchestrationId).toBeNull();
@@ -298,7 +298,7 @@ describe('the session engine', () => {
     expect(again).toMatchObject({ source: 'operator', answer: 'No' });
     expect(again?.payload['cached']).toBe(true);
     expect(brain.taught).toHaveLength(1);
-    expect(brain.taught[0]?.parts[0]).toContain('the operator answered "No"');
+    expect(brain.taught[0]?.parts[0]).toContain('the subject answered "No"');
     expect(asked?.teachOrchestrationId).toBe('fake-teach-1');
   });
 
@@ -327,7 +327,7 @@ describe('the session engine', () => {
     expect(asked).toMatchObject({ source: 'operator', answer: 'Yes' });
     expect(selected).toEqual(['e2=Yes']);
     expect([operator.questions.length, operator.notices]).toEqual([1, []]);
-    expect(brain.taught[0]?.parts[0]).toContain('the operator answered "Yes"');
+    expect(brain.taught[0]?.parts[0]).toContain('the subject answered "Yes"');
   });
 
   it('[BRW-5] writes rows through the queue so a failing write is reported, not thrown, and the session still closes', async () => {

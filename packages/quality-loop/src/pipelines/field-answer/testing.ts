@@ -75,6 +75,7 @@ const fact = (alias: string, text: string, ref: string): EvidenceItem => ({
   alias,
   text,
   when: '2026-10-02',
+  scope: 'subject',
   source: { runId: 'digest-run-1', pipeline: 'document-digest', ref, kind: 'profile_fact' },
 });
 

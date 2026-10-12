@@ -51,6 +51,7 @@ const item = (alias: string, text: string, kind: EvidenceItem['source']['kind'])
   alias,
   text,
   when: '2026-10-02',
+  scope: 'subject',
   source: {
     runId: 'digest-run-1',
     pipeline: 'document-digest',

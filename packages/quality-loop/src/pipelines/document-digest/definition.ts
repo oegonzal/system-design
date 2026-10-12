@@ -7,9 +7,10 @@
  * reader beside it and two exact validators.
  *
  * Two samples everywhere and two hits to confirm, as the experience digest
- * runs: the two gated findings — a fact the sections never stated, a section
- * read as saying what it does not — must be agreed by both samples of a
- * critic before they withhold a memory from the store.
+ * runs: the three gated findings — a fact the sections never stated, a
+ * section read as saying what it does not, a fact scoped where it does not
+ * hold — must be agreed by both samples of a critic before they withhold a
+ * memory from the store.
  */
 import { STANDARD } from '../../core/controllers';
 import type { PipelineDefinition } from '../../core/pipeline';
@@ -37,16 +38,20 @@ export const DOCUMENT_DIGEST: PipelineDefinition<DocumentDigest> = {
   task: {
     criterionKinds: {
       fact: 'A fact the sections state about the subject that a form could ask for — a role with its employer and dates, a figure of experience, a degree, a location, a right to work, an answer the subject gave — that the digest must capture.',
-      rule: 'A rule the goal states about how a memory may be written: kinded for what it is — a fact, a story kept whole, or a boundary on what may be claimed — resting only on its cited sections, complete with absolute dates and figures, named for the form situation that calls for it, and carrying any qualifier its cited sections put on the claim.',
+      rule: 'A rule the goal states about how a memory may be written: kinded for what it is — a fact, a story kept whole, or a boundary on what may be claimed — scoped for whether it holds of the subject wherever asked or only of the situation it was recorded in, resting only on its cited sections, complete with absolute dates and figures, named for the form situation that calls for it, and carrying any qualifier its cited sections put on the claim.',
     },
     findingTypes: {
       invented_fact: 'An insight that states something no cited section states.',
       misread_section: 'An insight that reads a cited section as saying something it does not.',
+      misscoped_fact:
+        'A memory scoped subject whose question asks about the situation it was recorded in — the employer, the role, this application — or scoped unit when its question asks about the subject wherever asked.',
       missed_fact: 'A fact a form could ask for that the sections state and no memory holds.',
       unusable_fact:
         'An insight a form field could not take or compute from as written: a relative date, a pronoun for the subject, a figure without its unit.',
       vague_condition:
         'An appliesWhen that does not name the form situation calling for the fact, so no field’s label would find it.',
+      provenance_leak:
+        'An insight or an appliesWhen on a memory scoped subject that carries where or when the fact was recorded — the unit of work, the employer applied to, the day, the page.',
       duplicate_fact: 'Two memories stating the same fact about the subject.',
     },
     maxCriteria: MAX_CRITERIA,
@@ -115,17 +120,20 @@ export const DOCUMENT_DIGEST: PipelineDefinition<DocumentDigest> = {
       // A broken rule is never offset by coverage: the store would hold the breach.
       rule: { dimension: 'fidelity', weight: 1, gate: true },
     },
-    // The two defects that would store a falsehood about a person gate;
+    // The three defects that would store a falsehood about a person gate;
     // what a memory fails to hold, or holds awkwardly, is priced.
     //
     // `withholds` is what a confirmed finding does to the memories it names
     // when the store reads the digest (`withheldItems`), by what the finding
     // says about the fact rather than by how loudly it says it. A fact the
-    // sections never stated, or a section read as saying what it does not, is
-    // wrong: storing it would have the corpus assert something about the
-    // subject that their own documents do not, so every memory such a finding
-    // names is withheld. The remaining types fault a fact that is true, and
-    // withhold nothing. A duplicate's confirmed set is a component of
+    // sections never stated, a section read as saying what it does not, or a
+    // fact scoped where it does not hold — one application's answer asserted
+    // of the subject everywhere — is wrong: storing it would have the corpus
+    // assert something about the subject that their own documents do not, so
+    // every memory such a finding names is withheld. The remaining types fault
+    // a fact that is true, and withhold nothing — a provenance leak among
+    // them: the fact holds, only its wording keeps a reworded question from
+    // finding it, and a revise fixes wording where a loss fixes nothing. A duplicate's confirmed set is a component of
     // overlapping claims, not one pair, so keeping one of it may drop a
     // bystander (`WITHHOLDINGS` says why). A fact a form could not
     // use as written, a condition that restates its insight, and a fact no
@@ -137,9 +145,11 @@ export const DOCUMENT_DIGEST: PipelineDefinition<DocumentDigest> = {
     findingTypes: {
       invented_fact: { dimension: 'fidelity', gate: true, withholds: 'every-ref' },
       misread_section: { dimension: 'fidelity', gate: true, withholds: 'every-ref' },
+      misscoped_fact: { dimension: 'fidelity', gate: true, withholds: 'every-ref' },
       missed_fact: { dimension: 'coverage', gate: false, withholds: 'none' },
       unusable_fact: { dimension: 'coverage', gate: false, withholds: 'none' },
       vague_condition: { dimension: 'coverage', gate: false, withholds: 'none' },
+      provenance_leak: { dimension: 'coverage', gate: false, withholds: 'none' },
       duplicate_fact: { dimension: 'coverage', gate: false, withholds: 'none' },
     },
     ...STANDARD_SCORING,

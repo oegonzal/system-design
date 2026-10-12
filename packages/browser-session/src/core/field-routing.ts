@@ -1,6 +1,6 @@
 import {
   excerpt,
-  fieldKeyOf,
+  fieldQuestionOf,
   needsValue,
   quoted,
   routeFields,
@@ -17,8 +17,8 @@ import type { BrainFaulted } from './ports';
  * The contracts' route table, with the one thing only a running session
  * knows: what the operator already answered. A field the operator settled
  * earlier in the session — the same question on a later form, told apart by
- * `fieldKeyOf` — is filled with that answer rather than asked again, and the
- * row says so. The precedence
+ * `fieldQuestionOf` — is filled with that answer rather than asked again, and
+ * the row says so. The precedence
  * the contracts declare is untouched: a hidden field stays blank before the
  * cache is consulted, because the cache only ever stands in for an ask.
  */
@@ -36,7 +36,7 @@ export function withOperatorCache(
   cache: ReadonlyMap<string, string>,
 ): RoutedField[] {
   return readouts.map((readout) => {
-    const key = fieldKeyOf(readout.field);
+    const key = fieldQuestionOf(readout.field);
     const cached = readout.route === 'ask-operator' && key !== null ? cache.get(key) : undefined;
     if (key === null || cached === undefined) return { ...readout, cached: false };
     return {

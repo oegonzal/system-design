@@ -1,4 +1,4 @@
-import { actionRefs, fieldKeyOf, type PageObservation } from '@sysdesign/contracts';
+import { actionRefs, fieldLabelOf, type PageObservation } from '@sysdesign/contracts';
 
 import type { EngineContext } from './engine-context';
 import type { BrowserAction, BrowserActionKind } from './ports';
@@ -21,7 +21,7 @@ export function touchedName(action: BrowserAction, observation: PageObservation)
   const [ref] = actionRefs(action);
   if (ref === undefined) return action.kind === 'press' ? action.key : null;
   const element = observation.elements.find((candidate) => candidate.ref === ref);
-  return element === undefined ? null : (fieldKeyOf(element) ?? element.role);
+  return element === undefined ? null : (fieldLabelOf(element) ?? element.role);
 }
 
 /** The image the policy asks for after an action, into the step's dump and its `captures.json`. */

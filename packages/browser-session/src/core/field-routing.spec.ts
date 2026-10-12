@@ -1,4 +1,5 @@
 import {
+  fieldQuestionOf,
   fieldSpecOf,
   formObservation,
   type FieldAnswers,
@@ -53,13 +54,14 @@ describe('field routing in a session', () => {
       ['e3', 'leave-blank', 'blank'],
       ['e4', 'leave-blank', 'blank'],
     ]);
-    // The operator answered "Work authorisation" earlier this session: filled, not asked, and said so.
+    // The operator answered the work-authorisation question earlier this session — cached under
+    // what the field asks, label and help text as one — so it is filled, not asked, and said so.
     const cached = routeFieldsInSession(
       decided,
       null,
       fields,
       new Map([
-        ['Work authorisation', 'No'],
+        [fieldQuestionOf(fields[1]) ?? '', 'No'],
         ['Website', 'never used: the field is hidden first'],
       ]),
     );
