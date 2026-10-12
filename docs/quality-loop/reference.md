@@ -262,7 +262,9 @@ elements, snapshot, recent actions, units of work, limits, index); two `cut` val
 index, so a fault refuses only the actions from it on. Two critics and one evaluator, one sample
 each, all in one wave: under `cited` corroboration a finding vetoes only when the evaluator, reading
 the page apart, failed a gating criterion it cites. The only pipeline that declares a refound pass.
-[`lens-debate.md`](lens-debate.md) walks one of its steps end to end.
+[`lens-debate.md`](lens-debate.md) walks one of its steps end to end; how a fact from outside the
+session — a unit a domain's record forbids — reaches those validators and comes back as an event:
+[`domain-rules.md`](domain-rules.md).
 
 **`field-answer/`** — answers every field of one form page about the session's subject from the
 evidence the goal lists, routing a field no evidence settles to the operator. A `block` references

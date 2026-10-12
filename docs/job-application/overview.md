@@ -38,6 +38,10 @@ same way:
   second listener costs nothing and the session never carries a domain's write
   address.
 
+How the same two seams are enforced for any domain, walked as one refused
+`taskStart` and one event path back to the record:
+[`../quality-loop/domain-rules.md`](../quality-loop/domain-rules.md).
+
 ## The record and its lattice
 
 A row is keyed by the session's unit id (a hand-entered one is minted), holds
