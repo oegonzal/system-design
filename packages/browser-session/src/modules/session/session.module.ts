@@ -45,12 +45,15 @@ import {
 const systemClock: Clock = { now: () => new Date() };
 
 /**
- * Ctrl-C as the operator's word. The first press hands the engine its stop,
- * and the session ends after the step in flight through every closing write;
- * a second press exits at once, as the process would with no handler. The
- * exit code is the shell's for an interrupt.
+ * Ctrl-C, or a termination, as the operator's word. The first hands the
+ * engine its stop, and the session ends after the step in flight through
+ * every closing write; a second exits at once, as the process would with no
+ * handler. The exit code is the shell's for an interrupt. The browser adapter
+ * leaves these signals to the engine (`launchOptions`), or Playwright's own
+ * handler would exit the process before the close.
  */
 const INTERRUPTED_EXIT_CODE = 130;
+const STOP_SIGNALS = ['SIGINT', 'SIGTERM'] as const;
 const processStopSignal: StopSignal = {
   onStop(handler) {
     let presses = 0;
@@ -59,9 +62,9 @@ const processStopSignal: StopSignal = {
       if (presses > 1) process.exit(INTERRUPTED_EXIT_CODE);
       handler();
     };
-    process.on('SIGINT', listener);
+    for (const signal of STOP_SIGNALS) process.on(signal, listener);
     return () => {
-      process.off('SIGINT', listener);
+      for (const signal of STOP_SIGNALS) process.off(signal, listener);
     };
   },
 };

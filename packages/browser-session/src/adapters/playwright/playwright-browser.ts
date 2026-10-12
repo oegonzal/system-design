@@ -145,6 +145,23 @@ const MARK_TIMEOUT_MS = 1_000;
 /** Words an element shows whole, around its own whitespace — never a longer text they begin. */
 const wholeText = (words: string): RegExp => new RegExp(`^\\s*${escapeRegExp(words)}\\s*$`);
 
+/**
+ * How the browser is launched. The session owns its own end: Ctrl-C and a
+ * termination reach the engine through its stop signal, which ends the
+ * session after the step in flight and closes the browser on the way out.
+ * Playwright's own handlers for the same signals would kill the browser and
+ * exit the process at once, before any closing write — measured 2026-10-12:
+ * session 79947605 ended with exit code 130 and its row still running at step
+ * 16, the interruption logged and nothing closed.
+ */
+export const launchOptions = (options: PlaywrightBrowserOptions, headed: boolean) => ({
+  channel: options.channel,
+  headless: !headed,
+  viewport: null,
+  handleSIGINT: false,
+  handleSIGTERM: false,
+});
+
 export class PlaywrightBrowser implements BrowserPort {
   private context: BrowserContext | null = null;
   private known = new Map<string, ObservedElement>();
@@ -152,11 +169,10 @@ export class PlaywrightBrowser implements BrowserPort {
   constructor(private readonly options: PlaywrightBrowserOptions) {}
 
   async open(profile: string, { headed }: { headed: boolean }): Promise<void> {
-    this.context = await chromium.launchPersistentContext(join(this.options.profilesDir, profile), {
-      channel: this.options.channel,
-      headless: !headed,
-      viewport: null,
-    });
+    this.context = await chromium.launchPersistentContext(
+      join(this.options.profilesDir, profile),
+      launchOptions(this.options, headed),
+    );
     this.context.setDefaultTimeout(this.options.actionTimeoutMs ?? DEFAULT_ACTION_TIMEOUT_MS);
     if (this.context.pages().length === 0) await this.context.newPage();
   }
