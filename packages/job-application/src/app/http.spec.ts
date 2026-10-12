@@ -160,6 +160,17 @@ describe('the job-application HTTP surface', () => {
       identity: [{ name: 'company', value: 'Globex' }],
       stance: 'forbid',
     });
+    // To the session that opened it, its own open unit is not on record at all.
+    const own = await send(url, 'POST', '/advice', {
+      subject: SUBJECT,
+      asker: { ...ASKER, id: session.sessionId },
+      facets: ['company'],
+    });
+    expect(
+      (await json<Envelope<UnitAdvice>>(own)).data.units.some(
+        (unit) => unit.identity[0]?.value === 'Globex',
+      ),
+    ).toBe(false);
     expect(bus.acked).toEqual(['1']);
   });
 });

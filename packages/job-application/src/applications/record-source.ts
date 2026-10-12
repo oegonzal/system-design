@@ -30,6 +30,16 @@ const day = (at: Date): string => at.toISOString().slice(0, 10);
 /** Forbidden first: what the validator will cut is what the planner must read first. */
 const RANK: Record<UnitStance, number> = { forbid: 0, avoid: 1 };
 
+/**
+ * The asker's own unit still in progress is no other session's: it is the
+ * open unit the asker's goal already renders, and read as forbidden it made a
+ * session set aside every unit it opened. Measured 2026-10-12, session
+ * 79947605: three units in a row closed `skipped` at the form's first page,
+ * each "on record as forbidden — in progress in another session".
+ */
+const ownOpenUnit = (application: Application, asker: UnitAdviceRequest['asker']): boolean =>
+  application.status === 'in-progress' && application.sessionId === asker.id;
+
 /** What the record knows of a company, in a few words, from the applications that earned its stance. */
 function noteOf(latestFirst: readonly Application[], stance: UnitStance, now: Date): string {
   const standing = latestFirst.map((application) => standingOf(application, now));
@@ -119,7 +129,9 @@ export class ApplicationRecordSource implements RecordSource {
 
   async unitsOnRecord(request: UnitAdviceRequest): Promise<UnitAdvice> {
     const now = this.clock();
-    const applications = await this.store.since(request.subject, windowStart(this.policy, now));
+    const applications = (
+      await this.store.since(request.subject, windowStart(this.policy, now))
+    ).filter((application) => !ownOpenUnit(application, request.asker));
     const units = onRecord(applications, this.policy, now);
     return {
       advisor: JOB_APPLICATION_ADVISOR_ID,

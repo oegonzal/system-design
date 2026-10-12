@@ -10,7 +10,7 @@ export const JOB_APPLICATION_CRITERIA: readonly Criterion[] = [
   {
     id: 'JA-2',
     statement:
-      'The advisor describes itself by its id and the one declared fact it keeps its record by, and answers a subject’s record as one unit per identity under the contracts’ key — the strongest stance among the applications, the latest date and the count in the note, the forbidden first — bounded by the contracts’ advice bound with the rest counted, and refuses an asker that does not compare on the fact it keeps.',
+      'The advisor describes itself by its id and the one declared fact it keeps its record by, and answers a subject’s record as one unit per identity under the contracts’ key — the strongest stance among the applications, the latest date and the count in the note, the forbidden first — never the asker’s own unit still in progress, which is no other session’s — bounded by the contracts’ advice bound with the rest counted, and refuses an asker that does not compare on the fact it keeps.',
   },
   {
     id: 'JA-3',

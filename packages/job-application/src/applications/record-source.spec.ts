@@ -100,6 +100,25 @@ describe('the record as the advisor answers it', () => {
     await store.insert(application({ subject: 'Someone Else', company: 'Other' }));
     const source = new ApplicationRecordSource(store, POLICY, () => NOW);
     expect(source.describe()).toEqual({ id: 'job-application', facets: ['company'] });
+    // The asker's own unit still in progress is no other session's: it is not on record to it, and forbidden to everyone else.
+    await store.insert(
+      application({
+        company: 'Mine Co',
+        status: 'in-progress',
+        sessionId: 'session-9',
+        closedAt: null,
+        expiresAt: new Date('2026-10-12T00:00:00.000Z'),
+      }),
+    );
+    const theirs = await source.unitsOnRecord({
+      subject: 'Alex Example',
+      asker: { kind: 'browser-session', id: 'session-8', label: 'step 1' },
+      facets: ['company'],
+    });
+    expect(theirs.units[0]).toMatchObject({
+      identity: [{ name: 'company', value: 'Mine Co' }],
+      stance: 'forbid',
+    });
     const advice = await source.unitsOnRecord({
       subject: 'Alex Example',
       asker: { kind: 'browser-session', id: 'session-9', label: 'step 2' },
@@ -111,5 +130,6 @@ describe('the record as the advisor answers it', () => {
       3,
     ]);
     expect(advice.units.some((unit) => unit.identity[0]?.value === 'Other')).toBe(false);
+    expect(advice.units.some((unit) => unit.identity[0]?.value === 'Mine Co')).toBe(false);
   });
 });
