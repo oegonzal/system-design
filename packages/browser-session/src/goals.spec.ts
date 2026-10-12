@@ -58,6 +58,8 @@ describe('the goals', () => {
       // So do a Unit identity and an Advisors section: a fact or an advisor nobody reads is a record nobody keeps.
       expect(() => unitFacetsOf(text)).not.toThrow();
       expect(() => advisorsOf(text)).not.toThrow();
+      // A goal that asks an advisor declares what a unit is known by, or the advisor would have nothing to answer about.
+      if (advisorsOf(text).length > 0) expect(unitFacetsOf(text).length).toBeGreaterThan(0);
       const events = text.slice(text.indexOf('## Task events'));
       const outcomes = [...events.matchAll(/`([a-z-]+)`/g)].map((match) => match[1]);
       const spoken = outcomes.filter((word) => (TASK_OUTCOMES as readonly string[]).includes(word));

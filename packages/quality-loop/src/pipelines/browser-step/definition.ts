@@ -44,6 +44,12 @@ import { limitsValidator, referencesValidator } from './validators';
  * from 24 derived lines (twice) to 39, the long ones splitting rules a
  * compact reading kept whole. 33 leaves 29 to derive beside the four fixed:
  * 24 and a fifth more (28.8), rounded up.
+ *
+ * Re-read 2026-10-12, five derivations of the 12.2 KB mission that declares
+ * a Unit identity and an Advisor and conditions its choose step on the
+ * record: the compact reading is still 24 derived (three of five), the long
+ * ones 25 and 29 — the rule gives 33 again, and the one reading at the cap
+ * is a long one.
  */
 const MAX_CRITERIA = 33;
 

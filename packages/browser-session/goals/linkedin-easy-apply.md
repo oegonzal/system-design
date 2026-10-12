@@ -10,6 +10,14 @@ One application: from opening a listing's card to the confirmation that the appl
 
 - "Applied ·": applied to before — the card is passed over, unopened, with no unit. A mark is a word on a card, never a stop condition.
 
+## Unit identity
+
+- company: the company as the listing's pane names it, beside the title.
+
+## Advisors
+
+- job-application
+
 ## The results page
 
 - The search box is the textbox "Describe the job you want"; it shows the query the results are for. The banner's "I’m looking for..." box is a different control and stays empty. Before any search the page lists suggested searches as links — "Remote senior software engineer easy apply", "Internships tackling climate issues" and the like — which are other searches, not job cards.
@@ -30,13 +38,13 @@ One application: from opening a listing's card to the confirmation that the appl
 ## Per-unit procedure
 
 1. Search. When the page is not the results of `easy apply software engineer remote` — the bare search page, another query's results, or a listing's own page after its unit closed — navigate to https://www.linkedin.com/jobs/search-results/?keywords=easy%20apply%20software%20engineer%20remote and wait for the list; if the textbox "Describe the job you want" then does not hold the query, fill it with exactly that text and press Enter. Suggested searches are never clicked. Once the list is the query's, it is paged, never searched again.
-2. Choose. Open the first card, top down, whose name ends in "Easy Apply", that is not marked "Applied ·", and that is not the title and company of a unit listed under Units of work: click it, and say in the assessment which card and why. A card whose name does not end in "Easy Apply" is passed over unopened, with no unit; a card's "Dismiss … job" control is never clicked. A card whose listing the pane already shows is not clicked again — go on to step 3.
-3. Open the unit. On the step after the click, with the listing in the pane and no dialog open: taskStart, then, in the same plan, by what the pane offers — "Easy Apply": click it; "Application status": taskDone `already-done`; only "Apply on company website" or "No longer accepting applications": taskDone `skipped`. After either close, the next card by step 2.
+2. Choose. Open the first card, top down, whose name ends in "Easy Apply", that is not marked "Applied ·", that is not the title and company of a unit listed under Units of work, and that is not at the company of the open unit, of a unit closed this session, or of a company listed under Units of work as on record to avoid: click it, and say in the assessment which card and why. When every card in view that would otherwise qualify is at such a company, page forward by step 8; only when no next page is listed may a card at a company on record to avoid be taken. A card whose name does not end in "Easy Apply" is passed over unopened, with no unit; a card's "Dismiss … job" control is never clicked. A card whose listing the pane already shows is not clicked again — go on to step 3.
+3. Open the unit. On the step after the click, with the listing in the pane and no dialog open: taskStart, then, in the same plan, by what the pane offers — "Easy Apply": click it; "Application status": taskDone `already-done`; only "Apply on company website" or "No longer accepting applications": taskDone `skipped`. After either close, the next card by step 2. A listing whose company is listed under Units of work as on record as forbidden — in progress in another session — is set aside without a unit: no taskStart, and the next card by step 2.
 4. Each form page. One askFields for every required field still empty and every field marked invalid — never fill a fact about the applicant yourself; a field holding a value is left as it is, and so is the selected résumé; "Upload resume" is never clicked. A question asking to agree to the site's additional job application terms is not asked: click the radio that reads "Yes". A required consent checkbox — agreeing to terms or to the processing of the applicant's data — is not asked either: click it to tick it. Then, in the same plan, click the page's advance button — "Next", "Review" or "Submit application". A button is clicked; no key is pressed for it.
 5. Submit. On the page with "Submit application": untick "Follow <Company> to stay up to date with their page" when it is ticked, then click "Submit application".
 6. Refused. If the page will not advance, ask for the fields it marks and click its advance button once more. Refused again: taskDone `failed`, click "Dismiss", then "Discard", and return to the list by step 1.
 7. Confirmation. On the page right after this unit's "Submit application" ran — the dialog saying "Your application was sent to <Company>!", or the pane's "Application submitted": taskDone `done`, then click "Not now", and the next card by step 2.
-8. Next page. When no card in view qualifies — each is marked "Applied ·", lacks "Easy Apply", or is a unit listed under Units of work — scroll down to the buttons below the list and click "Next". With no next page, the search has no more results.
+8. Next page. When no card in view qualifies — each is marked "Applied ·", lacks "Easy Apply", is a unit listed under Units of work, or is at a company on record to avoid — scroll down to the buttons below the list and click "Next". With no next page listed, a card at a company on record to avoid qualifies again by step 2; with none of those either, the search has no more results.
 
 ## Answering policy
 
@@ -64,6 +72,6 @@ Where the record answers a question, lead with record suggestions. Where it is s
 
 ## Task events
 
-- taskStart on the step after a card is clicked, when the pane shows the listing, labelled "<job title> at <company>", with the page's URL. A card passed over unopened is no unit: no taskStart, no taskDone.
+- taskStart on the step after a card is clicked, when the pane shows the listing, labelled "<job title> at <company>", with the page's URL and the fact "company" as the pane names the company beside the title. A card passed over unopened is no unit: no taskStart, no taskDone.
 - taskDone `done` once this unit's "Submit application" ran and the page says the application was sent — the dialog, or the pane's "Application submitted" — never `already-done` for it; `already-done` only for a listing whose pane showed "Application status" when it was first opened; `skipped` when the opened listing is set aside before the form — no Easy Apply button, or the operator says /blank to every field of a page; `failed` when the form was started and could not be submitted after one retry.
 - terminate with the stop condition's cause word as soon as its page is seen; for a cause the Stop conditions tie to words, only on a page that shows those words.
