@@ -22,9 +22,15 @@ import {
 import { LoopClient } from './loop-client';
 import { DerivationFailed, LoopRefused, LoopTimeout, LoopUnreachable } from './loop-errors';
 
-/** A read or a start answers at once; deriving a rubric is one model call and may take minutes. */
+/**
+ * A read or a start answers at once; deriving a rubric is one model call and
+ * may take minutes. Measured 2026-10-12 over 36 derivations of a 12 KB
+ * mission on the subscription model: 8–61 s but one at 195 s, which the
+ * former 180 s ended as a fault and cost a session its start — so a fifth
+ * above the longest seen.
+ */
 export const READ_TIMEOUT_MS = 15_000;
-export const DERIVE_TIMEOUT_MS = 180_000;
+export const DERIVE_TIMEOUT_MS = 240_000;
 
 type Method = 'GET' | 'POST';
 
