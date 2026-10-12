@@ -104,14 +104,19 @@ export function elementFactsInPage(
       (own !== null && own !== 'false') || (control?.getAttribute(name) ?? 'false') !== 'false'
     );
   };
-  /** The question every option of a radio group is named after, when none of them reads it. */
+  /**
+   * The question every option of a radio group is named after, when none of
+   * them reads it — a group of one included. Measured 2026-10-12: a form's
+   * acknowledgment was one radio named after its statement, showing "Yes" as
+   * its words, in a group the tree gave no name and no legend; read as having
+   * no question, it was put to the operator as "a field on the page".
+   */
   const sharedQuestion = (): string => {
     const names = radios.map(
       (radio) => radio.getAttribute('aria-label') || byIds(radio.getAttribute('aria-labelledby')),
     );
     const first = names[0] ?? '';
-    return names.length > 1 &&
-      first !== '' &&
+    return first !== '' &&
       names.every((name) => name === first) &&
       !radios.some((radio) => text(radio) === first)
       ? first

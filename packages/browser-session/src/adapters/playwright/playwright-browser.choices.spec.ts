@@ -12,7 +12,10 @@ import { PlaywrightBrowser } from './playwright-browser';
  * each answer a styled `role="radio"` named after the question, its native
  * input inside it unlabelled, "Yes" and "No" only as the words it shows, and
  * no required or invalid attribute anywhere. The second is plain HTML: native
- * radios in a fieldset, one of them required. Run with the `browser` project.
+ * radios in a fieldset, one of them required. The third is drawn the way a
+ * live form drew its acknowledgment on 2026-10-12: one radio, named after the
+ * statement it acknowledges, showing "Yes", in a group with no name, no legend
+ * and no description. Run with the `browser` project.
  */
 const QUESTIONS = `<!doctype html><html><head><title>Apply — additional questions</title></head><body>
   <div role="dialog" aria-modal="true" aria-label="Apply to Acme">
@@ -30,6 +33,12 @@ const QUESTIONS = `<!doctype html><html><head><title>Apply — additional questi
       <label><input type="radio" name="relocate" required> Yes</label>
       <label><input type="radio" name="relocate"> No</label>
     </fieldset>
+    <p>I certify that the information provided is accurate to the best of my knowledge.</p>
+    <div role="radiogroup">
+      <div role="radio" tabindex="0" aria-label="I certify that the information provided is accurate to the best of my knowledge." aria-checked="false">
+        <div><input id="certify-yes" type="radio" name="certify"><label for="certify-yes"></label></div><p>Yes</p>
+      </div>
+    </div>
     <button type="button">Next</button>
   </div>
   <script>
@@ -65,7 +74,7 @@ describe('the Playwright browser, on radio questions', () => {
   it('[BRW-2] reads each answer by the words it shows, the question its answers are named after, and a required radio as the group required', async () => {
     await browser.page.setContent(QUESTIONS);
     const observation = await browser.observe();
-    const [terms, relocate] = groups(observation);
+    const [terms, relocate, certify] = groups(observation);
     expect(terms).toMatchObject({
       options: ['Yes', 'No'],
       value: null,
@@ -74,6 +83,12 @@ describe('the Playwright browser, on radio questions', () => {
     });
     expect(relocate).toMatchObject({ options: ['Yes', 'No'], value: null, required: true });
     expect(relocate.context).toBe('Willing to relocate?');
+    // A group of one is still named after its question: the statement the lone answer acknowledges.
+    expect(certify).toMatchObject({
+      name: '',
+      options: ['Yes'],
+      context: 'I certify that the information provided is accurate to the best of my knowledge.',
+    });
 
     // The two answers share the question as their name; their words tell them apart.
     const answers = observation.elements.filter(
