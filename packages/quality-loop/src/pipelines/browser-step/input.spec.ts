@@ -1,5 +1,4 @@
 import {
-  ADMISSIONS as CONTRACT_ADMISSIONS,
   composeStepGoal,
   formObservation,
   GOAL_BUDGET_BYTES,
@@ -21,7 +20,6 @@ import {
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { ADMISSIONS } from '../../core/outputs';
 import { goalSection } from '../../core/stages/prompting';
 import { fill } from '../../core/testing';
 import { readIndex } from './input';
@@ -154,9 +152,5 @@ describe('the browser-step input codec', () => {
     expect(() =>
       composeStepGoal(stepGoalInput({ observation, ledger: openTaskLedger() }), 1000),
     ).toThrow(GoalBudgetExceeded);
-  });
-
-  it('[QL-39] the admissions the composers read are pinned to the engine’s', () => {
-    expect([...CONTRACT_ADMISSIONS]).toEqual([...ADMISSIONS]);
   });
 });

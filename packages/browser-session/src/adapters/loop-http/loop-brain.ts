@@ -6,8 +6,8 @@ import {
   FIELD_ANSWER_PIPELINE_ID,
   FORM_MEMORY_ORCHESTRATOR_ID,
   FORM_MEMORY_TARGET_STEP,
+  formTargetReportSchema,
   GoalBudgetExceeded,
-  isAdmission,
   renderDocumentGoal,
   textBytes,
   type AnswerSuggestions,
@@ -219,18 +219,16 @@ export class LoopBrain implements BrainPort {
       const fetched = await this.client.getRun(runId);
       if (fetched === null) throw new BrainFaulted('lost', `the loop no longer has run ${runId}`);
       const run = settled(fetched);
-      const reported = target.report?.['admission'];
-      const withheld = target.report?.['withheld'];
+      // The report read with the shape the orchestrator declares for it: one
+      // missing, or one that does not read, is no admission and withholds nothing.
+      const report = formTargetReportSchema.safeParse(target.report);
       return {
         runId,
         orchestrationRunId,
         run,
         composition: { rung: 'full', bytes: textBytes(goal), snapshotRung: null },
-        admission: isAdmission(reported) ? reported : 'fell-short',
-        // A report that names none withholds nothing it could name.
-        withheld: Array.isArray(withheld)
-          ? withheld.filter((ref): ref is string => typeof ref === 'string')
-          : [],
+        admission: report.success ? report.data.admission : 'fell-short',
+        withheld: report.success ? report.data.withheld : [],
       };
     });
   }

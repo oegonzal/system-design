@@ -11,6 +11,8 @@
  * repair. Nothing here names a domain: the kinds, the polarity and the
  * dimension a stored item carries are as true of a code review as of a design.
  */
+import { z } from 'zod';
+
 import type { ApiResponse } from '../envelope';
 import type { IsoDateString } from '../primitives';
 import type { Lesson } from './decision';
@@ -78,15 +80,19 @@ export const KNOWLEDGE_STEP_REASONS = [
 export type KnowledgeStepReason = (typeof KNOWLEDGE_STEP_REASONS)[number];
 
 /** What the `known` step reports: the items the digest was shown, by the alias it cites them under. */
-export interface KnowledgeKnownReportDto {
-  known: { alias: string; runId: string; ref: string; kind: string }[];
-}
+export const knowledgeKnownReportSchema = z.strictObject({
+  known: z.array(
+    z.strictObject({ alias: z.string(), runId: z.string(), ref: z.string(), kind: z.string() }),
+  ),
+});
+export type KnowledgeKnownReportDto = z.infer<typeof knowledgeKnownReportSchema>;
 
 /** What the `digest` step reports: whose policy the dimension map came from. */
-export interface KnowledgeDigestReportDto {
-  source: { pipeline: string; version: string };
-  known: number;
-}
+export const knowledgeDigestReportSchema = z.strictObject({
+  source: z.strictObject({ pipeline: z.string(), version: z.string() }),
+  known: z.number().int().nonnegative(),
+});
+export type KnowledgeDigestReportDto = z.infer<typeof knowledgeDigestReportSchema>;
 
 /**
  * The facets a stored chunk carries beyond its provenance: what a search may

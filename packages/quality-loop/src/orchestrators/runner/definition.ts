@@ -12,6 +12,7 @@ import type {
   StartOrchestrationRequest,
 } from '@sysdesign/contracts';
 import { ORCHESTRATION_REASONS } from '@sysdesign/contracts';
+import type { ZodType } from 'zod';
 
 import type { RunInput } from '../../core/loop/run-pipeline';
 
@@ -23,8 +24,8 @@ export interface StepResult<V = unknown> {
   counts?: Record<string, number>;
   /** The child runs, when the step ran them; the runner also records each as it opens. */
   runIds?: readonly string[];
-  /** What the step reports beyond counts — the orchestrator's own shape. */
-  report?: Record<string, unknown>;
+  /** What the step reports beyond counts, in the shape the orchestrator declares for the step; null once the runner refused one. */
+  report?: Record<string, unknown> | null;
   /** A failure that ends the whole run as failed, not only this step. */
   error?: RunErrorDto | null;
   /** What later steps may consume. A step that yields nothing blocks the steps that need it. */
@@ -98,6 +99,15 @@ export interface OrchestratorDefinition<O extends object = Record<string, unknow
   ) => string | null;
   /** What the run observed at open, recorded on the row for every step to read. */
   context(ports: P): Promise<Record<string, unknown>>;
+  /** The shape of what `context` observes, parsed at open: a context the shape refuses refuses the start. */
+  contextSchema: ZodType;
+  /**
+   * The shape of each step's report, by step id. The runner holds every report
+   * to it — one the shape refuses, or one from a step that declares none, is
+   * nulled with a note, the step keeping its status, output, counts and runs —
+   * so a client reads a report with the same declaration the step wrote it by.
+   */
+  reports: Partial<Record<keyof O & string, ZodType>>;
   steps: readonly OrchestratorStep<O, P>[];
 }
 
@@ -150,5 +160,9 @@ export function validateOrchestrator(
     if ((ORCHESTRATION_REASONS as readonly string[]).includes(reason)) {
       fail(`reason ${reason} belongs to the runner and may not be redeclared`);
     }
+  }
+  // Whether a step will report is a runtime fact; that a declared shape names a step is not.
+  for (const id of Object.keys(definition.reports)) {
+    if (!seen.has(id)) fail(`reports declares a shape for ${id}, which is no step`);
   }
 }

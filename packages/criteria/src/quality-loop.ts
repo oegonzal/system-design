@@ -306,6 +306,11 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
       'The form-memory orchestrator runs exactly the form pipeline a request names, from its declared list, and only over a goal the form codec composed for that pipeline; the evidence it composes in says what the store holds each item as, and its target reports the run’s admission and the locations a reader of the run withholds, each read off that pipeline’s own definition.',
   },
   {
+    id: 'QL-67',
+    statement:
+      'An orchestrator declares the shape of every report its steps make and of the context it records at open, each a contracts schema the loop and a client share: the runner holds every report to its shape — one the shape refuses, or one from a step that declares none, is nulled with a note while the step keeps its status, output, counts and runs — a declared shape naming no step fails boot, and a context the shape refuses refuses the start.',
+  },
+  {
     id: 'QL-66',
     statement:
       'The browser-step limits validator holds a taskStart to the unit identity its goal declares, from the index alone: one that lacks a declared fact, names one the mission does not declare or names one twice is cut at that action, and one whose facets match an identity the index lists as forbidden is cut with the record’s note and the alternative said back — while a unit merely to avoid is prose for the planner and never a validator’s fact.',

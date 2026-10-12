@@ -7,6 +7,7 @@
  * The first opinion is run zero of the reconcile.
  */
 import {
+  emptyContextSchema,
   SECOND_OPINION_ORCHESTRATOR_ID,
   SECOND_OPINION_STEP_REASONS,
   type PanelReportDto,
@@ -16,7 +17,7 @@ import {
 import { outputsOf } from '../../core/outputs';
 import { bareRequest, providedAsOutput, refuseInternal, requestInput, runTarget } from '../common';
 import type { OrchestratorDefinition } from '../runner/definition';
-import { panelStep, reconcileStep } from '../panel/steps';
+import { PANEL_REPORTS, panelStep, reconcileStep } from '../panel/steps';
 
 export interface SecondOpinionOutputs {
   first: QualityRunDto;
@@ -33,6 +34,8 @@ export const SECOND_OPINION: OrchestratorDefinition<SecondOpinionOutputs, unknow
   normalize: bareRequest,
   refuse: refuseInternal,
   context: () => Promise.resolve({}),
+  contextSchema: emptyContextSchema,
+  reports: PANEL_REPORTS,
   steps: [
     {
       id: 'first',

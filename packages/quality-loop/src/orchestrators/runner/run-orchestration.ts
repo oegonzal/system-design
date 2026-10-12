@@ -13,6 +13,7 @@ import type {
 } from '@sysdesign/contracts';
 import { openedAs, ORCHESTRATION_REASONS } from '@sysdesign/contracts';
 import { describeError } from '@sysdesign/run-dump';
+import type { ZodType } from 'zod';
 
 import { toRunDto, type RunRecord } from '../../core/contracts';
 import {
@@ -132,6 +133,42 @@ function stepContextFor<O extends object, P>(
   };
 }
 
+/** The first fault of a parse that failed, as one line; null when it passed. */
+const firstIssue = (parsed: ReturnType<ZodType['safeParse']>): string | null => {
+  if (parsed.success) return null;
+  const issue = parsed.error.issues[0];
+  return issue === undefined
+    ? 'does not read'
+    : `${issue.path.length === 0 ? 'report' : issue.path.map(String).join('.')}: ${issue.message}`;
+};
+
+/**
+ * A report held to the shape its orchestrator declares for the step. One the
+ * shape refuses, or one from a step that declares none, is nulled and said
+ * once — the step keeps its status, output, counts and runs, since a drift in
+ * what a step says of itself must never undo what it did.
+ */
+function checkedReport<O extends object, P>(
+  definition: OrchestratorDefinition<O, P>,
+  step: OrchestratorStep<O, P>,
+  result: StepResult,
+  warn: (message: string) => void,
+): StepResult {
+  if (result.report === undefined || result.report === null) return result;
+  const schema = definition.reports[step.id];
+  const refusal =
+    schema === undefined
+      ? `step ${step.id} declares no report`
+      : firstIssue(schema.safeParse(result.report));
+  if (refusal === null) return result;
+  warn(`step ${step.id}: report refused: ${refusal}`);
+  return {
+    ...result,
+    report: null,
+    note: [result.note, `report refused: ${refusal}`].filter((part) => part).join('; '),
+  };
+}
+
 /** A reason the orchestrator never declared fails the step as errored, naming the reason it gave. */
 const undeclaredReason = <O extends object, P>(
   step: OrchestratorStep<O, P>,
@@ -200,12 +237,13 @@ export async function runOrchestration<O extends object, P>(
       }
 
       await ledger.begin(step.id);
-      const result = await step.run(stepContextFor(step, declared, running));
-      const refused = undeclaredReason(step, result, allowed);
+      const ran = await step.run(stepContextFor(step, declared, running));
+      const refused = undeclaredReason(step, ran, allowed);
       if (refused !== null) {
         await ledger.end(step.id, refused);
         continue;
       }
+      const result = checkedReport(definition, step, ran, deps.warn);
       await ledger.end(step.id, result);
       if (result.output !== undefined) {
         (outputs as Record<string, unknown>)[step.id] = result.output;

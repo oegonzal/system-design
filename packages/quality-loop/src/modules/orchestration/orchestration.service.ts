@@ -149,11 +149,16 @@ export class OrchestrationService {
     request: StartOrchestrationRequest,
     provided: QualityRunDto | null,
   ): Promise<OrchestrationRunDto> {
+    // What the orchestrator observed, held to the shape it declares: a context
+    // the shape refuses is a start that fails, never a row that lies.
+    const observed = host.definition.contextSchema.parse(
+      await host.definition.context(host.ports),
+    ) as Record<string, unknown>;
     const record = openRecord(
       host.definition,
       request,
       provided,
-      await host.definition.context(host.ports),
+      observed,
       this.iterationBudget(request, provided),
       () => new Date().toISOString(),
     );

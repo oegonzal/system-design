@@ -11,6 +11,8 @@
 import {
   DOCUMENT_MEMORY_ORCHESTRATOR_ID,
   DOCUMENT_MEMORY_STEP_REASONS,
+  documentDigestReportSchema,
+  memoryContextSchema,
   type MemoryContextDto,
   type StartOrchestrationRequest,
 } from '@sysdesign/contracts';
@@ -36,6 +38,8 @@ export const DOCUMENT_MEMORY: OrchestratorDefinition<DocumentMemoryOutputs, Docu
   refuse: refuseNonDocument,
   context: async (ports) =>
     ({ embedding: ports.embedding, store: await ports.store.verify() }) satisfies MemoryContextDto,
+  contextSchema: memoryContextSchema,
+  reports: { digest: documentDigestReportSchema },
 
   steps: [
     { id: 'digest', pipeline: DOCUMENT_DIGEST_ID, run: digest },

@@ -7,6 +7,7 @@
  */
 import {
   CALIBRATION_ORCHESTRATOR_ID,
+  emptyContextSchema,
   PANEL_STEP_REASONS,
   type PanelReportDto,
   type QualityRunDto,
@@ -14,7 +15,7 @@ import {
 
 import { bareRequest, refuseInternal, requestInput } from '../common';
 import type { OrchestratorDefinition } from '../runner/definition';
-import { panelStep, reconcileStep } from '../panel/steps';
+import { PANEL_REPORTS, panelStep, reconcileStep } from '../panel/steps';
 
 export interface CalibrationOutputs {
   panel: QualityRunDto[];
@@ -31,6 +32,8 @@ export const CALIBRATION: OrchestratorDefinition<CalibrationOutputs, unknown> = 
   normalize: bareRequest,
   refuse: refuseInternal,
   context: () => Promise.resolve({}),
+  contextSchema: emptyContextSchema,
+  reports: PANEL_REPORTS,
   steps: [
     {
       id: 'panel',

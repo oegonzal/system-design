@@ -8,6 +8,7 @@
 import {
   ROUTER_ORCHESTRATOR_ID,
   ROUTER_STEP_REASONS,
+  routerContextSchema,
   type RouterContextDto,
 } from '@sysdesign/contracts';
 
@@ -25,6 +26,8 @@ export const ROUTER: OrchestratorDefinition<RouterOutputs, RouterPorts> = {
   reasons: ROUTER_STEP_REASONS,
   normalize: bareRequest,
   context: (ports) => Promise.resolve({ classifier: ports.model } satisfies RouterContextDto),
+  contextSchema: routerContextSchema,
+  reports: {},
   steps: [
     { id: 'classify', run: classify },
     {

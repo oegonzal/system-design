@@ -82,7 +82,10 @@ describe('the session service, end to end', () => {
       });
       core.complete(child.runId, [{ overall: 90, decision: 'accept', artifact: JOURNEY_ANSWERS }]);
       core.orchestrations.complete(id, {
-        [FORM_MEMORY_TARGET_STEP]: { runIds: [child.runId], report: { admission: 'admitted' } },
+        [FORM_MEMORY_TARGET_STEP]: {
+          runIds: [child.runId],
+          report: { admission: 'admitted', withheld: [] },
+        },
       });
     }
   };

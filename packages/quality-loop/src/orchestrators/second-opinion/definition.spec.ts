@@ -7,6 +7,7 @@ import { validateOrchestrator } from '../runner/definition';
 import { openRecord } from '../runner/record';
 import { runOrchestration } from '../runner/run-orchestration';
 import { orchestrationDeps, performed, summaryOf } from '../runner/testing';
+import { PANEL_REPORTS } from '../panel/steps';
 import { SECOND_OPINION } from './definition';
 
 const ARTIFACT = { text: 'the answer', parts: ['one'] };
@@ -132,5 +133,11 @@ describe('the second-opinion orchestrator', () => {
       runs: 3,
       contested: { findings: [{ key: 'leak|z', type: 'leak', seenBy: [0] }] },
     });
+  });
+
+  it('[QL-67] declares an empty context and the panel report both panel orchestrators share', () => {
+    expect(Object.keys(SECOND_OPINION.reports)).toEqual(['reconcile']);
+    expect(SECOND_OPINION.reports.reconcile).toBe(PANEL_REPORTS.reconcile);
+    expect(SECOND_OPINION.contextSchema.safeParse({}).success).toBe(true);
   });
 });

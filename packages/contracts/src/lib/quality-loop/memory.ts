@@ -3,8 +3,10 @@
  * reasons its steps may give, and the two tools beside it — the re-index and
  * the retrieval report. The run itself is an `OrchestrationRunDto`.
  */
+import { z } from 'zod';
+
 import type { ApiResponse } from '../envelope';
-import type { LlmAvailabilityDto } from '../llm-availability';
+import { llmAvailabilitySchema } from '../llm-availability';
 import type { OrchestrationStepDto } from './orchestration';
 
 export const MEMORY_ORCHESTRATOR_ID = 'memory';
@@ -39,21 +41,27 @@ export const MEMORY_STEP_REASONS = [
 export type MemoryStepReason = (typeof MEMORY_STEP_REASONS)[number];
 
 /** Whether the vector store can serve — derived facts, never credentials. */
-export interface MemoryStoreAvailabilityDto {
-  ready: boolean;
-  reason: 'unreachable' | 'no-model' | null;
+export const memoryStoreAvailabilitySchema = z.strictObject({
+  ready: z.boolean(),
+  reason: z.enum(['unreachable', 'no-model']).nullable(),
   /** The cause behind `unreachable`, for the boot log and the row — never a credential. */
-  note: string | null;
-  model: string | null;
-  collection: string | null;
-  chunks: number;
-}
+  note: z.string().nullable(),
+  model: z.string().nullable(),
+  collection: z.string().nullable(),
+  chunks: z.number().int().nonnegative(),
+});
+export type MemoryStoreAvailabilityDto = z.infer<typeof memoryStoreAvailabilitySchema>;
 
-/** What the memory orchestrator records at open, under `OrchestrationRunDto.context`. */
-export interface MemoryContextDto {
-  embedding: LlmAvailabilityDto;
-  store: MemoryStoreAvailabilityDto;
-}
+/**
+ * What every memory-backed orchestrator records at open, under
+ * `OrchestrationRunDto.context`, and the shape it declares for it: the one
+ * declaration the four of them share.
+ */
+export const memoryContextSchema = z.strictObject({
+  embedding: llmAvailabilitySchema,
+  store: memoryStoreAvailabilitySchema,
+});
+export type MemoryContextDto = z.infer<typeof memoryContextSchema>;
 
 /**
  * What a re-index did. It is a store step in every respect but persistence:

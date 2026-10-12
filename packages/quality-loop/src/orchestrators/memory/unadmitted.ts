@@ -5,9 +5,7 @@
  * the same admission a different name — and "nothing was judged" is never
  * collapsed into "judged and fell short".
  */
-import type { MemoryStepReason } from '@sysdesign/contracts';
-
-import type { Admission } from '../../core/outputs';
+import type { Admission, MemoryStepReason } from '@sysdesign/contracts';
 
 export type Unadmitted = Exclude<Admission, 'admitted'>;
 

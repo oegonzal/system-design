@@ -105,4 +105,20 @@ describe('the document-memory orchestrator', () => {
       ]);
     }
   });
+
+  it('[QL-67] declares the shape of its context and of the digest step’s report', () => {
+    expect(Object.keys(DOCUMENT_MEMORY.reports)).toEqual(['digest']);
+    expect(DOCUMENT_MEMORY.contextSchema.safeParse({ bogus: true }).success).toBe(false);
+    const report = DOCUMENT_MEMORY.reports.digest;
+    expect(
+      report?.safeParse({
+        kind: 'resume',
+        title: 'Résumé',
+        subject: 'Alex Example',
+        date: null,
+        chunk: { index: 1, of: 2 },
+      }).success,
+    ).toBe(true);
+    expect(report?.safeParse({ kind: 'resume', title: 'Résumé' }).success).toBe(false);
+  });
 });

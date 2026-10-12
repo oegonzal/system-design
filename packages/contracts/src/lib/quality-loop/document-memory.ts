@@ -3,7 +3,9 @@
  * chunk into facts about its subject and stores what the digest endorsed. The
  * run itself is an `OrchestrationRunDto`; its context is a `MemoryContextDto`.
  */
-import type { DocumentChunk } from './document-digest';
+import type { z } from 'zod';
+
+import { documentChunkSchema } from './document-digest';
 
 export const DOCUMENT_MEMORY_ORCHESTRATOR_ID = 'document-memory';
 
@@ -24,7 +26,11 @@ export const DOCUMENT_MEMORY_STEP_REASONS = [
 export type DocumentMemoryStepReason = (typeof DOCUMENT_MEMORY_STEP_REASONS)[number];
 
 /** What the digest step reports: the document it digested, read from the goal's own index. */
-export type DocumentDigestReportDto = Pick<
-  DocumentChunk,
-  'kind' | 'title' | 'subject' | 'date' | 'chunk'
->;
+export const documentDigestReportSchema = documentChunkSchema.pick({
+  kind: true,
+  title: true,
+  subject: true,
+  date: true,
+  chunk: true,
+});
+export type DocumentDigestReportDto = z.infer<typeof documentDigestReportSchema>;

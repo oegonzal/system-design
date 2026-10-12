@@ -13,6 +13,8 @@ import {
   FORM_MEMORY_STEP_REASONS,
   FORM_MEMORY_TARGET_STEP,
   FORM_PIPELINES,
+  formTargetReportSchema,
+  memoryContextSchema,
   readFieldIndex,
   type MemoryContextDto,
   type StartOrchestrationRequest,
@@ -43,6 +45,8 @@ export const FORM_MEMORY: OrchestratorDefinition<FormMemoryOutputs, FormMemoryPo
   refuse: refuseNonForm,
   context: async (ports) =>
     ({ embedding: ports.embedding, store: await ports.store.verify() }) satisfies MemoryContextDto,
+  contextSchema: memoryContextSchema,
+  reports: { [FORM_MEMORY_TARGET_STEP]: formTargetReportSchema },
 
   steps: [
     { id: 'recall', run: recall },

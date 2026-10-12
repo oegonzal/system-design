@@ -21,7 +21,7 @@
  * read the reply — leniently — so a lesson kept whole past its ceiling is
  * stored whole, never a digest refused for it.
  */
-import { parseLenient } from '@sysdesign/contracts';
+import { parseLenient, type Admission } from '@sysdesign/contracts';
 import type { ZodType } from 'zod';
 
 import {
@@ -29,7 +29,6 @@ import {
   withheldItems,
   withheldRefs,
   WITHHOLD_EVERY_REF,
-  type Admission,
   type RunOutputs,
   type WithheldItem,
   type WithholdingRules,

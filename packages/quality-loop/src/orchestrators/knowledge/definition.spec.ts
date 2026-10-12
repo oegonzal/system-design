@@ -134,4 +134,21 @@ describe('the knowledge orchestrator', () => {
     expect(record.steps['store'].status).toBe('complete');
     expect(record.status).toBe('complete');
   });
+
+  it('[QL-67] declares the shape of its context and of the two reports its steps make', () => {
+    expect(Object.keys(KNOWLEDGE.reports).sort()).toEqual(['digest', 'known']);
+    expect(KNOWLEDGE.contextSchema.safeParse({ bogus: true }).success).toBe(false);
+    expect(
+      KNOWLEDGE.reports.known?.safeParse({
+        known: [{ alias: 'k1', runId: 'r', ref: 'f1', kind: 'finding' }],
+      }).success,
+    ).toBe(true);
+    expect(
+      KNOWLEDGE.reports.digest?.safeParse({ source: { pipeline: 'p', version: '1.0.0' }, known: 1 })
+        .success,
+    ).toBe(true);
+    expect(
+      KNOWLEDGE.reports.digest?.safeParse({ source: { pipeline: 'p' }, known: 1 }).success,
+    ).toBe(false);
+  });
 });

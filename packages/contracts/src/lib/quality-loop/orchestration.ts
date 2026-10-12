@@ -4,6 +4,8 @@
  * beside the pipelines; the record is one shape for every orchestrator; and
  * every child is an ordinary quality run answering at `GET /runs/:id`.
  */
+import { z } from 'zod';
+
 import type { ApiListResponse, ApiResponse } from '../envelope';
 import type { IsoDateString, Uuid } from '../primitives';
 import type {
@@ -37,6 +39,9 @@ export const ORCHESTRATION_REASONS = [
   'errored',
   'interrupted',
 ] as const;
+
+/** The context of an orchestrator that observes nothing at open: the shape it declares all the same. */
+export const emptyContextSchema = z.strictObject({});
 
 export interface OrchestrationStepDto {
   status: OrchestrationStepStatus;

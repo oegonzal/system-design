@@ -112,4 +112,10 @@ describe('the router orchestrator', () => {
       reason: 'no-routes',
     });
   });
+
+  it('[QL-67] declares the shape of what it records at open — which model classifies — and reports nothing', () => {
+    expect(Object.keys(ROUTER.reports)).toEqual([]);
+    expect(ROUTER.contextSchema.safeParse({ classifier: { model: 'm' } }).success).toBe(true);
+    expect(ROUTER.contextSchema.safeParse({ classifier: {} }).success).toBe(false);
+  });
 });

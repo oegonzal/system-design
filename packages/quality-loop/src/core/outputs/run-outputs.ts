@@ -4,6 +4,7 @@
  * outside the engine re-derives "the best iteration" or "was it admitted".
  */
 import type {
+  Admission,
   ConfirmedFinding,
   CriterionEvidence,
   EvidenceLedger,
@@ -42,17 +43,6 @@ export function outputsOf<T>(trace: RunTrace<T>): RunOutputs<T> {
     lessons: trace.lessons,
   };
 }
-
-/**
- * What a caller that would draw on a finished run's best iteration is told.
- * `admitted`: it may. `fell-short`: it was judged, and a gate or the bar said
- * no. The other two are not verdicts at all — `no-rubric`: no criteria were
- * derived or supplied, so no lens had anything to judge against; `no-artifact`:
- * no iteration ran, or the best one produced nothing. Kept apart so "nothing
- * was judged" never reads as "judged and found wanting".
- */
-export const ADMISSIONS = ['admitted', 'fell-short', 'no-rubric', 'no-artifact'] as const;
-export type Admission = (typeof ADMISSIONS)[number];
 
 /**
  * Whether a finished run's best iteration may be drawn on, and when not,

@@ -5,8 +5,10 @@
  * is what dispatches. The route report is the tool beside it: which judge the
  * router would pick for a goal, running nothing.
  */
+import { z } from 'zod';
+
 import type { ApiResponse } from '../envelope';
-import type { LlmModelDto } from '../llm-model';
+import { llmModelSchema } from '../llm-model';
 
 export const ROUTER_ORCHESTRATOR_ID = 'router';
 
@@ -21,9 +23,8 @@ export interface RouteDto {
 }
 
 /** What the router records at open, under `OrchestrationRunDto.context`: which model classifies. */
-export interface RouterContextDto {
-  classifier: LlmModelDto;
-}
+export const routerContextSchema = z.strictObject({ classifier: llmModelSchema });
+export type RouterContextDto = z.infer<typeof routerContextSchema>;
 
 /** The body of `POST /router/report`. */
 export interface RouteReportRequest {

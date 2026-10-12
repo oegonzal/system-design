@@ -7,13 +7,19 @@
  * reads as data and the adapters know no orchestrator by name.
  */
 import type { PanelAlignment, PanelReportDto, QualityRunDto } from '@sysdesign/contracts';
-import { DEFAULT_PANEL_SAMPLES } from '@sysdesign/contracts';
+import { DEFAULT_PANEL_SAMPLES, panelReportSchema } from '@sysdesign/contracts';
+import type { ZodType } from 'zod';
 
 import { mapConcurrent } from '../../core/loop/scoped-llm';
 import { outputsOf, reconcile } from '../../core/outputs';
 import type { RunInput } from '../../core/loop/run-pipeline';
 import { completed, skipped } from '../common';
 import type { StepContext, StepResult } from '../runner/definition';
+
+/** The one report a panel orchestrator's steps make — the reconcile's — declared once for both. */
+export const PANEL_REPORTS: Readonly<Record<'reconcile', ZodType>> = {
+  reconcile: panelReportSchema,
+};
 
 /** What every sample runs on, or the declared reason the panel cannot run at all. */
 export type PanelSource = { input: RunInput } | { skip: string; note?: string | null };

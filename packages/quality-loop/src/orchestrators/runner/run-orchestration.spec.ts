@@ -1,5 +1,6 @@
 import type { PipelineSummary, QualityRunDto, StartQualityRunRequest } from '@sysdesign/contracts';
 import { describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 
 import type { RunRecord } from '../../core/contracts';
 import type { OrchestratorDefinition, StepContext, StepResult } from './definition';
@@ -60,6 +61,8 @@ const definition = (
   takesTarget: true,
   reasons: ['because'],
   context: () => Promise.resolve({ seen: true }),
+  contextSchema: z.strictObject({ seen: z.boolean() }),
+  reports: { a: z.strictObject({ runs: z.number() }) },
   steps: [
     stepA(a) as never,
     {
@@ -346,5 +349,53 @@ describe('declared pipelines', () => {
     expect(record.steps['a'].report).toEqual({ runs: 2 });
     expect(record.steps['a'].runIds).toEqual([]);
     expect(pendingStep().report).toBeNull();
+  });
+
+  it('[QL-67] a report its declared shape refuses, or one from a step that declares none, is nulled with a note — the step keeping its status, output and runs', async () => {
+    const warnings: string[] = [];
+    const def: OrchestratorDefinition<Outputs, Ports> = {
+      ...definition(),
+      steps: [
+        {
+          id: 'a',
+          run: () =>
+            Promise.resolve({
+              status: 'complete',
+              note: 'two runs',
+              output: 'a!',
+              report: { runs: 'two' },
+            }),
+        },
+        {
+          id: 'b',
+          needs: ['a'],
+          run: (ctx) =>
+            Promise.resolve({ status: 'complete', output: `${ctx.outputs.a}+b`, report: { x: 1 } }),
+        },
+        { id: 'c', needs: ['b'], run: () => Promise.resolve({ status: 'complete' }) },
+      ],
+    };
+    const record = open(def);
+    await runOrchestration(def, record, request, null, {
+      ...harness(),
+      warn: (message) => warnings.push(message),
+    });
+    expect(record.status).toBe('complete');
+    expect(record.steps['a']).toMatchObject({
+      status: 'complete',
+      report: null,
+      note: expect.stringMatching(/^two runs; report refused: runs: /),
+    });
+    expect(record.steps['b']).toMatchObject({
+      status: 'complete',
+      report: null,
+      note: 'report refused: step b declares no report',
+    });
+    // The output still flowed: b read a's, and c ran on b's.
+    expect(record.steps['c'].status).toBe('complete');
+    expect(warnings).toEqual([
+      expect.stringMatching(/^step a: report refused: runs: /),
+      'step b: report refused: step b declares no report',
+    ]);
   });
 });

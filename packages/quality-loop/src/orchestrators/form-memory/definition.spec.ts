@@ -160,4 +160,18 @@ describe('the form-memory orchestrator', () => {
     });
     expect(record.request.criteriaProvided).toBe(true);
   });
+
+  it('[QL-67] declares the shape of what it records at open and of what its target reports, and the shapes read what it writes', async () => {
+    expect(Object.keys(FORM_MEMORY.reports)).toEqual([FORM_MEMORY_TARGET_STEP]);
+    const ports = memoryPorts({}, sampleFacts);
+    expect(FORM_MEMORY.contextSchema.safeParse(await FORM_MEMORY.context(ports)).success).toBe(
+      true,
+    );
+    expect(FORM_MEMORY.contextSchema.safeParse({ bogus: true }).success).toBe(false);
+    const target = FORM_MEMORY.reports[FORM_MEMORY_TARGET_STEP];
+    expect(target?.safeParse({ admission: 'admitted', withheld: ['field.3.2'] }).success).toBe(
+      true,
+    );
+    expect(target?.safeParse({ admission: 'maybe', withheld: [] }).success).toBe(false);
+  });
 });

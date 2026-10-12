@@ -7,6 +7,7 @@
 import {
   MEMORY_ORCHESTRATOR_ID,
   MEMORY_STEP_REASONS,
+  memoryContextSchema,
   type OrchestrationRunDto,
 } from '@sysdesign/contracts';
 
@@ -30,6 +31,8 @@ export const MEMORY: OrchestratorDefinition<MemoryOutputs, MemoryPorts> = {
   normalize: bareRequest,
   refuse: refuseInternal,
   context: async (ports) => ({ embedding: ports.embedding, store: await ports.store.verify() }),
+  contextSchema: memoryContextSchema,
+  reports: {},
 
   steps: [
     {

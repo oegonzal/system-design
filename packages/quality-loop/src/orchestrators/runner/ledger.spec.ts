@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { z } from 'zod';
 
 import type { OrchestratorDefinition } from './definition';
 import { StepLedger } from './ledger';
@@ -11,6 +12,8 @@ const oneStep: OrchestratorDefinition<{ a: string }, undefined> = {
   takesTarget: true,
   reasons: [],
   context: () => Promise.resolve({}),
+  contextSchema: z.strictObject({}),
+  reports: {},
   steps: [{ id: 'a', run: () => Promise.resolve({ status: 'complete', output: 'a!' }) }],
 };
 

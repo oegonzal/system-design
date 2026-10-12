@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
 import { validateOrchestrator, type OrchestratorDefinition } from './definition';
 
@@ -14,6 +15,8 @@ const tiny = (
     takesTarget: true,
     reasons: ['because'],
     context: () => Promise.resolve({}),
+    contextSchema: z.strictObject({}),
+    reports: {},
     steps: [
       { id: 'a', run: () => Promise.resolve({ status: 'complete', output: 'x' }) },
       { id: 'b', needs: ['a'], run: () => Promise.resolve({ status: 'complete', output: 'y' }) },
@@ -38,5 +41,14 @@ describe('validateOrchestrator', () => {
     expect(() => validateOrchestrator(tiny({ reasons: ['run-failed'] }))).toThrow(
       /belongs to the runner/,
     );
+  });
+
+  it('[QL-67] refuses a report shape declared for a step that does not exist, and accepts one for a step that does', () => {
+    expect(() =>
+      validateOrchestrator(tiny({ reports: { c: z.strictObject({}) } } as never)),
+    ).toThrow(/reports declares a shape for c, which is no step/);
+    expect(() =>
+      validateOrchestrator(tiny({ reports: { a: z.strictObject({ n: z.number() }) } })),
+    ).not.toThrow();
   });
 });

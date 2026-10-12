@@ -9,7 +9,7 @@
  * the ledger — never over prose; the pack is read as the seam read the reply,
  * so one kept past a ceiling is drawn on rather than refused for its size.
  */
-import { parseLenient, type SuccessCriterion } from '@sysdesign/contracts';
+import { parseLenient, type Admission, type SuccessCriterion } from '@sysdesign/contracts';
 
 import {
   admission,
@@ -17,7 +17,6 @@ import {
   withheldItems,
   withheldRefs,
   withholdingOf,
-  type Admission,
   type RunOutputs,
   type WithheldItem,
 } from '../../../core/outputs';

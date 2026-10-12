@@ -7,12 +7,8 @@
  * apart so "nothing was judged" never reads as "judged and found wanting".
  *
  * The loop computes it (`core/outputs/run-outputs.ts`) and an orchestrator
- * step reports it on its record; a caller reads the report and never
- * recomputes it. Declared here so the report is typed where it is read; the
- * loop's own tuple is pinned equal by a spec there.
+ * step reports it on its record under a declared shape; a caller reads the
+ * report with that shape and never recomputes it.
  */
 export const ADMISSIONS = ['admitted', 'fell-short', 'no-rubric', 'no-artifact'] as const;
 export type Admission = (typeof ADMISSIONS)[number];
-
-export const isAdmission = (value: unknown): value is Admission =>
-  typeof value === 'string' && (ADMISSIONS as readonly string[]).includes(value);

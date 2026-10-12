@@ -81,4 +81,10 @@ describe('the calibration orchestrator', () => {
       report: null,
     });
   });
+
+  it('[QL-67] declares an empty context and the panel report both panel orchestrators share', () => {
+    expect(Object.keys(CALIBRATION.reports)).toEqual(['reconcile']);
+    expect(CALIBRATION.contextSchema.safeParse({}).success).toBe(true);
+    expect(CALIBRATION.contextSchema.safeParse({ seen: true }).success).toBe(false);
+  });
 });

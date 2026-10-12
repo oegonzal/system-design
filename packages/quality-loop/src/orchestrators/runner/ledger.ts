@@ -34,7 +34,7 @@ export class StepLedger {
       reason: outcome.reason ?? null,
       note: outcome.note ?? null,
       counts: outcome.counts ?? current.counts,
-      report: outcome.report ?? current.report,
+      report: outcome.report === undefined ? current.report : outcome.report,
       ...(outcome.runIds ? { runIds: [...outcome.runIds] } : {}),
       finishedAt: this.now(),
     });

@@ -97,7 +97,10 @@ const completeRuns = (artifact: unknown) => (core: FakeLoop) => {
 
 /** The orchestrator's target step as the fake settles it: a child run completed, the admission reported. */
 const completeFormMemory =
-  (artifact: unknown, report: Record<string, unknown> | null = { admission: 'admitted' }) =>
+  (
+    artifact: unknown,
+    report: Record<string, unknown> | null = { admission: 'admitted', withheld: [] },
+  ) =>
   (core: FakeLoop) => {
     for (const [id, orchestration] of core.orchestrations.records) {
       if (orchestration.status !== 'running') continue;
@@ -191,8 +194,14 @@ describe('the loop brain', () => {
 
     const unreported = harness(completeFormMemory(ANSWERS, null));
     expect((await unreported.brain.answerFields(input)).admission).toBe('fell-short');
-    const fellShort = harness(completeFormMemory(ANSWERS, { admission: 'fell-short' }));
+    const fellShort = harness(
+      completeFormMemory(ANSWERS, { admission: 'fell-short', withheld: [] }),
+    );
     expect((await fellShort.brain.answerFields(input)).admission).toBe('fell-short');
+    // A report the declared shape does not read is no admission, and withholds nothing.
+    const drifted = harness(completeFormMemory(ANSWERS, { admission: 'maybe', withheld: 'e2' }));
+    const read = await drifted.brain.answerFields(input);
+    expect([read.admission, read.withheld]).toEqual(['fell-short', []]);
 
     const noTarget = harness((core) => {
       for (const [id, o] of core.orchestrations.records) {

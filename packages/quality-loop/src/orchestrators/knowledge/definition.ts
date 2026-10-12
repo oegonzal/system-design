@@ -15,6 +15,9 @@
 import {
   KNOWLEDGE_ORCHESTRATOR_ID,
   KNOWLEDGE_STEP_REASONS,
+  knowledgeDigestReportSchema,
+  knowledgeKnownReportSchema,
+  memoryContextSchema,
   type MemoryContextDto,
 } from '@sysdesign/contracts';
 
@@ -39,6 +42,8 @@ export const KNOWLEDGE: OrchestratorDefinition<KnowledgeOutputs, KnowledgePorts>
   refuse: refuseInternal,
   context: async (ports) =>
     ({ embedding: ports.embedding, store: await ports.store.verify() }) satisfies MemoryContextDto,
+  contextSchema: memoryContextSchema,
+  reports: { known: knowledgeKnownReportSchema, digest: knowledgeDigestReportSchema },
 
   steps: [
     {
