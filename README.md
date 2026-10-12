@@ -45,6 +45,7 @@ tilt up                 # stores → migrations → seed → api, quality loop, 
 | Quality loop    | http://localhost:3003/health                         |
 | Govcon          | http://localhost:3004/health                         |
 | Notifications   | http://localhost:3005/health                         |
+| Job application | http://localhost:3006/health                         |
 | Postgres        | localhost:5433 · `admin`/`admin` · db `sysdesign`    |
 | Qdrant          | http://localhost:6333                                |
 | Storybook       | `nx run storybook:storybook` → http://localhost:6006 |
@@ -100,6 +101,7 @@ dependency is hoisted to the root and Nx is the single entry point.
 | `packages/govcon`          | SAM.gov contract opportunities: budgeted pull, Postgres store, deterministic leads (CLI + HTTP)                                                |
 | `packages/govcon-ui`       | Next.js client for govcon: pull, rank, read a lead's trace and description, watch the ledger                                                   |
 | `packages/notifications`   | The event bus over HTTP — declared topics, pulled subscriptions — and the channels (Telegram) that put prompts to you and bring answers back   |
+| `packages/job-application` | The record of units a browser session applied to, fed by the session's events, and the advisor it asks what is on record before each plan      |
 | `packages/web-kit`         | Shared web plumbing: Emotion SSR registry, HTTP request core, hooks, route table and announcer                                                 |
 | `packages/web-testing`     | Shared web spec harness: themed render, fetch stub, jsdom shims                                                                                |
 | `packages/studio-testing`  | The quality loop as a scriptable fake, behind studio-api's client fake and the e2e stub                                                        |
@@ -152,6 +154,7 @@ pnpm quality-loop:run --pipeline system-design --goal packages/quality-loop/prom
 pnpm quality:start                         # quality-loop on :3003 + its web client on :4201 (needs the db)
 pnpm govcon:start                          # govcon on :3004 + its web client on :4202 (needs the db)
 pnpm notifications:serve                   # the event bus on :3005, Telegram polling with TELEGRAM_API_KEY (needs the db)
+pnpm job-application:serve                 # the record of applications on :3006, fed by the bus; the advisor a browser session asks (needs the db)
 ```
 
 The dev servers need no Nx daemon: `nx run studio-api:serve` and

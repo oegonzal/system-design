@@ -1,0 +1,10 @@
+{
+  "subscription": "job-application.sessions",
+  "pullWaitMs": 25000,
+  "eventsPerPull": 20,
+  "retryPauseMs": 2000,
+  "busRecovery": {
+    "windowMs": 60000,
+    "pauseMs": 2000
+  }
+}

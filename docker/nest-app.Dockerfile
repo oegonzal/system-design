@@ -6,6 +6,7 @@
 #   docker build -f docker/nest-app.Dockerfile --build-arg APP=quality-loop .
 #   docker build -f docker/nest-app.Dockerfile --build-arg APP=govcon .
 #   docker build -f docker/nest-app.Dockerfile --build-arg APP=notifications .
+#   docker build -f docker/nest-app.Dockerfile --build-arg APP=job-application .
 #
 # The image builds the app itself — deterministic from a bare checkout, never
 # dependent on a host-side dist/ that a fresh clone does not have. Layer

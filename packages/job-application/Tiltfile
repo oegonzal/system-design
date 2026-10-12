@@ -1,0 +1,32 @@
+docker_build(
+    'job-application',
+    '../../',
+    dockerfile='../../docker/nest-app.Dockerfile',
+    build_args={'APP': 'job-application'},
+    only=[
+        './package.json',
+        './pnpm-lock.yaml',
+        './pnpm-workspace.yaml',
+        './nx.json',
+        './tsconfig.base.json',
+        './vite.nest.ts',
+        './packages/contracts',
+        './packages/db',
+        './packages/nest-kit',
+        './packages/config-kit',
+        './packages/notifications-client',
+        './packages/job-application',
+    ],
+)
+
+k8s_yaml(['./k8s/local/deployment.yaml'])
+
+# The record is fed by the bus, so the service starts once the bus is up; a
+# gap while it was down is covered by the bus keeping a subscription's events.
+k8s_resource(
+    'job-application',
+    port_forwards=3006,
+    resource_deps=['db: migration:up', 'notifications'],
+    labels=['backend'],
+    links=['http://localhost:3006/health']
+)

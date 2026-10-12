@@ -33,6 +33,7 @@ import type { ChangedFile } from './index';
  *   browser-session -> contracts, db, nest-kit, run-dump, loop-client, notifications-client, config-kit, studio-testing (specs only)   a Playwright session the loop decides for
  *   memory-ingest  -> contracts, loop-client, studio-testing (specs only)   documents chunked and handed to the loop
  *   notifications  -> contracts, db, nest-kit, config-kit   the event bus, and the channels that put prompts to people
+ *   job-application -> contracts, db, nest-kit, config-kit, notifications-client   the record of units a session applied to, and the advisor over it
  *   storybook      -> (anything)        the catalog host legitimately sees both sides
  *   studio-e2e     -> (anything)        drives the whole stack by definition
  *
@@ -70,6 +71,7 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
   ],
   'memory-ingest': ['contracts', 'loop-client', 'studio-testing'],
   notifications: ['contracts', 'db', 'nest-kit', 'config-kit'],
+  'job-application': ['contracts', 'db', 'nest-kit', 'config-kit', 'notifications-client'],
   storybook: null,
   'studio-e2e': null,
 };

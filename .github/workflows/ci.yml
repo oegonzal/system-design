@@ -124,7 +124,7 @@ jobs:
     timeout-minutes: 20
     strategy:
       matrix:
-        app: [studio-api, quality-loop, govcon, notifications]
+        app: [studio-api, quality-loop, govcon, notifications, job-application]
     steps:
       - uses: actions/checkout@v4
 

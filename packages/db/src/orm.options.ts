@@ -20,6 +20,7 @@ import { GovconSearchProfile } from './entities/govcon-search-profile.entity';
 import { GovconSourceCall } from './entities/govcon-source-call.entity';
 import { Interaction } from './entities/interaction.entity';
 import { InteractionDelivery } from './entities/interaction-delivery.entity';
+import { JobApplication } from './entities/job-application.entity';
 import { MemoryEmbedding } from './entities/memory-embedding.entity';
 import { MemorySupport } from './entities/memory-support.entity';
 import { OrchestrationRun } from './entities/orchestration-run.entity';
@@ -35,8 +36,8 @@ import { StarStory } from './entities/star-story.entity';
 
 /**
  * ORM settings shared by every entry point that configures MikroORM: the
- * studio API's, the quality loop's, govcon's and the notifications service's
- * DbModules, and `mikro-orm.config.ts` (the CLI that creates and applies
+ * studio API's, the quality loop's, govcon's, the notifications service's and
+ * the job-application service's DbModules, and `mikro-orm.config.ts` (the CLI that creates and applies
  * migrations).
  *
  * They have to agree. `namingStrategy` in particular decides whether the apps
@@ -78,6 +79,7 @@ export const ormOptions = {
     BusSubscription,
     Interaction,
     InteractionDelivery,
+    JobApplication,
   ],
   metadataProvider: ReflectMetadataProvider,
   namingStrategy: UnderscoreNamingStrategy,

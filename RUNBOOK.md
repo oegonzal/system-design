@@ -37,8 +37,9 @@ There is one local stack, whichever launcher starts it:
   migrations and `pnpm db:seed` re-seeds the reference experiences; both are
   idempotent, and the seed never touches your sessions.
 - **The apps.** The API (3000), the quality loop (3003), govcon (3004),
-  notifications (3005) and the three web clients (4200, 4201, 4202) find the
-  stores and one another at their defaults, so no connection variable is set.
+  notifications (3005), job-application (3006) and the three web clients
+  (4200, 4201, 4202) find the stores and one another at their defaults, so no
+  connection variable is set.
 
 The launchers differ only in where the apps run:
 
@@ -314,6 +315,45 @@ about 45 s each on the subscription login, so one application with three
 form pages is roughly ten to twenty minutes of model time plus whatever you
 type. Operator answers are cached for the session by field label.
 
+## Scattering applications across companies
+
+The Easy Apply sessions used to apply to companies they had applied to in an
+earlier session: nothing carried between sessions said which. Now
+`packages/job-application` keeps that record and the session asks it before
+every plan, and the mission says what to do with the answer. Three things make
+it work, and the session refuses to start — exit 2, before any row — when the
+first two are missing:
+
+1. **The service and the bus.** `pnpm notifications:serve` and
+   `pnpm job-application:serve` (or `tilt up`); `pnpm db:migrate` once for the
+   `job_application` table. The service subscribes to the session's events as
+   `job-application.sessions` and answers `GET /advisor`, `POST /advice`.
+2. **The session's environment.** `UNIT_ADVISOR_URLS=job-application=http://localhost:3006`
+   in `.env`, and a subject of your own — `--subject "Your Name"` or
+   `BROWSER_SESSION_SUBJECT` — since the record is kept per subject.
+3. **The mission.** `## Unit identity` declares the fact a unit is known by
+   (`- company: the company as the pane names it`), `## Advisors` names
+   `job-application`, and the per-unit procedure says what to do with a company
+   on record: prefer a card at another company, page forward before repeating,
+   never start a unit at a company in progress in another session (that one the
+   loop's validator cuts regardless).
+
+Backfill first, or the record starts empty: `pnpm browser-session sessions`
+and `show <id>` list every recorded unit with its label; enter each company
+once with `curl -X POST localhost:3006/applications -H 'content-type: application/json' -d '{"subject":"Your Name","company":"Acme","appliedAt":"2026-10-03T10:00:00.000Z"}'`.
+Then read the record: `curl 'localhost:3006/companies?subject=Your%20Name'`.
+
+What to read after a session: `static/sessions/<id>/01-steps/NN/advice.json`
+says what the advisor answered before each plan (`answered`, or `stale` with
+the step the advice is from); the goal in the run dump renders the companies
+to avoid under `## Units of work`; `manifest.json` lists `unsentEvents` when
+the bus was down at the close, and `pnpm browser-session replay-events <id>`
+sends a session's events again — the intake takes a replay as nothing new.
+A unit a crashed session left in progress is abandoned by the next session on
+the same profile, or stands as abandoned once the session's `maxMinutes` have
+passed; `PATCH /applications/:id {"status":"submitted"}` confirms one that did
+go through.
+
 ## Before changing a bound or a cap, measure
 
 Every string and list a model writes into is one declared bound — a target the
@@ -432,8 +472,8 @@ its asker gave it; the bot then edits its message to say so.
   `quality-loop-runs`, mounted at its default `static/runs`, which outlives
   restarts and `tilt down`. Copy them out with
   `kubectl cp <quality-loop pod>:/app/static/runs <dir>`.
-- Under Tilt the host reaches the API (3000), the loop (3003), govcon (3004)
-  and notifications (3005) through Tilt's port-forwards only; the Services are `ClusterIP`. They
+- Under Tilt the host reaches the API (3000), the loop (3003), govcon (3004),
+  notifications (3005) and job-application (3006) through Tilt's port-forwards only; the Services are `ClusterIP`. They
   used to be `LoadBalancer`, which Docker Desktop's Kubernetes turns into a
   host-published container on the same port, racing Tilt's forward. A cluster
   that ran the old manifests may keep a Service stuck deleting, and then Tilt

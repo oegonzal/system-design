@@ -10,6 +10,7 @@
 import type { Criterion } from './criterion';
 import { BROWSER_SESSION_CRITERIA } from './browser-session';
 import { GOVCON_CRITERIA } from './govcon';
+import { JOB_APPLICATION_CRITERIA } from './job-application';
 import { NOTIFICATIONS_CRITERIA } from './notifications';
 import { QUALITY_LOOP_CRITERIA } from './quality-loop';
 import { QUALITY_LOOP_CLIENTS_CRITERIA } from './quality-loop-clients';
@@ -26,4 +27,5 @@ export const CRITERIA: readonly Criterion[] = [
   ...WEB_CRITERIA,
   ...BROWSER_SESSION_CRITERIA,
   ...NOTIFICATIONS_CRITERIA,
+  ...JOB_APPLICATION_CRITERIA,
 ];

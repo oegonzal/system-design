@@ -1,0 +1,13 @@
+{
+  "windowDays": 90,
+  "stances": {
+    "in-progress": "forbid",
+    "submitted": "avoid",
+    "submitted-before": "avoid",
+    "abandoned": "avoid",
+    "failed": null,
+    "skipped": null
+  },
+  "neverOnRecord": [],
+  "skippedBecomesAvoidAfter": null
+}

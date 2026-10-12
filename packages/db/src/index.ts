@@ -16,6 +16,7 @@ export * from './entities/govcon-search-profile.entity';
 export * from './entities/govcon-source-call.entity';
 export * from './entities/interaction-delivery.entity';
 export * from './entities/interaction.entity';
+export * from './entities/job-application.entity';
 export * from './entities/memory-embedding.entity';
 export * from './entities/memory-support.entity';
 export * from './entities/orchestration-run-child.entity';

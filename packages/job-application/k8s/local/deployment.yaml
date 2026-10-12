@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: job-application
+  labels:
+    app: job-application
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: job-application
+  template:
+    metadata:
+      labels:
+        app: job-application
+    spec:
+      containers:
+        - name: job-application
+          image: job-application
+          ports:
+            - containerPort: 3006
+          # The bus by its in-cluster Service: the localhost fallback would
+          # subscribe to nothing inside the pod. Everything else is the
+          # package's own config/ files; the stores are on the host.
+          env:
+            - name: NOTIFICATIONS_URL
+              value: http://notifications-service:3005
+          envFrom:
+            - configMapRef:
+                name: local-stores
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: job-application-service
+spec:
+  selector:
+    app: job-application
+  ports:
+    - protocol: TCP
+      port: 3006
+      targetPort: 3006
+  # In-cluster only: the host reaches it through Tilt's port-forward.
+  type: ClusterIP
