@@ -23,9 +23,10 @@ const OUTCOMES = ['done', 'already-done', 'skipped', 'failed'] as const satisfie
  * plan's `taskStart` and closed by its `taskDone`. The ordinal is the task's
  * position in the session, so the pair is a stable address; `startStep` and
  * `endStep` bracket the steps the task spanned, which is how its decisions
- * are read back without a column on each. `externalRef` is what the site
- * calls the unit — a URL or an id — when the plan gave one, indexed so "was
- * this unit seen in an earlier session" is one lookup.
+ * are read back without a column on each. `externalRef` is the URL the plan
+ * gave, kept as audit; `facets` is the unit's identity as the mission declared
+ * it, the facts a record beyond the session names it by — that record is a
+ * domain's, so no lookup across sessions happens here.
  *
  * cascade: a deleted session's tasks are meaningless on their own.
  */
@@ -55,9 +56,12 @@ export class BrowserTask {
   @Property({ type: 'text' })
   label!: string;
 
-  @Index()
   @Property({ type: 'text', nullable: true })
   externalRef: string | null = null;
+
+  /** The facts the mission's Unit identity declares, with their values as the plan read them off the page. */
+  @Property({ type: 'json' })
+  facets: Opt<Contracts.UnitFacet[]> = [];
 
   @Property({ type: 'text' })
   status: Opt<Contracts.BrowserTaskStatus> = 'open';

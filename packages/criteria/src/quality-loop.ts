@@ -306,6 +306,11 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
       'The form-memory orchestrator runs exactly the form pipeline a request names, from its declared list, and only over a goal the form codec composed for that pipeline; the evidence it composes in says what the store holds each item as, and its target reports the run’s admission and the locations a reader of the run withholds, each read off that pipeline’s own definition.',
   },
   {
+    id: 'QL-66',
+    statement:
+      'The browser-step limits validator holds a taskStart to the unit identity its goal declares, from the index alone: one that lacks a declared fact, names one the mission does not declare or names one twice is cut at that action, and one whose facets match an identity the index lists as forbidden is cut with the record’s note and the alternative said back — while a unit merely to avoid is prose for the planner and never a validator’s fact.',
+  },
+  {
     id: 'QL-41',
     statement:
       "A stored chunk carries the facets a search can narrow by and a curator can read — what it is about, how strongly it is grounded, and how many other runs confirmed it — every one optional so a point written before them still ranks; a probe states what it will consider as data rather than in the store's own filter language; each writer replaces only the chunk kinds it owns under a source run, so two writers under one run id cannot erase each other; and the payload indexes are ensured on every boot, so a facet added later reaches the collection that already holds the corpus.",

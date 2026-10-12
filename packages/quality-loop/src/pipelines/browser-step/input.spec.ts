@@ -8,6 +8,7 @@ import {
   GoalBudgetExceeded,
   ELEMENTS_BOUND,
   MISSION_FIXTURE,
+  NO_UNITS_ON_RECORD,
   openTaskLedger,
   renderDocumentGoal,
   resumeChunk,
@@ -103,6 +104,9 @@ describe('the browser-step input codec', () => {
       stops: [{ cause: 'limit-reached', token: 'no more applications', shown: false }],
       // Every cause the fixture mission declares, which a terminate must name.
       causes: ['limit-reached', 'login-wall', 'mission-complete'],
+      // The fixture mission declares no unit identity, and no advisor was asked.
+      unitFacets: [],
+      unitsForbidden: [],
     });
   });
 
@@ -141,6 +145,7 @@ describe('the browser-step input codec', () => {
       pageUnchanged: false,
       lastStep: null,
       stops: stopsOnPage(stopsOf(MISSION_FIXTURE), observation),
+      onRecord: NO_UNITS_ON_RECORD,
     });
     expect(textBytes(goal)).toBeLessThan(GOAL_BUDGET_BYTES);
     expect(GOAL_BUDGET_BYTES - textBytes(goal)).toBeGreaterThan(8_000);

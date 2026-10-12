@@ -212,9 +212,10 @@ export class InMemoryLedger implements LedgerPort {
 
   openTask(task: NewTask): Promise<void> {
     return this.write(() => {
-      const { startedAt, ...rest } = task;
+      const { startedAt, facets, ...rest } = task;
       this.tasks.set(task.id, {
         ...rest,
+        facets: [...facets],
         status: 'open',
         outcome: null,
         endStep: null,

@@ -10,6 +10,7 @@ import { z } from 'zod';
 
 import { bound, bounded } from '../bounds';
 import { CRITERION_ID_MAX_LENGTH } from '../quality-loop/evidence';
+import { unitFacetsSchema } from '../units/identity';
 import { ELEMENT_REF, TASK_LABEL_BOUND, URL_MAX_LENGTH } from './observation.schema';
 import { PRESS_KEYS, SCROLL_DIRECTIONS, WAIT_UNTIL } from './action-effects';
 import { STOP_CAUSE_MAX_LENGTH } from './mission-stops';
@@ -115,6 +116,10 @@ export const stepActionSchema = z.discriminatedUnion('kind', [
       description: "The unit of work in the mission's own terms.",
     }),
     url: url(),
+    // The unit's identity as declared facts, so a record beyond this session
+    // can name it without reading the label. Required and empty when the
+    // mission declares none: a strict endpoint refuses an optional property.
+    facets: unitFacetsSchema,
     ...common,
   }),
   z.strictObject({

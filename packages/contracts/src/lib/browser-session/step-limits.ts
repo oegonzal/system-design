@@ -5,17 +5,27 @@
  * words appears only when the mission declares some.
  */
 import { quoted } from '../text';
+import type { UnitFacet } from '../units/identity';
+import type { UnitOnRecord } from '../units/record';
 import type { Mark } from './mission-marks';
 import type { StopOnPage } from './mission-stops';
 import { ACTIONS_BOUND } from './step-plan.schema';
 
-/** What the mission declared that a Limits line may depend on. */
+/** What the mission declared, and what the record holds, that a Limits line may depend on. */
 export interface LimitFacts {
   marks: readonly Mark[];
   stops: readonly StopOnPage[];
   /** Every cause the mission's Stop conditions declare. */
   causes: readonly string[];
+  /** The facts the mission's Unit identity declares, by name. */
+  unitFacets: readonly string[];
+  /** The units on record as forbidden. */
+  forbidden: readonly UnitOnRecord[];
 }
+
+/** An identity as the goal names it: `company "Acme"`, each facet in turn. */
+export const describeIdentity = (identity: readonly UnitFacet[]): string =>
+  identity.map((facet) => `${facet.name} ${quoted(facet.value)}`).join(' · ');
 
 interface Limit {
   /** Absent for a line every goal carries. */
@@ -73,6 +83,20 @@ const STEP_LIMITS: readonly Limit[] = [
       '- A taskStart, taskDone or terminate claims what this page shows: it comes before any navigate, click, fill, select, press or askFields, never after.',
   },
   { when: ({ marks }) => marks.length > 0, line: ({ marks }) => marksLimit(marks) },
+  // The unit's identity is data the validator holds a taskStart to, never a
+  // reading of its label: a record beyond this session names units by it.
+  {
+    when: ({ unitFacets }) => unitFacets.length > 0,
+    line: ({ unitFacets }) =>
+      `- A taskStart carries each fact the mission's Unit identity declares — ${unitFacets.join(', ')} — once, with its value exactly as this page names it, and no other fact.`,
+  },
+  {
+    when: ({ forbidden }) => forbidden.length > 0,
+    line: ({ forbidden }) =>
+      `- A unit on record as forbidden is never started: a taskStart naming ${forbidden
+        .map((unit) => describeIdentity(unit.identity))
+        .join(' or ')} is cut. Choose another item.`,
+  },
   {
     when: ({ causes }) => causes.length > 0,
     line: ({ causes }) =>

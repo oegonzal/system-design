@@ -91,6 +91,7 @@ export const JOURNEY_PLANS = {
       kind: 'taskStart',
       label: 'Senior Engineer at Acme',
       url: JOURNEY_URLS.listing,
+      facets: [],
       ...common,
     }),
     act({ kind: 'click', ref: 'e1', ...common }),

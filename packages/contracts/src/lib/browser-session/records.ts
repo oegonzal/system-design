@@ -5,6 +5,7 @@
  * are one id away.
  */
 import type { IsoDateString, Uuid } from '../primitives';
+import type { UnitFacet } from '../units/identity';
 import type {
   BrowserDecisionKind,
   BrowserDecisionSource,
@@ -41,6 +42,8 @@ export interface BrowserSessionDto {
   goalPath: string;
   goalHash: string;
   profile: string;
+  /** Whom the session acted for, as it was told; null for a session recorded before it was kept. */
+  subject: string | null;
   headed: boolean;
   status: BrowserSessionStatus;
   terminationReason: BrowserSessionTermination | null;
@@ -61,8 +64,10 @@ export interface BrowserTaskDto {
   sessionId: Uuid;
   ordinal: number;
   label: string;
-  /** What the site calls it — a URL or an id — when the plan gave one. */
+  /** The URL the plan gave for it, kept as audit; a unit's identity across sessions is its facets. */
   externalRef: string | null;
+  /** The unit's identity as the plan declared it: the facts the mission's Unit identity names. */
+  facets: UnitFacet[];
   status: BrowserTaskStatus;
   outcome: TaskOutcome | null;
   startStep: number;

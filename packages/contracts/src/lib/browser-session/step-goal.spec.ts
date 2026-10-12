@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { GOAL_BUDGET_BYTES, GoalBudgetExceeded, textBytes } from '../quality-loop/goal-index';
+import { NO_UNITS_ON_RECORD } from '../units/record';
 import {
   dialogObservation,
   emptyLedger,
@@ -137,6 +138,7 @@ describe('composeStepGoal', () => {
         closed: Array.from({ length: CLOSED_TASKS_BOUND.target }, (_, i) => ({
           label: `${'l'.repeat(TASK_LABEL_BOUND.target - 2)}${String(i).padStart(2, '0')}`,
           outcome: 'done' as const,
+          facets: [],
         })),
         closedOmitted: 3,
       },
@@ -157,6 +159,7 @@ describe('composeStepGoal', () => {
       },
       pageUnchanged: false,
       stops: [],
+      onRecord: NO_UNITS_ON_RECORD,
       // The longest hand-off the page section can carry: a long element name, and a full plan held past it.
       lastStep: {
         ran: 1,

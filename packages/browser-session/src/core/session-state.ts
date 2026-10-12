@@ -20,6 +20,7 @@ import {
   type StepPlan,
   type TaskLedgerSummary,
   type TaskOutcome,
+  type UnitFacet,
   excerpt,
   quoted,
   ranActionOf,
@@ -40,6 +41,8 @@ export interface OpenTask {
   ordinal: number;
   label: string;
   url: string;
+  /** The unit's identity as the plan declared it: the facts the mission's Unit identity names. */
+  facets: readonly UnitFacet[];
   startStep: number;
 }
 
@@ -222,7 +225,13 @@ export const ledgerSummaryOf = (
   rails: SessionRailsDto,
 ): TaskLedgerSummary => ({
   openTask:
-    state.tasks.open === null ? null : { label: state.tasks.open.label, url: state.tasks.open.url },
+    state.tasks.open === null
+      ? null
+      : {
+          label: state.tasks.open.label,
+          url: state.tasks.open.url,
+          facets: [...state.tasks.open.facets],
+        },
   closed: [...state.tasks.closed],
   closedOmitted: state.tasks.closedOmitted,
   counts: { ...state.tasks.counts },

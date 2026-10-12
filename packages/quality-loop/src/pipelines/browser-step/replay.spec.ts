@@ -1,6 +1,7 @@
 import {
   composeStepGoal,
   MISSION_FIXTURE,
+  NO_UNITS_ON_RECORD,
   routePlan,
   type PageObservation,
   type StepPlan,
@@ -47,7 +48,7 @@ const goalOf = (recorded: RecordedStep): string =>
     history: [],
     ledger: {
       openTask: recorded.openTask
-        ? { label: 'the open unit', url: recorded.observation.url }
+        ? { label: 'the open unit', url: recorded.observation.url, facets: [] }
         : null,
       closed: [],
       closedOmitted: 0,
@@ -60,6 +61,7 @@ const goalOf = (recorded: RecordedStep): string =>
     pageUnchanged: false,
     lastStep: null,
     stops: stopsOnPage(stopsOf(MISSION_FIXTURE), recorded.observation),
+    onRecord: NO_UNITS_ON_RECORD,
   });
 
 const validate = (recorded: RecordedStep): ValidationReport[] => {

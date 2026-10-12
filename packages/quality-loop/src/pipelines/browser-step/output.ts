@@ -32,7 +32,10 @@ export function describeAction(action: StepAction): string {
     case 'askFields':
       return `askFields ${action.refs.join(', ')}`;
     case 'taskStart':
-      return `taskStart ${quotedJson(action.label)} at ${action.url}`;
+      // The identity the validator holds the claim to, printed so the judges grade what it checks.
+      return `taskStart ${quotedJson(action.label)} at ${action.url}${action.facets
+        .map((facet) => ` · ${facet.name}=${quotedJson(facet.value)}`)
+        .join('')}`;
     case 'taskDone':
       return `taskDone ${action.outcome}${action.detail.length > 0 ? ` — ${action.detail}` : ''}`;
     case 'terminate':

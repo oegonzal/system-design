@@ -9,20 +9,24 @@ import {
   emptyLedger,
   listingObservation,
   MISSION_FIXTURE,
+  NO_UNITS_ON_RECORD,
   type PageObservation,
   type StepAction,
   type StepPlan,
   type SuccessCriterion,
   type TaskLedgerSummary,
+  type UnitFacet,
+  type UnitsOnRecord,
   stepGoalInput,
 } from '@sysdesign/contracts';
 
-/** The mission over a page, with no recent actions. */
+/** The mission over a page, with no recent actions, and the record an advisor answered — none, unless a spec says. */
 export const stepGoal = (
   observation: PageObservation = listingObservation(),
   ledger: TaskLedgerSummary = emptyLedger(),
   mission: string = MISSION_FIXTURE,
-): string => composeStepGoal(stepGoalInput({ mission, observation, ledger }));
+  onRecord: UnitsOnRecord = NO_UNITS_ON_RECORD,
+): string => composeStepGoal(stepGoalInput({ mission, observation, ledger, onRecord }));
 
 export const click = (
   ref: string,
@@ -56,10 +60,14 @@ export const askFields = (refs: string[], reason = 'questions about the subject'
   serves: [],
 });
 
-export const taskStart = (label = 'Senior Engineer at Acme'): StepAction => ({
+export const taskStart = (
+  label = 'Senior Engineer at Acme',
+  facets: UnitFacet[] = [],
+): StepAction => ({
   kind: 'taskStart',
   label,
   url: 'https://jobs.example.test/apply/42',
+  facets,
   reason: 'one application begins',
   expect: null,
   serves: [],

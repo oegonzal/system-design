@@ -74,6 +74,7 @@ export async function runSession(
     goalHash: goal.hash,
     goalMarkdown: goal.markdown,
     profile: options.profile,
+    subject: options.subject,
     headed: options.headed,
     limits: options.rails,
     startedAt,

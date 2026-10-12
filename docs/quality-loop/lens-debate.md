@@ -83,7 +83,8 @@ All three lenses run in one wave: none is shown another's answer (section 2 says
       (`withoutUnlistedRefs`);
    5. `## Recent actions` — `historyLines`;
    6. `## Objections to answer` — `objectionLines`: why plans made on this page did not run;
-   7. `## Units of work` — `ledgerLines`;
+   7. `## Units of work` — `ct/browser-session/step-goal-units.ts` `unitsLines`: the open and
+      closed units with their declared identity, then the units on record by stance;
    8. `## Progress` — `progressLines`;
    9. `## Limits` — `ct/browser-session/step-limits.ts` `limitsLines`: each rule the validators
       enforce, said once;

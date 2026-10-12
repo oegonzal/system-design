@@ -96,6 +96,7 @@
           "kind": "taskStart",
           "label": "Senior Software Engineer - Delivery Tech at Gopuff",
           "url": "https://www.linkedin.com/jobs/search-results/?currentJobId=4473257910&keywords=software%20engineer%20remote%20easy%20apply",
+          "facets": [],
           "reason": "Starting the application process for the job at Gopuff.",
           "expect": "Transitioning to the application form for the position.",
           "serves": []
@@ -529,6 +530,7 @@
           "kind": "taskStart",
           "label": "Senior Software Engineer - Delivery Tech at Gopuff",
           "url": "https://www.linkedin.com/jobs/view/4473257910/?companyName=Gopuff&refId=qIsXHQxpqSxWFRJHWfzrbA%3D%3D&trackingId=VSZziaEfKNHwEeIE6JYlyA%3D%3D&applicantTrackingSystemName=Lever",
+          "facets": [],
           "reason": "Starting the application process for the Senior Software Engineer position at Gopuff as part of the mission.",
           "expect": "The application form page will load, allowing the applicant to start inputting their information.",
           "serves": []
@@ -742,6 +744,7 @@
           "kind": "taskStart",
           "label": "Senior Software Engineer - Delivery Tech at Gopuff",
           "url": "https://www.linkedin.com/jobs/view/4473257910/?companyName=Gopuff&refId=qIsXHQxpqSxWFRJHWfzrbA%3D%3D&trackingId=VSZziaEfKNHwEeIE6JYlyA%3D%3D&applicantTrackingSystemName=Lever",
+          "facets": [],
           "reason": "Starting the application process for the Senior Software Engineer position at Gopuff is essential to complete this unit of work.",
           "expect": "The next action should open the application form for the position.",
           "serves": []
@@ -937,6 +940,7 @@
           "kind": "taskStart",
           "label": "Senior Software Engineer - Delivery Tech at Gopuff",
           "url": "https://www.linkedin.com/jobs/view/4473257910/?companyName=Gopuff&refId=qIsXHQxpqSxWFRJHWfzrbA%3D%3D&trackingId=VSZziaEfKNHwEeIE6JYlyA%3D%3D&applicantTrackingSystemName=Lever",
+          "facets": [],
           "reason": "To start the application process for the Senior Software Engineer role.",
           "expect": "The application form should load, showing required fields.",
           "serves": []
@@ -1112,6 +1116,7 @@
           "kind": "taskStart",
           "label": "Senior Software Engineer - Delivery Tech at Gopuff",
           "url": "https://www.linkedin.com/jobs/view/4473257910/?companyName=Gopuff&refId=qIsXHQxpqSxWFRJHWfzrbA%3D%3D&trackingId=VSZziaEfKNHwEeIE6JYlyA%3D%3D&applicantTrackingSystemName=Lever",
+          "facets": [],
           "reason": "Starting the application process for the Senior Software Engineer position.",
           "expect": "Load the application form with fields to fill out.",
           "serves": []

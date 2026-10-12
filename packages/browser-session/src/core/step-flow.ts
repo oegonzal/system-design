@@ -1,4 +1,5 @@
 import {
+  NO_UNITS_ON_RECORD,
   observationFingerprint,
   type PageObservation,
   type PlanReadout,
@@ -121,6 +122,7 @@ async function decide(
       pageUnchanged: state.pageUnchanged,
       lastStep: state.lastStep,
       progress: progressOf(state),
+      onRecord: NO_UNITS_ON_RECORD,
     });
     // An answered plan clears the count: the rail stops on faults in a row.
     state.brainFaults = 0;

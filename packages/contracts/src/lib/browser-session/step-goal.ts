@@ -8,6 +8,8 @@
 import { quoted } from '../text';
 import type { SuccessCriterion } from '../quality-loop/evidence';
 import { GOAL_BUDGET_BYTES, renderIndexSection, withinBudget } from '../quality-loop/goal-index';
+import { unitFacetsOf } from '../units/mission-identity';
+import { forbiddenOf, type UnitsOnRecord } from '../units/record';
 import type { RanAction } from './action-identity';
 import { marksOf, marksOn, type Mark } from './mission-marks';
 import { stopsOf, type StopOnPage } from './mission-stops';
@@ -21,9 +23,10 @@ import {
   type TaskLedgerSummary,
 } from './observation.schema';
 import { SETTLING_CRITERION_KINDS } from './pipelines';
+import { unitsLines } from './step-goal-units';
 import { indexOf, shownOptions, type LastStep, type StepPageState } from './step-index';
 import { limitsLines } from './step-limits';
-import { LANDMARK_ROLES, TASK_OUTCOME_SPENDS, TASK_OUTCOMES, type LandmarkRole } from './vocab';
+import { LANDMARK_ROLES, type LandmarkRole } from './vocab';
 
 /**
  * Where the mission stands, as engine facts: the criteria settled for the
@@ -61,6 +64,8 @@ export interface StepGoalInput extends StepPageState {
    * terminate is never cut for words a reduced snapshot dropped.
    */
   stops: readonly StopOnPage[];
+  /** The units an advisor put on record from earlier sessions; none when no advisor was asked. */
+  onRecord: UnitsOnRecord;
 }
 
 const optionsPart = (element: Pick<ObservedElement, 'options' | 'optionsOmitted'>): string => {
@@ -222,40 +227,6 @@ function progressLines(progress: StepProgress): string[] {
   ];
 }
 
-/**
- * The units of work as the planner is told them: the open one, the closed ones
- * by label and outcome so an item already handled is never taken up again, and
- * the counts with what the budget has left. Measured 2026-10-07: with only
- * counts to go on, the planner reopened the one listing the session had
- * handled, and the mission's "never the same listing twice" had nothing to
- * rest on.
- */
-const ledgerLines = (ledger: TaskLedgerSummary): string[] => [
-  ledger.openTask === null
-    ? '- No unit of work is open: taskStart opens one when the procedure takes an item up; an item the mission says to pass over gets no taskStart.'
-    : `- Open unit of work: ${quoted(ledger.openTask.label)} at ${ledger.openTask.url} (a taskStart while it is open is skipped).`,
-  ...(ledger.closed.length === 0
-    ? ['- Closed this session: none yet.']
-    : [
-        '- Closed this session, oldest first:',
-        ...ledger.closed.map((unit) => `  - ${quoted(unit.label)} — ${unit.outcome}`),
-        ...(ledger.closedOmitted > 0 ? [`  (${ledger.closedOmitted} older not listed)`] : []),
-      ]),
-  `- Closed so far: ${TASK_OUTCOMES.map((outcome) => `${outcome} ${ledger.counts[outcome]}`).join(' · ')}.${
-    ledger.remainingTasks === null
-      ? ''
-      : ` Units that may still be started: ${ledger.remainingTasks} — one closed ${TASK_OUTCOMES.filter(
-          (outcome) => !TASK_OUTCOME_SPENDS[outcome],
-        ).join(' or ')} does not count.`
-  }`,
-  // The session's goal, as the engine counts it: the planner never has to end the session for it.
-  ...(ledger.targetDone === null
-    ? []
-    : [
-        `- Target: ${ledger.counts.done} of ${ledger.targetDone} closed done — the session ends complete when it is reached.`,
-      ]),
-];
-
 /** One action that ran, as the page would know it again: `click button "Next"`, `fill searchbox "Search" "x"`, `press Enter`. */
 const describeRan = (ran: RanAction): string =>
   [
@@ -346,6 +317,8 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
   const marks = marksOf(input.mission);
   const { stops } = input;
   const causes = [...new Set(stopsOf(input.mission).map((stop) => stop.cause))];
+  const unitFacets = unitFacetsOf(input.mission);
+  const forbidden = forbiddenOf(input.onRecord);
   const goal = [
     // The mission brings its own heading — the template requires its `# Mission` — so the
     // goal never doubles it.
@@ -356,10 +329,10 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
     ...section('## Snapshot', snapshotLines(observation)),
     ...section('## Recent actions', historyLines(input.history)),
     ...section('## Objections to answer', objectionLines(input.objections)),
-    ...section('## Units of work', ledgerLines(input.ledger)),
+    ...section('## Units of work', unitsLines(input.ledger, input.onRecord)),
     ...section('## Progress', progressLines(input.progress)),
-    ...section('## Limits', limitsLines({ marks, stops, causes })),
-    renderIndexSection(indexOf(input, marks, stops, causes)),
+    ...section('## Limits', limitsLines({ marks, stops, causes, unitFacets, forbidden })),
+    renderIndexSection(indexOf(input, marks, stops, causes, { facets: unitFacets, forbidden })),
   ].join('\n');
   return withinBudget(goal, budget);
 }

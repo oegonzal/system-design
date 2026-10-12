@@ -10,6 +10,7 @@ import { z } from 'zod';
 
 import { bound, bounded, exact } from '../bounds';
 import { GOAL_BUDGET_BYTES } from '../quality-loop/goal-index';
+import { unitFacetsSchema } from '../units/identity';
 import { STEP_OUTCOMES } from './action-effects';
 import { ELEMENT_KINDS } from './element-kind';
 import { HIDDEN_TRAITS, LANDMARK_ROLES, SCOPE_ROLES, SNAPSHOT_RUNGS, TASK_OUTCOMES } from './vocab';
@@ -341,12 +342,25 @@ export type StepObjection = z.infer<typeof stepObjectionSchema>;
 
 export const taskLedgerSummarySchema = z.strictObject({
   openTask: z
-    .strictObject({ label: bounded.text(TASK_LABEL_BOUND), url: bounded.id(URL_MAX_LENGTH) })
+    .strictObject({
+      label: bounded.text(TASK_LABEL_BOUND),
+      url: bounded.id(URL_MAX_LENGTH),
+      /** The unit's identity as the plan declared it; empty when the mission declares no facets. */
+      facets: unitFacetsSchema,
+    })
     .nullable(),
-  /** The units closed this session, oldest first, within the bound; by label, since that is what a list item shows. */
+  /**
+   * The units closed this session, oldest first, within the bound; by label,
+   * since that is what a list item shows, and by identity, so the next plan
+   * can keep off an item that shares one with a unit already handled.
+   */
   closed: bounded.list(
     CLOSED_TASKS_BOUND,
-    z.strictObject({ label: bounded.text(TASK_LABEL_BOUND), outcome: z.enum(TASK_OUTCOMES) }),
+    z.strictObject({
+      label: bounded.text(TASK_LABEL_BOUND),
+      outcome: z.enum(TASK_OUTCOMES),
+      facets: unitFacetsSchema,
+    }),
   ),
   /** Closed units older than the bound keeps: counted, so the list never reads as the whole. */
   closedOmitted: z.number().int().min(0),

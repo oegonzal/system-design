@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { bound, bounded } from '../bounds';
-import { bulletsUnder } from './mission-sections';
+import { declaredSection } from './mission-sections';
 import type { PageObservation } from './observation.schema';
 import { STOP_ENDINGS } from './vocab';
 
@@ -18,7 +18,8 @@ import { STOP_ENDINGS } from './vocab';
  *     - login-wall (stopped) "Sign in": a sign-in form appears.
  *
  * The cause words and their endings are the mission's: the engine reads them
- * back as data, and no cause is the engine's own.
+ * back as data, and no cause is the engine's own. What a cause means is the
+ * bullet's own prose, read by the planner in the mission itself.
  *
  * A cause tied to words is checked, not believed: the composer writes into
  * the step index whether this page shows them, and the limits validator cuts
@@ -35,20 +36,15 @@ export const STOPS_HEADING = '## Stop conditions';
 export const STOPS_BOUND = bound(8, 'list');
 export const STOP_TOKEN_MAX_LENGTH = 60;
 export const STOP_CAUSE_MAX_LENGTH = 40;
-/** A cause word: lower-case words joined by hyphens, as a mission names it. */
-const STOP_CAUSE = /^[a-z][a-z0-9-]*$/;
-export const STOP_MEANING_BOUND = bound(300);
 
 const stopConditionSchema = z.strictObject({
-  cause: z.string().regex(STOP_CAUSE).max(STOP_CAUSE_MAX_LENGTH),
+  /** A cause word as the mission names it: lower-case words joined by hyphens, read by the grammar. */
+  cause: bounded.id(STOP_CAUSE_MAX_LENGTH, { min: 1 }),
   /** The status a stop leaves the session in, as the mission declares it. */
   ending: z.enum(STOP_ENDINGS),
   /** The exact text the page shows when the cause holds, matched as written; null when the mission ties the cause to no words. */
   token: bounded.id(STOP_TOKEN_MAX_LENGTH, { min: 1 }).nullable(),
-  /** What the mission says the cause means, for the planner. */
-  meaning: bounded.text(STOP_MEANING_BOUND, { min: 1 }),
 });
-const stopConditionsSchema = bounded.list(STOPS_BOUND, stopConditionSchema);
 export type StopCondition = z.infer<typeof stopConditionSchema>;
 
 /** A stop condition the mission ties to words, as this page bears on it: the step index's entry. */
@@ -59,8 +55,7 @@ export interface StopOnPage {
 }
 
 /** One bullet: the cause word, its ending in parentheses, an optional quoted token, a colon, the meaning. */
-const STOP_LINE =
-  /^- (?<cause>[a-z][a-z0-9-]*) \((?<ending>[a-z]+)\)(?: "(?<token>[^"]+)")?: (?<meaning>.+)$/;
+const STOP_LINE = /^- (?<cause>[a-z][a-z0-9-]*) \((?<ending>[a-z]+)\)(?: "(?<token>[^"]+)")?: .+$/;
 
 /** A Stop conditions bullet the grammar does not read; the mission is refused before any page is. */
 export class MissionStopMalformed extends Error {
@@ -72,31 +67,33 @@ export class MissionStopMalformed extends Error {
   }
 }
 
+/** A cause declared twice with two endings: the second bullet is the offending one. */
+const oneEndingPerCause = (
+  rows: readonly StopCondition[],
+  lines: readonly string[],
+): string | null => {
+  const endings = new Map<string, string>();
+  for (const [index, row] of rows.entries()) {
+    const seen = endings.get(row.cause);
+    if (seen !== undefined && seen !== row.ending) return lines[index] ?? null;
+    endings.set(row.cause, row.ending);
+  }
+  return null;
+};
+
 /**
  * The stop conditions a mission declares, in order; none when the section is
  * absent. A bullet the grammar does not read, an ending the vocabulary does
  * not know, or a cause declared twice with two endings refuses the mission.
  */
-export function stopsOf(mission: string): StopCondition[] {
-  const endings = new Map<string, string>();
-  const stops = bulletsUnder(mission, STOPS_HEADING).map((line) => {
-    const groups = STOP_LINE.exec(line)?.groups;
-    if (groups === undefined) throw new MissionStopMalformed(line);
-    const cause = groups['cause'] ?? '';
-    const ending = groups['ending'] ?? '';
-    if (endings.has(cause) && endings.get(cause) !== ending) throw new MissionStopMalformed(line);
-    endings.set(cause, ending);
-    const parsed = stopConditionSchema.safeParse({
-      cause,
-      ending,
-      token: groups['token'] ?? null,
-      meaning: groups['meaning'] ?? '',
-    });
-    if (!parsed.success) throw new MissionStopMalformed(line);
-    return parsed.data;
-  });
-  return stopConditionsSchema.parse(stops);
-}
+export const stopsOf = declaredSection({
+  heading: STOPS_HEADING,
+  line: STOP_LINE,
+  row: stopConditionSchema,
+  bound: STOPS_BOUND,
+  malformed: MissionStopMalformed,
+  across: oneEndingPerCause,
+});
 
 /** Whether the page shows a stop's words: in an element's name or words, or in a line of the snapshot, exactly as written. */
 const shownOn = (

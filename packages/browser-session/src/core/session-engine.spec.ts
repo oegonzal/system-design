@@ -70,7 +70,7 @@ describe('the session engine', () => {
     // Once closed, the unit is listed to the next plan by label and outcome, and counted.
     expect(brain.planInputs[4]?.ledger).toMatchObject({
       openTask: null,
-      closed: [{ label: 'Senior Engineer at Acme', outcome: 'done' }],
+      closed: [{ label: 'Senior Engineer at Acme', outcome: 'done', facets: [] }],
       closedOmitted: 0,
       counts: { done: 1, 'already-done': 0, skipped: 0, failed: 0 },
     });
@@ -169,6 +169,7 @@ describe('the session engine', () => {
           kind: 'taskStart',
           label: 'Senior Engineer at Acme',
           url: JOURNEY_URLS.listing,
+          facets: [],
           reason: 'the unit begins',
           expect: null,
           serves: [],
@@ -186,6 +187,7 @@ describe('the session engine', () => {
           kind: 'taskStart',
           label: 'Staff Engineer at Globex',
           url: JOURNEY_URLS.listing,
+          facets: [],
           reason: 'the next unit begins',
           expect: null,
           serves: [],

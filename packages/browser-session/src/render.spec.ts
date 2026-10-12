@@ -11,6 +11,7 @@ const session = (overrides: Partial<BrowserSessionDto> = {}): BrowserSessionDto 
   goalPath: 'goals/smoke-search.md',
   goalHash: 'abcdef0123456789',
   profile: 'smoke',
+  subject: 'Alex Example',
   headed: true,
   status: 'complete',
   terminationReason: 'mission-stop',
@@ -58,6 +59,7 @@ describe('the CLI renderer', () => {
           ordinal: 1,
           label: 'Senior Engineer at Acme',
           externalRef: 'https://jobs.example.test/42',
+          facets: [{ name: 'company', value: 'Acme' }],
           status: 'complete',
           outcome: 'done',
           startStep: 2,
@@ -112,7 +114,8 @@ describe('the CLI renderer', () => {
     );
     expect(targeted).toContain('3 brain faults · target 5 done');
     expect(targeted).toContain('ended by target-reached: 5 of 5 units of work closed done');
-    expect(text).toMatch(/1\s+Senior Engineer at Acme\s+complete\s+done\s+2–4/);
+    expect(text).toMatch(/1\s+Senior Engineer at Acme\s+company=Acme\s+complete\s+done\s+2–4/);
+    expect(text).toContain('subject Alex Example');
     expect(text).toMatch(
       /3\.2\s+field-answer\s+operator\s+run-9\s+e2\s+Work authorisation\s+Yes\s+low\s+teach-1/,
     );

@@ -74,6 +74,10 @@ export class BrowserSession {
   @Property({ type: 'text' })
   profile!: string;
 
+  /** Whom the session acted for, as it was told: the partition a record beyond the session is kept under. Null before it was kept. */
+  @Property({ type: 'text', nullable: true })
+  subject: string | null = null;
+
   @Property({ type: 'boolean' })
   headed!: boolean;
 

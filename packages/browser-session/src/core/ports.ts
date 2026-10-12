@@ -28,6 +28,8 @@ import type {
   TaskLedgerSummary,
   TaskOutcome,
   StopEnding,
+  UnitFacet,
+  UnitsOnRecord,
 } from '@sysdesign/contracts';
 import { MISSION_STOP } from '@sysdesign/contracts';
 import type { DumpBytes, DumpFile } from '@sysdesign/run-dump';
@@ -176,6 +178,8 @@ export interface StepInput {
   lastStep: LastStep | null;
   /** The criteria settled for the session, which the run's rubric omits, and those done in the open unit, which it keeps. */
   progress: { settled: readonly string[]; done: readonly string[] };
+  /** The units an advisor put on record from earlier sessions; none when no advisor was asked. */
+  onRecord: UnitsOnRecord;
 }
 
 /** What the form-memory orchestration reports of the run it opened: its admission, and the locations a reader withholds. */
@@ -231,6 +235,8 @@ export interface NewSession {
   goalHash: string;
   goalMarkdown: string;
   profile: string;
+  /** Whom the session acts for, by name: the partition every record beyond the session is kept under. */
+  subject: string;
   headed: boolean;
   limits: SessionRailsDto;
   startedAt: Date;
@@ -242,6 +248,8 @@ export interface NewTask {
   ordinal: number;
   label: string;
   externalRef: string | null;
+  /** The unit's identity as the plan declared it. */
+  facets: readonly UnitFacet[];
   startStep: number;
   startedAt: Date;
 }

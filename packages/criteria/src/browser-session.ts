@@ -66,6 +66,11 @@ export const BROWSER_SESSION_CRITERIA: readonly Criterion[] = [
     statement:
       'A field with no options that goes to the operator is asked at once, and suggested answers are asked for once per form, for exactly those fields, under the session’s own derived rubric: they are lettered record first, then the drafts labelled apart as transferable or invented, less every one the run’s report withholds and none from a run no judge saw; when they arrive before an answer the question is withdrawn as superseded and asked again with them, an answer given first is taken and nothing is asked again, a faulted run is warned once and leaves the question as asked, the full text behind a letter is what is filled, cached and taught, the decision row records what it rested on, and the fields file records what became of the suggestions.',
   },
+  {
+    id: 'BRW-13',
+    statement:
+      'A unit of work carries the identity its mission declares: the facts named under Unit identity, read by the one declared-section grammar every mission section uses, carried by every taskStart as facets with their values as the page names them, compared across sessions by one fixed-locale key, stored on the task row and rendered beside each open and closed unit; the units an advisor puts on record are rendered under Units of work by stance within a bound, and only the forbidden ones reach the goal’s index.',
+  },
   // Memory ingest (packages/memory-ingest)
   {
     id: 'ING-1',

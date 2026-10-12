@@ -19,23 +19,15 @@ const withStops = (bullets: string): string =>
   );
 
 describe('the stop conditions a mission declares', () => {
-  it("[BRW-8] reads every bullet as the mission's cause word, the status it ends the session in, the words the page shows when it holds, and the meaning — the words optional", () => {
+  it("[BRW-8] reads every bullet as the mission's cause word, the status it ends the session in and the words the page shows when it holds — the words optional, the meaning the mission's own prose", () => {
     expect(stopsOf(MISSION_FIXTURE)).toEqual([
-      {
-        cause: 'limit-reached',
-        ending: 'complete',
-        token: 'no more applications',
-        meaning: 'the site says no more applications are allowed today.',
-      },
-      { cause: 'login-wall', ending: 'stopped', token: null, meaning: 'a sign-in form appears.' },
-      {
-        cause: 'mission-complete',
-        ending: 'complete',
-        token: null,
-        meaning: 'no listing is left.',
-      },
+      { cause: 'limit-reached', ending: 'complete', token: 'no more applications' },
+      { cause: 'login-wall', ending: 'stopped', token: null },
+      { cause: 'mission-complete', ending: 'complete', token: null },
     ]);
     expect(stopsOf('# Mission\n\nNo stops declared.\n')).toEqual([]);
+    // A bullet still has to say what the cause means.
+    expect(() => stopsOf(withStops('- login-wall (stopped):'))).toThrow(MissionStopMalformed);
     // A cause may be tied to several words, one bullet each; a meaning may quote.
     expect(
       stopsOf(
@@ -53,7 +45,7 @@ describe('the stop conditions a mission declares', () => {
   it('[BRW-8] reads any cause the mission names, and refuses a line the grammar does not read, an ending it does not know, or a cause given two endings, naming the line', () => {
     // The cause is the mission's word: the engine knows none of them.
     expect(stopsOf(withStops('- out-of-credit (stopped): the balance is gone.'))).toEqual([
-      { cause: 'out-of-credit', ending: 'stopped', token: null, meaning: 'the balance is gone.' },
+      { cause: 'out-of-credit', ending: 'stopped', token: null },
     ]);
     expect(() => stopsOf(withStops('- limit-reached — no colon'))).toThrow(MissionStopMalformed);
     // No ending: the status a stop leaves the session in is never implied.

@@ -2,12 +2,14 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import {
+  advisorsOf,
   composeStepGoal,
   formObservation,
   marksOf,
   stopsOf,
   TASK_OUTCOMES,
   stepGoalInput,
+  unitFacetsOf,
 } from '@sysdesign/contracts';
 
 /**
@@ -53,6 +55,9 @@ describe('the goals', () => {
       const causes: readonly string[] = stops.map((stop) => stop.cause);
       // A Marks section, when a goal has one, reads whole: a mark nobody reads is a trap.
       expect(() => marksOf(text)).not.toThrow();
+      // So do a Unit identity and an Advisors section: a fact or an advisor nobody reads is a record nobody keeps.
+      expect(() => unitFacetsOf(text)).not.toThrow();
+      expect(() => advisorsOf(text)).not.toThrow();
       const events = text.slice(text.indexOf('## Task events'));
       const outcomes = [...events.matchAll(/`([a-z-]+)`/g)].map((match) => match[1]);
       const spoken = outcomes.filter((word) => (TASK_OUTCOMES as readonly string[]).includes(word));

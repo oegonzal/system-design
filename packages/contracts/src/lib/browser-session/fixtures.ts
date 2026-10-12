@@ -6,6 +6,7 @@
  */
 import type { DocumentChunk } from '../quality-loop/document-digest';
 import { DOCUMENT_RULES } from '../quality-loop/document-digest';
+import { NO_UNITS_ON_RECORD } from '../units/record';
 import type { ObservedElement, PageObservation, TaskLedgerSummary } from './observation.schema';
 import { stopsOf, stopsOnPage } from './mission-stops';
 import type { StepGoalInput } from './step-goal';
@@ -165,8 +166,12 @@ export function emptyLedger(): TaskLedgerSummary {
 
 export function openTaskLedger(): TaskLedgerSummary {
   return {
-    openTask: { label: 'Senior Engineer at Acme', url: 'https://jobs.example.test/apply/42' },
-    closed: [{ label: 'Staff Engineer at Globex', outcome: 'done' }],
+    openTask: {
+      label: 'Senior Engineer at Acme',
+      url: 'https://jobs.example.test/apply/42',
+      facets: [],
+    },
+    closed: [{ label: 'Staff Engineer at Globex', outcome: 'done', facets: [] }],
     closedOmitted: 0,
     counts: { done: 1, 'already-done': 0, skipped: 0, failed: 0 },
     remainingTasks: 8,
@@ -204,6 +209,13 @@ Answer about the applicant only from the evidence listed; otherwise ask the oper
 - Never type into a field the page hides or that asks whether you are a bot.
 `;
 
+/** The fixture mission declaring a unit's identity: one fact, the company as the listing names it. */
+export const MISSION_WITH_IDENTITY = `${MISSION_FIXTURE}
+## Unit identity
+
+- company: the company as the listing names it, beside the title.
+`;
+
 export function resumeChunk(): DocumentChunk {
   return {
     kind: 'resume',
@@ -236,6 +248,7 @@ export const stepGoalInput = (overrides: Partial<StepGoalInput> = {}): StepGoalI
     pageUnchanged: false,
     lastStep: null,
     stops: stopsOnPage(stopsOf(mission), observation),
+    onRecord: NO_UNITS_ON_RECORD,
     ...overrides,
   };
 };

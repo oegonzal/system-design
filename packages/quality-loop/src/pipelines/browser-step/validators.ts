@@ -24,6 +24,8 @@ import {
   actionLocation,
   actionRefs,
   CLAIMING_ACTION_KINDS,
+  describeIdentity,
+  matchesRecord,
   MUTATING_ACTION_KINDS,
   PAGE_REPLACING_ACTION_KINDS,
   PAGE_REPLACING_WAITS,
@@ -245,6 +247,50 @@ const stopFault = (action: StepAction, index: StepIndex): string | null => {
   return `terminate ${action.cause}: the mission ties it to the words ${tied.map((stop) => quotedJson(stop.token)).join(' or ')}, which this page does not show`;
 };
 
+/**
+ * A taskStart carries the unit's identity as the facts the mission declares,
+ * each once with a value, and no other: a record beyond this session names
+ * units by exactly these, so a claim missing one, or inventing one, is a unit
+ * nobody could look up. Blank values are a structural fault the schema already
+ * refuses; here the names are held to the index.
+ */
+const facetsFault = (action: StepAction, index: StepIndex): string | null => {
+  if (action.kind !== 'taskStart') return null;
+  const named = action.facets.map((facet) => facet.name);
+  const declared = index.unitFacets;
+  const missing = declared.filter((name) => !named.includes(name));
+  const undeclared = named.filter((name) => !declared.includes(name));
+  const repeated = named.filter((name, position) => named.indexOf(name) !== position);
+  if (missing.length === 0 && undeclared.length === 0 && repeated.length === 0) return null;
+  const faults = [
+    ...(missing.length > 0 ? [`lacks ${missing.join(', ')}`] : []),
+    ...(undeclared.length > 0
+      ? [`names ${undeclared.join(', ')}, which the mission does not declare`]
+      : []),
+    ...(repeated.length > 0 ? [`names ${[...new Set(repeated)].join(', ')} twice`] : []),
+  ];
+  return `taskStart ${faults.join('; ')}: a unit's identity is ${
+    declared.length === 0
+      ? 'no facet, since the mission declares none'
+      : `exactly ${declared.join(', ')}`
+  }`;
+};
+
+/**
+ * A unit on record as forbidden is never started: the identities an advisor
+ * put in the index are compared to the claim by the one key every process
+ * uses, and the record's own note is said back with the alternative, so the
+ * next plan knows why and what instead.
+ */
+const forbiddenFault = (action: StepAction, index: StepIndex): string | null => {
+  if (action.kind !== 'taskStart') return null;
+  const hit = index.unitsForbidden.find((unit) => matchesRecord(action.facets, unit.identity));
+  if (hit === undefined) return null;
+  return `taskStart names ${describeIdentity(hit.identity)}, a unit on record as forbidden${
+    hit.note === '' ? '' : ` (${hit.note})`
+  }: it is never started — choose another item`;
+};
+
 const limits: Rule = (plan, index) => {
   const elements = new Map(index.elements.map((element) => [element.ref, element]));
   const problems: ValidationProblem[] = [];
@@ -292,6 +338,10 @@ const limits: Rule = (plan, index) => {
     if (cause !== null) problems.push(problem('high', cause, at));
     const stop = stopFault(action, index);
     if (stop !== null) problems.push(problem('high', stop, at));
+    const facets = facetsFault(action, index);
+    if (facets !== null) problems.push(problem('high', facets, at));
+    const forbidden = forbiddenFault(action, index);
+    if (forbidden !== null) problems.push(problem('high', forbidden, at));
     // Past a page replacement every action is already refused above; the
     // stale-claim rule says what a replacement rule did not.
     const stale = replaced === null ? staleClaimFault(action, mutated) : null;

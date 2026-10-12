@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { bound, bounded } from '../bounds';
-import { bulletsUnder } from './mission-sections';
+import { declaredSection } from './mission-sections';
 import type { ObservedElement } from './observation.schema';
 
 /**
@@ -22,27 +22,24 @@ import type { ObservedElement } from './observation.schema';
  * The engine never names a word. It renders the mark beside every element
  * whose name or words carry the token, writes it into the step index, and the
  * limits validator refuses a touch on a marked element the way it refuses one
- * on an element the page hides. A mission that declares no marks declares
- * none, and nothing here runs.
+ * on an element the page hides. What a mark means is the bullet's own prose,
+ * read by the planner in the mission itself and carried nowhere else. A
+ * mission that declares no marks declares none, and nothing here runs.
  */
 
 export const MARKS_HEADING = '## Marks';
 /** The most marks a mission declares; a mark is a state word, and a page has few. */
 export const MARKS_BOUND = bound(8, 'list');
 export const MARK_TOKEN_MAX_LENGTH = 60;
-export const MARK_MEANING_BOUND = bound(200);
 
-export const markSchema = z.strictObject({
+const markSchema = z.strictObject({
   /** The exact text the page writes on a marked item, matched as written. */
   token: bounded.id(MARK_TOKEN_MAX_LENGTH, { min: 1 }),
-  /** What the mission says the mark means, for the planner. */
-  meaning: bounded.text(MARK_MEANING_BOUND, { min: 1 }),
 });
-export const marksSchema = bounded.list(MARKS_BOUND, markSchema);
 export type Mark = z.infer<typeof markSchema>;
 
-/** One bullet of the Marks section: the token in double quotes, a colon, the meaning. */
-const MARK_LINE = /^- "(?<token>[^"]+)": (?<meaning>.+)$/;
+/** One bullet of the Marks section: the token in double quotes, a colon, what it means. */
+const MARK_LINE = /^- "(?<token>[^"]+)": .+$/;
 
 /** A Marks bullet the grammar does not read; the mission is refused before any page is, since a mark nobody reads is a trap. */
 export class MissionMarkMalformed extends Error {
@@ -54,19 +51,14 @@ export class MissionMarkMalformed extends Error {
   }
 }
 
-/**
- * The marks a mission declares, read from its `## Marks` section: every
- * bullet there, in order, or none when the section is absent. A bullet the
- * grammar does not read refuses the mission.
- */
-export function marksOf(mission: string): Mark[] {
-  const marks = bulletsUnder(mission, MARKS_HEADING).map((line) => {
-    const groups = MARK_LINE.exec(line)?.groups;
-    if (groups === undefined) throw new MissionMarkMalformed(line);
-    return { token: groups['token'] ?? '', meaning: groups['meaning'] ?? '' };
-  });
-  return marksSchema.parse(marks);
-}
+/** The marks a mission declares, read from its `## Marks` section, in order; none when the section is absent. */
+export const marksOf = declaredSection({
+  heading: MARKS_HEADING,
+  line: MARK_LINE,
+  row: markSchema,
+  bound: MARKS_BOUND,
+  malformed: MissionMarkMalformed,
+});
 
 /** The marks an element carries: every declared token found in its name, or in its words when it has no name. */
 export function marksOn(

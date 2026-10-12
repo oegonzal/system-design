@@ -51,6 +51,7 @@ describe('the ledger in Postgres', () => {
       goalHash: 'a'.repeat(64),
       goalMarkdown: '# Mission\n',
       profile: 'spec',
+      subject: 'Alex Example',
       headed: false,
       limits: RAILS,
       startedAt: T0,
@@ -58,6 +59,7 @@ describe('the ledger in Postgres', () => {
     const [opened] = await ledger.listSessions(10);
     expect(opened).toMatchObject({
       id: sessionId,
+      subject: 'Alex Example',
       status: 'running',
       terminationReason: null,
       steps: 0,
@@ -83,6 +85,7 @@ describe('the ledger in Postgres', () => {
       ordinal: 1,
       label: 'Senior Engineer at Acme',
       externalRef: 'https://jobs.example.test/42',
+      facets: [{ name: 'company', value: 'Acme' }],
       startStep: 2,
       startedAt: at(20),
     });
@@ -180,6 +183,7 @@ describe('the ledger in Postgres', () => {
         ordinal: 1,
         label: 'Senior Engineer at Acme',
         externalRef: 'https://jobs.example.test/42',
+        facets: [{ name: 'company', value: 'Acme' }],
         status: 'complete',
         outcome: 'done',
         startStep: 2,
@@ -220,6 +224,7 @@ describe('the ledger in Postgres', () => {
       goalHash: 'b'.repeat(64),
       goalMarkdown: '# Mission\n',
       profile: 'spec',
+      subject: 'Alex Example',
       headed: false,
       limits: { ...RAILS, targetDone: 2 },
       startedAt: T0,
@@ -247,6 +252,7 @@ describe('the ledger in Postgres', () => {
       goalHash: 'c'.repeat(64),
       goalMarkdown: '# Mission\n',
       profile: 'spec',
+      subject: 'Alex Example',
       headed: false,
       limits: RAILS,
       startedAt: T0,

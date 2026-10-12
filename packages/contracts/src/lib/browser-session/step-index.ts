@@ -9,6 +9,9 @@ import { z } from 'zod';
 
 import { bounded } from '../bounds';
 import { readFencedIndex } from '../quality-loop/goal-index';
+import { unitIdentitySchema } from '../units/identity';
+import type { UnitOnRecord } from '../units/record';
+import { UNIT_FACET_NAME_MAX_LENGTH, UNIT_NOTE_BOUND } from '../units/vocab';
 import { STEP_ACTION_KINDS } from './action-effects';
 import { refNowOf, type RanAction } from './action-identity';
 import { ELEMENT_KINDS } from './element-kind';
@@ -136,8 +139,29 @@ export const stepIndexSchema = z.strictObject({
    * declares any.
    */
   causes: z.array(bounded.id(STOP_CAUSE_MAX_LENGTH, { min: 1 })).default([]),
+  /**
+   * The facts the mission's Unit identity declares, by name: a taskStart
+   * carries exactly these, or the limits validator cuts it. Written only when
+   * the mission declares any.
+   */
+  unitFacets: z.array(bounded.id(UNIT_FACET_NAME_MAX_LENGTH, { min: 1 })).default([]),
+  /**
+   * The units an advisor put on record as forbidden, by identity: a taskStart
+   * whose facets match one is cut, with the record's note said back. Written
+   * only when there are any; the units merely to avoid are prose for the
+   * planner and never a validator's fact.
+   */
+  unitsForbidden: z
+    .array(z.strictObject({ identity: unitIdentitySchema, note: bounded.text(UNIT_NOTE_BOUND) }))
+    .default([]),
 });
 export type StepIndex = z.infer<typeof stepIndexSchema>;
+
+/** What the goal declares about units beyond this session, for the index: the facet names, and the forbidden identities. */
+export interface UnitFacts {
+  facets: readonly string[];
+  forbidden: readonly UnitOnRecord[];
+}
 
 /** The first `OPTIONS_SHOWN` options, then a count of those the page offers past them, so a cut list never reads as the whole. */
 export const shownOptions = (
@@ -154,6 +178,7 @@ export const indexOf = (
   marks: readonly Mark[],
   stops: readonly StopOnPage[],
   causes: readonly string[],
+  units: UnitFacts,
 ): z.input<typeof stepIndexSchema> => ({
   pipeline: BROWSER_STEP_PIPELINE_ID,
   maxActions: ACTIONS_BOUND.target,
@@ -185,6 +210,15 @@ export const indexOf = (
     : {}),
   ...(stops.length > 0 ? { stops: [...stops] } : {}),
   ...(causes.length > 0 ? { causes: [...causes] } : {}),
+  ...(units.facets.length > 0 ? { unitFacets: [...units.facets] } : {}),
+  ...(units.forbidden.length > 0
+    ? {
+        unitsForbidden: units.forbidden.map((unit) => ({
+          identity: [...unit.identity],
+          note: unit.note,
+        })),
+      }
+    : {}),
 });
 
 /** The index this codec wrote, or null for a goal that is not a browser step. */

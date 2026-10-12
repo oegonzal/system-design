@@ -55,6 +55,7 @@ function openTask(
     ordinal: state.tasks.started + 1,
     label: action.label,
     url: action.url,
+    facets: action.facets,
     startStep: state.step,
   };
   state.tasks.open = task;
@@ -67,6 +68,7 @@ function openTask(
       ordinal: task.ordinal,
       label: task.label,
       externalRef: task.url,
+      facets: task.facets,
       startStep: task.startStep,
       startedAt,
     }),
@@ -89,7 +91,7 @@ async function closeTask(
   state.tasks.counts[action.outcome] += 1;
   // The next goal lists what this session handled, most recent last; past the
   // bound the oldest is counted rather than cut without a word.
-  state.tasks.closed.push({ label: task.label, outcome: action.outcome });
+  state.tasks.closed.push({ label: task.label, outcome: action.outcome, facets: [...task.facets] });
   if (state.tasks.closed.length > CLOSED_TASKS_BOUND.target) {
     state.tasks.closed.shift();
     state.tasks.closedOmitted += 1;

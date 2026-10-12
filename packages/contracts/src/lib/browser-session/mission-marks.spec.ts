@@ -6,18 +6,17 @@ import { MARKS_BOUND, marksOf, marksOn, MissionMarkMalformed } from './mission-m
 const withMarks = (lines: string): string => `${MISSION_FIXTURE}\n\n## Marks\n\n${lines}\n`;
 
 describe('the marks a mission declares', () => {
-  it('[BRW-8] reads every bullet of the Marks section as a token and its meaning, and none from a mission without one', () => {
+  it('[BRW-8] reads every bullet of the Marks section as its token — the meaning stays the mission’s prose — and none from a mission without one', () => {
     expect(marksOf(MISSION_FIXTURE)).toEqual([]);
     expect(
       marksOf(withMarks('- "Applied ·": applied to before.\n- "Sold out": nothing left to buy.')),
-    ).toEqual([
-      { token: 'Applied ·', meaning: 'applied to before.' },
-      { token: 'Sold out', meaning: 'nothing left to buy.' },
-    ]);
+    ).toEqual([{ token: 'Applied ·' }, { token: 'Sold out' }]);
     // The section ends at the next heading; a blank line is not a mark.
     expect(
       marksOf(`${withMarks('- "Read": seen already.')}\n## Afterword\n\n- "not a mark"\n`),
-    ).toEqual([{ token: 'Read', meaning: 'seen already.' }]);
+    ).toEqual([{ token: 'Read' }]);
+    // A bullet still has to say what the mark means: a token alone is not a mark.
+    expect(() => marksOf(withMarks('- "Applied ·":'))).toThrow(MissionMarkMalformed);
   });
 
   it('[BRW-8] refuses a mission whose Marks section holds a line the grammar does not read, naming the line', () => {
@@ -45,7 +44,7 @@ describe('the marks a mission declares', () => {
         { name: 'Senior Engineer Acme Applied · Posted 3 weeks ago · Easy Apply', text: null },
         marks,
       ),
-    ).toEqual([{ token: 'Applied ·', meaning: 'applied to before.' }]);
+    ).toEqual([{ token: 'Applied ·' }]);
     // "Easy Apply" is not "Applied ·", and case counts: a mark is the page's text as written.
     expect(marksOn({ name: 'Easy Apply', text: null }, marks)).toEqual([]);
     expect(marksOn({ name: '', text: 'applied · yesterday' }, marks)).toEqual([]);

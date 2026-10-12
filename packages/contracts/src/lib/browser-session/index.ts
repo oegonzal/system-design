@@ -9,6 +9,7 @@ export * from './observation-fingerprint';
 export * from './observation.schema';
 export * from './step-plan.schema';
 export * from './step-goal';
+export * from './step-goal-units';
 export * from './step-index';
 export * from './step-limits';
 export * from './field-answers.schema';

@@ -60,14 +60,19 @@ export function renderSessions(sessions: readonly BrowserSessionDto[], now: Date
   );
 }
 
+/** A unit's identity as the table shows it: `company=Acme`, each declared fact in turn. */
+const identityCell = (task: BrowserTaskDto): string =>
+  task.facets.map((facet) => `${facet.name}=${facet.value}`).join(' · ');
+
 const taskRows = (tasks: readonly BrowserTaskDto[]): string =>
   tasks.length === 0
     ? 'no units of work'
     : table(
-        ['#', 'label', 'status', 'outcome', 'steps', 'ref'],
+        ['#', 'label', 'identity', 'status', 'outcome', 'steps', 'ref'],
         tasks.map((task) => [
           String(task.ordinal),
           excerpt(task.label, 48),
+          excerpt(identityCell(task), 40),
           task.status,
           task.outcome ?? '',
           `${task.startStep}${task.endStep === null ? '…' : `–${task.endStep}`}`,
@@ -100,9 +105,9 @@ export function renderSession(detail: BrowserSessionDetailDto, now: Date): strin
       : ` · ended by ${endedBy(detail.terminationReason, detail.terminationCause)}${detail.terminationDetail ? `: ${detail.terminationDetail}` : ''}`;
   return [
     `session ${detail.id} · ${liveness(detail, now)}${ended}`,
-    `goal ${detail.goalPath} (${detail.goalHash.slice(0, 12)}) · profile ${detail.profile} · ${
-      detail.headed ? 'headed' : 'headless'
-    } · ${detail.steps} step(s) · dump ${detail.dumpRunId}`,
+    `goal ${detail.goalPath} (${detail.goalHash.slice(0, 12)}) · profile ${detail.profile}${
+      detail.subject === null ? '' : ` · subject ${detail.subject}`
+    } · ${detail.headed ? 'headed' : 'headless'} · ${detail.steps} step(s) · dump ${detail.dumpRunId}`,
     `rails: ${detail.limits.maxTasks} tasks · ${detail.limits.maxMinutes} min · ${detail.limits.maxConsecutiveFailures} failures · ${detail.limits.maxBrainFaults} brain faults${
       detail.limits.targetDone === null ? '' : ` · target ${detail.limits.targetDone} done`
     }`,

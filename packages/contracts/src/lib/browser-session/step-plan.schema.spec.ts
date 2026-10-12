@@ -17,6 +17,7 @@ describe('stepPlanSchema', () => {
     for (const meaning of [
       'exactly as the Elements list gives it',
       'One of the options the Elements list gives for this ref, verbatim.',
+      "Each fact the mission's Unit identity declares, with its value exactly as this page names it; empty when the mission declares none.",
     ]) {
       expect(json, `the model is never told: ${meaning}`).toContain(meaning);
     }

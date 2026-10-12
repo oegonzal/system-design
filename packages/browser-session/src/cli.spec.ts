@@ -24,6 +24,7 @@ const session = (overrides: Partial<BrowserSessionDto> = {}): BrowserSessionDto 
   goalPath: 'goals/smoke-search.md',
   goalHash: 'abc123',
   profile: 'smoke',
+  subject: null,
   headed: true,
   status: 'complete',
   terminationReason: 'mission-stop',

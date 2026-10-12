@@ -12,6 +12,7 @@ import {
   GoalBudgetExceeded,
   listingObservation,
   MISSION_FIXTURE,
+  NO_UNITS_ON_RECORD,
   renderDocumentGoal,
   resumeChunk,
   routePlan,
@@ -64,6 +65,7 @@ const stepInput = (
   pageUnchanged,
   lastStep,
   progress: { settled: [], done: [] },
+  onRecord: NO_UNITS_ON_RECORD,
 });
 
 /** A goal input with the stop facts the composer is handed, read from its own page. */
