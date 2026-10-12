@@ -4,11 +4,10 @@ import {
   needsValue,
   quoted,
   routeFields,
-  type Admission,
   type FieldReadout,
+  type FieldsDecision,
   type FieldSpec,
   type FieldType,
-  type QualityRunDto,
 } from '@sysdesign/contracts';
 
 import type { BrainFaulted } from './ports';
@@ -67,21 +66,21 @@ export function faultedReadouts(fields: readonly FieldSpec[], fault: BrainFaulte
         : needsValue(field)
           ? reason
           : `optional, left blank: ${reason}`,
-      faults: [],
+      withheld: [],
     };
   });
 }
 
-/** One route per field for the session: the contracts' table, then the operator's cache. */
+/** One route per field for the session: the contracts' table over what the orchestration reported, then the operator's cache. */
 export function routeFieldsInSession(
-  decided: { run: QualityRunDto; admission: Admission } | null,
+  decided: FieldsDecision | null,
   fault: BrainFaulted | null,
   fields: readonly FieldSpec[],
   cache: ReadonlyMap<string, string>,
 ): RoutedField[] {
   const readouts =
     decided !== null
-      ? routeFields(decided.run, decided.admission, fields)
+      ? routeFields(decided, fields)
       : fault !== null
         ? faultedReadouts(fields, fault)
         : [];

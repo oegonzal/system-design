@@ -101,7 +101,10 @@ describe('the form-memory orchestrator', () => {
     expect(record.steps[FORM_MEMORY_TARGET_STEP]).toMatchObject({
       status: 'complete',
       runIds: ['answer-suggestions-run'],
-      report: { admission: 'admitted', withheld: ['field.3.2'] },
+      report: {
+        admission: 'admitted',
+        withheld: [{ ref: 'field.3.2', source: 'finding', by: 'mislabelled', note: null }],
+      },
     });
   });
 
@@ -169,9 +172,12 @@ describe('the form-memory orchestrator', () => {
     );
     expect(FORM_MEMORY.contextSchema.safeParse({ bogus: true }).success).toBe(false);
     const target = FORM_MEMORY.reports[FORM_MEMORY_TARGET_STEP];
-    expect(target?.safeParse({ admission: 'admitted', withheld: ['field.3.2'] }).success).toBe(
-      true,
-    );
+    expect(
+      target?.safeParse({
+        admission: 'admitted',
+        withheld: [{ ref: 'field.3.2', source: 'finding', by: 'mislabelled', note: null }],
+      }).success,
+    ).toBe(true);
     expect(target?.safeParse({ admission: 'maybe', withheld: [] }).success).toBe(false);
   });
 });

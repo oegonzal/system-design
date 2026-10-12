@@ -51,7 +51,9 @@ describe('reading a recall', () => {
     expect(readout.admission).toBe('admitted');
     // m2 is the one a finding names, and it is the only one withheld.
     expect(readout.usable.map((item) => item.alias)).toEqual(['m1']);
-    expect(readout.withheld).toEqual([{ ref: 'm2', source: 'finding', by: 'irrelevant_chunk' }]);
+    expect(readout.withheld).toEqual([
+      { ref: 'm2', source: 'finding', by: 'irrelevant_chunk', note: null },
+    ]);
   });
 
   it('[QL-53] a redundant set and a gap that names a kept chunk each withhold nothing', () => {

@@ -282,7 +282,7 @@ describe('what a knowledge digest endorses', () => {
       [2, 'fact'],
     ]);
     expect(readout.withheld).toEqual([
-      { ref: 'memory.3', source: 'validator', by: 'run-specificity' },
+      { ref: 'memory.3', source: 'validator', by: 'run-specificity', note: expect.any(String) },
     ]);
   });
 });

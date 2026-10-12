@@ -6,6 +6,7 @@
 import { z } from 'zod';
 
 import { ADMISSIONS } from '../quality-loop/admission';
+import { WITHHOLDING_SOURCES } from '../quality-loop/pipeline';
 
 /** One bounded plan for the page in front of the session. */
 export const BROWSER_STEP_PIPELINE_ID = 'browser-step';
@@ -31,10 +32,24 @@ export const FORM_MEMORY_ORCHESTRATOR_ID = 'form-memory';
 /** The form-memory step that runs the form pipeline: the run a session reads its answers from. */
 export const FORM_MEMORY_TARGET_STEP = 'target';
 
+/**
+ * One location a reader of the run withholds, with what withheld it — a
+ * finding's type or a validator's id — and why, in the judge's own words, for
+ * the operator's eye and never for a route: the session routes by the ref
+ * alone.
+ */
+export const withheldRefSchema = z.strictObject({
+  ref: z.string().min(1),
+  source: z.enum(WITHHOLDING_SOURCES),
+  by: z.string().min(1),
+  note: z.string().nullable(),
+});
+export type WithheldRef = z.infer<typeof withheldRefSchema>;
+
 /** What the form-memory target step reports: the run's admission, and the locations a reader of it withholds. */
 export const formTargetReportSchema = z.strictObject({
   admission: z.enum(ADMISSIONS),
-  withheld: z.array(z.string().min(1)),
+  withheld: z.array(withheldRefSchema),
 });
 
 /** Why the form-memory recall step skipped or failed — beyond the runner's own reasons. */
@@ -70,7 +85,6 @@ export const BROWSER_SESSION_PIPELINES = {
 export const actionLocation = (position: number): string => `action.${position + 1}`;
 export const fieldLocation = (position: number): string => `field.${position + 1}`;
 export const ACTION_LOCATION = /^action\.(\d+)$/;
-export const FIELD_LOCATION = /^field\.(\d+)$/;
 /** One suggestion of one field: `field.2.1` is the second field's first suggestion. */
 export const suggestionLocation = (field: number, suggestion: number): string =>
   `field.${field + 1}.${suggestion + 1}`;

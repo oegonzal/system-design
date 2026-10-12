@@ -66,7 +66,12 @@ async function ask(
         field: field.field,
         // A refused answer is not offered back; the question says why it returned.
         untrusted: refusal === null ? field.value : null,
-        why: refusal ?? [field.reason, ...field.faults].join(' — '),
+        why:
+          refusal ??
+          [
+            field.reason,
+            ...field.withheld.map((item) => `${item.by}: ${item.note ?? 'withheld'}`),
+          ].join(' — '),
         task: state.tasks.open?.label ?? null,
         page: observation.title,
       },
@@ -127,7 +132,7 @@ const keptReadout = (field: FieldSpec, position: number): RoutedField => ({
   value: field.value,
   source: 'engine',
   reason: 'holds what this session settled for it',
-  faults: [],
+  withheld: [],
   cached: true,
 });
 
@@ -169,7 +174,7 @@ const decisionOf = (
     route: outcome.route,
     routed: field.route,
     reason: field.reason,
-    faults: field.faults,
+    withheld: field.withheld,
     decision: field.answer?.decision ?? null,
     basis: field.answer?.basis ?? [],
     suggestion: field.value,

@@ -14,7 +14,7 @@ import {
   withOperatorCache,
 } from './field-routing';
 import { BrainFaulted } from './ports';
-import { decidedAnswers } from './testing';
+import { decidedAnswers, withheldBy } from './testing';
 
 const fields = formObservation()
   .elements.filter((e) => ['e1', 'e2', 'e3', 'e4'].includes(e.ref))
@@ -72,12 +72,18 @@ describe('field routing in a session', () => {
       cached: true,
     });
     expect(cached[2]).toMatchObject({ route: 'leave-blank', source: 'blank', cached: false });
-    // A judge pointing at a field, or a closed admission, goes to the operator before the cache is read.
-    const judged = decidedAnswers(answers, { findings: [finding('ungrounded', ['field.1'])] });
+    // A field the report withholds, or a closed admission, goes to the operator before the cache is read;
+    // the run's own findings are not read here — the report is.
+    const judged = decidedAnswers(answers, {
+      findings: [finding('ungrounded', ['field.1'])],
+      withheld: [withheldBy('field.1', 'ungrounded', 'ungrounded seen')],
+    });
     expect(routeFieldsInSession(judged, null, fields, new Map())[0]).toMatchObject({
       route: 'ask-operator',
-      faults: ['ungrounded: ungrounded seen'],
+      withheld: [withheldBy('field.1', 'ungrounded', 'ungrounded seen')],
     });
+    const unreported = decidedAnswers(answers, { findings: [finding('ungrounded', ['field.1'])] });
+    expect(routeFieldsInSession(unreported, null, fields, new Map())[0]?.route).toBe('fill');
     // A run that fell short demotes nothing by itself: the judges' objections arrive as faults.
     const fellShort = decidedAnswers(answers, { admission: 'fell-short' });
     expect(routeFieldsInSession(fellShort, null, fields, new Map())[0]).toMatchObject({

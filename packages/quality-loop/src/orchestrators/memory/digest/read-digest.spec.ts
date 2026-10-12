@@ -53,7 +53,7 @@ describe('reading a digest', () => {
           iterations: [1, 2],
         },
       ],
-      withheld: [{ ref: 'memory.2', source: 'finding', by: 'run_specific' }],
+      withheld: [{ ref: 'memory.2', source: 'finding', by: 'run_specific', note: null }],
     });
     const belowTheBar = readoutTrace({
       ...digestInput(digest, goal),

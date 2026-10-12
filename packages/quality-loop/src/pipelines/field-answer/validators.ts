@@ -3,9 +3,10 @@
  * the answers do. `references` blocks — an answer for a field the form never
  * listed, or resting on evidence the goal never listed, cannot be trusted by
  * any lens. `limits` only WARNS, on purpose: a value the field cannot take is
- * located at its field, the lenses read it, and the session routes that one
- * field to the operator instead of the whole judged page being voided.
- * Nothing here reads prose: every fact is in the index the composer wrote.
+ * located at its field, the lenses read it, and the orchestration's report
+ * withholds that one field — the session asks the operator for it — instead
+ * of the whole judged page being voided. Nothing here reads prose: every fact
+ * is in the index the composer wrote.
  */
 import {
   fieldLocation,
@@ -102,9 +103,11 @@ export const referencesValidator: Validator<FieldAnswers> = indexedValidator(
  * Warn rather than block: a value past a field's own maxLength, or a numeric
  * field answered with prose, is one field's problem. Blocking would close
  * admission on the whole page and the operator would be asked to fill every
- * field of it. Located warnings route exactly the faulted fields to the
- * operator (`routeFields`) and leave the rest to be filled.
+ * field of it. A located warning withholds exactly the field it names — the
+ * declaration the report is read by — so the session asks the operator for
+ * that one and fills the rest.
  */
 export const limitsValidator: Validator<FieldAnswers> = asWarning(
   indexedValidator(LIMITS_VALIDATOR_ID, readIndex, limits, []),
+  'every-ref',
 );

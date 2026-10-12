@@ -7,6 +7,7 @@ import {
   type FieldSpec,
   type InteractionAnswer,
   type QualityRunDto,
+  type WithheldRef,
 } from '@sysdesign/contracts';
 
 import type { EngineContext } from './engine-context';
@@ -36,7 +37,7 @@ import { QuestionWithdrawn, type Withdrawal } from './ports';
 /** The suggestions a run offers each field, by ref, the ones a reader of the run withholds left out. */
 function offeredSuggestions(
   run: QualityRunDto,
-  withheld: readonly string[],
+  withheld: readonly WithheldRef[],
 ): ReadonlyMap<string, OfferedSuggestion[]> {
   const best = bestIterationOf(run);
   const parsed =
@@ -45,7 +46,7 @@ function offeredSuggestions(
       : parseLenient(answerSuggestionsSchema, best.artifact);
   if (parsed === null || !parsed.ok) return new Map();
   const kept = (field: number, position: number): boolean =>
-    !withheld.includes(suggestionLocation(field, position));
+    !withheld.some((item) => item.ref === suggestionLocation(field, position));
   return new Map(
     parsed.value.fields.map((field, at) => [
       field.ref,
@@ -67,7 +68,7 @@ export interface SuggestionsRecord {
   runId: string | null;
   orchestrationRunId: string | null;
   admission: Admission | null;
-  withheld: readonly string[];
+  withheld: readonly WithheldRef[];
   durationMs: number | null;
   fault: string | null;
   offered: Record<string, OfferedSuggestion[]>;

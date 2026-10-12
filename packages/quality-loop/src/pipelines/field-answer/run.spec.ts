@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { runPipeline } from '../../core/loop/run-pipeline';
 import { admission, outputsOf } from '../../core/outputs';
 import { fill, runDto, sequencedLlm } from '../../core/testing';
+import { withheldOf } from '../../orchestrators/form-memory/steps';
 import { FIELD_ANSWER } from './definition';
 import { answer, fieldGoal, policyCriteria, sampleAnswers, sampleFields } from './testing';
 
@@ -95,9 +96,18 @@ describe('the field-answer loop', () => {
     expect(only.decision.finalDecision).toBe('accept');
     expect(trace.stopReason).toBe('accepted');
 
-    const verdict = admission(outputsOf(trace), FIELD_ANSWER.policy.thresholds.acceptAt);
+    const outputs = outputsOf(trace);
+    const verdict = admission(outputs, FIELD_ANSWER.policy.thresholds.acceptAt);
     expect(verdict).toBe('admitted');
-    const routed = routeFields(runDto('answers', trace), verdict, sampleFields());
+    // Routed as the session routes: over what the orchestration's report withholds, as the pipeline declares it.
+    const routed = routeFields(
+      {
+        run: runDto('answers', trace),
+        admission: verdict,
+        withheld: withheldOf(FIELD_ANSWER, outputs),
+      },
+      sampleFields(),
+    );
     expect(routed.map((field) => [field.field.ref, field.route, field.source])).toEqual([
       ['e1', 'fill', 'memory'],
       ['e2', 'fill', 'memory'],
@@ -106,13 +116,20 @@ describe('the field-answer loop', () => {
       ['e5', 'leave-blank', 'loop'],
     ]);
     expect(routed[2]).toMatchObject({
-      reason: 'optional, left blank: faulted',
+      reason: 'optional, left blank: withheld',
       value: 'Acme',
-      faults: [expect.stringContaining('ungrounded')],
+      withheld: [expect.objectContaining({ ref: 'field.3', source: 'finding', by: 'ungrounded' })],
     });
     expect(routed[4]).toMatchObject({
-      reason: 'optional, left blank: faulted',
-      faults: ['limits: e5 takes at most 200 characters; the value runs to 220'],
+      reason: 'optional, left blank: withheld',
+      withheld: [
+        {
+          ref: 'field.5',
+          source: 'validator',
+          by: 'limits',
+          note: 'e5 takes at most 200 characters; the value runs to 220',
+        },
+      ],
     });
     expect(routed[3].reason).toContain('trap-skipped');
     expect(routed[0].value).toBe('6');
@@ -131,10 +148,18 @@ describe('the field-answer loop', () => {
       },
     );
     expect(trace.finalDecision).toBe('escalate');
-    const verdict = admission(outputsOf(trace), FIELD_ANSWER.policy.thresholds.acceptAt);
+    const outputs = outputsOf(trace);
+    const verdict = admission(outputs, FIELD_ANSWER.policy.thresholds.acceptAt);
     expect(verdict).toBe('fell-short');
-    // The judges' objections arrive as faults at the fields they are about; with none, each field is read on its own merits.
-    const routed = routeFields(runDto('answers', trace), verdict, sampleFields());
+    // The judges' objections arrive as what the report withholds at the fields they are about; with none, each field is read on its own merits.
+    const routed = routeFields(
+      {
+        run: runDto('answers', trace),
+        admission: verdict,
+        withheld: withheldOf(FIELD_ANSWER, outputs),
+      },
+      sampleFields(),
+    );
     expect(routed.map((field) => field.route)).toEqual([
       'fill',
       'fill',

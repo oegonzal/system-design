@@ -11,11 +11,21 @@
  * its validation reports and its criteria's citations — never over what any
  * of them says in prose.
  */
-import type { DecisionPolicy, EvidenceLedger, Withholding } from '@sysdesign/contracts';
+import type {
+  DecisionPolicy,
+  EvidenceLedger,
+  Withholding,
+  WithholdingSource,
+} from '@sysdesign/contracts';
 
 import type { Validator } from '../ports';
 
-export { WITHHOLDINGS, type Withholding } from '@sysdesign/contracts';
+export {
+  WITHHOLDING_SOURCES,
+  WITHHOLDINGS,
+  type Withholding,
+  type WithholdingSource,
+} from '@sysdesign/contracts';
 
 /** What a finding type or a validator that declares nothing withholds: every item it names. */
 export const UNDECLARED_WITHHOLDING: Withholding = 'every-ref';
@@ -53,10 +63,6 @@ export const withholdingOf = (definition: WithholdingDeclarations): WithholdingR
   ),
 });
 
-/** What named an item: a confirmed finding, or a validator's problem. */
-export const WITHHOLDING_SOURCES = ['finding', 'validator'] as const;
-export type WithholdingSource = (typeof WITHHOLDING_SOURCES)[number];
-
 /** One item withheld, and what withheld it — a reader counts these by source and by type. */
 export interface WithheldItem {
   /** The item's location id, as the reader listed it. */
@@ -64,6 +70,8 @@ export interface WithheldItem {
   source: WithholdingSource;
   /** The finding's type, or the validator's id. */
   by: string;
+  /** Why, in the judge's own words — the finding's rationale or the problem's message; for a reader's eye, never a route. */
+  note: string | null;
 }
 
 /** How many passing criteria cite a location as their evidence: the support an item has. */
@@ -78,6 +86,7 @@ export const supportIn =
 interface Naming {
   source: WithholdingSource;
   by: string;
+  note: string | null;
   withholds: Withholding;
   /** The items it names, in the reader's order. */
   refs: string[];
@@ -93,6 +102,7 @@ function namingsOf(
     ...ledger.findings.map((finding) => ({
       source: 'finding' as const,
       by: finding.type,
+      note: finding.rationale ?? null,
       withholds: rules.findingTypes[finding.type]?.withholds ?? UNDECLARED_WITHHOLDING,
       refs: among(finding.locationRefs),
     })),
@@ -100,6 +110,7 @@ function namingsOf(
       report.problems.map((problem) => ({
         source: 'validator' as const,
         by: report.validatorId,
+        note: problem.message,
         withholds: rules.validators[report.validatorId] ?? UNDECLARED_WITHHOLDING,
         refs: among(problem.locationRefs),
       })),
@@ -124,7 +135,7 @@ export function withheldItems(
       const seen = withheld.some(
         (item) => item.ref === ref && item.source === naming.source && item.by === naming.by,
       );
-      if (!seen) withheld.push({ ref, source: naming.source, by: naming.by });
+      if (!seen) withheld.push({ ref, source: naming.source, by: naming.by, note: naming.note });
     }
   };
   for (const naming of namings.filter((each) => each.withholds === 'every-ref')) {

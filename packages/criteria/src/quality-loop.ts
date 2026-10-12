@@ -188,7 +188,7 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-37',
     statement:
-      'Field answers list every field the goal listed exactly once and cite evidence only by listed alias; a value the field cannot take is a located warning the lenses and the caller both read; a field a confirmed finding points at is never filled by the caller; and a field the page hides is left blank whatever the model decided.',
+      'Field answers list every field the goal listed exactly once and cite evidence only by listed alias; a value the field cannot take is a located warning the lenses read and the orchestration’s report withholds; what each finding type and validator withholds is declared on the pipeline — a wrong value every ref, a needless ask or a required blank none — so a field the report withholds is never filled by the caller and one a finding merely prices is routed on its own merits; and a field the page hides is left blank whatever the model decided.',
   },
   {
     id: 'QL-38',
@@ -303,7 +303,7 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-65',
     statement:
-      'The form-memory orchestrator runs exactly the form pipeline a request names, from its declared list, and only over a goal the form codec composed for that pipeline; the evidence it composes in says what the store holds each item as, and its target reports the run’s admission and the locations a reader of the run withholds, each read off that pipeline’s own definition.',
+      'The form-memory orchestrator runs exactly the form pipeline a request names, from its declared list, and only over a goal the form codec composed for that pipeline; the evidence it composes in says what the store holds each item as and where it holds, and its target reports the run’s admission and the locations a reader of the run withholds — each with what withheld it and why, in the judge’s own words — read off that pipeline’s own definition.',
   },
   {
     id: 'QL-67',

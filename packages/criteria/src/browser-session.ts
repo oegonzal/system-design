@@ -19,7 +19,7 @@ export const BROWSER_SESSION_CRITERIA: readonly Criterion[] = [
   {
     id: 'BRW-3',
     statement:
-      "Fields are routed by declared precedence — the page's admission, the page's own hidden traits, what a judge or validator pointed at, then the model's decision with its confidence and basis — and an operator's answer is filled, recorded with its source, cached for the session, and taught back as a guidance document whose orchestration id lands on the rows it came from; an answer the page refuses is put back to the operator with why, not offered again, as many times as the operator settings declare, so a field fixed in the browser is read back and kept, and past that the refusal stands.",
+      "Fields are routed by declared precedence — the page's own hidden traits, the page's admission, what the orchestration's report withholds at the field (consumed, never recomputed from the run's findings or warnings), then the model's decision with its confidence and basis — and an operator's answer is filled, recorded with its source, cached for the session, and taught back as a guidance document whose orchestration id lands on the rows it came from; an answer the page refuses is put back to the operator with why, not offered again, as many times as the operator settings declare, so a field fixed in the browser is read back and kept, and past that the refusal stands.",
   },
   {
     id: 'BRW-4',

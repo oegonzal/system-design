@@ -28,9 +28,9 @@ import {
   admission,
   outputsOf,
   withheldItems,
-  withheldRefs,
   withholdingOf,
   type RunOutputs,
+  type WithheldItem,
 } from '../../core/outputs';
 import type { PipelineDefinition } from '../../core/pipeline';
 import { ANSWER_SUGGESTIONS } from '../../pipelines/answer-suggestions/definition';
@@ -67,17 +67,22 @@ const formPipelineOf = (named: string | undefined): FormPipeline | null =>
   FORM_PIPELINES.find((pipeline) => pipeline === named) ?? null;
 
 /**
- * The locations of the run's best artifact a reader withholds: every one a
- * confirmed finding or a validator problem names, as far as what named it
- * withholds — read off the pipeline's own declarations, over engine facts only.
+ * The locations of the run's best artifact a reader withholds, each with what
+ * withheld it and why: every one a confirmed finding or a validator problem
+ * names, as far as what named it withholds — read off the pipeline's own
+ * declarations, over engine facts only. The session routes by these and
+ * recomputes nothing from the findings itself.
  */
-function withheldOf(definition: PipelineDefinition<unknown>, outputs: RunOutputs): string[] {
+export function withheldOf<T>(
+  definition: PipelineDefinition<T>,
+  outputs: RunOutputs,
+): WithheldItem[] {
   const { best } = outputs;
   if (best === null) return [];
   const parsed = definition.task.output.schema.safeParse(best.artifact);
   if (!parsed.success) return [];
   const items = definition.task.output.locate(parsed.data).map((location) => location.id);
-  return [...withheldRefs(withheldItems(best.ledger, items, withholdingOf(definition)))];
+  return withheldItems(best.ledger, items, withholdingOf(definition));
 }
 
 /**

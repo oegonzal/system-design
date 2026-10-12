@@ -13,6 +13,7 @@ import {
   decidedAnswers,
   decidedPlan,
   decidedSuggestions,
+  withheldBy,
   FakeBrowser,
   ScriptedOperator,
   type BrainScript,
@@ -93,7 +94,10 @@ const SUGGESTIONS: AnswerSuggestions = {
 };
 
 const suggested = (options: Parameters<typeof decidedSuggestions>[1] = {}) =>
-  decidedSuggestions(SUGGESTIONS, { withheld: [suggestionLocation(0, 3)], ...options });
+  decidedSuggestions(SUGGESTIONS, {
+    withheld: [withheldBy(suggestionLocation(0, 3), 'ungrounded', 'faulted by a judge')],
+    ...options,
+  });
 
 const script = (extra: Partial<BrainScript>): BrainScript => ({
   plans: [PLANS.search, PLANS.results, FORM, PLANS.done, PLANS.end].map((p) => decidedPlan(p)),
@@ -146,7 +150,7 @@ describe('suggested answers in the session', () => {
       requested: ['e7'],
       state: 'settled',
       admission: 'admitted',
-      withheld: [suggestionLocation(0, 3)],
+      withheld: [withheldBy(suggestionLocation(0, 3), 'ungrounded', 'faulted by a judge')],
       fault: null,
     });
     expect(warnings).toEqual([]);

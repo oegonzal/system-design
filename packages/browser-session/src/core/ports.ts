@@ -30,6 +30,7 @@ import type {
   StopEnding,
   UnitFacet,
   UnitsOnRecord,
+  WithheldRef,
 } from '@sysdesign/contracts';
 import { MISSION_STOP } from '@sysdesign/contracts';
 import type { DumpBytes, DumpFile } from '@sysdesign/run-dump';
@@ -184,10 +185,10 @@ export interface StepInput {
   onRecord: UnitsOnRecord;
 }
 
-/** What the form-memory orchestration reports of the run it opened: its admission, and the locations a reader withholds. */
+/** What the form-memory orchestration reports of the run it opened: its admission, and the locations a reader withholds, each with what withheld it and why. */
 export interface FormReport {
   admission: Admission;
-  withheld: readonly string[];
+  withheld: readonly WithheldRef[];
 }
 
 export interface FieldsInput {

@@ -34,8 +34,8 @@ describe('withheldItems', () => {
     const faulted = ledger({ findings: [naming('wrong', ['memory.2', 'memory.3', 'summary'])] });
     const withheld = withheldItems(faulted, ITEMS);
     expect(withheld).toEqual([
-      { ref: 'memory.2', source: 'finding', by: 'wrong' },
-      { ref: 'memory.3', source: 'finding', by: 'wrong' },
+      { ref: 'memory.2', source: 'finding', by: 'wrong', note: null },
+      { ref: 'memory.3', source: 'finding', by: 'wrong', note: null },
     ]);
     // Only the reader's items are ever withheld: `summary` is not one.
     expect(withheldItems(faulted, ITEMS, WITHHOLD_EVERY_REF)).toEqual(withheld);
@@ -68,7 +68,7 @@ describe('withheldItems', () => {
       ],
     });
     expect(withheldItems(warned, ITEMS)).toEqual([
-      { ref: 'memory.4', source: 'validator', by: 'run-specificity' },
+      { ref: 'memory.4', source: 'validator', by: 'run-specificity', note: 'names the run' },
     ]);
     // Read off the definition's validators, each declaring on itself — one that
     // says nothing is left to the strict default.

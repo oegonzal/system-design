@@ -120,15 +120,25 @@ export const FIELD_ANSWER: PipelineDefinition<FieldAnswers> = {
       compliance: { dimension: 'compliance', weight: 1, gate: false },
       coverage: { dimension: 'coverage', weight: 1, gate: false },
     },
+    // `withholds` is what a confirmed finding does to the fields it names when
+    // the session reads the page back through the orchestration's report
+    // (`withheldItems`): a field it withholds is never filled, and goes to the
+    // operator with the finding's words. A value nothing bears on, a value that
+    // contradicts its evidence, and a value given to a trap are wrong values —
+    // typed into someone's form they would speak falsely for the subject — so
+    // each withholds the field it names. A field asked needlessly, or left
+    // blank although required, has no value to withhold: the finding is priced
+    // and the route stands. Declared here rather than left to the strict
+    // default so the read-back never again demotes on "any finding".
     findingTypes: {
-      // Priced, not gated: a faulted field is routed to the operator by the
-      // caller, and the page's other fields are still worth filling.
-      ungrounded: { dimension: 'grounding', gate: false },
-      inconsistent: { dimension: 'grounding', gate: false },
+      // Priced, not gated: a withheld field is the operator's, and the page's
+      // other fields are still worth filling.
+      ungrounded: { dimension: 'grounding', gate: false, withholds: 'every-ref' },
+      inconsistent: { dimension: 'grounding', gate: false, withholds: 'every-ref' },
       // The one defect no score can offset: a value in a trap flags the account.
-      trap_answered: { dimension: 'compliance', gate: true },
-      needless_ask: { dimension: 'coverage', gate: false },
-      blank_required: { dimension: 'coverage', gate: false },
+      trap_answered: { dimension: 'compliance', gate: true, withholds: 'every-ref' },
+      needless_ask: { dimension: 'coverage', gate: false, withholds: 'none' },
+      blank_required: { dimension: 'coverage', gate: false, withholds: 'none' },
     },
     ...STANDARD_SCORING,
     // Only the gated type vetoes. The standard scoring would also let a

@@ -8,6 +8,8 @@ import {
   type FieldAnswers,
   type StepPlan,
   type SuccessCriterion,
+  type WithheldRef,
+  type WithholdingSource,
   FAKE_RUBRIC,
   fakeRun,
   type FakeRunOptions,
@@ -31,10 +33,22 @@ export function decidedPlan(plan: StepPlan, options: FakeRunOptions = {}): Decid
   return { runId: run.runId, orchestrationRunId: null, run, composition: FULL };
 }
 
-/** Field answers as the form-memory orchestration would have decided them, with the admission it reports. */
+/** One location the orchestration's report withholds, as a spec declares it. */
+export const withheldBy = (
+  ref: string,
+  by: string,
+  note: string | null = null,
+  source: WithholdingSource = 'finding',
+): WithheldRef => ({ ref, source, by, note });
+
+/** Field answers as the form-memory orchestration would have decided them, with the admission and the withholding it reports. */
 export function decidedAnswers(
   answers: FieldAnswers,
-  options: FakeRunOptions & { admission?: Admission; orchestrationRunId?: string } = {},
+  options: FakeRunOptions & {
+    admission?: Admission;
+    orchestrationRunId?: string;
+    withheld?: WithheldRef[];
+  } = {},
 ): Decided<FieldAnswers> & FormReport {
   const run = fakeRun(FIELD_ANSWER_PIPELINE_ID, answers, options);
   return {
@@ -43,14 +57,14 @@ export function decidedAnswers(
     run,
     composition: FULL,
     admission: options.admission ?? 'admitted',
-    withheld: [],
+    withheld: options.withheld ?? [],
   };
 }
 
 /** Suggested answers as the form-memory orchestration would have run them, with what it reports a reader withholds. */
 export function decidedSuggestions(
   suggestions: AnswerSuggestions,
-  options: FakeRunOptions & { admission?: Admission; withheld?: string[] } = {},
+  options: FakeRunOptions & { admission?: Admission; withheld?: WithheldRef[] } = {},
 ): Decided<AnswerSuggestions> & FormReport {
   const run = fakeRun(ANSWER_SUGGESTIONS_PIPELINE_ID, suggestions, options);
   return {

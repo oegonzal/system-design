@@ -34,6 +34,10 @@ import type { AxisFactorLevel, Corroboration, GoalSource, Severity } from './voc
 export const WITHHOLDINGS = ['every-ref', 'none'] as const;
 export type Withholding = (typeof WITHHOLDINGS)[number];
 
+/** What named a withheld item: a confirmed finding, or a validator's problem. */
+export const WITHHOLDING_SOURCES = ['finding', 'validator'] as const;
+export type WithholdingSource = (typeof WITHHOLDING_SOURCES)[number];
+
 /**
  * The decision policy: every number, threshold, gate and route the controller
  * uses. A pipeline declares one as data; the loop refuses a malformed one
