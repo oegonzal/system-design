@@ -139,5 +139,16 @@ describe('observationFingerprint', () => {
       ariaSnapshot: clickable.ariaSnapshot.replace('[cursor=pointer]', '[active] [cursor=pointer]'),
     };
     expect(observationFingerprint(focused)).toBe(observationFingerprint(clickable));
+    // A line YAML wrapped in single quotes is a node like any other, and in the identity.
+    const wrapped = {
+      ...first,
+      ariaSnapshot: `${first.ariaSnapshot}\n  - 'combobox "Note: required" [ref=e9] [cursor=pointer]':`,
+    };
+    const rewrapped = {
+      ...wrapped,
+      ariaSnapshot: wrapped.ariaSnapshot.replace('Note: required', 'Note: optional'),
+    };
+    expect(observationFingerprint(wrapped)).not.toBe(observationFingerprint(first));
+    expect(observationFingerprint(rewrapped)).not.toBe(observationFingerprint(wrapped));
   });
 });

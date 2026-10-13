@@ -19,7 +19,8 @@ import {
  * node per line, indented two spaces per level: a role, an optional quoted
  * name, bracketed attributes — among them the ref Playwright minted, which
  * `aria-ref=` resolves — and a trailing colon when children or inline text
- * follow. A text line (`- text: …`) is a node of the one pseudo-role `text`,
+ * follow; a line YAML wrapped in single quotes is the same node, its name
+ * with the doubled quotes undone. A text line (`- text: …`) is a node of the one pseudo-role `text`,
  * carrying what it says as its inline text; a property line (`- /url: …`)
  * is not a node. Nothing here touches a page; the spec runs over fixture text.
  */
@@ -37,8 +38,9 @@ export interface SnapshotNode {
 
 const ATTRIBUTE = /\[([^\]=]+)(?:=([^\]]*))?\]/g;
 
-/** A quoted name with its escapes undone. */
-const unescape = (name: string): string => name.replace(/\\(.)/g, '$1');
+/** A quoted name with its escapes undone — and, on a line YAML wrapped in single quotes, the quotes it doubled. */
+const unescape = (name: string, wrapped: boolean): string =>
+  (wrapped ? name.replace(/''/g, "'") : name).replace(/\\(.)/g, '$1');
 
 function attributesOf(text: string): Record<string, string | true> {
   const attributes: Record<string, string | true> = {};
@@ -61,7 +63,10 @@ export function decodeAriaSnapshot(snapshot: string): SnapshotNode[] {
     nodes.push({
       depth: (groups['indent'] ?? '').length / 2,
       role: groups['role'],
-      name: groups['name'] === undefined ? null : unescape(groups['name']),
+      name:
+        groups['name'] === undefined
+          ? null
+          : unescape(groups['name'], groups['quote'] !== undefined),
       ref: typeof ref === 'string' && ELEMENT_REF.test(ref) ? ref : null,
       attributes,
       inline: inline === '' ? null : inline,

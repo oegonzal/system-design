@@ -120,13 +120,19 @@ export const refOf = (line: string): string | null => {
  * The grammar of one line of Playwright's `ariaSnapshot({ mode: 'ai' })`: a
  * node per line, indented two spaces per level — a role, an optional quoted
  * name, bracketed attributes, and a trailing colon when children or inline
- * text follow. A text line (`- text: …`) matches with the one pseudo-role; a
+ * text follow. A line YAML would misread unquoted — a name with `: ` in it,
+ * among others — comes with everything before its colon wrapped in single
+ * quotes, every quote inside doubled: the same node, the wrap read as
+ * `quote`. A text line (`- text: …`) matches with the one pseudo-role; a
  * property line (`- /url: …`) matches nothing. Declared once, here, so the
  * adapter that decodes a tree and the fingerprint that compares two pages
- * read the same lines the same way.
+ * read the same lines the same way. Measured 2026-10-13: 7 wrapped node lines
+ * in 6 of 786 recorded snapshots, every one a question control with a ref,
+ * each read as no node at all — the field was never answered, and a page
+ * refusing to advance over it stalled the session.
  */
 export const SNAPSHOT_NODE_LINE =
-  /^(?<indent> *)- (?<role>[a-z][\w-]*)(?: "(?<name>(?:[^"\\]|\\.)*)")?(?<attrs>(?: \[[^\]]*\])*)\s*(?::\s*(?<inline>.*))?$/;
+  /^(?<indent> *)- (?<quote>')?(?<role>[a-z][\w-]*)(?: "(?<name>(?:[^"\\]|\\.)*)")?(?<attrs>(?: \[[^\]]*\])*)\k<quote>\s*(?::\s*(?<inline>.*))?$/;
 export const SNAPSHOT_TEXT_ROLE = 'text';
 
 /** A node line without the text after its colon, or null for a line that is no node: a property line, a text line. */

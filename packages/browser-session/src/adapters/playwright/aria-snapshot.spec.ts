@@ -57,6 +57,37 @@ describe('the aria snapshot decoder', () => {
     expect(decodeAriaSnapshot('')).toEqual([]);
   });
 
+  it('[BRW-2] reads a line YAML wrapped in single quotes as the same node: its role, its name with the doubled quotes undone, its ref and inline text', () => {
+    // Measured 2026-10-13: Playwright quotes a line whose name holds `: `, and
+    // a sponsorship question so worded read as no node at all — the field was
+    // never answered, and the page refusing to advance over it stalled the session.
+    const wrapped = [
+      '- generic [ref=e1]:',
+      `  - 'combobox "Will you require sponsorship?*Please note: proof may be required.*" [active] [ref=e2] [cursor=pointer]':`,
+      '    - option "Select an option" [disabled] [selected]',
+      '    - option "No"',
+      `  - 'radio "Have you completed the following level of education: Bachelor''s Degree?" [checked] [ref=e3]'`,
+      `  - 'textbox "Note: optional" [ref=e4]': a value`,
+    ].join('\n');
+    const nodes = decodeAriaSnapshot(wrapped);
+    expect(nodes.map((node) => [node.ref, node.role, node.name, node.depth])).toEqual([
+      ['e1', 'generic', null, 0],
+      ['e2', 'combobox', 'Will you require sponsorship?*Please note: proof may be required.*', 1],
+      [null, 'option', 'Select an option', 2],
+      [null, 'option', 'No', 2],
+      ['e3', 'radio', "Have you completed the following level of education: Bachelor's Degree?", 1],
+      ['e4', 'textbox', 'Note: optional', 1],
+    ]);
+    expect(nodes[1]?.attributes).toEqual({ active: true, ref: 'e2', cursor: 'pointer' });
+    expect(nodes[5]?.inline).toBe('a value');
+    // A reduced snapshot keeps a wrapped line as it keeps any line with words.
+    const big = [
+      wrapped,
+      ...Array.from({ length: 200 }, () => `- generic "${'x'.repeat(80)}"`),
+    ].join('\n');
+    expect(fitSnapshot(big, 4_000).text).toContain('[ref=e2]');
+  });
+
   it('[BRW-2] reads the dialog a node sits in from the tree, and the words beneath an unnamed node', () => {
     // The live shape, both halves: a results page whose links carry their words
     // in child paragraphs (26 of 37 elements read `link ""` or `button ""` on
