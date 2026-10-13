@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { userEvent, within } from 'storybook/test';
 
 import { ColumnChart } from './column-chart';
 import type { ColumnDatum } from './geometry';
@@ -98,3 +99,11 @@ export const Empty: Story = {
 
 /** Reloading: the last numbers stay in view, dimmed. */
 export const Pending: Story = { args: { ...Stacked.args, pending: true } };
+
+/** A period under the pointer: one bubble names every series at that x, value first; its columns lift. */
+export const Tooltip: Story = {
+  args: Grouped.args,
+  play: async ({ canvasElement }) => {
+    await userEvent.hover(within(canvasElement).getByRole('button', { name: /^Jun:/ }));
+  },
+};

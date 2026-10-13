@@ -4,6 +4,7 @@ import {
   domainOf,
   layoutColumns,
   MAX_COLUMN_WIDTH,
+  slotBoxes,
   SURFACE_GAP,
   type ColumnDatum,
 } from './geometry';
@@ -52,5 +53,22 @@ describe('column geometry', () => {
     expect((b?.x ?? 0) - (a?.x ?? 0)).toBeCloseTo((a?.width ?? 0) + SURFACE_GAP, 6);
     expect(a?.width).toBeLessThanOrEqual(MAX_COLUMN_WIDTH);
     expect(layoutColumns([], SERIES, 'grouped', plot)).toEqual({ columns: [], bands: [] });
+  });
+
+  it('cuts the plot into one hit box per datum as fractions of the frame, bubbles flipping past the midpoint, and none for no data', () => {
+    const frame = { width: 960, height: 266, plot: { left: 60, top: 18, width: 888, height: 220 } };
+    const boxes = slotBoxes(3, frame);
+    expect(boxes).toHaveLength(3);
+    expect(boxes[0]).toEqual({
+      left: 60 / 960,
+      width: 296 / 960,
+      top: 18 / 266,
+      height: 220 / 266,
+      after: true,
+    });
+    expect(boxes[1]?.after).toBe(true);
+    expect(boxes[2]).toMatchObject({ left: 652 / 960, after: false });
+    expect((boxes[2]?.left ?? 0) + (boxes[2]?.width ?? 0)).toBeCloseTo(948 / 960, 9);
+    expect(slotBoxes(0, frame)).toEqual([]);
   });
 });

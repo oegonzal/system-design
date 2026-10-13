@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 import { composeStories } from '@storybook/react';
 import type { ReactElement } from 'react';
 import { describe, expect, it } from 'vitest';
@@ -60,6 +60,39 @@ describe('ColumnChart', () => {
     renderWithTheme(<Pending />);
     expect(document.querySelector('figure[aria-busy="true"]')).toBeTruthy();
     expect(screen.getByRole('img').querySelector('g[opacity="0.45"]')).toBeTruthy();
+  });
+
+  it('answers hover and focus on a datum with one tooltip naming every series at that x, lifts its columns, moves with the arrow keys, and hides on leave or Escape', () => {
+    renderWithTheme(<Grouped />);
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    const group = screen.getByRole('group', { name: 'Obligations by fiscal period values' });
+    const jun = within(group).getByRole('button', { name: /^Jun:/ });
+    expect(within(group).getAllByRole('button')).toHaveLength(12);
+    expect(jun.getAttribute('aria-label')).toContain('FY2026 $1,080,000 (provisional)');
+
+    fireEvent.mouseEnter(jun);
+    const tooltip = screen.getByRole('tooltip');
+    expect(tooltip.textContent).toContain('Jun');
+    for (const label of ['FY2026', 'FY2025', 'FY2024', 'FY2023']) {
+      expect(tooltip.textContent).toContain(label);
+    }
+    expect(tooltip.textContent).toContain('$1,080,000');
+    expect(tooltip.textContent).toContain('(provisional)');
+    expect(screen.getByRole('img').querySelectorAll('[data-lift]')).toHaveLength(4);
+
+    fireEvent.mouseLeave(group);
+    expect(screen.queryByRole('tooltip')).toBeNull();
+    expect(screen.getByRole('img').querySelectorAll('[data-lift]')).toHaveLength(0);
+
+    // A real focus, so the arrow keys have a focused target to move from.
+    act(() => jun.focus());
+    expect(screen.getByRole('tooltip')).toBeTruthy();
+    fireEvent.keyDown(group, { key: 'ArrowRight' });
+    expect(document.activeElement).toBe(within(group).getByRole('button', { name: /^Jul:/ }));
+    expect(screen.getByRole('tooltip').textContent).toContain('Jul');
+    expect(screen.getByRole('tooltip').textContent).toContain('(projected)');
+    fireEvent.keyDown(group, { key: 'Escape' });
+    expect(screen.queryByRole('tooltip')).toBeNull();
   });
 
   it('refuses more series than the theme has slots', () => {

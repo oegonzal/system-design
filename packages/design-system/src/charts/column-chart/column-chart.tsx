@@ -1,13 +1,16 @@
 import { useTheme } from '@emotion/react';
-import { useId } from 'react';
+import styled from '@emotion/styled';
+import { useId, useState } from 'react';
 
 import { Text } from '../../primitives/text/text';
 import { CHART_SERIES_LIMIT, compactNumber, ticks } from '../scale';
-import { ChartFrame, describeCell } from './frame';
+import { ColumnTooltip } from './column-tooltip';
+import { ChartFrame, describeDatum } from './frame';
 import {
   cellOf,
   domainOf,
   layoutColumns,
+  slotBoxes,
   type ColumnDatum,
   type ColumnLayout,
   type ColumnRect,
@@ -49,6 +52,13 @@ const PROVISIONAL_OPACITY = 0.5;
 const PENDING_OPACITY = 0.45;
 /** At most this many x labels, so they never collide. */
 const MAX_X_LABELS = 12;
+/** The outline that lifts the hovered datum's columns. */
+const LIFT_OPACITY = 0.35;
+
+/** The plot and its hover layer share one box, so the layer's percentages are the svg's. */
+const Plot = styled.div`
+  position: relative;
+`;
 
 const plain = (value: number): string => value.toLocaleString('en-US');
 
@@ -70,8 +80,10 @@ function columnPath({ x, y, width, height, negative }: ColumnRect): string {
  * it; a provisional cell is lighter; while pending, the marks dim and the
  * words do not. Gridlines sit at nice ticks, the one
  * direct label is the maximum column's, and every datum carries its values
- * as a native title. Text wears text tokens, never a series colour. A legend
- * and a data-table twin come from the frame.
+ * as a native title. Hover or focus on a datum's slot opens one tooltip over
+ * the plot naming every series at that x and lifts its columns. Text wears
+ * text tokens, never a series colour. A legend and a data-table twin come
+ * from the frame.
  */
 export function ColumnChart({
   title,
@@ -94,6 +106,7 @@ export function ColumnChart({
   }
   const theme = useTheme();
   const patternBase = useId().replace(/:/g, '');
+  const [active, setActive] = useState<number | null>(null);
   const colors = series.map(
     (_, index) => theme.color.chart.series[index] ?? theme.color.accent.default,
   );
@@ -124,124 +137,156 @@ export function ColumnChart({
     null,
   );
   const height = MARGIN.top + plot.height + MARGIN.bottom;
+  const shown = active !== null && active < data.length ? active : null;
+  const boxes = slotBoxes(data.length, {
+    width: WIDTH,
+    height,
+    plot: { left: MARGIN.left, top: MARGIN.top, width: plot.width, height: plot.height },
+  });
 
   return (
     <ChartFrame {...frame}>
-      <svg
-        viewBox={`0 0 ${WIDTH} ${height}`}
-        width="100%"
-        role="img"
-        aria-label={title}
-        focusable="false"
-        style={{ display: 'block', fontFamily: theme.font.family.base }}
-      >
-        <title>{title}</title>
-        {summary ? <desc>{summary}</desc> : null}
-        <defs>
-          {colors.map((color, index) => (
-            <pattern
-              key={series[index]?.id ?? color}
-              id={`${patternBase}-hatch-${index}`}
-              width="6"
-              height="6"
-              patternUnits="userSpaceOnUse"
-              patternTransform="rotate(45)"
-            >
-              <rect width="2.5" height="6" fill={color} />
-            </pattern>
-          ))}
-        </defs>
-        {tickValues.map((value) => (
-          <g key={value}>
-            <line
-              x1={MARGIN.left}
-              x2={WIDTH - MARGIN.right}
-              y1={y(value)}
-              y2={y(value)}
-              stroke={value === 0 ? theme.color.border.default : theme.color.border.subtle}
-              strokeWidth="1"
-            />
-            <text
-              x={MARGIN.left - 8}
-              y={y(value)}
-              dy="0.35em"
-              textAnchor="end"
-              fontSize={AXIS_FONT}
-              fill={theme.color.text.muted}
-            >
-              {formatTick(value)}
-            </text>
-          </g>
-        ))}
-        <g opacity={pending ? PENDING_OPACITY : 1}>
-          {bands.map((band) => (
-            <rect
-              key={`band-${band.datumIndex}-${band.seriesIndex}`}
-              x={MARGIN.left + band.x}
-              y={MARGIN.top + band.y}
-              width={band.width}
-              height={band.height}
-              fill={colors[band.seriesIndex]}
-              opacity={BAND_OPACITY}
-            />
-          ))}
-          {data.map((datum, datumIndex) => (
-            <g key={datum.label}>
-              <title>
-                {`${datum.label}: ${series
-                  .map((item) => `${item.label} ${describeCell(datum, item.id, formatValue)}`)
-                  .join('; ')}`}
-              </title>
-              {columns
-                .filter((column) => column.datumIndex === datumIndex)
-                .map((column) => (
-                  <path
-                    key={column.seriesIndex}
-                    d={columnPath({
-                      ...column,
-                      x: MARGIN.left + column.x,
-                      y: MARGIN.top + column.y,
-                    })}
-                    fill={
-                      column.cell.projected
-                        ? `url(#${patternBase}-hatch-${column.seriesIndex})`
-                        : colors[column.seriesIndex]
-                    }
-                    fillOpacity={column.cell.provisional ? PROVISIONAL_OPACITY : 1}
-                    stroke={column.cell.projected ? colors[column.seriesIndex] : 'none'}
-                    strokeWidth={column.cell.projected ? PROJECTED_STROKE : 0}
-                  />
-                ))}
-              {datumIndex % stride === 0 ? (
-                <text
-                  x={MARGIN.left + slot * datumIndex + slot / 2}
-                  y={height - 8}
-                  textAnchor="middle"
-                  fontSize={AXIS_FONT}
-                  fill={theme.color.text.secondary}
-                >
-                  {datum.label}
-                </text>
-              ) : null}
+      <Plot>
+        <svg
+          viewBox={`0 0 ${WIDTH} ${height}`}
+          width="100%"
+          role="img"
+          aria-label={title}
+          focusable="false"
+          style={{ display: 'block', fontFamily: theme.font.family.base }}
+        >
+          <title>{title}</title>
+          {summary ? <desc>{summary}</desc> : null}
+          <defs>
+            {colors.map((color, index) => (
+              <pattern
+                key={series[index]?.id ?? color}
+                id={`${patternBase}-hatch-${index}`}
+                width="6"
+                height="6"
+                patternUnits="userSpaceOnUse"
+                patternTransform="rotate(45)"
+              >
+                <rect width="2.5" height="6" fill={color} />
+              </pattern>
+            ))}
+          </defs>
+          {tickValues.map((value) => (
+            <g key={value}>
+              <line
+                x1={MARGIN.left}
+                x2={WIDTH - MARGIN.right}
+                y1={y(value)}
+                y2={y(value)}
+                stroke={value === 0 ? theme.color.border.default : theme.color.border.subtle}
+                strokeWidth="1"
+              />
+              <text
+                x={MARGIN.left - 8}
+                y={y(value)}
+                dy="0.35em"
+                textAnchor="end"
+                fontSize={AXIS_FONT}
+                fill={theme.color.text.muted}
+              >
+                {formatTick(value)}
+              </text>
             </g>
           ))}
-        </g>
-        {peak !== null ? (
-          <text
-            x={MARGIN.left + peak.x + peak.width / 2}
-            y={
-              peak.negative
-                ? MARGIN.top + peak.y + peak.height + AXIS_FONT
-                : MARGIN.top + peak.y - 5
-            }
-            textAnchor="middle"
-            fontSize={AXIS_FONT}
-            fill={theme.color.text.secondary}
-          >
-            {formatTick(cellOf(peak.cell).value)}
-          </text>
-        ) : null}
-      </svg>
+          <g opacity={pending ? PENDING_OPACITY : 1}>
+            {bands.map((band) => (
+              <rect
+                key={`band-${band.datumIndex}-${band.seriesIndex}`}
+                x={MARGIN.left + band.x}
+                y={MARGIN.top + band.y}
+                width={band.width}
+                height={band.height}
+                fill={colors[band.seriesIndex]}
+                opacity={BAND_OPACITY}
+              />
+            ))}
+            {data.map((datum, datumIndex) => (
+              <g key={datum.label}>
+                <title>{describeDatum(datum, series, formatValue)}</title>
+                {columns
+                  .filter((column) => column.datumIndex === datumIndex)
+                  .map((column) => (
+                    <path
+                      key={column.seriesIndex}
+                      d={columnPath({
+                        ...column,
+                        x: MARGIN.left + column.x,
+                        y: MARGIN.top + column.y,
+                      })}
+                      fill={
+                        column.cell.projected
+                          ? `url(#${patternBase}-hatch-${column.seriesIndex})`
+                          : colors[column.seriesIndex]
+                      }
+                      fillOpacity={column.cell.provisional ? PROVISIONAL_OPACITY : 1}
+                      stroke={column.cell.projected ? colors[column.seriesIndex] : 'none'}
+                      strokeWidth={column.cell.projected ? PROJECTED_STROKE : 0}
+                    />
+                  ))}
+                {datumIndex % stride === 0 ? (
+                  <text
+                    x={MARGIN.left + slot * datumIndex + slot / 2}
+                    y={height - 8}
+                    textAnchor="middle"
+                    fontSize={AXIS_FONT}
+                    fill={theme.color.text.secondary}
+                  >
+                    {datum.label}
+                  </text>
+                ) : null}
+              </g>
+            ))}
+          </g>
+          {peak !== null ? (
+            <text
+              x={MARGIN.left + peak.x + peak.width / 2}
+              y={
+                peak.negative
+                  ? MARGIN.top + peak.y + peak.height + AXIS_FONT
+                  : MARGIN.top + peak.y - 5
+              }
+              textAnchor="middle"
+              fontSize={AXIS_FONT}
+              fill={theme.color.text.secondary}
+            >
+              {formatTick(cellOf(peak.cell).value)}
+            </text>
+          ) : null}
+          {shown === null
+            ? null
+            : columns
+                .filter((column) => column.datumIndex === shown && column.height > 0)
+                .map((column) => (
+                  <rect
+                    key={`lift-${column.seriesIndex}`}
+                    data-lift=""
+                    x={MARGIN.left + column.x - 0.5}
+                    y={MARGIN.top + column.y - 0.5}
+                    width={column.width + 1}
+                    height={column.height + 1}
+                    fill="none"
+                    stroke={theme.color.text.primary}
+                    strokeOpacity={LIFT_OPACITY}
+                    strokeWidth="1"
+                  />
+                ))}
+        </svg>
+        <ColumnTooltip
+          title={title}
+          series={series}
+          data={data}
+          colors={colors}
+          formatValue={formatValue}
+          boxes={boxes}
+          active={shown}
+          onActiveChange={setActive}
+        />
+      </Plot>
     </ChartFrame>
   );
 }

@@ -9,9 +9,9 @@ import {
 import { Table } from '../../primitives/table/table';
 import { Text } from '../../primitives/text/text';
 import { transient } from '../../theme/styled';
-import { cellOf, type ColumnDatum, type ColumnSeries } from './geometry';
+import { cellOf, type ColumnCell, type ColumnDatum, type ColumnSeries } from './geometry';
 
-const DASH = '—';
+export const DASH = '—';
 
 const Figure = styled.figure`
   margin: 0;
@@ -60,6 +60,15 @@ export interface ChartFrameProps {
   children: ReactNode;
 }
 
+/** What kind of value a cell is, in words beside its number: projected, provisional, its band. */
+export function cellNotes(cell: ColumnCell, formatValue: (value: number) => string): string[] {
+  return [
+    cell.projected ? '(projected)' : null,
+    cell.provisional ? '(provisional)' : null,
+    cell.band ? `· ${formatValue(cell.band.low)}–${formatValue(cell.band.high)}` : null,
+  ].filter((note): note is string => note !== null);
+}
+
 /** How one cell reads in the table: the value, then what kind of value it is. */
 export function describeCell(
   datum: ColumnDatum,
@@ -69,13 +78,16 @@ export function describeCell(
   const value = datum.values[id];
   if (value === undefined) return DASH;
   const cell = cellOf(value);
-  const notes = [
-    cell.projected ? '(projected)' : null,
-    cell.provisional ? '(provisional)' : null,
-    cell.band ? `· ${formatValue(cell.band.low)}–${formatValue(cell.band.high)}` : null,
-  ].filter((note): note is string => note !== null);
-  return [formatValue(cell.value), ...notes].join(' ');
+  return [formatValue(cell.value), ...cellNotes(cell, formatValue)].join(' ');
 }
+
+/** One datum in words — its label, then every series' cell — the chart's native title and each hit target's name. */
+export const describeDatum = (
+  datum: ColumnDatum,
+  series: readonly ColumnSeries[],
+  formatValue: (value: number) => string,
+): string =>
+  `${datum.label}: ${series.map((item) => `${item.label} ${describeCell(datum, item.id, formatValue)}`).join('; ')}`;
 
 const hasProjection = (data: readonly ColumnDatum[], id: string): boolean =>
   data.some((datum) => {

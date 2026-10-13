@@ -52,6 +52,39 @@ export interface PlotArea {
   domain: Domain;
 }
 
+/** The svg frame and where the plot sits inside it, in svg units. */
+export interface PlotFrame {
+  width: number;
+  height: number;
+  plot: { left: number; top: number; width: number; height: number };
+}
+
+/**
+ * One datum's hit area as fractions of the frame — the whole slot across, the
+ * whole plot down — so an HTML layer over the svg scales with it and nothing
+ * is measured. `after` says a bubble sits past the slot (a datum in the left
+ * half) or before it (the right half), so it never leaves the chart.
+ */
+export interface SlotBox {
+  left: number;
+  width: number;
+  top: number;
+  height: number;
+  after: boolean;
+}
+
+export function slotBoxes(count: number, frame: PlotFrame): SlotBox[] {
+  if (count === 0) return [];
+  const slot = frame.plot.width / count;
+  return Array.from({ length: count }, (_, index) => ({
+    left: (frame.plot.left + slot * index) / frame.width,
+    width: slot / frame.width,
+    top: frame.plot.top / frame.height,
+    height: frame.plot.height / frame.height,
+    after: index * 2 < count,
+  }));
+}
+
 /** Marks stay thin: never wider than this, whatever the plot width. */
 export const MAX_COLUMN_WIDTH = 24;
 /** The surface showing between adjacent fills — stacked segments, grouped neighbours. */
