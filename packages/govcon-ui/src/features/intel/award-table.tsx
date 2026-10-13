@@ -32,6 +32,7 @@ export function AwardTable({ awards, total, limit, offset, onPage }: AwardTableP
           <thead>
             <tr>
               <th>Signed</th>
+              <th>PIID</th>
               <th>Awardee</th>
               <th>Amount</th>
               <th>Offers</th>
@@ -46,6 +47,7 @@ export function AwardTable({ awards, total, limit, offset, onPage }: AwardTableP
             {awards.map((award) => (
               <tr key={`${award.source}:${award.externalId}`}>
                 <td>{award.signedAt}</td>
+                <td>{award.piid ?? '—'}</td>
                 <td>{clip(award.awardeeName, 40)}</td>
                 <td>{money(award.amount)}</td>
                 <td>{award.offersReceived ?? '—'}</td>

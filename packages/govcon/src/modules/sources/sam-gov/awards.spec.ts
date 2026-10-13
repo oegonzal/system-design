@@ -35,6 +35,8 @@ describe('the SAM.gov contract awards', () => {
     expect(result.value.awards[0]).toEqual({
       source: 'sam.gov',
       externalId: 'SPE4A526P6036-0',
+      piid: 'SPE4A526P6036',
+      awardType: 'PURCHASE ORDER',
       solicitationNumber: 'SPE4A626T74X8',
       naicsCode: '332710',
       pscCode: '4920',
@@ -47,6 +49,7 @@ describe('the SAM.gov contract awards', () => {
       extentCompeted: 'G',
       setAsideCode: null,
       signedAt: '2026-06-25',
+      popStartAt: '2026-06-25',
       completionAt: '2026-09-18',
       placeOfPerformance: { city: 'SOLON', state: 'OH', zip: '441393940', country: 'USA' },
     });

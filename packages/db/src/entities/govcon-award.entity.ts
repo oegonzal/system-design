@@ -30,6 +30,12 @@ export class GovconAward {
   externalId!: string;
 
   @Property({ type: 'text', nullable: true })
+  piid!: string | null;
+
+  @Property({ type: 'varchar', length: 40, nullable: true })
+  awardType!: string | null;
+
+  @Property({ type: 'text', nullable: true })
   solicitationNumber!: string | null;
 
   @Property({ type: 'varchar', length: 16, nullable: true })
@@ -64,6 +70,9 @@ export class GovconAward {
 
   @Property({ type: 'date' })
   signedAt!: string;
+
+  @Property({ type: 'date', nullable: true })
+  popStartAt!: string | null;
 
   @Property({ type: 'date', nullable: true })
   completionAt!: string | null;

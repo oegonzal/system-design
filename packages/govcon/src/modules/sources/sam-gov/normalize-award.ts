@@ -42,6 +42,8 @@ function shape(record: SamAward, signedAt: string, source: AwardDraft['source'])
   return {
     source,
     externalId: `${record.contractId.piid}-${modification}`,
+    piid: record.contractId.piid,
+    awardType: clean(record.coreData?.awardOrIDVType?.name),
     solicitationNumber: clean(record.coreData?.solicitationId),
     naicsCode: clean(products?.principalNaics?.[0]?.code),
     pscCode: clean(products?.productOrService?.code),
@@ -64,6 +66,7 @@ function shape(record: SamAward, signedAt: string, source: AwardDraft['source'])
     extentCompeted: clean(record.coreData?.competitionInformation?.extentCompeted?.code),
     setAsideCode: setAside === 'NONE' ? null : setAside,
     signedAt,
+    popStartAt: isoDay(record.awardDetails?.dates?.periodOfPerformanceStartDate),
     completionAt:
       isoDay(record.awardDetails?.dates?.ultimateCompletionDate) ??
       isoDay(record.awardDetails?.dates?.currentCompletionDate),

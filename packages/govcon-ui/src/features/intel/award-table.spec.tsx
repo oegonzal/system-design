@@ -20,6 +20,7 @@ describe('AwardTable', () => {
         .map((cell) => cell.textContent),
     ).toEqual([
       '2026-06-12',
+      'SPE4A726P0123',
       'PRECISION PARTS CO',
       '$52,000',
       '3',

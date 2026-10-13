@@ -270,6 +270,8 @@ export const bidPipelineSummaryOf = (
 export const awardOf = (overrides: Partial<Award> = {}): Award => ({
   source: 'sam.gov',
   externalId: 'SPE4A726P0123',
+  piid: 'SPE4A726P0123',
+  awardType: 'PURCHASE ORDER',
   solicitationNumber: 'SPE4A7-26-Q-0001',
   naicsCode: '332710',
   pscCode: '5340',
@@ -282,6 +284,7 @@ export const awardOf = (overrides: Partial<Award> = {}): Award => ({
   extentCompeted: 'D',
   setAsideCode: 'SBA',
   signedAt: '2026-06-12',
+  popStartAt: '2026-06-12',
   completionAt: '2026-09-30',
   placeOfPerformance: { city: 'Richmond', state: 'VA', zip: '23297', country: 'USA' },
   fetchedAt: '2026-09-27T04:00:00.000Z',

@@ -11,6 +11,10 @@ import type { AwardSource, SliceOutcome } from './vocab';
 export interface Award {
   source: AwardSource;
   externalId: string;
+  /** The contract id as the source spells it (the PIID). */
+  piid: string | null;
+  /** The award's type as the source names it, e.g. `PURCHASE ORDER`. */
+  awardType: string | null;
   solicitationNumber: string | null;
   naicsCode: string | null;
   pscCode: string | null;
@@ -25,8 +29,10 @@ export interface Award {
   /** SAM.gov's `extentCompeted` code, e.g. `A` full and open; open by design. */
   extentCompeted: string | null;
   setAsideCode: string | null;
-  /** ISO date. */
+  /** ISO date — when the award was signed. */
   signedAt: string;
+  /** ISO date — when performance began; null when the source did not say. */
+  popStartAt: string | null;
   completionAt: string | null;
   placeOfPerformance: OpportunityPlace | null;
   /** ISO 8601. */

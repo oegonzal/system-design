@@ -13,6 +13,8 @@ const toRow = (
 ): Omit<GovconAward, typeof import('@mikro-orm/core').PrimaryKeyProp> => ({
   source: award.source,
   externalId: award.externalId,
+  piid: award.piid,
+  awardType: award.awardType,
   solicitationNumber: award.solicitationNumber,
   naicsCode: award.naicsCode,
   pscCode: award.pscCode,
@@ -25,6 +27,7 @@ const toRow = (
   extentCompeted: award.extentCompeted,
   setAsideCode: award.setAsideCode,
   signedAt: award.signedAt,
+  popStartAt: award.popStartAt,
   completionAt: award.completionAt,
   placeOfPerformance: award.placeOfPerformance ? { ...award.placeOfPerformance } : null,
   fetchedAt: new Date(award.fetchedAt),
@@ -33,6 +36,8 @@ const toRow = (
 const fromRow = (row: GovconAward): Award => ({
   source: row.source,
   externalId: row.externalId,
+  piid: row.piid,
+  awardType: row.awardType,
   solicitationNumber: row.solicitationNumber,
   naicsCode: row.naicsCode,
   pscCode: row.pscCode,
@@ -45,6 +50,7 @@ const fromRow = (row: GovconAward): Award => ({
   extentCompeted: row.extentCompeted,
   setAsideCode: row.setAsideCode,
   signedAt: String(row.signedAt).slice(0, 10),
+  popStartAt: row.popStartAt === null ? null : String(row.popStartAt).slice(0, 10),
   completionAt: row.completionAt === null ? null : String(row.completionAt).slice(0, 10),
   placeOfPerformance: row.placeOfPerformance ? { ...row.placeOfPerformance } : null,
   fetchedAt: row.fetchedAt.toISOString(),

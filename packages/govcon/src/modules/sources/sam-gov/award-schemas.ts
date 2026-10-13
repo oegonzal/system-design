@@ -20,6 +20,7 @@ export const samAwardSchema = z.looseObject({
   coreData: z
     .looseObject({
       solicitationId: text,
+      awardOrIDVType: codeName,
       federalOrganization: z
         .looseObject({
           contractingInformation: z
@@ -55,6 +56,7 @@ export const samAwardSchema = z.looseObject({
       dates: z
         .looseObject({
           dateSigned: text,
+          periodOfPerformanceStartDate: text,
           ultimateCompletionDate: text,
           currentCompletionDate: text,
         })
