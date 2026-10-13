@@ -20,15 +20,19 @@ export const GOVCON_TOPICS = {
 export const ALERT_KINDS = ['award-ending', 'pulse-above-band'] as const;
 export type AlertKind = (typeof ALERT_KINDS)[number];
 
-/** What makes one alert the same alert the next day: its kind, the scope it was computed in (a hash), and its subject — an award's id, a fiscal period. */
+/**
+ * What makes one alert the same alert tomorrow, or in another scope: its kind
+ * and its subject — an award's id, a fiscal period. The scope it was found in
+ * travels in the payload, not the key, so an award seen through two scopes is
+ * one alert to the person who reads the digest.
+ */
 export interface AlertKey {
   kind: AlertKind;
-  scopeKey: string;
   subject: string;
 }
 
 /** The key as one string, the way a ledger spells it. */
-export const alertKeyOf = (key: AlertKey): string => `${key.kind}:${key.scopeKey}:${key.subject}`;
+export const alertKeyOf = (key: AlertKey): string => `${key.kind}:${key.subject}`;
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const alertBase = {

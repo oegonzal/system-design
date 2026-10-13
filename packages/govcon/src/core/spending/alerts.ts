@@ -21,8 +21,9 @@ import type { LensBody } from './lens';
 /**
  * The alert rules, as declared arithmetic over what a warm read: no clock,
  * no store — the day and the ids come in as parameters, so the same answers
- * always give the same alerts. The policy is the profile's; the key is what
- * makes an alert the same alert tomorrow.
+ * always give the same alerts. The policy is the profile's; the key — kind
+ * and subject — is what makes an alert the same alert tomorrow or in another
+ * scope, and the scope it was found in rides in the payload.
  */
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -46,7 +47,7 @@ export function awardEndingAlerts(
     return [
       {
         topic: GOVCON_TOPICS.awardEnding,
-        key: { kind: 'award-ending' as const, scopeKey: key, subject: row.externalId },
+        key: { kind: 'award-ending' as const, subject: row.externalId },
         payload: {
           profileId,
           scopeKey: key,
@@ -89,7 +90,6 @@ export function pulseAboveBandAlerts(
       topic: GOVCON_TOPICS.pulseAboveBand,
       key: {
         kind: 'pulse-above-band' as const,
-        scopeKey: key,
         subject: `${partial.fiscalYear}-${partial.period}`,
       },
       payload: {

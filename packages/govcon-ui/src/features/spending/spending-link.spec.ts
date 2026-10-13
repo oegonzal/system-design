@@ -69,10 +69,10 @@ describe('the spending view in its address', () => {
     ).toBe('/spending?naics=541511&naics=332710');
     expect(
       spendingHref(
-        { ...base, scope: { ...base.scope, psc: 'da, 7030' }, preset: 'last-12-months' },
+        { ...base, scope: { ...base.scope, psc: 'da, 7030' }, preset: 'fytd' },
         PROFILE_NAICS,
       ),
-    ).toBe('/spending?psc=da&psc=7030&window=last-12-months');
+    ).toBe('/spending?psc=da&psc=7030&window=fytd');
     expect(
       sameView(base, { ...base, scope: { ...base.scope, naics: '332710,541511' } }, PROFILE_NAICS),
     ).toBe(true);

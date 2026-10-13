@@ -18,21 +18,17 @@ const NOW = new Date('2026-06-15T12:00:00Z');
 const PROFILE = { id: 'enfav', company: 'Enfav LLC' };
 
 describe('the alert rules', () => {
-  it('[GOV-24] an award ending inside the profile’s window is one alert keyed by kind, scope and award — a row past the window, a window of zero, or a capped horizon’s missing rows raise none', () => {
+  it('[GOV-24] an award ending inside the profile’s window is one alert keyed by kind and award, the scope in its payload — a row past the window, a window of zero, or a capped horizon’s missing rows raise none', () => {
     // The fixture's rows end 2026-07-20 (35 days out) and 2026-09-14 (91 days out) from 2026-06-15.
     const horizon = spendingHorizonOf();
     const alerts = awardEndingAlerts(horizon, DEFAULT_ALERT_POLICY, 'enfav');
     expect(alerts).toHaveLength(1);
     const [alert] = alerts;
     if (alert?.topic !== 'govcon.award.ending') throw new Error('expected an award alert');
-    expect(alert.key).toEqual({
-      kind: 'award-ending',
-      scopeKey: expect.stringMatching(/^[0-9a-f]{64}$/),
-      subject: horizonRowOf().externalId,
-    });
+    expect(alert.key).toEqual({ kind: 'award-ending', subject: horizonRowOf().externalId });
     expect(alert.payload).toMatchObject({
       profileId: 'enfav',
-      scopeKey: alert.key.scopeKey,
+      scopeKey: expect.stringMatching(/^[0-9a-f]{64}$/),
       piid: 'N6660426P0205',
       family: 'contracts',
       endsAt: '2026-07-20',
@@ -46,13 +42,14 @@ describe('the alert rules', () => {
       awardEndingAlerts(horizon, { ...DEFAULT_ALERT_POLICY, endingWithinDays: 0 }, 'enfav'),
     ).toEqual([]);
     expect(awardEndingAlerts({ ...horizon, rows: [] }, DEFAULT_ALERT_POLICY, 'enfav')).toEqual([]);
-    // Another scope is another key.
+    // Another scope is the same key, found elsewhere.
     const narrowed = awardEndingAlerts(
       { ...horizon, scope: { ...horizon.scope, agency: '097' } },
       DEFAULT_ALERT_POLICY,
       'enfav',
     );
-    expect(narrowed[0]?.key.scopeKey).not.toBe(alert.key.scopeKey);
+    expect(narrowed[0]?.key).toEqual(alert.key);
+    expect(narrowed[0]?.payload.scopeKey).not.toBe(alert.payload.scopeKey);
   });
 
   it('[GOV-24] the partial period above its projected high is one alert per period, and none without a projection, a partial period, a projected period, a total inside the band, or the policy', () => {

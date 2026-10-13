@@ -3,6 +3,8 @@ import type { AlertKey, GovconAlert, InteractionPrompt } from '@sysdesign/contra
 /** One alert the warm raised: by its key, for a profile, when, with the bus's receipt and the digest it was listed in. */
 export interface RaisedAlert {
   key: AlertKey;
+  /** The scope the alert was first found in — the payload's. */
+  scopeKey: string;
   profileId: string;
   raisedAt: Date;
   /** The bus's sequence for the published event. */

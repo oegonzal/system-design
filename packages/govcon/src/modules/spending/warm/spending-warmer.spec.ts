@@ -118,7 +118,7 @@ const outcomes = (report: WarmReport) =>
   report.lenses.map((lens) => [lens.lens, lens.outcome, 'status' in lens ? lens.status : null]);
 
 describe('the spending warmer', () => {
-  it('[GOV-22] a warm forces every declared lens for the default profile’s NAICS and the outlook of the top agencies the breakdown names, keys the breakdown on the fiscal year to date, never throws, and skips an empty store', async () => {
+  it('[GOV-22] a warm forces every declared lens for the default profile’s NAICS, then the horizon and the outlook of each top agency the breakdown names over a rolling year, never throws, and skips an empty store', async () => {
     const { warmer, sources, profiles, operations } = harness();
     await profiles.create(tinyProfile());
     const report = await warmer.warm();
@@ -128,7 +128,9 @@ describe('the spending warmer', () => {
       ['breakdown', 'ok', null],
       ['horizon', 'ok', null],
       ['agencies', 'ok', null],
+      ['horizon 097', 'ok', null],
       ['agency 097', 'ok', null],
+      ['horizon 080', 'ok', null],
       ['agency 080', 'ok', null],
     ]);
     expect(
@@ -143,12 +145,21 @@ describe('the spending warmer', () => {
     });
     expect(sources.requests.breakdowns[0]).toMatchObject({
       category: 'awarding_agency',
-      from: '2025-10-01',
+      from: '2025-06-15',
       to: '2026-06-15',
     });
-    expect((sources.requests.ending as HorizonRequest[]).map((request) => request.family)).toEqual([
-      'contracts',
-      'idvs',
+    expect(
+      (sources.requests.ending as HorizonRequest[]).map((request) => [
+        request.family,
+        request.agency?.toptierCode ?? null,
+      ]),
+    ).toEqual([
+      ['contracts', null],
+      ['idvs', null],
+      ['contracts', '097'],
+      ['idvs', '097'],
+      ['contracts', '080'],
+      ['idvs', '080'],
     ]);
     expect(
       sources.requests.budgets.map((request) => (request as { toptierCode: string }).toptierCode),
@@ -219,7 +230,7 @@ describe('the spending warmer', () => {
     expect(liveWarm).toHaveBeenCalledTimes(1);
   });
 
-  it('[GOV-24] after a warm each new alert is published once on its declared topic, one digest prompt per warm lists them for the profile, what was already raised is not published again, nothing is recorded that was not published, and the policy is the profile’s', async () => {
+  it('[GOV-24] after a warm each new alert is published once on its declared topic — the same award through every horizon is one — one digest prompt per warm lists them for the profile, what was already raised is not published again, nothing is recorded that was not published, and the policy is the profile’s', async () => {
     const { warmer, sink, ledger, profiles } = harness();
     await profiles.create(tinyProfile());
     const first = await warmer.warm();
@@ -234,10 +245,12 @@ describe('the spending warmer', () => {
     expect(interactionPromptSchema.parse(prompt)).toEqual(prompt);
     expect(prompt.title).toBe('2 spending alerts for Tiny LLC');
     expect(prompt.details).toHaveLength(2);
+    // The same award came through three horizons — the profile's and two agencies' — and is one alert.
     expect(ledger.rows.map((row) => [row.key.kind, row.eventSeq, row.promptId])).toEqual([
       ['award-ending', '1', prompt.id],
       ['pulse-above-band', '2', prompt.id],
     ]);
+    expect(ledger.rows[0]?.scopeKey).toMatch(/^[0-9a-f]{64}$/);
 
     const second = await warmer.warm();
     expect(second.alerts).toEqual({ found: 2, fresh: 0, published: 0, prompted: false });

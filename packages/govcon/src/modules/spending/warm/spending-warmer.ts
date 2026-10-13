@@ -14,6 +14,7 @@ import {
   WARM_TOP_AGENCIES,
   windowOf,
   type GovconAlert,
+  type HorizonBody,
   type Periodic,
   type Provenance,
   type SearchProfile,
@@ -80,7 +81,7 @@ const refusalOf = (error: unknown): { status: number | null; message: string } =
   return { status: null, message: messageOf(error) };
 };
 
-/** One alert per key, the first kept — a finding named twice is one alert. */
+/** One alert per key, the first kept — the same award through two scopes is one alert. */
 const uniqueByKey = (alerts: readonly GovconAlert[]): GovconAlert[] => {
   const seen = new Set<string>();
   return alerts.filter((alert) => {
@@ -93,10 +94,12 @@ const uniqueByKey = (alerts: readonly GovconAlert[]): GovconAlert[] => {
 
 /**
  * The daily warm: the default profile's scope through every lens, forced, so
- * the client's first look is a snapshot; the outlook of the agencies the
- * breakdown names; then the alert rules over what was read, each alert raised
- * once per key, published on its topic, and listed in one digest put to a
- * person. Started by `serve()` alone — a lifecycle hook would also run under
+ * the client's first look is a snapshot; for each top agency the breakdown
+ * names, the horizon narrowed to it — the scope a directory pick opens, and
+ * the one whose walk reaches today where a wide scope's caps first — and its
+ * outlook; then the alert rules over every horizon and the pulse, each alert
+ * raised once per key, published on its topic, and listed in one digest put
+ * to a person. Started by `serve()` alone — a lifecycle hook would also run under
  * the CLI and the HTTP suite — and stopped before the store closes.
  */
 @Injectable()
@@ -153,12 +156,13 @@ export class SpendingWarmer implements OnModuleDestroy {
     const pulse = await read('pulse', () =>
       this.spending.pulse(pulseQuerySchema.parse(wire), REFRESH),
     );
+    // A rolling year, as the page opens: the fiscal year to date is thirteen days long on October 13.
     const breakdown = await read('breakdown', () =>
       this.spending.breakdown(
         breakdownQuerySchema.parse({
           ...wire,
           category: 'awarding_agency',
-          ...windowOf('fytd', this.now().getTime()),
+          ...windowOf('last-12-months', this.now().getTime()),
         }),
         REFRESH,
       ),
@@ -171,14 +175,19 @@ export class SpendingWarmer implements OnModuleDestroy {
       breakdown && agencies
         ? topAgencyCodes(breakdown.rows, agencies.entries, WARM_TOP_AGENCIES)
         : [];
+    const horizons: HorizonBody[] = horizon ? [horizon] : [];
     for (const code of top) {
+      const narrowed = await read(`horizon ${code}`, () =>
+        this.spending.horizon(horizonQuerySchema.parse({ ...wire, agency: code }), REFRESH),
+      );
+      if (narrowed) horizons.push(narrowed);
       await read(`agency ${code}`, () =>
         this.spending.agency(code, { awardFamily: 'both' }, REFRESH),
       );
     }
 
     const found = uniqueByKey([
-      ...(horizon ? awardEndingAlerts(horizon, profile.alerts, profile.id) : []),
+      ...horizons.flatMap((body) => awardEndingAlerts(body, profile.alerts, profile.id)),
       ...(pulse ? pulseAboveBandAlerts(pulse, profile.alerts, profile.id) : []),
     ]);
     return { profile: profile.id, lenses, alerts: await this.raise(profile, found) };
@@ -282,6 +291,7 @@ export class SpendingWarmer implements OnModuleDestroy {
     const raisedAt = this.now();
     const rows: RaisedAlert[] = published.map(({ alert, seq }) => ({
       key: alert.key,
+      scopeKey: alert.payload.scopeKey,
       profileId: profile.id,
       raisedAt,
       eventSeq: seq,

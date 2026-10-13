@@ -27,6 +27,27 @@ export const Capped: Story = {
   ),
 };
 
+/** A wide scope: thirty pages of awards all ending after the window, so nothing is known inside it. */
+export const Unreached: Story = {
+  render: () => (
+    <HorizonTiles
+      horizon={{
+        ...HORIZON,
+        rows: [],
+        openNotices: [],
+        buckets: HORIZON.buckets.map((bucket) => ({
+          ...bucket,
+          contracts: { count: 0, amount: 0 },
+          idvs: { count: 0, amount: 0 },
+        })),
+        capped: true,
+        stoppedBy: 'pages',
+        reachedEndsAt: '2027-05-31',
+      }}
+    />
+  ),
+};
+
 /** The soonest-ending rows; the first already has an open notice for its work and buyer. */
 export const Rows: Story = {
   render: () => (

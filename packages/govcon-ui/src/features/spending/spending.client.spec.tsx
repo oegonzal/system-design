@@ -103,7 +103,7 @@ describe('SpendingClient', () => {
     await applyLastReplace(rerender);
     await screen.findByRole('list', { name: 'Obligations by awarding agency' });
     expect(urls(calls)).toContain(
-      `/spending/breakdown?${narrowed}&category=awarding_agency&from=2025-10-01&to=2026-06-15`,
+      `/spending/breakdown?${narrowed}&category=awarding_agency&from=2025-06-15&to=2026-06-15`,
     );
     fireEvent.click(screen.getByRole('button', { name: 'Prior fiscal year' }));
     expect(lastReplace()).toBe(`/spending?${restParams}&tab=where&window=prior-fy`);

@@ -18,14 +18,10 @@ export class MikroOrmAlertLedger implements AlertLedger {
       .fork()
       .find(
         GovconAlert,
-        { $or: keys.map(({ kind, subject, scopeKey }) => ({ kind, subject, scopeKey })) },
-        { fields: ['kind', 'subject', 'scopeKey'] },
+        { $or: keys.map(({ kind, subject }) => ({ kind, subject })) },
+        { fields: ['kind', 'subject'] },
       );
-    return new Set(
-      rows.map((row) =>
-        alertKeyOf({ kind: row.kind, subject: row.subject, scopeKey: row.scopeKey }),
-      ),
-    );
+    return new Set(rows.map((row) => alertKeyOf({ kind: row.kind, subject: row.subject })));
   }
 
   async record(rows: readonly RaisedAlert[]): Promise<void> {
@@ -36,7 +32,7 @@ export class MikroOrmAlertLedger implements AlertLedger {
         id: randomUUID(),
         kind: row.key.kind,
         subject: row.key.subject,
-        scopeKey: row.key.scopeKey,
+        scopeKey: row.scopeKey,
         profileId: row.profileId,
         raisedAt: row.raisedAt,
         eventSeq: row.eventSeq,

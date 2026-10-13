@@ -36,7 +36,7 @@ the same view. Only what differs from the profile's default is written:
 | `awardFamily` | `contracts`, `idvs`, `both`                                                             | `both`              |
 | `tab`         | `pulse`, `where`, `horizon`, `agency`                                                   | `pulse`             |
 | `category`    | `awarding_agency`, `awarding_subagency`, `recipient`, `naics`, `psc`, `state_territory` | `awarding_agency`   |
-| `window`      | `fytd`, `prior-fy`, `last-12-months`                                                    | `fytd`              |
+| `window`      | `fytd`, `prior-fy`, `last-12-months`                                                    | `last-12-months`    |
 | `months`      | `6`, `12`, `24`                                                                         | `12`                |
 
 A value the vocabulary does not know falls back to the default. A tab mounts
@@ -74,9 +74,11 @@ complete prior year there is no projection, and the panel says so.
 The scope's obligations over a window, ranked by awarding agency,
 sub-agency, recipient, NAICS, PSC or state, each a share of the scope's
 whole over that window (the whole is read separately, so the rows need not
-add up to it). The window presets are the fiscal year to date, the prior
-fiscal year and the last twelve months. "Truncated" means more rows exist
-beyond the declared bound (`MAX_BREAKDOWN_ROWS`).
+add up to it). The window opens on the last twelve months — a whole year on
+any day, where the fiscal year to date is thirteen days long on October 13 —
+with the fiscal year to date and the prior fiscal year as presets.
+"Truncated" means more rows exist beyond the declared bound
+(`MAX_BREAKDOWN_ROWS`).
 
 ### Horizon — what is ending
 
@@ -87,7 +89,14 @@ page, inside a lookback window of action dates (`HORIZON_LOOKBACK_YEARS`),
 and stops when the end dates pass today. The walk is bounded by a page cap
 per family (`MAX_HORIZON_PAGES`) and by the pull deadline; a capped walk says
 so, names what stopped it, and names the earliest end date it reached — the
-months after it are complete, the ones before it may be missing rows.
+months after it are complete, the ones before it may be missing rows. A wide
+scope caps before it reaches the window at all: measured 2026-10-13, the
+four software NAICS together put 3,000 contracts per family all ending after
+September 2027, and 541511 alone across every agency reached January 2027 in
+3,000 — while 541511 at one department (Defense) reached today in nine pages,
+uncapped. The panel says when nothing inside the window was reached; the
+Horizon reads best at one code family and one agency, which is what the
+directory pick sets, and what the daily warm fills.
 
 **Open notices are recompetes.** Each expiring award is joined, on every
 read, to the open notices already stored by the pulls that share its exact
@@ -116,8 +125,10 @@ the spending warm runs at once and then every `GOVCON_SPENDING_WARM_HOURS`
 (default 24; `0` turns it off). Each warm reads the default profile's NAICS
 (no PSC, every agency, both families) through every lens with a forced
 refresh — the snapshot is replaced inside the cache window, so the page's
-first look that day is a snapshot — then the outlook of the top three
-agencies the breakdown names, and logs one line per lens:
+first look that day is a snapshot — then, for each of the top three agencies
+the rolling-year breakdown names, the horizon narrowed to that agency (the
+scope a directory pick opens, and the one whose walk reaches today) and its
+outlook, and logs one line per lens:
 
 ```
 spending warm every 24 h
@@ -125,6 +136,7 @@ warm pulse source 1 req 812 ms
 warm breakdown source 2 req 1240 ms
 warm horizon source 7 req 9870 ms
 warm agencies source 1 req 310 ms
+warm horizon 097 source 9 req 6210 ms
 warm agency 097 source 2 req 1105 ms
 warm alerts: 3 found, 2 new, 2 published, digest sent
 ```
@@ -137,9 +149,10 @@ profile and edited in Settings → Alerts:
 | An award in the scope is ending | `alerts.endingWithinDays` | One alert per listed award ending within this many days of today (default 90; `0` raises none)         |
 | The pulse runs above its band   | `alerts.pulseAboveBand`   | One alert when the period in progress has already obligated more than every prior year's amount for it |
 
-Each alert is raised once per kind, scope and subject: a ninth table,
-`govcon_alert`, remembers what was raised, so tomorrow's warm raises only
-what is new. Each new alert is published on its declared topic
+Each alert is raised once per kind and subject — the same expiring award
+seen through the profile's horizon and an agency's is one alert: a ninth
+table, `govcon_alert`, remembers what was raised, so tomorrow's warm raises
+only what is new. Each new alert is published on its declared topic
 (`govcon.award.ending`, `govcon.pulse.above-band`) on the notifications bus
 at `NOTIFICATIONS_URL`, and one digest per warm — "N spending alerts for
 Enfav LLC", at most ten lines and a count of the rest, one "Noted" button,
@@ -214,6 +227,7 @@ does not carry them.
 | A first look takes long                                 | The scope is new today: the lens is built from the source. Later reads answer from the snapshot; the warm fills the default profile's scope daily.                              |
 | "from an older snapshot — the source refused a refresh" | USAspending answered 429, 5xx or timed out; the day-old answer is better than none. Read the ledger row for the outcome.                                                        |
 | "The walk stopped early (pages)"                        | The scope is wide; the months after `reachedEndsAt` are complete. Narrow the scope or the family.                                                                               |
+| \"…before it reached the window\"                       | Wider still: every award the walk read ends after the window. Pick an agency in the Agency tab, or one code family.                                                             |
 | "The walk stopped early (source)"                       | A page failed; the answer was not kept, so the next read walks again.                                                                                                           |
 | 404 on an agency                                        | The toptier code is not in USAspending's directory (`GET /spending/agencies`).                                                                                                  |
 | "No projection"                                         | No complete prior fiscal year in the lookback with anything obligated.                                                                                                          |

@@ -36,7 +36,8 @@ export const defaultView = (profileNaics: readonly string[]): SpendingView => ({
   scope: { naics: profileNaics.join(', '), psc: '', agency: '', awardFamily: 'both' },
   tab: 'pulse',
   category: 'awarding_agency',
-  preset: 'fytd',
+  // A rolling year is a whole picture on any day; the fiscal year to date is thirteen days long on October 13.
+  preset: 'last-12-months',
   months: DEFAULT_HORIZON_MONTHS,
 });
 

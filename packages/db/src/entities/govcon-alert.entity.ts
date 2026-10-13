@@ -6,14 +6,14 @@ const KINDS = ['award-ending', 'pulse-above-band'] as const satisfies ContractKi
 
 /**
  * One alert the spending warm raised, by the key that makes it the same alert
- * tomorrow — its kind, the scope it was computed in and its subject — so a
- * warm raises each once. `event_seq` is the bus's receipt for the published
+ * tomorrow or in another scope — its kind and its subject — so a warm raises
+ * each once; `scope_key` is where it was first found. `event_seq` is the bus's receipt for the published
  * event; `prompt_id` the digest it was listed in, null when the digest could
  * not be published. Rows are only ever written for what was published.
  */
 @Entity()
 @Index({ properties: ['raisedAt'] })
-@Unique({ properties: ['kind', 'subject', 'scopeKey'] })
+@Unique({ properties: ['kind', 'subject'] })
 @Check({
   name: 'govcon_alert_kind_check',
   expression: `kind in (${KINDS.map((kind) => `'${kind}'`).join(', ')})`,

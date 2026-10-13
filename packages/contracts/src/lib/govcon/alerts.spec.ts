@@ -26,7 +26,7 @@ const PULSE = {
 };
 
 describe('the govcon alerts', () => {
-  it('[GOV-24] declares both topics on the bus for anyone to publish, each with the payload the warm publishes, refuses a payload beside it, and spells one key per kind, scope and subject', () => {
+  it('[GOV-24] declares both topics on the bus for anyone to publish, each with the payload the warm publishes, refuses a payload beside it, and spells one key per kind and subject', () => {
     for (const topic of Object.values(GOVCON_TOPICS)) {
       expect(NOTIFICATION_TOPICS[topic]?.publishedBy).toBe('anyone');
     }
@@ -36,8 +36,8 @@ describe('the govcon alerts', () => {
     expect(awardEndingSchema.safeParse({ ...AWARD, extra: true }).success).toBe(false);
     expect(pulseAboveBandSchema.parse(PULSE)).toEqual(PULSE);
     expect(pulseAboveBandSchema.safeParse({ ...PULSE, period: 13 }).success).toBe(false);
-    expect(alertKeyOf({ kind: 'award-ending', scopeKey: SCOPE_KEY, subject: 'CONT_AWD_1' })).toBe(
-      `award-ending:${SCOPE_KEY}:CONT_AWD_1`,
+    expect(alertKeyOf({ kind: 'award-ending', subject: 'CONT_AWD_1' })).toBe(
+      'award-ending:CONT_AWD_1',
     );
   });
 });

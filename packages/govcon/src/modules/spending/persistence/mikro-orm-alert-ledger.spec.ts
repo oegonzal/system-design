@@ -20,19 +20,22 @@ describe('the alert ledger in Postgres', () => {
 
   it('[GOV-24] records what was published and answers the raised keys back; an unknown key is not raised, and no keys ask nothing', async () => {
     const ledger = new MikroOrmAlertLedger(orm.em);
-    const key = { kind: 'award-ending' as const, scopeKey: 'a'.repeat(64), subject: 'CONT_1' };
+    const scopeKey = 'a'.repeat(64);
+    const key = { kind: 'award-ending' as const, subject: 'CONT_1' };
     const other = { ...key, subject: 'CONT_2' };
     expect(await ledger.raised([key])).toEqual(new Set());
     await ledger.record([
       {
         key,
+        scopeKey,
         profileId: 'enfav',
         raisedAt: new Date('2026-06-15T12:00:00Z'),
         eventSeq: '12',
         promptId: null,
       },
       {
-        key: { kind: 'pulse-above-band', scopeKey: key.scopeKey, subject: '2026-9' },
+        key: { kind: 'pulse-above-band', subject: '2026-9' },
+        scopeKey,
         profileId: 'enfav',
         raisedAt: new Date('2026-06-15T12:00:00Z'),
         eventSeq: '13',

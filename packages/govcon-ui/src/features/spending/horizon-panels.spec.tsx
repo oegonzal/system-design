@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { HorizonMonths } from './horizon-panels';
 import * as stories from './horizon-panels.stories';
 
-const { Chart, Tiles, Capped, Rows, NoRows } = composeStories(stories);
+const { Chart, Tiles, Capped, Unreached, Rows, NoRows } = composeStories(stories);
 
 describe('the horizon panels', () => {
   it('[GOVU-11] charts the months ahead with both families and a data table, and tiles what ends in the window', () => {
@@ -30,6 +30,10 @@ describe('the horizon panels', () => {
     renderWithTheme(<Capped />);
     expect(screen.getByRole('alert').textContent).toContain(
       'complete only for awards ending after 2026-11-30',
+    );
+    renderWithTheme(<Unreached />);
+    expect(screen.getAllByRole('alert').at(-1)?.textContent).toContain(
+      'before it reached the window: every award it read ends after 2027-05-31. Narrow the scope',
     );
   });
 

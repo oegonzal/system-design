@@ -67,6 +67,19 @@ export interface HorizonTilesProps {
   horizon: SpendingHorizon;
 }
 
+/** What a capped walk says: how far it got — or that it never reached the window at all, which a wide scope does. */
+const cappedMessage = (horizon: SpendingHorizon): string => {
+  const stop = horizon.stoppedBy ?? 'unknown';
+  if (horizon.rows.length === 0) {
+    return `The walk stopped early (${stop}) before it reached the window: every award it read ends after ${horizon.reachedEndsAt ?? 'the window'}. Narrow the scope — one code family, one agency, one award family.`;
+  }
+  return `The walk stopped early (${stop}): the list is partial${
+    horizon.reachedEndsAt === null
+      ? ''
+      : `, complete only for awards ending after ${horizon.reachedEndsAt}`
+  }.`;
+};
+
 /** How much ends inside the window, per family, how many rows already have an open notice, and whether the walk saw all of it. */
 export function HorizonTiles({ horizon }: HorizonTilesProps) {
   const withNotice = horizon.openNotices.filter((match) => match.notices.length > 0).length;
@@ -96,15 +109,7 @@ export function HorizonTiles({ horizon }: HorizonTilesProps) {
           detail={`of ${horizon.rows.length} listed`}
         />
       </StatGrid>
-      {horizon.capped ? (
-        <Alert tone="warn">
-          {`The walk stopped early (${horizon.stoppedBy ?? 'unknown'}): the list is partial${
-            horizon.reachedEndsAt === null
-              ? ''
-              : `, complete only for awards ending after ${horizon.reachedEndsAt}`
-          }.`}
-        </Alert>
-      ) : null}
+      {horizon.capped ? <Alert tone="warn">{cappedMessage(horizon)}</Alert> : null}
     </Stack>
   );
 }
