@@ -190,8 +190,12 @@ ledger row under its own operation), the body is stored and answers as
 `stale`, saying so; a walk the source cut short answers but is not kept, so
 the next read walks again; a read asked to `refresh` — the warm — skips the
 window; and one query is never loaded twice at once — a reader that arrives
-while its load is in flight waits on that load. Snapshot keys carry the clock's inputs (the fiscal period, today), so
-a row is never served for another day. Pure arithmetic lives in
+while its load is in flight waits on that load. Snapshot keys carry the
+clock's inputs (the fiscal period, today), so a row is never served for
+another day. A buyer is stored as a dotted `department.subtier.office` path,
+the way SAM.gov writes a notice's; a name's own dots are dropped when the
+path is built, so `U.S. Coast Guard` is stored and shown as `US Coast Guard`.
+Pure arithmetic lives in
 `packages/govcon/src/core/spending/` (the series aligner, the projection,
 the horizon walk, the agency alignment, the recompete join, the alert rules);
 one adapter per USAspending endpoint lives in
@@ -313,7 +317,9 @@ end in the next twelve months ($5.8B obligated on them) — 31, 57, 91, 72,
 inside six months ($3.7B). Narrowed to the work the capabilities statement
 names — 541511 with PSC DA01, application development support — 253
 Defense contracts end in the next twelve months ($1.8B obligated on them),
-146 inside six ($1.3B); that read is whole in five requests. Each is work a
+146 inside six ($1.3B); that read is whole in five requests. At Veterans
+Affairs, systems design (541512) alone: 286 contracts end within two years,
+with $15.3B obligated on them. Each is work a
 buyer may buy again. The open-notices column joins a row to the stored
 notices in its NAICS code at the same buying sub-agency: candidates for its
 recompete, not a confirmed match (at Defense a sub-agency is a whole
@@ -434,4 +440,8 @@ driven by Playwright, on the software codes above: nineteen checks, all
 passing, the console clean. The walk is what found that a PSC in the scope
 answered 502, that two identical reads at once each walked the source, that
 every chip press started a walk of an in-between scope, and that the tooltip
-left the viewport in a narrow window — each fixed and walked again.
+left the viewport in a narrow window; reading the live digest found a
+buyer's name split at its own dots ("U.S. Marshals Service" shown by its
+second half), and reading the service log found a warm started on a service
+that was told to stop while still booting. Each was fixed and checked again
+on the running stack.
