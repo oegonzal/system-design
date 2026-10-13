@@ -1,15 +1,7 @@
-import type { INestApplication } from '@nestjs/common';
-import { Test } from '@nestjs/testing';
-import { EntityManager } from '@mikro-orm/postgresql';
 import type {
-  Award,
-  AwardsSummary,
-  Entity,
-  EntityLookup,
   Bid,
   BidPipelineSummary,
   DescriptionFetch,
-  FetchAwardsReport,
   LeadsReport,
   NoticeDto,
   PipelineRow,
@@ -17,177 +9,51 @@ import type {
   SavedSearch,
   SourceCall,
   SourceStatus,
-  SpendingBreakdown,
-  SpendingHorizon,
-  SpendingPulse,
-  AgencyDirectory,
-  AgencyOutlook,
   StoredProfile,
 } from '@sysdesign/contracts';
-import {
-  ensureDatabase,
-  GovconAward,
-  GovconBid,
-  GovconEntity,
-  GovconOpportunity,
-  GovconSavedSearch,
-  GovconSearchProfile,
-  GovconSourceCall,
-  GovconSpendingSnapshot,
-  truncateTestTables,
-} from '@sysdesign/db';
 
-import type { BudgetPolicy } from '../../core/budget';
+import { pick, tinyProfile } from '../../core/testing';
 import {
-  okPage,
-  opportunityOf,
-  scriptedDescriptions,
-  pick,
-  scriptedSearch,
-  tinyProfile,
-  awardDraftOf,
-  awardPageOf,
-  entityBatchOf,
-  entityDraftOf,
-  scriptedContractAwards,
-  scriptedSpendingAwards,
-  scriptedRegistry,
-} from '../../core/testing';
-import { scriptedSpendingSources } from '../../core/spending/testing';
-import {
-  BUDGET_POLICY,
-  CLOCK,
-  CONTRACT_AWARDS,
-  ENTITY_REGISTRY,
-  NOTICE_DESCRIPTIONS,
-  OPPORTUNITY_SEARCH,
-  SPENDING_AWARDS,
-  SPENDING_SOURCES,
-} from '../sources/tokens';
-import { AppModule } from './app.module';
-import { configureApp } from './configure-app';
-
-type Envelope<T> = { data: T };
-type Page<T> = { data: T[]; meta: { total: number; limit: number; offset: number } };
-type Issues = { issues: { path: string; message: string }[] };
-
-const NOW = new Date('2026-09-26T12:00:00Z');
-/** The two saved searches of the tiny profile: three notices, one of them a set-aside the profile cannot bid. */
-const PAGES = [
-  okPage([opportunityOf({ noticeId: 'a' }), opportunityOf({ noticeId: 'b', setAsideCode: '8A' })]),
-  okPage([opportunityOf({ noticeId: 'c', naicsCode: '541511', naicsCodes: ['541511'] })]),
-];
-const SEARCHES = [
-  {
-    name: 'Machine shops',
-    filter: { naics: '332710' },
-    days: 3,
-    includedInPull: true,
-    pullOrder: 0,
-  },
-  {
-    name: 'Computer services',
-    filter: { naics: '5415' },
-    days: 3,
-    includedInPull: true,
-    pullOrder: 1,
-  },
-];
+  bootGovconHttp,
+  get,
+  json,
+  NOW,
+  PAGES,
+  post,
+  pullTiny,
+  resetGovcon,
+  SEARCHES,
+  send,
+  truncateGovcon,
+  type Envelope,
+  type GovconHttp,
+  type Issues,
+  type Page,
+} from './testing';
 
 /**
- * The real modules over real HTTP and the real Postgres tables; only the
- * upstream adapters are scripted (behind the real gate, so the ledger and
- * the budget are exercised for real) and the clock is fixed. Every test
- * seeds what it reads through the API itself.
+ * The HTTP surface over the harness in `./testing`: health, profiles, saved
+ * searches, pulls, leads, notices, descriptions and bids. Awards, entities
+ * and spending have their own `*.http.spec.ts` beside their modules.
  */
-const AWARD = awardDraftOf({ externalId: 'SPE4A726P0123-0' });
-
-async function boot() {
-  // Before anything connects: a database that is not a test one is refused here.
-  await ensureDatabase();
-  const scripted = scriptedSearch('sam.gov', PAGES);
-  const contractAwards = scriptedContractAwards([awardPageOf([AWARD])]);
-  const spendingAwards = scriptedSpendingAwards([
-    awardPageOf([{ ...AWARD, source: 'usaspending', externalId: 'CONT_1' }]),
-  ]);
-  const moduleRef = await Test.createTestingModule({ imports: [AppModule] })
-    .overrideProvider(CLOCK)
-    .useValue(() => NOW)
-    .overrideProvider(BUDGET_POLICY)
-    .useValue({
-      ttlMs: 0,
-      pullDeadlineMs: 120_000,
-      buckets: { 'sam.gov': { dailyBudget: 4 } },
-    } satisfies BudgetPolicy)
-    .overrideProvider(OPPORTUNITY_SEARCH)
-    .useValue(scripted)
-    .overrideProvider(NOTICE_DESCRIPTIONS)
-    .useValue(scriptedDescriptions('sam.gov'))
-    .overrideProvider(CONTRACT_AWARDS)
-    .useValue(contractAwards)
-    .overrideProvider(SPENDING_AWARDS)
-    .useValue(spendingAwards)
-    .overrideProvider(SPENDING_SOURCES)
-    .useValue(scriptedSpendingSources())
-    .overrideProvider(ENTITY_REGISTRY)
-    .useValue(scriptedRegistry([entityBatchOf([entityDraftOf()])]))
-    .compile();
-  const app = configureApp(moduleRef.createNestApplication());
-  await app.listen(0);
-  return { app, url: await app.getUrl(), scripted };
-}
-
-const truncate = async (em: EntityManager) => {
-  await truncateTestTables(em, [
-    GovconSourceCall,
-    GovconSpendingSnapshot,
-    GovconAward,
-    GovconEntity,
-    GovconBid,
-    GovconOpportunity,
-    GovconSavedSearch,
-    GovconSearchProfile,
-  ]);
-};
-
-const send = (url: string, method: string, path: string, body?: unknown) =>
-  fetch(`${url}${path}`, {
-    method,
-    headers: { 'content-type': 'application/json' },
-    body: body === undefined ? undefined : JSON.stringify(body),
-  });
-const post = (url: string, path: string, body: unknown) => send(url, 'POST', path, body);
-const json = async <T>(response: Response): Promise<T> => (await response.json()) as T;
-const get = <T>(url: string, path: string) => fetch(`${url}${path}`).then((r) => json<T>(r));
-
 describe('the govcon HTTP surface', () => {
-  let app: INestApplication;
+  let http: GovconHttp;
   let url: string;
-  let em: EntityManager;
-  let scripted: ReturnType<typeof scriptedSearch>;
+  let scripted: GovconHttp['scripted'];
 
   beforeAll(async () => {
-    ({ app, url, scripted } = await boot());
-    em = app.get(EntityManager);
+    http = await bootGovconHttp();
+    ({ url, scripted } = http);
   });
 
-  /** An empty store, an empty ledger, the scripted pages from the top, the tiny profile with its two searches. */
-  beforeEach(async () => {
-    await truncate(em);
-    scripted.script(PAGES);
-    expect((await post(url, '/profiles', tinyProfile())).status).toBe(201);
-    for (const search of SEARCHES) {
-      expect((await post(url, '/profiles/tiny/searches', search)).status).toBe(201);
-    }
-  });
+  beforeEach(() => resetGovcon(http));
 
   afterAll(async () => {
-    await truncate(em);
-    await app.close();
+    await truncateGovcon(http.em);
+    await http.app.close();
   });
 
-  /** Two searches, three notices stored. */
-  const pulled = () => post(url, '/pulls', { profile: 'tiny', days: 2 });
+  const pulled = () => pullTiny(url);
 
   it('[GOV-8] answers health, the profiles and the source status from their contracts', async () => {
     expect(await get(url, '/health')).toEqual({ status: 'ok' });
@@ -494,164 +360,5 @@ describe('the govcon HTTP surface', () => {
     expect((await send(url, 'DELETE', '/notices/a/bid')).status).toBe(204);
     expect((await send(url, 'DELETE', '/notices/a/bid')).status).toBe(404);
     expect((await get<Envelope<NoticeDto>>(url, '/notices/a')).data.bid).toBeNull();
-  });
-
-  it('[GOV-8] [GOV-17] fetches awards from both sources through the gate, then lists and summarizes them, and the notice sees its solicitation', async () => {
-    const bad = await post(url, '/awards/fetch', {
-      from: '2026-06-01',
-      to: '2026-01-01',
-      sources: ['sam.gov'],
-    });
-    expect(bad.status).toBe(400);
-    expect((await json<Issues>(bad)).issues.map((i) => i.path).sort()).toEqual(['naics', 'to']);
-
-    const fetched = await post(url, '/awards/fetch', {
-      naics: ['332710'],
-      from: '2026-06-01',
-      to: '2026-09-29',
-      sources: ['sam.gov', 'usaspending'],
-    });
-    expect(fetched.status).toBe(200);
-    const report = (await json<Envelope<FetchAwardsReport>>(fetched)).data;
-    expect(report.slices.map((s) => [s.source, s.outcome, s.inserted])).toEqual([
-      ['sam.gov', 'ok', 1],
-      ['usaspending', 'ok', 1],
-    ]);
-    expect(report).toMatchObject({ spent: 1, budget: 4 });
-    const calls = await get<Page<SourceCall>>(url, '/source/calls?limit=10');
-    expect(calls.data.map((call) => [call.source, call.operation]).sort()).toEqual([
-      ['sam.gov', 'awards'],
-      ['usaspending', 'spending'],
-    ]);
-
-    const list = await get<Page<Award>>(url, '/awards?naics=3327&source=sam.gov');
-    expect(list.meta).toEqual({ total: 1, limit: 50, offset: 0 });
-    expect(list.data[0]).toMatchObject({ externalId: 'SPE4A726P0123-0', amount: 52000 });
-    expect((await get<Page<Award>>(url, '/awards')).meta.total).toBe(2);
-    expect((await fetch(`${url}/awards?source=other`)).status).toBe(400);
-    const summary = await get<Envelope<AwardsSummary>>(url, '/awards/summary?naics=332710');
-    expect(summary.data).toMatchObject({
-      count: 2,
-      total: 104000,
-      bySource: { 'sam.gov': 1, usaspending: 1 },
-    });
-
-    await pulled();
-    const notice = await get<Envelope<NoticeDto>>(url, '/notices/a');
-    expect(notice.data.awards.bySolicitation.map((a) => a.externalId).sort()).toEqual([
-      'CONT_1',
-      'SPE4A726P0123-0',
-    ]);
-    expect(notice.data.awards.related.count).toBe(2);
-    expect(notice.data.factors.find((f) => f.id === 'history')?.evidence[0]).toBe(
-      '2 stored award(s) in naics 332710 in the last 365 day(s)',
-    );
-  });
-
-  it('[GOV-8] [GOV-20] answers the five spending routes from their contracts through the gate — one ledger row per operation, every query string coerced and bounded, an unknown agency 404 — and names the source it served from', async () => {
-    const pulse = await get<Envelope<SpendingPulse>>(
-      url,
-      '/spending/pulse?naics=541511,332710&awardFamily=contracts&lookback=2',
-    );
-    expect(pulse.data).toMatchObject({
-      fiscalYear: 2026,
-      scope: { naics: ['332710', '541511'], psc: [], agency: null, awardFamily: 'contracts' },
-      projection: null,
-      provenance: { source: 'usaspending', servedFrom: 'source', requests: 1, asOf: '2026-06-14' },
-    });
-    expect(pulse.data.series).toHaveLength(3 * 12);
-    expect(pulse.data.series.at(-1)).toMatchObject({ fiscalYear: 2026, period: 12, partial: true });
-
-    const breakdown = await get<Envelope<SpendingBreakdown>>(
-      url,
-      '/spending/breakdown?category=awarding_agency&naics=332710&from=2025-10-01&to=2026-09-26',
-    );
-    expect(breakdown.data).toMatchObject({
-      category: 'awarding_agency',
-      total: 0,
-      rows: [],
-      truncated: false,
-      provenance: { requests: 2 },
-    });
-
-    const horizon = await get<Envelope<SpendingHorizon>>(
-      url,
-      '/spending/horizon?naics=332710&months=6',
-    );
-    expect(horizon.data).toMatchObject({ today: '2026-09-26', months: 6, capped: false, rows: [] });
-    expect(horizon.data.buckets.map((bucket) => bucket.month)).toEqual([9, 10, 11, 12, 1, 2]);
-
-    const agencies = await get<Envelope<AgencyDirectory>>(url, '/spending/agencies');
-    expect(agencies.data.entries.map((entry) => entry.toptierCode)).toEqual(['097']);
-    const agency = await get<Envelope<AgencyOutlook>>(
-      url,
-      '/spending/agencies/097?fiscalYear=2026&awardFamily=idvs',
-    );
-    expect(agency.data).toMatchObject({
-      name: 'Department of Defense',
-      officesFiscalYear: 2026,
-      awardFamily: 'idvs',
-      subAgencies: [],
-    });
-
-    expect((await fetch(`${url}/spending/agencies/999`)).status).toBe(404);
-    expect((await fetch(`${url}/spending/agencies/abc`)).status).toBe(400);
-    expect((await fetch(`${url}/spending/horizon?months=0`)).status).toBe(400);
-    expect((await fetch(`${url}/spending/pulse?naics=12345678`)).status).toBe(400);
-    expect(
-      (await fetch(`${url}/spending/breakdown?category=nope&from=2026-01-01&to=2026-02-01`)).status,
-    ).toBe(400);
-    const badWindow = await fetch(
-      `${url}/spending/breakdown?category=recipient&from=2026-02-01&to=2026-01-01`,
-    );
-    expect(badWindow.status).toBe(400);
-    expect((await json<Issues>(badWindow)).issues.map((i) => i.path)).toEqual(['to']);
-
-    const calls = await get<Page<SourceCall>>(url, '/source/calls?limit=50');
-    const byOperation: Record<string, number> = {};
-    for (const call of calls.data)
-      byOperation[call.operation] = (byOperation[call.operation] ?? 0) + 1;
-    // The horizon's default scope is both families: one page each.
-    expect(byOperation).toEqual({
-      series: 2,
-      breakdown: 1,
-      horizon: 2,
-      'agency-directory': 3,
-      'agency-budget': 1,
-      'agency-offices': 1,
-      freshness: 4,
-    });
-    expect(calls.data.every((call) => call.source === 'usaspending')).toBe(true);
-    expect(JSON.stringify(calls)).not.toContain('api_key');
-    expect((await get<Page<SourceCall>>(url, '/source/calls?operation=series')).meta.total).toBe(2);
-  });
-
-  it("[GOV-8] [GOV-18] looks registrants up through the gate, reads them from the store, and answers the profile's own", async () => {
-    expect((await get<Envelope<Entity | null>>(url, '/entities/own')).data).toBeNull();
-    expect((await get<Envelope<Entity | null>>(url, '/entities/ABC123DEF456')).data).toBeNull();
-    expect((await fetch(`${url}/entities/short`)).status).toBe(400);
-    const bad = await post(url, '/entities/lookup', { ueis: ['nope'] });
-    expect(bad.status).toBe(400);
-    expect((await json<Issues>(bad)).issues[0]?.path).toBe('ueis.0');
-
-    const looked = await post(url, '/entities/lookup', { ueis: ['ABC123DEF456', 'ZZZ000000001'] });
-    expect(looked.status).toBe(200);
-    const lookup = (await json<Envelope<EntityLookup>>(looked)).data;
-    expect(lookup.entities.map((e) => e.uei)).toEqual(['ABC123DEF456']);
-    expect(lookup.unknown).toEqual(['ZZZ000000001']);
-    expect(lookup).toMatchObject({ spent: 1, budget: 4 });
-    expect((await get<Envelope<Entity | null>>(url, '/entities/ABC123DEF456')).data).toMatchObject({
-      legalName: 'PRECISION PARTS CO',
-      excluded: false,
-    });
-
-    const withUei = tinyProfile({ entityUei: 'ABC123DEF456' });
-    expect((await send(url, 'PUT', '/profiles/tiny', withUei)).status).toBe(200);
-    expect((await get<Envelope<Entity | null>>(url, '/entities/own?profile=tiny')).data?.uei).toBe(
-      'ABC123DEF456',
-    );
-    expect(
-      (await get<Page<SourceCall>>(url, '/source/calls')).data.map((call) => call.operation),
-    ).toEqual(['entity']);
   });
 });

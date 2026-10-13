@@ -313,7 +313,7 @@ describe('test database guarantees', () => {
         'packages/quality-loop/src/modules/http/testing.ts',
         'packages/studio-api/src/test/harness.ts',
         'packages/db/src/testing/ensure-database.ts',
-        'packages/govcon/src/modules/app/http.spec.ts',
+        'packages/govcon/src/modules/app/testing.ts',
       ]),
     );
     // …and none of them boots before it guards.

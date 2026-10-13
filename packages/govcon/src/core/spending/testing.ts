@@ -77,45 +77,50 @@ export const agencyYearOf = (overrides: Partial<AgencyYear> = {}): AgencyYear =>
   ...overrides,
 });
 
-/** Per-port scripted replies, each answered in order and repeating the last. */
-export interface SpendingScript {
-  series?: readonly Scripted<SeriesPoint[]>[];
-  breakdowns?: readonly Scripted<CategoryPage>[];
-  ending?: readonly Scripted<EndingAwardsPage>[];
-  budgets?: readonly Scripted<AgencyYear[]>[];
-  offices?: readonly Scripted<OfficesPage>[];
-  catalog?: readonly Scripted<AgencyDirectoryEntry[]>[];
-  freshness?: readonly Scripted<string>[];
+/** What each port answers, by the script's key. */
+interface ScriptValues {
+  series: SeriesPoint[];
+  breakdowns: CategoryPage;
+  ending: EndingAwardsPage;
+  budgets: AgencyYear[];
+  offices: OfficesPage;
+  catalog: AgencyDirectoryEntry[];
+  freshness: string;
 }
+type Port = keyof ScriptValues;
+
+/** Per-port scripted replies, each answered in order and repeating the last. */
+export type SpendingScript = { [K in Port]?: readonly Scripted<ScriptValues[K]>[] };
 
 export interface ScriptedSpendingSources extends SpendingSources {
   /** Every request each port saw, in order. */
-  requests: Record<keyof SpendingSources, unknown[]>;
+  requests: Record<Port, unknown[]>;
+  /** The replies from the top again — the script given, or the one it was built with; what a suite does between tests. */
+  script(next?: SpendingScript): void;
 }
 
 const asAttempted = <T>(reply: Scripted<T>): Attempted<Fetched<T>> =>
   'attempts' in reply ? reply : attempted(reply);
 
-function replier<T>(replies: readonly Scripted<T>[], requests: unknown[]) {
-  let call = 0;
-  return async (request: unknown = {}): Promise<Attempted<Fetched<T>>> => {
-    requests.push(request);
-    const reply = replies[Math.min(call, replies.length - 1)];
-    call += 1;
-    if (!reply) throw new Error('scriptedSpendingSources: no replies');
-    return asAttempted(reply);
-  };
-}
+/** An unscripted port answers something empty and sensible; the catalog knows one agency, DoD `097`, so a scoped lens can resolve it. */
+const withDefaults = (script: SpendingScript): Required<SpendingScript> => ({
+  series: script.series ?? [fetchedOf<SeriesPoint[]>([])],
+  breakdowns: script.breakdowns ?? [fetchedOf<CategoryPage>({ rows: [], hasMore: false })],
+  ending: script.ending ?? [fetchedOf<EndingAwardsPage>({ rows: [], rejected: 0, hasMore: false })],
+  budgets: script.budgets ?? [fetchedOf<AgencyYear[]>([])],
+  offices: script.offices ?? [fetchedOf<OfficesPage>({ subAgencies: [], hasMore: false })],
+  catalog: script.catalog ?? [fetchedOf([agencyDirectoryEntryOf()])],
+  freshness: script.freshness ?? [fetchedOf('2026-06-14')],
+});
 
 /**
- * The seven ports over a script; an unscripted port answers something empty
- * and sensible (the catalog knows one agency, DoD `097`, so a scoped lens can
- * resolve it). Disclosures are one declared line per port, so a spec can see
- * them carried through.
+ * The seven ports over a script, answered in order and repeating the last
+ * reply; `script()` starts them over. Disclosures are one declared line per
+ * port, so a spec can see them carried through.
  */
 export function scriptedSpendingSources(script: SpendingScript = {}): ScriptedSpendingSources {
   const id = 'usaspending';
-  const requests: ScriptedSpendingSources['requests'] = {
+  const requests: Record<Port, unknown[]> = {
     series: [],
     breakdowns: [],
     ending: [],
@@ -124,34 +129,39 @@ export function scriptedSpendingSources(script: SpendingScript = {}): ScriptedSp
     catalog: [],
     freshness: [],
   };
-  const series = replier(script.series ?? [fetchedOf<SeriesPoint[]>([])], requests.series);
-  const breakdowns = replier(
-    script.breakdowns ?? [fetchedOf<CategoryPage>({ rows: [], hasMore: false })],
-    requests.breakdowns,
-  );
-  const ending = replier(
-    script.ending ?? [fetchedOf<EndingAwardsPage>({ rows: [], rejected: 0, hasMore: false })],
-    requests.ending,
-  );
-  const budgets = replier(script.budgets ?? [fetchedOf<AgencyYear[]>([])], requests.budgets);
-  const offices = replier(
-    script.offices ?? [fetchedOf<OfficesPage>({ subAgencies: [], hasMore: false })],
-    requests.offices,
-  );
-  const catalog = replier(
-    script.catalog ?? [fetchedOf([agencyDirectoryEntryOf()])],
-    requests.catalog,
-  );
-  const freshness = replier(script.freshness ?? [fetchedOf('2026-06-14')], requests.freshness);
+  const calls: Record<Port, number> = {
+    series: 0,
+    breakdowns: 0,
+    ending: 0,
+    budgets: 0,
+    offices: 0,
+    catalog: 0,
+    freshness: 0,
+  };
+  let current = withDefaults(script);
+  const replier =
+    <K extends Port>(port: K) =>
+    async (request: unknown = {}): Promise<Attempted<Fetched<ScriptValues[K]>>> => {
+      requests[port].push(request);
+      const replies = current[port] as readonly Scripted<ScriptValues[K]>[];
+      const reply = replies[Math.min(calls[port], replies.length - 1)];
+      calls[port] += 1;
+      if (!reply) throw new Error('scriptedSpendingSources: no replies');
+      return asAttempted(reply);
+    };
   return {
     requests,
-    series: { id, disclosures: ['series disclosure'], series },
-    breakdowns: { id, disclosures: ['breakdown disclosure'], breakdown: breakdowns },
-    ending: { id, disclosures: ['horizon disclosure'], page: ending },
-    budgets: { id, disclosures: ['budget disclosure'], budgets },
-    offices: { id, disclosures: ['offices disclosure'], offices },
-    catalog: { id, disclosures: ['catalog disclosure'], agencies: () => catalog() },
-    freshness: { id, disclosures: [], lastUpdated: () => freshness() },
+    script(next = script) {
+      current = withDefaults(next);
+      for (const port of Object.keys(calls) as Port[]) calls[port] = 0;
+    },
+    series: { id, disclosures: ['series disclosure'], series: replier('series') },
+    breakdowns: { id, disclosures: ['breakdown disclosure'], breakdown: replier('breakdowns') },
+    ending: { id, disclosures: ['horizon disclosure'], page: replier('ending') },
+    budgets: { id, disclosures: ['budget disclosure'], budgets: replier('budgets') },
+    offices: { id, disclosures: ['offices disclosure'], offices: replier('offices') },
+    catalog: { id, disclosures: ['catalog disclosure'], agencies: replier('catalog') },
+    freshness: { id, disclosures: [], lastUpdated: replier('freshness') },
   };
 }
 
