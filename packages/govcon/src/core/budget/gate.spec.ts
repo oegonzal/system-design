@@ -8,6 +8,7 @@ import {
   okText,
   operationOf,
   opportunityOf,
+  pick,
   scriptedDescriptions,
   scriptedSearch,
   type Scripted,
@@ -239,7 +240,7 @@ describe('the request gate', () => {
       recordCount: 1,
       totalRecords: null,
     });
-    expect(operationOf(log.calls[1]!)).toEqual({
+    expect(operationOf(pick(log.calls, 1))).toEqual({
       operation: 'description',
       query: { noticeId: 'n-7' },
     });

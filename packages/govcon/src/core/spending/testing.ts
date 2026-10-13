@@ -23,7 +23,7 @@ import type {
   SpendingSnapshotStore,
   SpendingSources,
 } from '../ports';
-import { attempted, type Scripted } from '../testing';
+import { asAttempted, type Scripted } from '../testing';
 
 /**
  * Pure fakes for the spending lenses: a snapshot store in memory, and the
@@ -99,9 +99,6 @@ export interface ScriptedSpendingSources extends SpendingSources {
   /** The replies from the top again — the script given, or the one it was built with; what a suite does between tests. */
   script(next?: SpendingScript): void;
 }
-
-const asAttempted = <T>(reply: Scripted<T>): Attempted<Fetched<T>> =>
-  'attempts' in reply ? reply : attempted(reply);
 
 /** An unscripted port answers something empty and sensible; the catalog knows one agency, DoD `097`, so a scoped lens can resolve it. */
 const withDefaults = (script: SpendingScript): Required<SpendingScript> => ({
