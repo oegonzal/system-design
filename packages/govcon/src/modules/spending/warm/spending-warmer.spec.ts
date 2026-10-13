@@ -246,6 +246,20 @@ describe('the spending warmer', () => {
     }
   });
 
+  it('[GOV-22] starts nothing once its module is destroyed — a service told to stop while still booting never warms against a closed store', async () => {
+    const { warmer } = harness({ policy: { everyMs: 60_000 } });
+    const warm = vi.spyOn(warmer, 'warm');
+    vi.useFakeTimers();
+    try {
+      await warmer.onModuleDestroy();
+      warmer.start();
+      await vi.advanceTimersByTimeAsync(180_000);
+      expect(warm).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('[GOV-22] a warm at start reads what the cache window still holds — every lens a snapshot, no request, no alert raised again — while a scheduled warm renews', async () => {
     const { warmer, sources, sink, profiles } = harness();
     await profiles.create(tinyProfile());

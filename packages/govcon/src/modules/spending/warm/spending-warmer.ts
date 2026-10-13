@@ -109,6 +109,8 @@ const uniqueByKey = (alerts: readonly GovconAlert[]): GovconAlert[] => {
 export class SpendingWarmer implements OnModuleDestroy {
   private readonly logger = new Logger(SpendingWarmer.name);
   private periodic: Periodic | null = null;
+  /** Set when the module is destroyed. A service told to stop while still booting reaches `start` after its store has closed; measured 2026-10-13, that warm failed on a destroyed driver. */
+  private destroyed = false;
 
   constructor(
     @Inject(SPENDING_WARM_POLICY) private readonly policy: SpendingWarmPolicy,
@@ -120,7 +122,8 @@ export class SpendingWarmer implements OnModuleDestroy {
   ) {}
 
   /**
-   * On the declared cadence; starting twice starts once. The run at start
+   * On the declared cadence; starting twice starts once, and starting after
+   * the module is destroyed starts nothing. The run at start
    * brings every lens up to date within the cache window — it reads what the
    * window still holds, so a restart inside the day spends no request — and
    * every scheduled run after it renews. Measured 2026-10-13: four renewing
@@ -128,7 +131,7 @@ export class SpendingWarmer implements OnModuleDestroy {
    * refused this address.
    */
   start(): void {
-    if (this.periodic !== null) return;
+    if (this.destroyed || this.periodic !== null) return;
     this.logger.log(
       this.policy.everyMs === null
         ? 'spending warm off'
@@ -152,8 +155,10 @@ export class SpendingWarmer implements OnModuleDestroy {
     this.periodic = null;
   }
 
-  onModuleDestroy(): Promise<void> {
-    return this.stop();
+  /** The store closes after this: a warm in flight is waited for, and none starts afterwards. */
+  async onModuleDestroy(): Promise<void> {
+    this.destroyed = true;
+    await this.stop();
   }
 
   /** One warm — renewing unless told to read what the window holds. A lens the source or the schema refuses is one logged line; the rest still run. */

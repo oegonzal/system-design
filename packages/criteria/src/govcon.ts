@@ -170,7 +170,7 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
   {
     id: 'GOV-22',
     statement:
-      'The spending warm runs on a cadence declared in the environment (GOVCON_SPENDING_WARM_HOURS; 0 never) and is started only by serve once it listens — never by a lifecycle hook, so the CLI and the HTTP suite never warm. The run at start brings every lens up to date within the cache window, so a restart inside it spends no request, and every scheduled run renews: the default profile’s NAICS through the controller’s own query schemas, then the horizon and the outlook of each top agency the breakdown names through the directory’s own id — every lens’s outcome logged, a refusal included, every page ledgered like any read.',
+      'The spending warm runs on a cadence declared in the environment (GOVCON_SPENDING_WARM_HOURS; 0 never) and is started only by serve once it listens — never by a lifecycle hook, so the CLI and the HTTP suite never warm, and never once its module is destroyed. The run at start brings every lens up to date within the cache window, so a restart inside it spends no request, and every scheduled run renews: the default profile’s NAICS through the controller’s own query schemas, then the horizon and the outlook of each top agency the breakdown names through the directory’s own id — every lens’s outcome logged, a refusal included, every page ledgered like any read.',
   },
   {
     id: 'GOV-24',
