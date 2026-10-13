@@ -103,6 +103,9 @@ describe('the answer-suggestions pipeline', () => {
     expect(ANSWER_SUGGESTIONS.producer.persona).toMatch(
       /takes a record suggestion only from the entry/,
     );
+    expect(ANSWER_SUGGESTIONS.producer.persona).toMatch(
+      /no sentence of it says what the unit is, needs or calls for/,
+    );
     expect(ANSWER_SUGGESTIONS.critics[0].persona).toMatch(/listed without the rest of its group/);
   });
 

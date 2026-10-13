@@ -116,6 +116,9 @@ describe('the field-answer pipeline', () => {
     // Whatever its kind, a value claims nothing about the unit of work its evidence does not state, and a part
     // of the question nothing bears on is left out and named — never filled with an unstated stance.
     expect(FIELD_ANSWER.producer.persona).toMatch(/how the subject measures against it/);
+    // A composed account lets its particulars speak: measured 2026-10-13, "shows how the subject suits the unit"
+    // drew a closing sentence on what the unit calls for, withheld every time.
+    expect(FIELD_ANSWER.producer.persona).toMatch(/no sentence of it says what the unit of work/);
     expect(FIELD_ANSWER.producer.persona).toMatch(
       /a part of the question nothing listed bears on is left out/,
     );
