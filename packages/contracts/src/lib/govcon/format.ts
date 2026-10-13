@@ -15,10 +15,13 @@ export const day = (iso: string | null): string => (iso === null ? DASH : iso.sl
 
 export const minute = (iso: string): string => iso.slice(0, 16).replace('T', ' ');
 
-/** The office at the end of SAM.gov's dotted agency path. */
+/** The office at the end of a dotted agency path, as SAM.gov writes one. */
 export const agencyOf = (path: string | null): string | null => {
   if (path === null) return null;
-  const parts = path.split('.').filter((part) => part.trim().length > 0);
+  const parts = path
+    .split('.')
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
   return parts[parts.length - 1] ?? path;
 };
 

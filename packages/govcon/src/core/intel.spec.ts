@@ -1,6 +1,6 @@
 import { awardOf } from '@sysdesign/contracts';
 
-import { awardHistoryOf, offersBand, subtierOf, summarizeAwards } from './intel';
+import { awardHistoryOf, offersBand, summarizeAwards } from './intel';
 
 describe('summarizeAwards', () => {
   it('[GOV-17] counts, totals, medians, bands the offers, ranks the awardees and mixes the set-asides, deterministically', () => {
@@ -92,8 +92,5 @@ describe('awardHistoryOf', () => {
     expect(history.countFor('332710', '097.97AS.SPE4A7', 30)).toEqual({ same: 2, agency: 1 });
     expect(history.countFor('999999', '097.97AS.SPE4A7', 365)).toEqual({ same: 0, agency: 0 });
     expect(history.countFor(null, '097.97AS.SPE4A7', 365)).toEqual({ same: 0, agency: 0 });
-    expect(subtierOf('9700.97AS.SPE4A5')).toBe('97AS');
-    expect(subtierOf('9700')).toBeNull();
-    expect(subtierOf(null)).toBeNull();
   });
 });

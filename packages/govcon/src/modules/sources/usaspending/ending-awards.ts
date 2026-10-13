@@ -1,6 +1,7 @@
 import type { AwardFamily, HorizonRequest, HorizonRow } from '@sysdesign/contracts';
 import { z } from 'zod';
 
+import { dottedPath } from '../../../core/agency-path';
 import type { Attempted, Fetched } from '../../../core/budget';
 import type { EndingAwards, EndingAwardsPage } from '../../../core/ports';
 import { issuesOf, type AttemptedHttp } from '../http';
@@ -8,7 +9,7 @@ import { USASPENDING_DISCLOSURES } from './disclosures';
 import { AWARD_TYPE_CODES, END_DATE_FIELD } from './families';
 import { scopeFilters, timePeriod } from './filters';
 import { USASPENDING_BASE_URL, USASPENDING_SOURCE_ID } from './source';
-import { amount, clean, day, dotted } from './values';
+import { amount, clean, day } from './values';
 
 const SEARCH_PATH = '/api/v2/search/spending_by_award/';
 
@@ -94,8 +95,11 @@ export function normalizeEndingAward(raw: unknown, family: AwardFamily): Normali
       recipientUei: clean(record['Recipient UEI']),
       amount: amount(record['Award Amount']) ?? 0,
       endsAt,
-      agencyPath: dotted([clean(record['Awarding Agency']), clean(record['Awarding Sub Agency'])]),
-      agencyCode: dotted([
+      agencyPath: dottedPath([
+        clean(record['Awarding Agency']),
+        clean(record['Awarding Sub Agency']),
+      ]),
+      agencyCode: dottedPath([
         clean(record['Awarding Agency Code']),
         clean(record['Awarding Sub Agency Code']),
       ]),

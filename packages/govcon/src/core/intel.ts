@@ -6,6 +6,7 @@ import type {
   OffersBand,
 } from '@sysdesign/contracts';
 
+import { subtierOf } from './agency-path';
 import type { HistoryRow } from './ports';
 import type { HistoryIndex } from './scoring';
 
@@ -68,12 +69,6 @@ export function summarizeAwards(awards: readonly Award[]): AwardsSummary {
     bySource,
   };
 }
-
-/** The subtier segment of a `department.subtier.office` code — what an award and a notice share when the same buyer is behind both. */
-export const subtierOf = (agencyCode: string | null): string | null => {
-  const segment = agencyCode?.split('.')[1];
-  return segment && segment.length > 0 ? segment : null;
-};
 
 /** The history factor's index over the stored awards: counts by NAICS inside a window, and how many of those were the notice's own subtier. */
 export function awardHistoryOf(rows: readonly HistoryRow[], nowMs: number): HistoryIndex {

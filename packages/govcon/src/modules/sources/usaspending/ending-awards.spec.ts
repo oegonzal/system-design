@@ -102,6 +102,8 @@ describe('the USAspending ending awards', () => {
       ).result,
     );
     expect(idvPage.hasMore).toBe(false);
+    // A buyer's own dots never split its name: the path reads back whole.
+    expect(idvPage.rows[0]?.agencyPath).toBe('Department of Homeland Security.US Coast Guard');
     expect(idvPage.rows[0]).toMatchObject({
       externalId: 'CONT_IDV_70Z08026D16007B00_7008',
       family: 'idvs',

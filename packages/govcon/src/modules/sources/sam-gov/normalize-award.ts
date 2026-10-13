@@ -1,3 +1,4 @@
+import { dottedPath } from '../../../core/agency-path';
 import type { AwardDraft } from '../../../core/ports';
 import { samAwardSchema, type SamAward } from './award-schemas';
 import { parseSamDate } from './normalize';
@@ -28,11 +29,6 @@ const integer = (value: number | string | null | undefined): number | null => {
 const isoDay = (value: string | null | undefined): string | null =>
   parseSamDate(value)?.slice(0, 10) ?? null;
 
-const path = (parts: readonly (string | null)[]): string | null => {
-  const present = parts.filter((part): part is string => part !== null);
-  return present.length > 0 ? present.join('.') : null;
-};
-
 function shape(record: SamAward, signedAt: string, source: AwardDraft['source']): AwardDraft {
   const contracting = record.coreData?.federalOrganization?.contractingInformation;
   const place = record.coreData?.principalPlaceOfPerformance;
@@ -47,12 +43,12 @@ function shape(record: SamAward, signedAt: string, source: AwardDraft['source'])
     solicitationNumber: clean(record.coreData?.solicitationId),
     naicsCode: clean(products?.principalNaics?.[0]?.code),
     pscCode: clean(products?.productOrService?.code),
-    agencyPath: path([
+    agencyPath: dottedPath([
       clean(contracting?.contractingDepartment?.name),
       clean(contracting?.contractingSubtier?.name),
       clean(contracting?.contractingOffice?.name),
     ]),
-    agencyCode: path([
+    agencyCode: dottedPath([
       clean(contracting?.contractingDepartment?.code),
       clean(contracting?.contractingSubtier?.code),
       clean(contracting?.contractingOffice?.code),

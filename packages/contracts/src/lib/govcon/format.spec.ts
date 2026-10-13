@@ -23,6 +23,7 @@ describe('govcon formatting', () => {
   it('names the office at the end of a dotted agency path', () => {
     expect(agencyOf('DEPT OF DEFENSE.DEFENSE LOGISTICS AGENCY.DLA AVIATION')).toBe('DLA AVIATION');
     expect(agencyOf('DLA')).toBe('DLA');
+    expect(agencyOf('DEPT OF JUSTICE. MARSHALS SERVICE ')).toBe('MARSHALS SERVICE');
     expect(agencyOf(null)).toBeNull();
   });
 

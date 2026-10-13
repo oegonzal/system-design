@@ -1,6 +1,7 @@
+import { dottedPath } from '../../../core/agency-path';
 import type { AwardDraft } from '../../../core/ports';
 import { spendingAwardSchema, type SpendingAward } from './schemas';
-import { amount, clean, day, dotted } from './values';
+import { amount, clean, day } from './values';
 
 /**
  * USAspending award → `AwardDraft`. Pure. An award needs its id and the day it
@@ -20,8 +21,8 @@ function shape(record: SpendingAward, signedAt: string): AwardDraft {
     solicitationNumber: null,
     naicsCode: clean(record.NAICS?.code),
     pscCode: clean(record.PSC?.code),
-    agencyPath: dotted([agency, subAgency]),
-    agencyCode: dotted([
+    agencyPath: dottedPath([agency, subAgency]),
+    agencyCode: dottedPath([
       clean(record['Awarding Agency Code']),
       clean(record['Awarding Sub Agency Code']),
     ]),

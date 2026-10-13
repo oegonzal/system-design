@@ -38,9 +38,3 @@ export const integer = (value: number | string | null | undefined): number | nul
   const parsed = amount(value);
   return parsed === null ? null : Math.trunc(parsed);
 };
-
-/** `department.subtier.office` out of its parts, present ones only; null when none. */
-export const dotted = (parts: readonly (string | null)[]): string | null => {
-  const present = parts.filter((part): part is string => part !== null);
-  return present.length > 0 ? present.join('.') : null;
-};

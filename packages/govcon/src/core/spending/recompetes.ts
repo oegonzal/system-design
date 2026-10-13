@@ -7,7 +7,7 @@ import {
   type Opportunity,
 } from '@sysdesign/contracts';
 
-import { subtierOf } from '../intel';
+import { subtierOf } from '../agency-path';
 import type { CandidateFilter } from '../ports';
 
 /**
