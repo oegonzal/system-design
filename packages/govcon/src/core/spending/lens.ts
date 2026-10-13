@@ -42,6 +42,16 @@ export interface LensSpec<Q extends object, B> {
 
 export type LensAnswer<B> = { kind: 'ok'; body: B; provenance: Provenance } | LensRefusal;
 
+/**
+ * How a read may depart from the default: `refresh` asks the source inside
+ * the cache window and replaces the row — the way a warm renews a day's
+ * snapshots — while a load the source refuses still serves the stored row as
+ * stale.
+ */
+export interface ReadOptions {
+  refresh?: boolean;
+}
+
 interface Stored<B> {
   row: SnapshotRow;
   body: B;
@@ -56,8 +66,9 @@ interface Stored<B> {
  * already had is better than none; something `missing` is never served
  * stale, since the snapshot cannot vouch for a thing the source does not
  * have. An answer a lens marks `keep: false` — one the source cut short — is
- * served as `source` and not stored, so the next read asks again. Freshness
- * is decided here and nowhere else, from the injected clock.
+ * served as `source` and not stored, so the next read asks again. A read
+ * asked to `refresh` skips the window and asks the source. Freshness is
+ * decided here and nowhere else, from the injected clock.
  *
  * The store is an optimisation, never a dependency: a read that fails falls
  * through to the load with a warning, a write that fails loses one snapshot
@@ -72,11 +83,17 @@ export class SnapshotCache {
     private readonly warn: (message: string) => void = () => undefined,
   ) {}
 
-  async read<Q extends object, B>(spec: LensSpec<Q, B>, query: Q): Promise<LensAnswer<B>> {
+  async read<Q extends object, B>(
+    spec: LensSpec<Q, B>,
+    query: Q,
+    options: ReadOptions = {},
+  ): Promise<LensAnswer<B>> {
     const key = snapshotKey(spec.lens, query);
     const at = this.now();
     const stored = await this.stored(spec, key);
-    if (stored !== null && this.fresh(stored.row, at)) return answer(spec, stored, 'snapshot');
+    if (stored !== null && options.refresh !== true && this.fresh(stored.row, at)) {
+      return answer(spec, stored, 'snapshot');
+    }
 
     const fetched = await spec.load(query);
     if (fetched.kind === 'ok') {

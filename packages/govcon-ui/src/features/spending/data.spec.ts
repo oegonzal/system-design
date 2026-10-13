@@ -1,11 +1,10 @@
 import { periodMonthLabel } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { AGENCY_OUTLOOK, PULSE, SPENDING_NOW_MS } from '../../testing/spending-fixtures';
+import { AGENCY_OUTLOOK, PULSE } from '../../testing/spending-fixtures';
 import { agencyYears, periodColumns, pulseYears } from './period-columns';
 import { pulseFigures } from './pulse-figures';
 import { EMPTY_SCOPE, scopeQueryOf, toggleCode } from './scope';
-import { windowOf } from './windows';
 
 describe('the spending page’s data', () => {
   it('[GOVU-11] turns the scope bar’s draft into the query, toggling codes in and out of a typed list', () => {
@@ -16,19 +15,6 @@ describe('the spending page’s data', () => {
     expect(
       scopeQueryOf({ naics: '332710, 541511', psc: '5340', agency: '097', awardFamily: 'idvs' }),
     ).toEqual({ naics: ['332710', '541511'], psc: ['5340'], agency: '097', awardFamily: 'idvs' });
-  });
-
-  it('[GOVU-11] names the windows through the fiscal calendar at the instant given', () => {
-    expect(windowOf('fytd', SPENDING_NOW_MS)).toEqual({ from: '2025-10-01', to: '2026-06-15' });
-    expect(windowOf('prior-fy', SPENDING_NOW_MS)).toEqual({ from: '2024-10-01', to: '2025-09-30' });
-    expect(windowOf('last-12-months', SPENDING_NOW_MS)).toEqual({
-      from: '2025-06-15',
-      to: '2026-06-15',
-    });
-    expect(windowOf('fytd', Date.UTC(2026, 9, 12))).toEqual({
-      from: '2026-10-01',
-      to: '2026-10-12',
-    });
   });
 
   it('[GOVU-11] lays fiscal years over twelve periods newest first, marking the period in progress provisional and the rest projected with its band', () => {

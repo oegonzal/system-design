@@ -2,13 +2,14 @@ import {
   BREAKDOWN_CATEGORIES,
   compactMoney,
   money,
+  WINDOW_PRESETS,
   type BreakdownCategory,
   type SpendingBreakdown,
+  type WindowPreset,
 } from '@sysdesign/contracts';
 import { BarList, Button, SelectField, Stack, StatTile, Text } from '@sysdesign/design-system';
 
 import { BREAKDOWN_CATEGORY_LABEL } from './costs';
-import { WINDOW_PRESETS, type WindowPreset } from './windows';
 
 export interface BreakdownControlsProps {
   category: BreakdownCategory;

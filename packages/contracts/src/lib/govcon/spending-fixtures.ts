@@ -1,15 +1,17 @@
 import { FISCAL_PERIODS } from './fiscal';
-import type {
-  AgencyDirectory,
-  AgencyDirectoryEntry,
-  AgencyOutlook,
-  HorizonRow,
-  PeriodObligations,
-  Provenance,
-  SpendingBreakdown,
-  SpendingHorizon,
-  SpendingPulse,
-  SpendingScope,
+import { opportunityOf } from './fixtures';
+import {
+  noticeRefOf,
+  type AgencyDirectory,
+  type AgencyDirectoryEntry,
+  type AgencyOutlook,
+  type HorizonRow,
+  type PeriodObligations,
+  type Provenance,
+  type SpendingBreakdown,
+  type SpendingHorizon,
+  type SpendingPulse,
+  type SpendingScope,
 } from './spending';
 
 /**
@@ -165,6 +167,14 @@ export const spendingHorizonOf = (overrides: Partial<SpendingHorizon> = {}): Spe
   capped: false,
   stoppedBy: null,
   reachedEndsAt: null,
+  // The DLA bracket solicitation shares the first row's NAICS and buyer: one recompete in view.
+  openNotices: [
+    {
+      externalId: horizonRowOf().externalId,
+      notices: [noticeRefOf(opportunityOf({ agencyCode: '097.1700.N00104' }))],
+    },
+  ],
+  openNoticesCapped: false,
   provenance: provenanceOf({ requests: 7 }),
   ...overrides,
 });

@@ -74,7 +74,7 @@ describe('the opportunity repository in Postgres', () => {
     expect(await repository.findDescription('d')).toMatchObject({ text: 'Bracket, 400 each' });
   });
 
-  it('[GOV-6] [GOV-15] filters candidates in SQL — activity, deadlines, set-asides, types, codes, text — newest first and bounded', async () => {
+  it('[GOV-6] [GOV-15] filters candidates in SQL — activity, deadlines, set-asides, types, a code family or an exact code set, text — newest first and bounded', async () => {
     const repository = new MikroOrmOpportunityRepository(orm.em);
     await truncateTestTables(orm.em, [GovconOpportunity]);
     await repository.upsertMany(
@@ -122,6 +122,7 @@ describe('the opportunity repository in Postgres', () => {
       setAsideCodes: ['SBA', 'SBP'],
       excludeNoticeTypes: ['Award Notice'],
       naicsPrefix: null,
+      naicsCodes: null,
       setAsideCode: null,
       noticeType: null,
       agencyContains: null,
@@ -146,6 +147,8 @@ describe('the opportunity repository in Postgres', () => {
     expect(await ids({ deadlineOnOrBefore: new Date('2026-10-31T00:00:00Z') })).toEqual(['open']);
     expect(await ids({ naicsPrefix: '5415' })).toEqual(['unknown']);
     expect(await ids({ naicsPrefix: '33' })).toEqual(['open']);
+    expect(await ids({ naicsCodes: ['541511', '999999'] })).toEqual(['unknown']);
+    expect(await ids({ naicsCodes: [] })).toEqual([]);
     expect(await ids({ setAsideCode: 'SBA' })).toEqual(['open']);
     expect(await ids({ noticeType: 'Solicitation' })).toEqual(['unknown', 'open']);
     expect(await ids({ agencyContains: 'dla aviation' })).toEqual(['unknown', 'open']);

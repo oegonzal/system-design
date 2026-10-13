@@ -1,5 +1,6 @@
 import type { ApiResponse } from '../envelope';
 import type { FiscalPeriod } from './fiscal';
+import type { Opportunity } from './opportunity';
 import type { AwardFamily, AwardFamilyChoice, BreakdownCategory } from './vocab';
 
 /**
@@ -141,7 +142,8 @@ export interface HorizonRow {
   description: string | null;
 }
 
-export interface SpendingHorizon {
+/** What the horizon lens computes and the snapshot stores. */
+export interface HorizonBody {
   scope: SpendingScope;
   /** ISO date the walk counted from. */
   today: string;
@@ -153,6 +155,50 @@ export interface SpendingHorizon {
   capped: boolean;
   stoppedBy: HorizonStop | null;
   reachedEndsAt: string | null;
+}
+
+/** A stored notice as the horizon names it beside an expiring award. */
+export interface NoticeRef {
+  noticeId: string;
+  title: string;
+  solicitationNumber: string | null;
+  noticeType: string | null;
+  /** ISO 8601, when the notice states one. */
+  responseDeadlineAt: string | null;
+  agencyPath: string | null;
+}
+
+/** The reference a notice is named by, out of its stored record. */
+export const noticeRefOf = ({
+  noticeId,
+  title,
+  solicitationNumber,
+  noticeType,
+  responseDeadlineAt,
+  agencyPath,
+}: Opportunity): NoticeRef => ({
+  noticeId,
+  title,
+  solicitationNumber,
+  noticeType,
+  responseDeadlineAt,
+  agencyPath,
+});
+
+/** The open notices sharing one expiring award's NAICS and buyer; a row with none is absent. */
+export interface HorizonNoticeMatch {
+  externalId: string;
+  notices: NoticeRef[];
+}
+
+/**
+ * The wire answer: the body, the open stored notices joined to its rows on
+ * every read — never stored — and the provenance.
+ */
+export interface SpendingHorizon extends HorizonBody {
+  openNotices: HorizonNoticeMatch[];
+  /** More open notices in the rows' codes exist than the declared bound read. */
+  openNoticesCapped: boolean;
   provenance: Provenance;
 }
 

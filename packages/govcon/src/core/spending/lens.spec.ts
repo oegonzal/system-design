@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
 import { failure } from '../testing';
-import { SnapshotCache, type LensLoad, type LensSpec } from './lens';
+import { SnapshotCache, type LensLoad, type LensSpec, type ReadOptions } from './lens';
 import { InMemorySnapshotStore } from './testing';
 
 const T0 = new Date('2026-06-15T12:00:00Z');
@@ -50,7 +50,7 @@ function harness(replies: readonly LensLoad<Body>[], ttlMs = 24 * HOUR) {
     store,
     warnings,
     lens,
-    read: (id = 'a') => cache.read(lens.spec, { id }),
+    read: (id = 'a', options?: ReadOptions) => cache.read(lens.spec, { id }, options),
     advance: (ms: number) => {
       now = new Date(now.getTime() + ms);
     },
@@ -149,6 +149,31 @@ describe('the snapshot cache', () => {
     });
     expect(store.rows.size).toBe(1);
     expect(lens.queries).toHaveLength(2);
+  });
+
+  it('[GOV-20] a forced refresh asks the source inside the TTL and replaces the row, a refused refresh still serves the row as stale, and the next plain read is a snapshot', async () => {
+    const { store, lens, read, warnings } = harness([
+      ok(1),
+      ok(2),
+      failure('error', 502, 'status 502'),
+    ]);
+    await read();
+    expect(await read('a', { refresh: true })).toMatchObject({
+      body: { value: 2 },
+      provenance: { servedFrom: 'source' },
+    });
+    expect(store.rows.size).toBe(1);
+    expect(lens.queries).toHaveLength(2);
+    expect(await read('a', { refresh: true })).toMatchObject({
+      body: { value: 2 },
+      provenance: { servedFrom: 'stale' },
+    });
+    expect(warnings).toHaveLength(1);
+    expect(await read()).toMatchObject({
+      body: { value: 2 },
+      provenance: { servedFrom: 'snapshot' },
+    });
+    expect(lens.queries).toHaveLength(3);
   });
 
   it('[GOV-2] [GOV-20] a store that cannot be read or written falls through with a warning', async () => {

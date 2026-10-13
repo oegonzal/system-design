@@ -4,7 +4,7 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { horizonRowOf } from '@sysdesign/contracts';
+import { horizonRowOf, noticeRefOf, opportunityOf } from '@sysdesign/contracts';
 
 import { RequestGate, type BudgetPolicy } from '../../core/budget';
 import {
@@ -14,13 +14,18 @@ import {
   seriesPointOf,
   type SpendingScript,
 } from '../../core/spending/testing';
-import { failure, InMemorySourceCallLog } from '../../core/testing';
+import { failure, InMemoryOpportunityRepository, InMemorySourceCallLog } from '../../core/testing';
 import { SpendingService } from './spending.service';
 
 const T0 = new Date('2026-06-15T12:00:00Z');
 
 /** `tickMs` advances the clock on every read, so a wall-clock deadline can pass inside one call. */
-function harness(script: SpendingScript = {}, policy: Partial<BudgetPolicy> = {}, tickMs = 0) {
+function harness(
+  script: SpendingScript = {},
+  policy: Partial<BudgetPolicy> = {},
+  tickMs = 0,
+  notices = new InMemoryOpportunityRepository(),
+) {
   let now = T0;
   const clock = () => {
     now = new Date(now.getTime() + tickMs);
@@ -34,16 +39,20 @@ function harness(script: SpendingScript = {}, policy: Partial<BudgetPolicy> = {}
     ...policy,
   };
   const sources = scriptedSpendingSources(script);
+  const store = new InMemorySnapshotStore();
   const service = new SpendingService(
-    new InMemorySnapshotStore(),
+    store,
     sources,
     budget,
     new RequestGate(log, budget, clock),
     clock,
+    notices,
   );
   return {
     service,
     sources,
+    store,
+    notices,
     operations: () => log.calls.map((call) => call.operation),
     advance: (ms: number) => {
       now = new Date(now.getTime() + ms);
@@ -94,6 +103,49 @@ describe('the spending service', () => {
     expect(horizon.buckets).toHaveLength(6);
     expect(sources.requests.ending).toHaveLength(1);
     expect(sources.requests.ending[0]).toMatchObject({ family: 'contracts', to: '2026-06-15' });
+  });
+
+  it('[GOV-20] a forced refresh asks the source inside the TTL and replaces the snapshot', async () => {
+    const point = seriesPointOf({ fiscalYear: 2026, period: 1, total: 5 });
+    const { service, operations } = harness({
+      series: [fetchedOf([point]), fetchedOf([{ ...point, total: 7 }])],
+    });
+    await service.pulse({ ...scope, lookback: 3 });
+    const refreshed = await service.pulse({ ...scope, lookback: 3 }, { refresh: true });
+    expect(refreshed.provenance.servedFrom).toBe('source');
+    expect(
+      refreshed.series.find((point) => point.fiscalYear === 2026 && point.period === 1)?.total,
+    ).toBe(7);
+    expect(operations()).toEqual(['series', 'freshness', 'series']);
+    expect((await service.pulse({ ...scope, lookback: 3 })).provenance.servedFrom).toBe('snapshot');
+  });
+
+  it('[GOV-23] joins the horizon’s rows to the open stored notices at read time — a snapshot read recomputes the join, nothing of it is stored, and a row without a NAICS never matches', async () => {
+    const notices = new InMemoryOpportunityRepository();
+    await notices.upsertMany([opportunityOf()], T0);
+    const page = fetchedOf({
+      rows: [
+        horizonRowOf({ agencyCode: '097.97AS', endsAt: '2026-08-01' }),
+        horizonRowOf({ externalId: 'bare', naicsCode: null, endsAt: '2026-08-02' }),
+      ],
+      rejected: 0,
+      hasMore: false,
+    });
+    const { service, store } = harness({ ending: [page] }, {}, 0, notices);
+    const first = await service.horizon({ ...scope, awardFamily: 'contracts', months: 6 });
+    expect(first.openNotices).toEqual([
+      { externalId: horizonRowOf().externalId, notices: [noticeRefOf(opportunityOf())] },
+    ]);
+    expect(first.openNoticesCapped).toBe(false);
+    for (const row of store.rows.values()) expect(row.payload).not.toHaveProperty('openNotices');
+
+    await notices.upsertMany(
+      [opportunityOf({ noticeId: 'n-2', responseDeadlineAt: '2026-09-01T00:00:00.000Z' })],
+      T0,
+    );
+    const second = await service.horizon({ ...scope, awardFamily: 'contracts', months: 6 });
+    expect(second.provenance.servedFrom).toBe('snapshot');
+    expect(second.openNotices[0]?.notices.map((notice) => notice.noticeId)).toEqual(['n-2', 'n-1']);
   });
 
   it('[GOV-8] [GOV-20] an unknown agency is a 404, a spent budget a 503, a rate limit a 503, a provider error a 502, and a fiscal year after the current one a 400', async () => {

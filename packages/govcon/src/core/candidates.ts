@@ -34,6 +34,7 @@ export function candidateFilterOf(
     setAsideCodes: Object.keys(profile.scoring.setAside.byCode),
     excludeNoticeTypes: profile.scoring.noticeType.exclude,
     naicsPrefix: filters.naics ?? null,
+    naicsCodes: null,
     setAsideCode: filters.setAside ?? null,
     noticeType: filters.noticeType ?? null,
     agencyContains: filters.agency ?? null,

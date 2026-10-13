@@ -6,13 +6,13 @@ import {
   HORIZON_PAGE_SIZE,
   MAX_HORIZON_PAGES,
   MAX_HORIZON_ROWS,
+  type HorizonBody,
   type HorizonRequest,
-  type SpendingHorizon,
   type SpendingScope,
 } from '@sysdesign/contracts';
 
 import { bucketHorizon, soonestRows, walkHorizon } from '../horizon';
-import type { LensBody, LensSpec } from '../lens';
+import type { LensSpec } from '../lens';
 import { horizonBodySchema } from '../schemas';
 import { scopeOf, spend, type LensDeps } from './deps';
 import { asOfFrom, resolveAgency } from './shared';
@@ -30,7 +30,7 @@ export interface HorizonQuery extends SpendingScope {
  * an action-date window of `HORIZON_LOOKBACK_YEARS`, bounded by the page cap
  * and the wall-clock deadline, and says how far it got.
  */
-export const horizonLens = (deps: LensDeps): LensSpec<HorizonQuery, LensBody<SpendingHorizon>> => ({
+export const horizonLens = (deps: LensDeps): LensSpec<HorizonQuery, HorizonBody> => ({
   lens: 'horizon',
   source: deps.sources.ending.id,
   schema: horizonBodySchema,

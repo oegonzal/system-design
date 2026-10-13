@@ -12,6 +12,7 @@ import {
   isoDateOf,
   type AgencyDirectory,
   type AgencyOutlook,
+  type HorizonRow,
   type Provenance,
   type SpendingBreakdown,
   type SpendingHorizon,
@@ -20,14 +21,25 @@ import {
 } from '@sysdesign/contracts';
 
 import type { BudgetPolicy, RequestGate } from '../../core/budget';
-import type { SpendingSnapshotStore, SpendingSources } from '../../core/ports';
-import { SnapshotCache, type LensAnswer } from '../../core/spending/lens';
+import type {
+  OpportunityRepository,
+  SpendingSnapshotStore,
+  SpendingSources,
+} from '../../core/ports';
+import {
+  SnapshotCache,
+  type LensAnswer,
+  type LensSpec,
+  type ReadOptions,
+} from '../../core/spending/lens';
 import { agencyLens } from '../../core/spending/lenses/agency';
 import { breakdownLens } from '../../core/spending/lenses/breakdown';
 import type { LensDeps } from '../../core/spending/lenses/deps';
 import { directoryLens } from '../../core/spending/lenses/directory';
 import { horizonLens } from '../../core/spending/lenses/horizon';
 import { pulseLens } from '../../core/spending/lenses/pulse';
+import { horizonNaics, matchOpenNotices, openNoticesFilter } from '../../core/spending/recompetes';
+import { OPPORTUNITY_REPOSITORY } from '../opportunities/tokens';
 import { BUDGET_POLICY, CLOCK, REQUEST_GATE, SPENDING_SOURCES } from '../sources/tokens';
 import type {
   AgencyOutlookQueryInput,
@@ -50,14 +62,17 @@ const scopeOf = (
 /**
  * The spending lenses as a service: every read goes through the one snapshot
  * cache over the one gate, the clock-derived inputs (the fiscal period,
- * today) join the query so a snapshot is never served for another day, and
- * a lens's refusal becomes the HTTP answer every other module gives — 404
- * for something the source does not have, 503 for a spent budget or a rate
- * limit, 502 for a source that failed.
+ * today) join the query so a snapshot is never served for another day, a
+ * read may be asked to refresh, the horizon's rows are joined to the open
+ * stored notices on every read and never stored, and a lens's refusal
+ * becomes the HTTP answer every other module gives — 404 for something the
+ * source does not have, 503 for a spent budget or a rate limit, 502 for a
+ * source that failed.
  */
 @Injectable()
 export class SpendingService {
   private readonly logger = new Logger(SpendingService.name);
+  private readonly cache: SnapshotCache;
   private readonly deps: LensDeps;
 
   constructor(
@@ -66,8 +81,9 @@ export class SpendingService {
     @Inject(BUDGET_POLICY) policy: BudgetPolicy,
     @Inject(REQUEST_GATE) gate: RequestGate,
     @Inject(CLOCK) private readonly now: () => Date,
+    @Inject(OPPORTUNITY_REPOSITORY) private readonly notices: OpportunityRepository,
   ) {
-    const cache = new SnapshotCache(store, policy.ttlMs, now, (message) =>
+    this.cache = new SnapshotCache(store, policy.ttlMs, now, (message) =>
       this.logger.warn(message),
     );
     this.deps = {
@@ -75,60 +91,89 @@ export class SpendingService {
       gate,
       now,
       deadlineMs: policy.pullDeadlineMs,
-      read: (spec, query) => cache.read(spec, query),
+      read: (spec, query) => this.cache.read(spec, query),
     };
   }
 
-  pulse(query: PulseQueryInput): Promise<SpendingPulse> {
+  pulse(query: PulseQueryInput, options: ReadOptions = {}): Promise<SpendingPulse> {
     const current = currentFiscalPeriod(this.now().getTime());
     return this.answer(
-      this.deps.read(pulseLens(this.deps), {
-        ...scopeOf(query),
-        lookback: query.lookback,
-        fiscalYear: current.fiscalYear,
-        period: current.period,
-      }),
+      this.read(
+        pulseLens(this.deps),
+        {
+          ...scopeOf(query),
+          lookback: query.lookback,
+          fiscalYear: current.fiscalYear,
+          period: current.period,
+        },
+        options,
+      ),
     );
   }
 
-  breakdown(query: BreakdownQueryInput): Promise<SpendingBreakdown> {
+  breakdown(query: BreakdownQueryInput, options: ReadOptions = {}): Promise<SpendingBreakdown> {
     return this.answer(
-      this.deps.read(breakdownLens(this.deps), {
-        ...scopeOf(query),
-        category: query.category,
-        from: query.from,
-        to: query.to,
-      }),
+      this.read(
+        breakdownLens(this.deps),
+        { ...scopeOf(query), category: query.category, from: query.from, to: query.to },
+        options,
+      ),
     );
   }
 
-  horizon(query: HorizonQueryInput): Promise<SpendingHorizon> {
-    return this.answer(
-      this.deps.read(horizonLens(this.deps), {
-        ...scopeOf(query),
-        months: query.months,
-        today: isoDateOf(this.now().getTime()),
-      }),
+  async horizon(query: HorizonQueryInput, options: ReadOptions = {}): Promise<SpendingHorizon> {
+    const body = await this.answer(
+      this.read(
+        horizonLens(this.deps),
+        { ...scopeOf(query), months: query.months, today: isoDateOf(this.now().getTime()) },
+        options,
+      ),
     );
+    return { ...body, ...(await this.openNoticesOf(body.rows)) };
   }
 
-  agencies(): Promise<AgencyDirectory> {
-    return this.answer(this.deps.read(directoryLens(this.deps), {}));
+  agencies(options: ReadOptions = {}): Promise<AgencyDirectory> {
+    return this.answer(this.read(directoryLens(this.deps), {}, options));
   }
 
-  async agency(toptierCode: string, query: AgencyOutlookQueryInput): Promise<AgencyOutlook> {
+  async agency(
+    toptierCode: string,
+    query: AgencyOutlookQueryInput,
+    options: ReadOptions = {},
+  ): Promise<AgencyOutlook> {
     const current = currentFiscalPeriod(this.now().getTime());
     const fiscalYear = query.fiscalYear ?? current.fiscalYear;
     if (fiscalYear > current.fiscalYear) {
       throw new BadRequestException(`fiscal year ${fiscalYear} has not begun`);
     }
     return this.answer(
-      this.deps.read(agencyLens(this.deps), {
-        toptierCode,
-        fiscalYear,
-        awardFamily: query.awardFamily,
-      }),
+      this.read(
+        agencyLens(this.deps),
+        { toptierCode, fiscalYear, awardFamily: query.awardFamily },
+        options,
+      ),
     );
+  }
+
+  /** One lens through the cache, with how this read may depart from the default. */
+  private read<Q extends object, B>(
+    spec: LensSpec<Q, B>,
+    query: Q,
+    options: ReadOptions,
+  ): Promise<LensAnswer<B>> {
+    return this.cache.read(spec, query, options);
+  }
+
+  /** The open stored notices the rows share a NAICS and a buyer with — joined on every read, never stored. */
+  private async openNoticesOf(
+    rows: readonly HorizonRow[],
+  ): Promise<Pick<SpendingHorizon, 'openNotices' | 'openNoticesCapped'>> {
+    const naics = horizonNaics(rows);
+    if (naics.length === 0) return { openNotices: [], openNoticesCapped: false };
+    const { opportunities, capped } = await this.notices.findCandidates(
+      openNoticesFilter(naics, this.now()),
+    );
+    return { openNotices: matchOpenNotices(rows, opportunities), openNoticesCapped: capped };
   }
 
   /** The body with its provenance, or the HTTP answer a refusal is. */

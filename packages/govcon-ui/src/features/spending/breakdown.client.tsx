@@ -1,6 +1,11 @@
 'use client';
 
-import type { BreakdownCategory, ScopeQuery } from '@sysdesign/contracts';
+import {
+  windowOf,
+  type BreakdownCategory,
+  type ScopeQuery,
+  type WindowPreset,
+} from '@sysdesign/contracts';
 import { Alert, Spinner, Stack, Text } from '@sysdesign/design-system';
 import { useResource } from '@sysdesign/web-kit';
 import { useState } from 'react';
@@ -9,7 +14,6 @@ import { api } from '../../api/client';
 import { BreakdownControls, BreakdownList } from './breakdown-panels';
 import { FIRST_LOOK_NOTE, LENS_LOADING } from './costs';
 import { ProvenanceLine } from './provenance-line';
-import { windowOf, type WindowPreset } from './windows';
 
 export interface BreakdownLensProps {
   scope: ScopeQuery;

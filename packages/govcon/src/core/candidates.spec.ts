@@ -15,6 +15,7 @@ describe('candidateFilterOf', () => {
       setAsideCodes: ['SBA', 'SBP'],
       excludeNoticeTypes: ['Award Notice'],
       naicsPrefix: null,
+      naicsCodes: null,
       setAsideCode: null,
       noticeType: null,
       agencyContains: null,

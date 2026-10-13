@@ -51,6 +51,10 @@ export class MikroOrmOpportunityRepository implements OpportunityRepository {
 
   /** Every gate and filter in SQL; one row past the limit says whether it cut the set. */
   async findCandidates(filter: CandidateFilter): Promise<CandidateSet> {
+    // An empty set names nothing: answered here, since SQL has no `in ()`.
+    if (filter.naicsCodes !== null && filter.naicsCodes.length === 0) {
+      return { opportunities: [], capped: false };
+    }
     const conditions: FilterQuery<GovconOpportunity>[] = [];
     // `active != false` would drop the unknowns: SQL's null never compares.
     if (filter.activeOnly) conditions.push({ $or: [{ active: true }, { active: null }] });
@@ -80,6 +84,9 @@ export class MikroOrmOpportunityRepository implements OpportunityRepository {
     }
     if (filter.naicsPrefix !== null)
       conditions.push({ naicsCode: { $like: `${filter.naicsPrefix}%` } });
+    if (filter.naicsCodes !== null) {
+      conditions.push({ naicsCode: { $in: [...filter.naicsCodes] } });
+    }
     if (filter.setAsideCode !== null) conditions.push({ setAsideCode: filter.setAsideCode });
     if (filter.noticeType !== null) conditions.push({ noticeType: filter.noticeType });
     if (filter.agencyContains !== null) {

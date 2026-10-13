@@ -4,8 +4,8 @@ import {
   HORIZON_STOPS,
   type AgencyDirectory,
   type AgencyOutlook,
+  type HorizonBody,
   type SpendingBreakdown,
-  type SpendingHorizon,
   type SpendingPulse,
 } from '@sysdesign/contracts';
 import { z } from 'zod';
@@ -115,7 +115,7 @@ export const horizonBodySchema = z.strictObject({
   capped: z.boolean(),
   stoppedBy: z.enum(HORIZON_STOPS).nullable(),
   reachedEndsAt: isoDate.nullable(),
-}) satisfies z.ZodType<LensBody<SpendingHorizon>>;
+}) satisfies z.ZodType<HorizonBody>;
 
 const directoryEntry = z.strictObject({
   agencyId: z.number().int(),

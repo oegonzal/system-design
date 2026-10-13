@@ -24,6 +24,8 @@ export interface CandidateFilter {
   excludeNoticeTypes: readonly string[];
   /** A NAICS code or family the record's primary code starts with. */
   naicsPrefix: string | null;
+  /** Exactly these primary NAICS codes; an empty set matches nothing. */
+  naicsCodes: readonly string[] | null;
   setAsideCode: string | null;
   noticeType: string | null;
   /** Case-insensitive substring of the agency path. */

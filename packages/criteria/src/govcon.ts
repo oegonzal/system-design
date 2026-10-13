@@ -163,6 +163,11 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
       'Every spending lens spends through the one request gate as its own ledger operation, answers from the snapshot table inside the cache window without a request, validates a stored payload before trusting it, serves a stale snapshot only when a refresh failed and says so, and carries its provenance — fetched when, as of, served from where, how many attempts, which provider facts.',
   },
   {
+    id: 'GOV-23',
+    statement:
+      'An expiring award is joined at read time to the open stored notices sharing its exact NAICS code and its agency sub-tier segment — never a name, never a prefix — bounded by MAX_RECOMPETE_NOTICES with the answer saying when that cut; the join is computed on every read, a snapshot read included, and never stored.',
+  },
+  {
     id: 'GOV-21',
     statement:
       'Spending arithmetic is pure and declared: fiscal periods start in October, a series is aligned on the periods asked for with the partial month marked, the projection is the declared seasonal mean of prior years scaled by the year-to-date ratio only after the declared base, the horizon walk pages the source by number, is bounded by a page cap and the wall-clock deadline and reports what it reached, and agency periods are aligned on those present.',

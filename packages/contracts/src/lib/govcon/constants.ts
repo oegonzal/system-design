@@ -55,5 +55,7 @@ export const HORIZON_PAGE_SIZE = 100;
 export const MAX_HORIZON_ROWS = 200;
 /** Sub-agencies one agency outlook answers; the answer says when more exist. */
 export const MAX_AGENCY_OFFICES = 50;
+/** Open stored notices one horizon read joins to its rows; the answer says when this bound cut. */
+export const MAX_RECOMPETE_NOTICES = 500;
 /** USAspending's award search begins on 2007-10-01, the first day of FY2008. */
 export const FIRST_FISCAL_YEAR = 2008;

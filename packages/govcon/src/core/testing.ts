@@ -329,6 +329,11 @@ export class InMemoryOpportunityRepository implements OpportunityRepository {
       .filter(
         (o) => filter.naicsPrefix === null || (o.naicsCode ?? '').startsWith(filter.naicsPrefix),
       )
+      .filter(
+        (o) =>
+          filter.naicsCodes === null ||
+          (o.naicsCode !== null && filter.naicsCodes.includes(o.naicsCode)),
+      )
       .filter((o) => filter.setAsideCode === null || o.setAsideCode === filter.setAsideCode)
       .filter((o) => filter.noticeType === null || o.noticeType === filter.noticeType)
       .filter((o) => filter.agencyContains === null || has(o.agencyPath, filter.agencyContains))

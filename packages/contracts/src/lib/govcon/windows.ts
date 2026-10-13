@@ -1,11 +1,10 @@
-import {
-  currentFiscalPeriod,
-  fiscalYearEnd,
-  fiscalYearStart,
-  isoDateOf,
-} from '@sysdesign/contracts';
+import { currentFiscalPeriod, fiscalYearEnd, fiscalYearStart, isoDateOf } from './fiscal';
 
-/** The windows a breakdown is read over, as presets. */
+/**
+ * The windows a breakdown is read over, as presets. Declared here so the
+ * client's controls and the service's warm compute the same two dates from
+ * the same instant, and so key the same snapshot.
+ */
 export const WINDOW_PRESETS = [
   { id: 'fytd', label: 'Fiscal year to date' },
   { id: 'prior-fy', label: 'Prior fiscal year' },
