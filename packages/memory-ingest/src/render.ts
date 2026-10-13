@@ -56,6 +56,7 @@ export function renderIngest(report: IngestReport): string {
     `unstored ${report.unstored}`,
     `skipped ${report.skipped}`,
     `failed ${report.failed}`,
+    ...(report.retracted > 0 ? [`retracted ${report.retracted}`] : []),
   ].join(' · ');
   const tail = [
     report.dryRun ? 'dry run — nothing was posted and nothing was recorded' : null,

@@ -11,6 +11,7 @@ import {
   type QualityLoopHealthDto,
   type QualityRunDto,
   type QualityRunStartedDto,
+  type RetractedMemoryRunDto,
   type RunHeartbeatDto,
   type RunRecallDto,
   type StartOrchestrationFromRunRequest,
@@ -68,6 +69,8 @@ export class FakeLoop {
   derivationFails = false;
   failNextStart: Error | null = null;
   library: PromptLibraryDocumentDto[];
+  /** Digest runs a caller retracted, in order. The fake keeps no points, so each retraction removes none. */
+  readonly retracted: string[] = [];
 
   private readonly model: string;
   private readonly prefix: string;
@@ -221,6 +224,13 @@ export class FakeLoop {
   /** The studio's digest, as it fires it: the memory orchestrator from a finished run. */
   digestRun(runId: string): OrchestrationRunStartedDto {
     return this.startOrchestrationFromRun('memory', { runId });
+  }
+
+  /** `DELETE /memory/:id` — recorded, nothing removed: the fake has no store behind it. */
+  retract(digestRunId: string): RetractedMemoryRunDto {
+    if (this.unreachable) throw new LoopUnreachable();
+    this.retracted.push(digestRunId);
+    return { runId: digestRunId, removed: 0 };
   }
 
   /** Run ids handed to an orchestrator from-run, in order — what the studio asked to have digested. */

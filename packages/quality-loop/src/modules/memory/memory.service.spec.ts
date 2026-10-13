@@ -124,4 +124,40 @@ describe('the memory service’s re-index', () => {
     await expect(service.reindex('not-a-uuid')).rejects.toThrow(/not found/);
     await expect(service.reindex(undigested.orchestrationRunId)).rejects.toThrow(/digested no run/);
   });
+  it('[QL-70] retracts every point a digest run stored and nothing else; a run the store never held removes nothing', async () => {
+    const ports = memoryPorts();
+    const store = ports.store as InMemoryMemoryStore;
+    const seeded = store.points.size;
+    expect(seeded).toBeGreaterThan(0);
+    await store.replaceRunChunks('run-b', [
+      {
+        text: 'a lesson of another run',
+        keys: { condition: 'elsewhere', lesson: 'a lesson of another run' },
+        contentHash: contentHash('a lesson of another run'),
+        source: {
+          runId: 'run-b',
+          pipeline: 'system-design',
+          kind: 'lesson',
+          ref: 'memory.1',
+          decision: 'accept',
+          iteration: 1,
+          when: '2026-09-06',
+        },
+        evidence: [],
+        digestRunId: null,
+        lineage: null,
+        model: 'fake-embedding',
+        vectors: { condition: [0, 1, 0, 0, 0, 0, 0, 0], lesson: [0, 1, 0, 0, 0, 0, 0, 0] },
+      },
+    ]);
+    const service = new MemoryService(
+      { get: () => Promise.resolve(null) } as unknown as RunsService,
+      ports,
+      { find: () => Promise.resolve(null) } as unknown as OrchestrationRunRepository,
+    );
+
+    expect(await service.retract('run-a')).toEqual({ runId: 'run-a', removed: seeded });
+    expect([...store.points.values()].map((chunk) => chunk.source.runId)).toEqual(['run-b']);
+    expect(await service.retract('run-a')).toEqual({ runId: 'run-a', removed: 0 });
+  });
 });

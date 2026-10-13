@@ -9,6 +9,7 @@ import type {
 import { causeOf } from './core/ports';
 import type { SessionOutcome } from './core/session-engine';
 import { isLive, SESSION_STALE_AFTER_MS } from './core/write-queue';
+import type { TeachAgainReport } from './modules/session/teach-again';
 
 /**
  * stdout for humans. Fixed-width tables built with padEnd — no dependency —
@@ -127,4 +128,20 @@ export function renderOutcome(outcome: SessionOutcome): string {
 /** What ended a session, in words: the mission's stop by its cause word, or the engine's own reason. */
 function endedBy(reason: string, cause: string | null): string {
   return cause === null ? reason : `the mission's stop ${cause}`;
+}
+
+/** One line for what `teach-again` did, or would do: the dumps held no answer are counted, the ones it could not link are named. */
+export function renderTeachAgain(report: TeachAgainReport): string {
+  const head = `${report.answers} answer(s) in ${report.sessions} session(s)`;
+  const tail = [
+    report.unanswered === 0 ? null : `${report.unanswered} dump(s) held no answer`,
+    ...report.skipped,
+  ]
+    .filter((note): note is string => note !== null)
+    .map((note) => `; ${note}`)
+    .join('');
+  if (report.dryRun) {
+    return `${head} would be taught again as ${report.documents} document(s); nothing was posted${tail}`;
+  }
+  return `${head} taught again as ${report.documents} document(s): ${report.stored} fact(s) stored, ${report.retracted} earlier digest(s) retracted${tail}`;
 }

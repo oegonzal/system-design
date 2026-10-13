@@ -64,6 +64,9 @@ const orchestration = (overrides: Partial<OrchestrationRunDto>): OrchestrationRu
 
 /** A client that answers each read from a script and counts its calls; nothing else is ever asked. */
 class ScriptedClient extends LoopClient {
+  retractMemory(): never {
+    throw new Error('the await spec retracts nothing');
+  }
   reads = 0;
   constructor(
     private readonly runs: (QualityRunDto | null)[] = [],

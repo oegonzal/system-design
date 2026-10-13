@@ -217,4 +217,20 @@ describe('HttpLoopClient', () => {
     expect(calls[1]?.url).toBe('http://loop/prompts/agentic/workflow%20graph');
     expect(await client.getPrompt('missing')).toBeNull();
   });
+  it('[LC-1] retracts a digest run’s memories by DELETE, unwrapping the envelope; a refusal names the route', async () => {
+    const { fetch, calls } = scripted(({ url }) =>
+      url.endsWith('/memory/d1')
+        ? json(200, { data: { runId: 'd1', removed: 4 } })
+        : json(404, { statusCode: 404, message: 'no such run' }),
+    );
+    const client = new HttpLoopClient('http://loop', fetch);
+
+    expect(await client.retractMemory('d1')).toEqual({ runId: 'd1', removed: 4 });
+    expect(calls[0]).toMatchObject({ url: 'http://loop/memory/d1', init: { method: 'DELETE' } });
+    await expect(client.retractMemory('d 2')).rejects.toMatchObject({
+      status: 404,
+      route: 'DELETE /memory/:id',
+    });
+    expect(calls[1]?.url).toBe('http://loop/memory/d%202');
+  });
 });

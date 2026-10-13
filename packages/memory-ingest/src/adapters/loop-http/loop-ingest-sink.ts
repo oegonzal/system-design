@@ -37,4 +37,8 @@ export class LoopIngestSink implements IngestSink {
   status(orchestrationRunId: string): Promise<OrchestrationRunDto | null> {
     return this.client.getOrchestration(orchestrationRunId);
   }
+
+  async retract(digestRunId: string): Promise<number> {
+    return (await this.client.retractMemory(digestRunId)).removed;
+  }
 }

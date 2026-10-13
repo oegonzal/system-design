@@ -37,6 +37,8 @@ export interface IngestSink {
   post(planned: PlannedChunk): Promise<OrchestrationRunDto>;
   /** The orchestration as the loop has it now, or null when it no longer does. */
   status(orchestrationRunId: string): Promise<OrchestrationRunDto | null>;
+  /** Every point a digest run stored, gone — how many went; a run the store never held removes nothing. */
+  retract(digestRunId: string): Promise<number>;
 }
 
 export class IngestWaitFailed extends Error {

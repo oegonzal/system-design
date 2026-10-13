@@ -71,6 +71,7 @@ const report = (overrides: Partial<IngestReport> = {}): IngestReport => ({
   unstored: 1,
   skipped: 0,
   failed: 1,
+  retracted: 0,
   stopped: null,
   halted: null,
   ...overrides,

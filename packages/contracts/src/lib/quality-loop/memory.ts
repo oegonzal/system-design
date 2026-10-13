@@ -70,6 +70,18 @@ export type MemoryContextDto = z.infer<typeof memoryContextSchema>;
  */
 export type ReindexMemoryRunResponse = ApiResponse<OrchestrationStepDto>;
 
+/**
+ * What a retraction did: every point a digest run stored, gone from the
+ * store. A digest run has one writer, so the run id is the unit a caller
+ * retracts by — a document taught again, a document ingested again by force —
+ * and retracting a run the store never held removes nothing and is no error.
+ */
+export interface RetractedMemoryRunDto {
+  runId: string;
+  removed: number;
+}
+export type RetractMemoryRunResponse = ApiResponse<RetractedMemoryRunDto>;
+
 /** One chunk as a search returned it. */
 export interface RetrievalHitDto {
   runId: string;

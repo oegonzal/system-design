@@ -38,7 +38,11 @@ export const INGEST_FLAGS = {
   limit: { type: 'string', describe: 'post at most this many chunks, then halt' },
   'parts-per-chunk': { type: 'string', describe: 'the most sections one chunk may carry' },
   'dry-run': { type: 'boolean', describe: 'print the chunks; post nothing, record nothing' },
-  force: { type: 'boolean', describe: 'post chunks the manifest already holds as complete' },
+  force: {
+    type: 'boolean',
+    describe:
+      'post chunks the manifest already holds as complete, retracting what their earlier digests stored',
+  },
   json: { type: 'boolean', describe: 'print the report as JSON' },
   refresh: { type: 'boolean', describe: 'read every recorded orchestration back from the loop' },
 } as const satisfies Record<string, { type: 'string' | 'boolean'; describe: string }>;

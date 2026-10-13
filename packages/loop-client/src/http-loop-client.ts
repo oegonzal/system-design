@@ -12,6 +12,7 @@ import {
   type QualityRunStartedDto,
   type Recovery,
   type RecoveryClock,
+  type RetractedMemoryRunDto,
   rideOut,
   type Settled,
   type StartOrchestrationFromRunRequest,
@@ -32,7 +33,7 @@ import { DerivationFailed, LoopRefused, LoopTimeout, LoopUnreachable } from './l
 export const READ_TIMEOUT_MS = 15_000;
 export const DERIVE_TIMEOUT_MS = 240_000;
 
-type Method = 'GET' | 'POST';
+type Method = 'GET' | 'POST' | 'DELETE';
 
 interface Answer {
   status: number;
@@ -42,13 +43,14 @@ interface Answer {
 /**
  * Whether an attempt may be asked again within the declared recovery: one
  * that never reached the loop — the connection failed, never a timeout, which
- * the loop may have received — or a read the loop answered 5xx. A start the
- * loop answered is never repeated, whatever it said: it may have opened a run.
+ * the loop may have received — or a read or a retraction the loop answered
+ * 5xx, both idempotent. A start the loop answered is never repeated, whatever
+ * it said: it may have opened a run.
  */
 const repeatable = (method: Method, outcome: Settled<Answer>): boolean =>
   'error' in outcome
     ? outcome.error instanceof LoopUnreachable
-    : method === 'GET' && outcome.value.status >= 500;
+    : method !== 'POST' && outcome.value.status >= 500;
 
 const isTimeout = (error: unknown): boolean =>
   error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
@@ -156,6 +158,13 @@ export class HttpLoopClient extends LoopClient {
       `/orchestrations/${segment(orchestrationRunId)}`,
       'GET /orchestrations/:id',
     );
+  }
+
+  async retractMemory(digestRunId: string): Promise<RetractedMemoryRunDto> {
+    const path = `/memory/${segment(digestRunId)}`;
+    const answer = await this.call('DELETE', path, undefined, READ_TIMEOUT_MS);
+    if (answer.status !== 200) throw this.refused('DELETE /memory/:id', answer);
+    return data<RetractedMemoryRunDto>(answer.body);
   }
 
   /** A start answers 202 — or 200 from an older build — with the envelope. */

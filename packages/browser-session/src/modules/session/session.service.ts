@@ -1,4 +1,5 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { LoopClient } from '@sysdesign/loop-client';
 import {
   excerpt,
   type BrowserSessionDetailDto,
@@ -34,6 +35,7 @@ import {
   STOP_SIGNAL,
   UNIT_ADVISORS,
 } from './tokens';
+import { teachAgain, type TeachAgainReport } from './teach-again';
 
 /**
  * What the command line asks of a run: the engine's options, the subject
@@ -78,6 +80,7 @@ export class SessionService {
     @Inject(SESSION_EVENTS) private readonly events: SessionEventsPort,
     @Inject(STOP_SIGNAL) private readonly stop: StopSignal,
     @Inject(SESSION_CONFIG) private readonly config: SessionConfig,
+    private readonly client: LoopClient,
   ) {}
 
   run(options: RunOptions): Promise<SessionOutcome> {
@@ -171,5 +174,23 @@ export class SessionService {
     const events = sessionEventsOf({ ...detail, subject });
     for (const event of events) await this.events.publish(event);
     return events.length;
+  }
+
+  /**
+   * The operator answers a folder of session dumps recorded, taught again in
+   * the canonical shape and their earlier digests retracted; `dryRun` plans and
+   * posts nothing. The subject is each dump's own, else the configured one.
+   */
+  teachAgain(dumpsDir: string, dryRun: boolean): Promise<TeachAgainReport> {
+    return teachAgain(
+      {
+        client: this.client,
+        ledger: this.ledger,
+        subject: this.config.subject,
+        log: (text) => this.operator.notify(text),
+      },
+      dumpsDir,
+      dryRun,
+    );
   }
 }

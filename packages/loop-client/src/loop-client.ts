@@ -8,6 +8,7 @@ import type {
   QualityLoopHealthDto,
   QualityRunDto,
   QualityRunStartedDto,
+  RetractedMemoryRunDto,
   StartOrchestrationFromRunRequest,
   StartOrchestrationRequest,
   StartQualityRunRequest,
@@ -48,4 +49,6 @@ export abstract class LoopClient {
   ): Promise<OrchestrationRunStartedDto>;
   /** Null when the loop has no such orchestration. */
   abstract getOrchestration(orchestrationRunId: string): Promise<OrchestrationRunDto | null>;
+  /** `DELETE /memory/:id` — every point a digest run stored, gone; how many went. Idempotent. */
+  abstract retractMemory(digestRunId: string): Promise<RetractedMemoryRunDto>;
 }

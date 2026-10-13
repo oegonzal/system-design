@@ -164,6 +164,17 @@ export class InMemoryMemoryStore implements MemoryStore {
     return Promise.resolve(chunks.length);
   }
 
+  retractRun(sourceRunId: string): Promise<number> {
+    if (this.unreachable) return Promise.reject(new Error('store unreachable'));
+    let removed = 0;
+    for (const [id, chunk] of this.points) {
+      if (chunk.source.runId !== sourceRunId) continue;
+      this.points.delete(id);
+      removed += 1;
+    }
+    return Promise.resolve(removed);
+  }
+
   /** As the adapter does: the counts are set on points that stand, and an unknown point is left alone. */
   setSupport(
     updates: readonly { point: PointRef; support: { confirms: number; contradicts: number } }[],

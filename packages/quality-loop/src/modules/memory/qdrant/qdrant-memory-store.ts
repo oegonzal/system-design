@@ -134,6 +134,14 @@ export class QdrantMemoryStore implements MemoryStore {
     return chunks.length;
   }
 
+  async retractRun(sourceRunId: string): Promise<number> {
+    const collection = await this.bound();
+    const filter = { must: [{ key: 'runId', match: { value: sourceRunId } }] };
+    const { count } = await this.client.count(collection, { filter, exact: true });
+    if (count > 0) await this.client.delete(collection, { wait: true, filter });
+    return count;
+  }
+
   /**
    * Write the support counts of points that already stand, leaving the rest of
    * each payload alone. One call per point, because each carries its own

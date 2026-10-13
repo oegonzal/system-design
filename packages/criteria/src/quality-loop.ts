@@ -350,4 +350,9 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
     statement:
       'A document memory declares where it holds — of the subject wherever asked, or of the one unit of work it was recorded for — by a closed scope the digest writes, the stored point carries, the form goals render beside the kind under one legend, and a point written before scopes reads as the default; a fact scoped where it does not hold is a gated falsehood that withholds every memory it names, and provenance leaking into a subject fact is wording that withholds nothing; and a document digest judged below the bar is still drawn on where the engine’s own gates held — an artifact present that the validators passed — with every memory a confirmed finding withholds still withheld, the step saying it stored what was judged and not refuted.',
   },
+  {
+    id: 'QL-70',
+    statement:
+      'A digest run’s memories are retracted by its id — every point it stored gone, whatever its kind, and a run the store never held removing nothing — through DELETE /memory/:id and the client port’s retraction, so a document taught or ingested again closes behind itself and the store never holds two digests of one document.',
+  },
 ];

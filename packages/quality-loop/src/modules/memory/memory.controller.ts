@@ -1,7 +1,8 @@
-import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
 import type {
   RecallEffectivenessResponse,
   ReindexMemoryRunResponse,
+  RetractMemoryRunResponse,
   RetrievalReportResponse,
   StandingGapsResponse,
 } from '@sysdesign/contracts';
@@ -25,6 +26,17 @@ export class MemoryController {
   @HttpCode(200)
   async reindex(@Param('id') id: string): Promise<ReindexMemoryRunResponse> {
     return { data: await this.memory.reindex(id) };
+  }
+
+  /**
+   * Retract every point a digest run stored, by the run's id — what a document
+   * taught or ingested again calls before its new digest lands. Idempotent: a
+   * run the store never held removes nothing.
+   */
+  @Delete(':id')
+  @HttpCode(200)
+  async retract(@Param('id') id: string): Promise<RetractMemoryRunResponse> {
+    return { data: await this.memory.retract(id) };
   }
 
   /**

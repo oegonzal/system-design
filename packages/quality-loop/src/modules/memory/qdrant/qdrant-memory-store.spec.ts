@@ -201,4 +201,21 @@ describe('the Qdrant memory store', () => {
       chunks: 0,
     });
   });
+  it('[QL-70] retracts every point of a run by its id and nothing else; a run never stored removes nothing', async () => {
+    const before = (await store.verify()).chunks;
+    await store.replaceRunChunks('run-r1', [
+      chunk('cache the listing by its filter key', 'run-r1', 'memory.1'),
+      chunk('expire the cache on every write to the list', 'run-r1', 'memory.2'),
+    ]);
+    await store.replaceRunChunks('run-r2', [
+      chunk('read the listing through one query per page', 'run-r2', 'memory.1'),
+    ]);
+    expect((await store.verify()).chunks).toBe(before + 3);
+
+    expect(await store.retractRun('run-r1')).toBe(2);
+    expect((await store.verify()).chunks).toBe(before + 1);
+    expect(await store.retractRun('run-r1')).toBe(0);
+    expect(await store.retractRun('run-r2')).toBe(1);
+    expect((await store.verify()).chunks).toBe(before);
+  });
 });

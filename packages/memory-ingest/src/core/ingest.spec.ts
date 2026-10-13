@@ -177,14 +177,15 @@ describe('ingest', () => {
     expect(ledger.entries[0]?.status).toBe('complete');
   });
 
-  it('[ING-1] a re-run skips what the manifest holds as stored, and --force posts it again while the ledger keeps every outcome', async () => {
+  it('[ING-1] [ING-3] a re-run skips what the manifest holds as stored, and --force retracts each earlier digest and posts it again while the ledger keeps every outcome', async () => {
     const first = harness();
     await ingest(['notes.md'], options(), first.deps);
 
     const again = harness([], first.ledger);
     const skipped = await ingest(['notes.md'], options(), again.deps);
-    expect(skipped).toMatchObject({ chunks: 3, posted: 0, skipped: 3, failed: 0 });
+    expect(skipped).toMatchObject({ chunks: 3, posted: 0, skipped: 3, failed: 0, retracted: 0 });
     expect(again.posted).toHaveLength(0);
+    expect(again.loop.retracted).toEqual([]);
     expect(outcomes(skipped)).toEqual(['skipped', 'skipped', 'skipped']);
     expect(skipped.files[0]?.chunks[0]).toMatchObject({
       orchestrationRunId: first.ledger.entries[0]?.orchestrationRunId,
@@ -194,8 +195,10 @@ describe('ingest', () => {
 
     const forced = harness([], first.ledger);
     const report = await ingest(['notes.md'], options({ force: true }), forced.deps);
-    expect(report).toMatchObject({ posted: 3, skipped: 0 });
+    expect(report).toMatchObject({ posted: 3, skipped: 0, retracted: 3 });
     expect(forced.posted).toHaveLength(3);
+    // Each stored chunk's earlier digest run, as the manifest recorded it, went before the chunk was posted again.
+    expect(forced.loop.retracted).toEqual(['digest-run-1', 'digest-run-1', 'digest-run-1']);
     expect(first.ledger.entries).toHaveLength(6);
     expect(latestByHash(first.ledger.entries).size).toBe(3);
   });

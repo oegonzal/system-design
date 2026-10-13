@@ -334,7 +334,8 @@ Owns the memory tier's adapters. Tokens: `EMBEDDING_CLIENT`, `EMBEDDING_CACHE`, 
 store: one adapter set, two port shapes, because `support` belongs to one orchestrator and widening
 `MemoryPorts` would reach every fake of it.
 
-Four routes. `POST /memory/:id/reindex` re-embeds a finished memory run's lessons.
+Five routes. `POST /memory/:id/reindex` re-embeds a finished memory run's lessons. `DELETE /memory/:id`
+retracts every point a digest run stored, for a document taught or ingested again.
 `POST /memory/retrieval-report` shows store availability, each probe's own ranking and the fused
 candidate list, without running a pipeline. `GET /memory/effectiveness` joins each recalling run's
 lessons to what the engine said changed in its next iteration — attributed at run level, which the

@@ -101,6 +101,14 @@ export class ScriptedSink implements IngestSink {
 
   constructor(private readonly outcomes: (OrchestrationRunDto | Error)[] = []) {}
 
+  /** Digest runs retracted, in order; the scripted sink keeps no points, so each removes none. */
+  readonly retracted: string[] = [];
+
+  retract(digestRunId: string): Promise<number> {
+    this.retracted.push(digestRunId);
+    return Promise.resolve(0);
+  }
+
   async post(planned: PlannedChunk): Promise<OrchestrationRunDto> {
     this.posted.push(planned);
     const next = this.outcomes.shift() ?? settledOrchestration();

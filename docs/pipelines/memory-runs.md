@@ -376,21 +376,26 @@ query probes — binds them into the memory orchestrator's ports for the
 orchestration module (which never imports Qdrant), and serves the two tools
 that need them without a run.
 
-| Verb   | Path                                     | Code | Body / query                                      | Answers                                        |
-| ------ | ---------------------------------------- | ---- | ------------------------------------------------- | ---------------------------------------------- |
-| `POST` | `/orchestrations/:orchestrator`          | 202  | the shared `runRequestSchema`                     | `{ data: { orchestrationRunId, status } }`     |
-| `POST` | `/orchestrations/:orchestrator/from-run` | 202  | `{ runId }`                                       | the same; steps with a stand-in are provided   |
-| `GET`  | `/orchestrations`                        | 200  | `orchestrator`, `pipeline`, `status`, list paging | `{ data, meta }`, newest first                 |
-| `GET`  | `/orchestrations/:id`                    | 200  | —                                                 | `{ data: OrchestrationRunDto }`, 404 otherwise |
-| `POST` | `/memory/:id/reindex`                    | 200  | —                                                 | `{ data: OrchestrationStepDto }`               |
-| `POST` | `/memory/retrieval-report`               | 200  | `{ goal }`, up to 64,000 B                        | `{ data: RetrievalReportDto }`                 |
+| Verb     | Path                                     | Code | Body / query                                      | Answers                                        |
+| -------- | ---------------------------------------- | ---- | ------------------------------------------------- | ---------------------------------------------- |
+| `POST`   | `/orchestrations/:orchestrator`          | 202  | the shared `runRequestSchema`                     | `{ data: { orchestrationRunId, status } }`     |
+| `POST`   | `/orchestrations/:orchestrator/from-run` | 202  | `{ runId }`                                       | the same; steps with a stand-in are provided   |
+| `GET`    | `/orchestrations`                        | 200  | `orchestrator`, `pipeline`, `status`, list paging | `{ data, meta }`, newest first                 |
+| `GET`    | `/orchestrations/:id`                    | 200  | —                                                 | `{ data: OrchestrationRunDto }`, 404 otherwise |
+| `POST`   | `/memory/:id/reindex`                    | 200  | —                                                 | `{ data: OrchestrationStepDto }`               |
+| `DELETE` | `/memory/:id`                            | 200  | —                                                 | `{ data: { runId, removed } }`                 |
+| `POST`   | `/memory/retrieval-report`               | 200  | `{ goal }`, up to 64,000 B                        | `{ data: RetrievalReportDto }`                 |
 
 `/memory-runs` is retired, not aliased. The body of a memory orchestration is
 **exactly** the body of a quality run; `output` and `maxIterations` reach the
-target only. The two `/memory` routes run **no pipeline at all**: `reindex`
+target only. The three `/memory` routes run **no pipeline at all**: `reindex`
 re-embeds a memory run's lessons from the digest artifact it already produced,
 which is what makes a generation bump survivable (§6); `retrieval-report`
-answers what a recall _would_ retrieve for a goal without running one.
+answers what a recall _would_ retrieve for a goal without running one; `DELETE
+/memory/:id` retracts every point a digest run stored, by the run's id — one
+writer per digest run — which is how a document taught or ingested again closes
+behind itself (`memory-ingest … --force`, `browser-session teach-again`); a run
+the store never held removes nothing and is no error.
 
 Guards, before any row exists: an unknown orchestrator is a 404; a pipeline
 not in `RunsService.list()` is a 404, the same as `POST /runs`; whatever the
@@ -486,7 +491,10 @@ so the module never imports the client directly:
   generations are not comparable, and one collection ranking two
   representations against one query means nothing. Bump it whenever the
   indexed text changes. The old rows are then unreachable — and the way back
-  is **re-indexing, not re-digesting**. Re-digesting asks a model to derive the
+  is **re-indexing, not re-digesting**. A superseded collection is dropped by
+  hand once nothing can address it: the first generation's
+  (`quality-memory__text-embedding-3-small__1536`, six `lesson` points of one
+  2026-09-06 run) went on 2026-10-12. Re-digesting asks a model to derive the
   lessons afresh, and `replaceRunChunks` deletes a run's chunks before it
   writes, so a replay that answers differently destroys exactly what it was
   meant to migrate. `POST /memory/:id/reindex` re-embeds the digest

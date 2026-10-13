@@ -94,7 +94,7 @@ export const BROWSER_SESSION_CRITERIA: readonly Criterion[] = [
   {
     id: 'BRW-17',
     statement:
-      'An operator’s answer is taught under what its field asks — the label, then the words beside it, as one text the recall’s probe is searched with — as the subject’s answer to that question with where and when it was asked kept apart as provenance and a chosen draft said to be one, parsed through the guidance schema before it is taught; a field that asks nothing it can be told by is kept for the session and taught to nobody, and the step says so.',
+      'An operator’s answer is taught under what its field asks — the label, then the words beside it, as one text the recall’s probe is searched with — as the subject’s answer to that question with where and when it was asked kept apart as provenance and a chosen draft said to be one, parsed through the guidance schema before it is taught; a field that asks nothing it can be told by is kept for the session and taught to nobody, and the step says so; and the answers a folder of session dumps recorded — an older item under its label and context, a newer under its question — are taught again in that shape batched per session as one document may carry, their rows linked to the new orchestration and each earlier digest retracted once the new facts stand, or planned and posted nowhere under a dry run.',
   },
   // Memory ingest (packages/memory-ingest)
   {
@@ -106,5 +106,10 @@ export const BROWSER_SESSION_CRITERIA: readonly Criterion[] = [
     id: 'ING-2',
     statement:
       "Documents are read through a declared table of readers by extension — PDF text from the page's own geometry, markdown and plain text verbatim, JSON Lines one record per titled section through a declared field map — and an extension the table does not name, or a record the map cannot read, is refused by name, never guessed and never skipped.",
+  },
+  {
+    id: 'ING-3',
+    statement:
+      'A forced re-ingest retracts what a chunk’s earlier digest stored — by the digest run id the manifest keeps, before the chunk is posted again — and the report counts the retractions, so the store never holds two digests of one chunk.',
   },
 ];

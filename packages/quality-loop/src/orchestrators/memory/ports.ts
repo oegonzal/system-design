@@ -175,6 +175,13 @@ export interface MemoryStore {
   setSupport(
     updates: readonly { point: PointRef; support: { confirms: number; contradicts: number } }[],
   ): Promise<void>;
+  /**
+   * Every point a source run stored, gone — whatever its kind: a digest run
+   * has one writer, so the run is the unit a caller retracts by when its
+   * document is taught or ingested again. Returns how many went; a run the
+   * store never held removes nothing.
+   */
+  retractRun(sourceRunId: string): Promise<number>;
 }
 
 export interface EmbeddingCache {

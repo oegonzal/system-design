@@ -63,6 +63,12 @@ export const SESSION_FLAGS = {
   subject: { name: '--subject', valued: true, help: "whom the operator's answers are about" },
   limit: { name: '--limit', valued: true, help: 'how many sessions to list' },
   json: { name: '--json', valued: false, help: 'print the records as JSON' },
+  sessions: {
+    name: '--sessions',
+    valued: true,
+    help: 'a folder of session dumps whose operator answers are taught again',
+  },
+  dryRun: { name: '--dry-run', valued: false, help: 'plan what would be taught; post nothing' },
 } as const;
 export type SessionFlag = keyof typeof SESSION_FLAGS;
 

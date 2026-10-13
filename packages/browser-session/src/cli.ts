@@ -4,6 +4,7 @@
  * `main.js sessions [--limit n] [--json]`
  * `main.js show <id> [--json]`
  * `main.js replay-events <id>`
+ * `main.js teach-again --sessions <dir> [--dry-run]`
  *
  * `parseOptions` reads argv against the declared flags; `execute` runs the
  * options over the service and writes through `io`; `cli` loads the
@@ -36,7 +37,7 @@ import {
 import { SessionRefused } from './core/unit-advice';
 import { AppModule } from './modules/app/app.module';
 import { SessionService } from './modules/session/session.service';
-import { renderOutcome, renderSession, renderSessions } from './render';
+import { renderOutcome, renderSession, renderSessions, renderTeachAgain } from './render';
 import { readSessionSettings, type SessionDefaults } from './settings';
 
 const flag = (key: keyof typeof SESSION_FLAGS): string => SESSION_FLAGS[key].name;
@@ -49,7 +50,10 @@ export const USAGE = `usage: browser-session <command> [options]
   sessions  [${flag('limit')} n] [${flag('json')}]
   show      <id> [${flag('json')}]
   replay-events <id>
-            publishes a recorded session's events again, for a record that missed them`;
+            publishes a recorded session's events again, for a record that missed them
+  teach-again ${flag('sessions')} <dir> [${flag('dryRun')}]
+            teaches the operator answers recorded in a folder of session dumps again, in the canonical
+            shape, and retracts what their earlier digests stored`;
 
 /** The commands, as data: what each takes as a positional, and whether it reads or writes the session's tables. */
 export const COMMANDS = {
@@ -58,6 +62,7 @@ export const COMMANDS = {
   sessions: { positionals: 0, ledger: true },
   show: { positionals: 1, ledger: true },
   'replay-events': { positionals: 1, ledger: true },
+  'teach-again': { positionals: 0, ledger: true },
 } as const;
 export type Command = keyof typeof COMMANDS;
 
@@ -76,7 +81,8 @@ export type Options =
   | { command: 'login'; profile: string; url: string }
   | { command: 'sessions'; limit: number; json: boolean }
   | { command: 'show'; id: string; json: boolean }
-  | { command: 'replay-events'; id: string };
+  | { command: 'replay-events'; id: string }
+  | { command: 'teach-again'; sessions: string; dryRun: boolean };
 
 /** What `execute` writes to and how it is answered. */
 export interface Io {
@@ -86,7 +92,10 @@ export interface Io {
 }
 
 /** The slice of the service the CLI drives — the fake in the spec implements exactly this. */
-export type CliService = Pick<SessionService, 'run' | 'login' | 'list' | 'show' | 'replayEvents'>;
+export type CliService = Pick<
+  SessionService,
+  'run' | 'login' | 'list' | 'show' | 'replayEvents' | 'teachAgain'
+>;
 
 const isCommand = (value: string | undefined): value is Command =>
   value !== undefined && Object.hasOwn(COMMANDS, value);
@@ -160,6 +169,12 @@ export function parseOptions(argv: readonly string[], defaults: SessionDefaults)
         return { command, id: positionals[0] ?? '', json: on('json') ?? false };
       case 'replay-events':
         return { command, id: positionals[0] ?? '' };
+      case 'teach-again':
+        return {
+          command,
+          sessions: required(text('sessions'), 'sessions'),
+          dryRun: on('dryRun') ?? false,
+        };
     }
   } catch (error) {
     return error instanceof Error ? error : new Error(messageOf(error));
@@ -202,6 +217,11 @@ export async function execute(options: Options, service: CliService, io: Io): Pr
           return 1;
         }
         io.out(`${published} event(s) published again for session ${options.id}`);
+        return 0;
+      }
+      case 'teach-again': {
+        const report = await service.teachAgain(options.sessions, options.dryRun);
+        io.out(renderTeachAgain(report));
         return 0;
       }
     }

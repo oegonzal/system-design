@@ -23,8 +23,10 @@ import { entryOf, identityOf, statusOf } from './record';
  * refuses the whole run up front. `runIngest` then posts one chunk at a time,
  * awaiting each orchestration to settle before the next, and records every
  * outcome in the ledger. A chunk whose facts the ledger holds as stored is
- * skipped unless forced; a refusal from the loop stops the run, because the
- * next chunk would be refused the same way.
+ * skipped unless forced — and forced, the points its earlier digest stored
+ * are retracted by that digest run's id before the chunk is posted again, so
+ * the store never holds two digests of one chunk; a refusal from the loop
+ * stops the run, because the next chunk would be refused the same way.
  */
 export interface IngestOptions {
   kind: IngestKind;
@@ -113,6 +115,8 @@ export interface IngestReport {
   skipped: number;
   /** Failed and refused together. */
   failed: number;
+  /** Digest runs retracted before a forced re-post: the points an earlier digest of the same chunk had stored, gone. */
+  retracted: number;
   /** Set when a refusal stopped the run before every chunk was posted. */
   stopped: { document: string; chunk: number; message: string } | null;
   /**
@@ -286,6 +290,7 @@ export async function runIngest(
     unstored: 0,
     skipped: 0,
     failed: 0,
+    retracted: 0,
     stopped: null,
     halted: null,
   };
@@ -303,6 +308,11 @@ export async function runIngest(
         continue;
       }
       if (options.dryRun) continue;
+      // Forced past a stored posting: what its digest stored goes before the chunk is digested again.
+      if (prior?.digestRunId != null && INGESTED.has(prior.status)) {
+        await deps.sink.retract(prior.digestRunId);
+        report.retracted += 1;
+      }
 
       const entry = await postOne(planned, document, deps);
       entries.push(entry);

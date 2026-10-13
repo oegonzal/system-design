@@ -8,6 +8,7 @@ import type {
   QualityLoopHealthDto,
   QualityRunDto,
   QualityRunStartedDto,
+  RetractedMemoryRunDto,
   StartOrchestrationFromRunRequest,
   StartOrchestrationRequest,
   StartQualityRunRequest,
@@ -67,6 +68,10 @@ export class FakeLoopClient extends LoopClient {
 
   getOrchestration(orchestrationRunId: string): Promise<OrchestrationRunDto | null> {
     return this.answer(() => this.core.getOrchestration(orchestrationRunId));
+  }
+
+  retractMemory(digestRunId: string): Promise<RetractedMemoryRunDto> {
+    return this.answer(() => this.core.retract(digestRunId));
   }
 
   private answer<T>(call: () => T): Promise<T> {

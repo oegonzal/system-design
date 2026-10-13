@@ -17,6 +17,7 @@ import type {
   QualityRunDto,
   QualityRunSummaryDto,
   RecallEffectivenessDto,
+  RetractedMemoryRunDto,
   RetrievalHitDto,
   RetrievalProbeDto,
   RetrievalReportDto,
@@ -151,6 +152,18 @@ export class MemoryService implements OnModuleInit {
       startedAt: at,
       finishedAt: new Date().toISOString(),
     };
+  }
+
+  /**
+   * Retract every point a digest run stored: the seam a document taught again,
+   * or ingested again by force, closes behind itself, so the store never holds
+   * two digests of one document. The run is the unit — one writer per digest
+   * run — and a run the store never held removes nothing and is no error.
+   */
+  async retract(runId: string): Promise<RetractedMemoryRunDto> {
+    const removed = await this.ports.store.retractRun(runId);
+    this.logger.log(`digest run ${runId} retracted: ${removed} point(s) removed`);
+    return { runId, removed };
   }
 
   /**
