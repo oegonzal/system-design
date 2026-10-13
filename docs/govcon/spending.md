@@ -126,10 +126,13 @@ Q4). Picking the agency again clears the scope.
 
 Once the service listens (`pnpm govcon:serve`; never under a CLI command),
 the spending warm runs at once and then every `GOVCON_SPENDING_WARM_HOURS`
-(default 24; `0` turns it off). Each warm reads the default profile's NAICS
-(no PSC, every agency, both families) through every lens with a forced
-refresh — the snapshot is replaced inside the cache window, so the page's
-first look that day is a snapshot — then, for each of the top three agencies
+(default 24; `0` turns it off). The run at start reads what the cache window
+still holds — a restart inside the day is every lens `snapshot` and no
+request, which matters under `node --watch`, where every save restarts the
+service — and each scheduled run renews: the snapshot is replaced inside the
+window, so the page's first look that day is a snapshot. A warm reads the
+default profile's NAICS (no PSC, every agency, both families) through every
+lens, then, for each of the top three agencies
 the rolling-year breakdown names, the horizon narrowed to that agency (the
 scope a directory pick opens, and the one whose walk reaches today) and its
 outlook, and logs one line per lens:
@@ -331,20 +334,21 @@ to a month, or narrow the profile's codes to the software four.
 
 ## Troubleshooting
 
-| What you see                                             | Why, and what to do                                                                                                                                                             |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A first look takes long                                  | The scope is new today: the lens is built from the source. Later reads answer from the snapshot; the warm fills the default profile's scope daily.                              |
-| "from an older snapshot — the source refused a refresh"  | USAspending answered 429, 5xx or timed out; the day-old answer is better than none. Read the ledger row for the outcome.                                                        |
-| "The walk stopped early (pages)"                         | The scope is wide; the months after `reachedEndsAt` are complete. Narrow the scope or the family.                                                                               |
-| \"…before it reached the window\"                        | Wider still: every award the walk read ends after the window. Pick an agency in the Agency tab, or one code family.                                                             |
-| "The walk stopped early (source)"                        | A page failed; the answer was not kept, so the next read walks again.                                                                                                           |
-| 404 on an agency                                         | The toptier code is not in USAspending's directory (`GET /spending/agencies`).                                                                                                  |
-| 502 on an agency with `fiscal_year is outside the range` | A fiscal year was asked that the source has no submissions for yet; leave it out and the agency's active year is used.                                                          |
-| "No projection"                                          | No complete prior fiscal year in the lookback with anything obligated.                                                                                                          |
-| Every "Open notices" is 0                                | No pull has stored notices in these codes yet (`pnpm govcon pull`), or none is open.                                                                                            |
-| `warm skipped: no default profile`                       | The store has no profile; the seed runs on an empty store at boot.                                                                                                              |
-| `warm pulse refused 400 naics Too big`                   | The profile names more codes than a scope may (`MAX_SCOPE_CODES`).                                                                                                              |
-| `alerts not published` / `digest not sent`               | The notifications service at `NOTIFICATIONS_URL` is down or does not know the `govcon.*` topics yet (rebuild it); nothing is recorded, so the same alerts are raised next warm. |
+| What you see                                             | Why, and what to do                                                                                                                                                                                    |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A first look takes long                                  | The scope is new today: the lens is built from the source. Later reads answer from the snapshot; the warm fills the default profile's scope daily.                                                     |
+| "from an older snapshot — the source refused a refresh"  | USAspending answered 429, 5xx or timed out; the day-old answer is better than none. Read the ledger row for the outcome.                                                                               |
+| "The walk stopped early (pages)"                         | The scope is wide; the months after `reachedEndsAt` are complete. Narrow the scope or the family.                                                                                                      |
+| \"…before it reached the window\"                        | Wider still: every award the walk read ends after the window. Pick an agency in the Agency tab, or one code family.                                                                                    |
+| "The walk stopped early (source)"                        | A page failed; the answer was not kept, so the next read walks again.                                                                                                                                  |
+| 404 on an agency                                         | The toptier code is not in USAspending's directory (`GET /spending/agencies`).                                                                                                                         |
+| 502 on an agency with `fiscal_year is outside the range` | A fiscal year was asked that the source has no submissions for yet; leave it out and the agency's active year is used.                                                                                 |
+| "No projection"                                          | No complete prior fiscal year in the lookback with anything obligated.                                                                                                                                 |
+| Every "Open notices" is 0                                | No pull has stored notices in these codes yet (`pnpm govcon pull`), or none is open.                                                                                                                   |
+| `warm skipped: no default profile`                       | The store has no profile; the seed runs on an empty store at boot.                                                                                                                                     |
+| `warm pulse refused 400 naics Too big`                   | The profile names more codes than a scope may (`MAX_SCOPE_CODES`).                                                                                                                                     |
+| `alerts not published` / `digest not sent`               | The notifications service at `NOTIFICATIONS_URL` is down or does not know the `govcon.*` topics yet (rebuild it); nothing is recorded, so the same alerts are raised next warm.                        |
+| `fetch failed`, or 500 with \"Web Page Blocked!\"        | USAspending's firewall is refusing this address after a burst of requests. Stored snapshots still answer (as `stale` once past the window); wait before asking again — every retry is another request. |
 
 ## Limits
 
@@ -374,6 +378,7 @@ Probed live on 2026-10-12 and 2026-10-13; free, no key.
 - `spending_by_award` requires the `sort` field among the requested `fields`; IDVs end at `Last Date to Order`, contracts at `End Date`; `time_period` filters the action date only, never the period of performance.
 - Any `spending_by_award` request carrying the keyset cursor (`last_record_unique_id`, `last_record_sort_value`) answers an empty-body 503 every time; numbered pages answer (page 60 is empty for a six-digit NAICS), so the walk pages by number.
 - `budgetary_resources` periods are sparse — a year just begun is empty, older years quarterly — and are shown as reported; `sub_agency` refuses a `fiscal_year` outside its submissions (the new fiscal year, for weeks after October 1), while `references/toptier_agencies` reports each agency's `active_fy`.
+- The source sits behind a firewall with no published limit. Measured 2026-10-13: about 700 requests in fourteen minutes — four renewing warms back to back, the last two within two minutes — and it answered 500 with a "Web Page Blocked!" page, then refused connections from this address; one warm of about 190 requests in a minute had passed three times before that. One warm a day and ordinary browsing stay well under it; a burst does not.
 - `awards/last_updated` is `MM/DD/YYYY`; Department of Defense awards appear 90 days after signing; agency financials are revealed about five to six weeks after the period.
 
 ## Reviewing a build live

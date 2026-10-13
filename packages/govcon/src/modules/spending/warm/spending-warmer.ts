@@ -29,6 +29,7 @@ import {
   awardEndingAlerts,
   pulseAboveBandAlerts,
 } from '../../../core/spending/alerts';
+import type { ReadOptions } from '../../../core/spending/lens';
 import { messageOf } from '../../../core/text';
 import { ProfilesService } from '../../profiles/profiles.service';
 import { CLOCK } from '../../sources/tokens';
@@ -37,7 +38,8 @@ import { SpendingService } from '../spending.service';
 import { ALERT_LEDGER, ALERT_SINK, SPENDING_WARM_POLICY } from '../tokens';
 import type { SpendingWarmPolicy } from './warm-policy';
 
-const REFRESH = { refresh: true } as const;
+/** What a scheduled warm asks of every lens: the source, inside the cache window. */
+const RENEW: ReadOptions = { refresh: true };
 const HOUR_MS = 60 * 60 * 1000;
 
 export type WarmLensOutcome =
@@ -93,8 +95,9 @@ const uniqueByKey = (alerts: readonly GovconAlert[]): GovconAlert[] => {
 };
 
 /**
- * The daily warm: the default profile's scope through every lens, forced, so
- * the client's first look is a snapshot; for each top agency the breakdown
+ * The daily warm: the default profile's scope through every lens — renewed
+ * on schedule, read from the window at a start — so the client's first look
+ * is a snapshot; for each top agency the breakdown
  * names, the horizon narrowed to it — the scope a directory pick opens, and
  * the one whose walk reaches today where a wide scope's caps first — and its
  * outlook; then the alert rules over every horizon and the pulse, each alert
@@ -116,7 +119,14 @@ export class SpendingWarmer implements OnModuleDestroy {
     @Inject(CLOCK) private readonly now: () => Date,
   ) {}
 
-  /** On the declared cadence, the first warm at once; starting twice starts once. */
+  /**
+   * On the declared cadence; starting twice starts once. The run at start
+   * brings every lens up to date within the cache window — it reads what the
+   * window still holds, so a restart inside the day spends no request — and
+   * every scheduled run after it renews. Measured 2026-10-13: four renewing
+   * warms in fourteen minutes, one per restart, and the source's firewall
+   * refused this address.
+   */
   start(): void {
     if (this.periodic !== null) return;
     this.logger.log(
@@ -124,9 +134,14 @@ export class SpendingWarmer implements OnModuleDestroy {
         ? 'spending warm off'
         : `spending warm every ${this.policy.everyMs / HOUR_MS} h`,
     );
+    let scheduled = false;
     this.periodic = startPeriodic(
       { everyMs: this.policy.everyMs, atStart: true },
-      () => this.warm(),
+      () => {
+        const options: ReadOptions = { refresh: scheduled };
+        scheduled = true;
+        return this.warm(options);
+      },
       (error) => this.logger.error(`warm failed: ${messageOf(error)}`),
     );
   }
@@ -141,8 +156,8 @@ export class SpendingWarmer implements OnModuleDestroy {
     return this.stop();
   }
 
-  /** One warm. A lens the source or the schema refuses is one logged line; the rest still run. */
-  async warm(): Promise<WarmReport> {
+  /** One warm — renewing unless told to read what the window holds. A lens the source or the schema refuses is one logged line; the rest still run. */
+  async warm(options: ReadOptions = RENEW): Promise<WarmReport> {
     const profile = await this.defaultProfile();
     if (profile === null) {
       this.logger.warn('warm skipped: no default profile');
@@ -154,7 +169,7 @@ export class SpendingWarmer implements OnModuleDestroy {
     const wire = scopeWireOf(profile);
 
     const pulse = await read('pulse', () =>
-      this.spending.pulse(pulseQuerySchema.parse(wire), REFRESH),
+      this.spending.pulse(pulseQuerySchema.parse(wire), options),
     );
     // A rolling year, as the page opens: the fiscal year to date is thirteen days long on October 13.
     const breakdown = await read('breakdown', () =>
@@ -164,13 +179,13 @@ export class SpendingWarmer implements OnModuleDestroy {
           category: 'awarding_agency',
           ...windowOf('last-12-months', this.now().getTime()),
         }),
-        REFRESH,
+        options,
       ),
     );
     const horizon = await read('horizon', () =>
-      this.spending.horizon(horizonQuerySchema.parse(wire), REFRESH),
+      this.spending.horizon(horizonQuerySchema.parse(wire), options),
     );
-    const agencies = await read('agencies', () => this.spending.agencies(REFRESH));
+    const agencies = await read('agencies', () => this.spending.agencies(options));
     const top =
       breakdown && agencies
         ? topAgencyCodes(breakdown.rows, agencies.entries, WARM_TOP_AGENCIES)
@@ -178,11 +193,11 @@ export class SpendingWarmer implements OnModuleDestroy {
     const horizons: HorizonBody[] = horizon ? [horizon] : [];
     for (const code of top) {
       const narrowed = await read(`horizon ${code}`, () =>
-        this.spending.horizon(horizonQuerySchema.parse({ ...wire, agency: code }), REFRESH),
+        this.spending.horizon(horizonQuerySchema.parse({ ...wire, agency: code }), options),
       );
       if (narrowed) horizons.push(narrowed);
       await read(`agency ${code}`, () =>
-        this.spending.agency(code, { awardFamily: 'both' }, REFRESH),
+        this.spending.agency(code, { awardFamily: 'both' }, options),
       );
     }
 
