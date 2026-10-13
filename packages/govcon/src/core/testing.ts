@@ -669,11 +669,4 @@ export class InMemoryEntityRepository implements EntityRepository {
   async find(uei: string): Promise<Entity | null> {
     return this.rows.get(uei) ?? null;
   }
-
-  async findMany(ueis: readonly string[]): Promise<Entity[]> {
-    return ueis.flatMap((uei) => {
-      const row = this.rows.get(uei);
-      return row ? [row] : [];
-    });
-  }
 }

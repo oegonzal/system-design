@@ -57,12 +57,4 @@ export class MikroOrmEntityRepository implements EntityRepository {
     const row = await this.em.fork().findOne(GovconEntity, { uei });
     return row ? fromRow(row) : null;
   }
-
-  async findMany(ueis: readonly string[]): Promise<Entity[]> {
-    if (ueis.length === 0) return [];
-    const rows = await this.em
-      .fork()
-      .find(GovconEntity, { uei: { $in: [...ueis] } }, { orderBy: { uei: 'asc' } });
-    return rows.map(fromRow);
-  }
 }

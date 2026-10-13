@@ -18,7 +18,7 @@ describe('the entity repository in Postgres', () => {
     await orm.close(true);
   });
 
-  it('[GOV-18] upserts by UEI, round-trips every column, and finds one or many', async () => {
+  it('[GOV-18] upserts by UEI, round-trips every column, and finds one by its UEI', async () => {
     const repository = new MikroOrmEntityRepository(orm.em);
     const first = entityOf();
     expect(
@@ -42,10 +42,7 @@ describe('the entity repository in Postgres', () => {
       registrationStatus: 'Expired',
     });
     expect(await repository.find('NOPE')).toBeNull();
-    expect(
-      (await repository.findMany(['ZZZ000000001', 'ABC123DEF456', 'NOPE'])).map((e) => e.uei),
-    ).toEqual(['ABC123DEF456', 'ZZZ000000001']);
-    expect(await repository.findMany([])).toEqual([]);
+    expect((await repository.find('ZZZ000000001'))?.excluded).toBe(true);
     expect(await repository.upsertMany([])).toEqual({ inserted: 0, updated: 0 });
   });
 });

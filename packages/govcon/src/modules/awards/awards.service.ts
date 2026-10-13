@@ -57,10 +57,11 @@ const sliceOf = (source: AwardSource, code: string): AwardsFetchSlice => ({
 });
 
 /**
- * Awards as intel. A fetch spends by source and code — SAM.gov's Contract
- * Awards one gated page per code (the shared bucket), USAspending one gated
- * page per fetch (free) — up to `MAX_AWARD_PAGES` each, storing what
- * normalized; a listing and a summary read the store and spend nothing.
+ * Awards as intel. A fetch spends by source and page — every code asked for
+ * travels in one request, each page of it one gated call: SAM.gov's Contract
+ * Awards against the shared bucket, USAspending free — up to
+ * `MAX_AWARD_PAGES` a source, storing what normalized; a listing and a
+ * summary read the store and spend nothing.
  */
 @Injectable()
 export class AwardsService {

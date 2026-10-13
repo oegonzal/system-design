@@ -22,5 +22,4 @@ export interface EntityRegistry {
 export interface EntityRepository {
   upsertMany(entities: readonly Entity[]): Promise<UpsertSummary>;
   find(uei: string): Promise<Entity | null>;
-  findMany(ueis: readonly string[]): Promise<Entity[]>;
 }
