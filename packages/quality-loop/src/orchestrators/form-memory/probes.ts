@@ -14,10 +14,12 @@ import {
   evidenceAlias,
   EVIDENCE_TEXT_MAX_LENGTH,
   fieldQuestionOf,
+  fieldTypeOf,
   MAX_EVIDENCE,
   type DocumentMemoryKind,
   type EvidenceItem,
   type FieldSpec,
+  type FieldType,
   excerpt,
 } from '@sysdesign/contracts';
 
@@ -26,31 +28,59 @@ import { fuse } from '../memory/recall/fusion';
 
 /** How many distinct probes one page may search under; a page lists at most as many fields. */
 export const MAX_FIELD_PROBES = 40;
-/** How many hits one probe contributes per named vector before its field's fusion. */
-export const HITS_PER_PROBE = 3;
+/**
+ * How many hits one probe contributes per named vector before its field's
+ * fusion, by what kind of control asks. A control that takes one value — a
+ * radio, a select, a short text — is settled by the one fact that answers it,
+ * and more hits only crowd the page's cap; a free-text field draws on a story
+ * and the several facts a paragraph is composed from. A table over every
+ * declared field type, so a new kind is classified or the build refuses.
+ */
+export const HITS_PER_FIELD_TYPE: Readonly<Record<FieldType, number>> = {
+  text: 3,
+  textarea: 6,
+  number: 3,
+  date: 3,
+  select: 3,
+  radio: 3,
+  checkbox: 3,
+  file: 3,
+  unknown: 3,
+};
+
+/** The hits a field's probe takes per named vector. */
+export const hitsFor = (field: Pick<FieldSpec, 'role' | 'inputType'>): number =>
+  HITS_PER_FIELD_TYPE[fieldTypeOf(field)];
 
 export interface FieldProbeSet {
   /** Distinct probe texts, in field order. */
   texts: string[];
   /** For each field, the index into `texts` it is searched under; null for a field with nothing to ask, or past the cap. */
   byField: (number | null)[];
+  /** For each probe, the hits it takes per named vector: the most any field asking it takes. */
+  limits: number[];
 }
 
 /** One probe per distinct question the page asks, each field pointing at its own. */
 export function fieldProbes(fields: readonly FieldSpec[]): FieldProbeSet {
   const texts: string[] = [];
+  const limits: number[] = [];
   const positions = new Map<string, number>();
   const byField = fields.map((field) => {
     const text = fieldQuestionOf(field);
     if (text === null) return null;
     const known = positions.get(text);
-    if (known !== undefined) return known;
+    if (known !== undefined) {
+      limits[known] = Math.max(limits[known] ?? 0, hitsFor(field));
+      return known;
+    }
     if (texts.length === MAX_FIELD_PROBES) return null;
     positions.set(text, texts.length);
     texts.push(text);
+    limits.push(hitsFor(field));
     return texts.length - 1;
   });
-  return { texts, byField };
+  return { texts, byField, limits };
 }
 
 /**
@@ -62,17 +92,22 @@ export function fieldProbes(fields: readonly FieldSpec[]): FieldProbeSet {
  */
 export const FORM_EVIDENCE_FILTER: ProbeFilter = { kinds: DOCUMENT_MEMORY_KINDS };
 
-/** Every named vector asked of every probe, as one batch, each with the same small budget and filter. */
+/** Every named vector asked of every probe, as one batch, each under its probe's budget and the one filter. */
 export const searchProbes = (
   vectors: readonly (readonly number[])[],
-  limit = HITS_PER_PROBE,
+  limits: readonly number[],
 ): MemoryProbe[] =>
-  vectors.flatMap((vector) =>
-    VECTOR_NAMES.map((using) => ({ vector, using, limit, filter: FORM_EVIDENCE_FILTER })),
-  );
+  vectors.flatMap((vector, index) => {
+    const limit = limits[index];
+    if (limit === undefined) throw new Error(`probe ${index} has no budget`);
+    return VECTOR_NAMES.map((using) => ({ vector, using, limit, filter: FORM_EVIDENCE_FILTER }));
+  });
 
 /** The ranked lists that answer probe `index`: one per named vector, as `searchProbes` asked them. */
-const listsOf = (ranked: readonly (readonly MemoryHit[])[], index: number) =>
+export const probeLists = (
+  ranked: readonly (readonly MemoryHit[])[],
+  index: number,
+): readonly (readonly MemoryHit[])[] =>
   ranked.slice(index * VECTOR_NAMES.length, (index + 1) * VECTOR_NAMES.length);
 
 /** How many distinct lessons the whole search surfaced, before any fusion or cap. */
@@ -92,11 +127,12 @@ export function fieldEvidence(
   limit = MAX_EVIDENCE,
 ): MemoryHit[] {
   const perField = probes.byField.map((probe) =>
-    probe === null ? [] : fuse(listsOf(ranked, probe), HITS_PER_PROBE),
+    probe === null ? [] : fuse(probeLists(ranked, probe), probes.limits[probe] ?? 0),
   );
+  const deepest = Math.max(0, ...probes.limits);
   const seen = new Set<string>();
   const chosen: MemoryHit[] = [];
-  for (let rank = 0; rank < HITS_PER_PROBE; rank++) {
+  for (let rank = 0; rank < deepest; rank++) {
     for (const hits of perField) {
       const hit = hits[rank];
       if (hit === undefined || seen.has(hit.contentHash)) continue;

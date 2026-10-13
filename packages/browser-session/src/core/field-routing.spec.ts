@@ -10,12 +10,7 @@ import {
   finding,
 } from '@sysdesign/contracts';
 
-import {
-  faultedReadouts,
-  fieldTypeOf,
-  routeFieldsInSession,
-  withOperatorCache,
-} from './field-routing';
+import { faultedReadouts, routeFieldsInSession, withOperatorCache } from './field-routing';
 import { BrainFaulted } from './ports';
 import { decidedAnswers, withheldBy } from './testing';
 
@@ -177,16 +172,5 @@ describe('field routing in a session', () => {
     // With no run to read, an unanswered choice is still the operator's, as the route table has it.
     const faulted = faultedReadouts(questions, new BrainFaulted('unreachable', 'nobody home'));
     expect(faulted.map((r) => r.route)).toEqual(['ask-operator', 'ask-operator', 'ask-operator']);
-  });
-
-  it("names a field's control kind from its role and input type", () => {
-    expect(fieldTypeOf({ role: 'textbox', inputType: 'number' })).toBe('number');
-    expect(fieldTypeOf({ role: 'textbox', inputType: 'text' })).toBe('text');
-    expect(fieldTypeOf({ role: 'textbox', inputType: 'textarea' })).toBe('textarea');
-    expect(fieldTypeOf({ role: 'textbox', inputType: null })).toBe('text');
-    expect(fieldTypeOf({ role: 'combobox', inputType: 'select' })).toBe('select');
-    expect(fieldTypeOf({ role: 'radiogroup', inputType: null })).toBe('radio');
-    expect(fieldTypeOf({ role: 'checkbox', inputType: 'checkbox' })).toBe('checkbox');
-    expect(fieldTypeOf({ role: 'button', inputType: null })).toBe('unknown');
   });
 });

@@ -35,12 +35,16 @@ Read: the orchestration's `digest` step reports `{kind: 'notes', …}` and
 `points_count` rose by exactly `kept`; and
 
 ```bash
-curl -s -X POST localhost:3003/memory/retrieval-report -H 'content-type: application/json' \
-  -d '{"goal":"How many years of experience do you have with TypeScript?"}' | jq '.data.candidates[0]'
+curl -s -X POST localhost:3003/memory/form-retrieval-report -H 'content-type: application/json' \
+  -d '{"fields":[{"name":"How many years of experience do you have with TypeScript?"}]}' \
+  | jq '.data.fields[0].fused[0]'
 ```
 
-names the TypeScript fact first, with `runId` the digest run's id and
-`pipeline` `document-digest`. Then `ingest Resume_a2.pdf --kind resume`.
+names the TypeScript fact first for that field, with `runId` the digest run's
+id and `pipeline` `document-digest` — the form path's own recall (the field's
+words as the probe, both named vectors, the hits its field type takes), not
+the curated recall's `retrieval-report`, which derives probes with a model and
+searches every kind. Then `ingest Resume_a2.pdf --kind resume`.
 
 ## 2. A benign session
 

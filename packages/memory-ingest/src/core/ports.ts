@@ -1,8 +1,10 @@
 import type {
   DocumentChunk,
   DocumentKind,
+  ExperienceProfileDto,
   OrchestrationRunDto,
   OrchestrationStepStatus,
+  StarStoryDto,
 } from '@sysdesign/contracts';
 
 /**
@@ -15,6 +17,17 @@ import type {
 /** A document's text. A reader that cannot read the path throws, naming why. */
 export interface DocumentReader {
   read(path: string): Promise<string>;
+}
+
+/** A document written whole at a path, the folders above it made as needed. */
+export interface DocumentWriter {
+  write(path: string, text: string): Promise<void>;
+}
+
+/** The studio's record of the subject, read whole: every experience profile and every STAR story. */
+export interface StudioSource {
+  experiences(): Promise<readonly ExperienceProfileDto[]>;
+  stories(): Promise<readonly StarStoryDto[]>;
 }
 
 /** One chunk as it will be posted: the contract shape, the goal it renders to, and the hash that names it. */

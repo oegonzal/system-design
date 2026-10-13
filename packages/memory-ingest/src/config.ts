@@ -23,6 +23,8 @@ export const DEFAULT_KIND: IngestKind = 'notes';
 /** How large a rendered chunk goal may grow; well under the engine's budget so a digest reads one screen of facts. */
 export const DEFAULT_CHUNK_BYTES = 6000;
 export const DEFAULT_LOOP_URL = 'http://localhost:3003';
+/** The studio API, whose experience profiles and STAR stories `export-studio` writes as documents. */
+export const DEFAULT_STUDIO_URL = 'http://localhost:3000/api';
 /** Where the manifest lives, under the working directory. */
 export const DEFAULT_HOME = 'static/memory-ingest';
 
@@ -45,12 +47,15 @@ export const INGEST_FLAGS = {
   },
   json: { type: 'boolean', describe: 'print the report as JSON' },
   refresh: { type: 'boolean', describe: 'read every recorded orchestration back from the loop' },
+  out: { type: 'string', describe: 'the folder the exported documents are written under' },
 } as const satisfies Record<string, { type: 'string' | 'boolean'; describe: string }>;
 export type IngestFlag = keyof typeof INGEST_FLAGS;
 
 export const INGEST_ENV = {
   /** The quality loop's base URL. */
   loopUrl: 'QUALITY_LOOP_URL',
+  /** The studio API's base URL, read by `export-studio`. */
+  studioUrl: 'STUDIO_API_URL',
   /** The directory the manifest is written under; relative to the working directory. */
   home: 'MEMORY_INGEST_HOME',
   /** The default subject, so a user need not repeat their name on every run. */
@@ -59,6 +64,7 @@ export const INGEST_ENV = {
 
 export interface IngestConfig {
   loopUrl: string;
+  studioUrl: string;
   home: string;
   /** Undefined when neither the environment nor the flag names one; `ingest` then refuses. */
   subject: string | undefined;
@@ -74,19 +80,17 @@ const set = (env: NodeJS.ProcessEnv, name: string): string | undefined => {
 };
 
 /** An `http(s)` URL with no path to speak of, or a refusal naming the variable. */
-function loopUrl(env: NodeJS.ProcessEnv): string {
-  const raw = set(env, INGEST_ENV.loopUrl);
-  if (raw === undefined) return DEFAULT_LOOP_URL;
+function serviceUrl(env: NodeJS.ProcessEnv, name: string, fallback: string): string {
+  const raw = set(env, name);
+  if (raw === undefined) return fallback;
   let parsed: URL;
   try {
     parsed = new URL(raw);
   } catch {
-    throw new IngestConfigError(`${INGEST_ENV.loopUrl} must be a URL, got ${JSON.stringify(raw)}`);
+    throw new IngestConfigError(`${name} must be a URL, got ${JSON.stringify(raw)}`);
   }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    throw new IngestConfigError(
-      `${INGEST_ENV.loopUrl} must be an http(s) URL, got ${JSON.stringify(raw)}`,
-    );
+    throw new IngestConfigError(`${name} must be an http(s) URL, got ${JSON.stringify(raw)}`);
   }
   return raw.replace(/\/+$/, '');
 }
@@ -94,7 +98,8 @@ function loopUrl(env: NodeJS.ProcessEnv): string {
 /** The one read of the environment. Anything it cannot use is refused here, by name. */
 export function loadIngestConfig(env: NodeJS.ProcessEnv): IngestConfig {
   return {
-    loopUrl: loopUrl(env),
+    loopUrl: serviceUrl(env, INGEST_ENV.loopUrl, DEFAULT_LOOP_URL),
+    studioUrl: serviceUrl(env, INGEST_ENV.studioUrl, DEFAULT_STUDIO_URL),
     home: set(env, INGEST_ENV.home) ?? DEFAULT_HOME,
     subject: subjectName(set(env, INGEST_ENV.subject), INGEST_ENV.subject),
   };

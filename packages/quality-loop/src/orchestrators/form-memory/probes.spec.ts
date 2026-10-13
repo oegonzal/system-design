@@ -1,6 +1,7 @@
 import {
   DOCUMENT_MEMORY_KINDS,
   EVIDENCE_TEXT_MAX_LENGTH,
+  FIELD_TYPES,
   fieldQuestionOf,
   MAX_EVIDENCE,
   type FieldSpec,
@@ -16,16 +17,22 @@ import {
   evidenceItems,
   fieldEvidence,
   fieldProbes,
-  HITS_PER_PROBE,
+  HITS_PER_FIELD_TYPE,
+  hitsFor,
   MAX_FIELD_PROBES,
   searchProbes,
 } from './probes';
 
-const field = (ref: string, name: string, context: string | null = null): FieldSpec => ({
+const field = (
+  ref: string,
+  name: string,
+  context: string | null = null,
+  inputType: string | null = null,
+): FieldSpec => ({
   ref,
   role: 'textbox',
   name,
-  inputType: null,
+  inputType,
   options: null,
   optionsOmitted: 0,
   value: null,
@@ -56,7 +63,11 @@ describe('the form recall’s probes', () => {
       field('e3', 'City'),
       field('e4', '   '),
     ]);
-    expect(probes).toEqual({ texts: ['City', 'Country'], byField: [0, 1, 0, null] });
+    expect(probes).toEqual({
+      texts: ['City', 'Country'],
+      byField: [0, 1, 0, null],
+      limits: [3, 3],
+    });
     expect(fieldProbes(sampleFields()).texts).toHaveLength(5);
     const many = fieldProbes(
       Array.from({ length: MAX_FIELD_PROBES + 2 }, (_, index) => field(`e${index}`, `q${index}`)),
@@ -65,17 +76,39 @@ describe('the form recall’s probes', () => {
     expect(many.byField.slice(-2)).toEqual([null, null]);
   });
 
-  it('[QL-38] every probe is asked of every named vector in one batch, each with the same small budget, and only of what documents taught about the subject', () => {
-    const probes = searchProbes([
-      [1, 0],
-      [0, 1],
+  it('[QL-70] a probe takes as many hits as the kind of control asking it: a free-text field draws deeper than a control that takes one value, and a question two controls share takes the deeper budget', () => {
+    expect(hitsFor(field('e1', 'Cover letter', null, 'textarea'))).toBe(6);
+    expect(hitsFor(field('e2', 'City'))).toBe(3);
+    expect(hitsFor({ role: 'radiogroup', inputType: null })).toBe(3);
+    // Every declared field type is classified — a new kind is a build error, never a silent default.
+    expect(Object.keys(HITS_PER_FIELD_TYPE).sort()).toEqual([...FIELD_TYPES].sort());
+    const probes = fieldProbes([
+      field('e1', 'Tell us about yourself', null, 'textarea'),
+      field('e2', 'City'),
+      field('e3', 'City', null, 'textarea'),
     ]);
+    expect(probes).toEqual({
+      texts: ['Tell us about yourself', 'City'],
+      byField: [0, 1, 1],
+      limits: [6, 6],
+    });
+  });
+
+  it('[QL-38] every probe is asked of every named vector in one batch, each under its own budget, and only of what documents taught about the subject', () => {
+    const probes = searchProbes(
+      [
+        [1, 0],
+        [0, 1],
+      ],
+      [3, 6],
+    );
     expect(probes.map((probe) => [probe.using, probe.limit])).toEqual([
-      ['condition', HITS_PER_PROBE],
-      ['lesson', HITS_PER_PROBE],
-      ['condition', HITS_PER_PROBE],
-      ['lesson', HITS_PER_PROBE],
+      ['condition', 3],
+      ['lesson', 3],
+      ['condition', 6],
+      ['lesson', 6],
     ]);
+    expect(() => searchProbes([[1, 0]], [])).toThrow('probe 0 has no budget');
     // Never a design lesson: a probe for this person's career reads the kinds a document teaches.
     expect(probes.every((probe) => probe.filter?.kinds === DOCUMENT_MEMORY_KINDS)).toBe(true);
     expect(DOCUMENT_MEMORY_KINDS).not.toContain('lesson');
@@ -97,7 +130,24 @@ describe('the form recall’s probes', () => {
     expect(fieldEvidence(probes, ranked, 2).map((hit) => hit.text)).toEqual([b.text, c.text]);
     expect(MAX_EVIDENCE).toBe(24);
     // A field with no probe contributes nothing; an empty search is empty evidence.
-    expect(fieldEvidence({ texts: [], byField: [null] }, [])).toEqual([]);
+    expect(fieldEvidence({ texts: [], byField: [null], limits: [] }, [])).toEqual([]);
+  });
+
+  it('[QL-70] a free-text field is dealt as deep as its budget allows once every field has its first hits', () => {
+    const probes = fieldProbes([
+      field('e1', 'Describe your experience', null, 'textarea'),
+      field('e2', 'City'),
+    ]);
+    const story = (rank: number) => hitOf(`story part ${rank}`, 'digest-9', `memory.${rank}`);
+    const stories = [1, 2, 3, 4, 5, 6].map(story);
+    // The textarea's lists run six deep under both vectors; the city's one hit stands alone.
+    const ranked = [stories, stories, [c], [c]];
+    const chosen = fieldEvidence(probes, ranked);
+    expect(chosen.map((hit) => hit.text)).toEqual([
+      'story part 1',
+      c.text,
+      ...[2, 3, 4, 5, 6].map((rank) => `story part ${rank}`),
+    ]);
   });
 
   it('[QL-38] a long page never starves its last fields: eleven fields of three distinct hits each under the cap of 24 give every field its best and at least two', () => {

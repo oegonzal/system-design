@@ -4,6 +4,7 @@ import {
   DEFAULT_CHUNK_BYTES,
   DEFAULT_HOME,
   DEFAULT_LOOP_URL,
+  DEFAULT_STUDIO_URL,
   INGEST_ENV,
   INGEST_FLAGS,
   IngestConfigError,
@@ -16,6 +17,7 @@ describe('loadIngestConfig', () => {
   it('answers the defaults from an empty environment', () => {
     expect(loadIngestConfig({})).toEqual({
       loopUrl: DEFAULT_LOOP_URL,
+      studioUrl: DEFAULT_STUDIO_URL,
       home: DEFAULT_HOME,
       subject: undefined,
     });
@@ -25,11 +27,13 @@ describe('loadIngestConfig', () => {
     expect(
       loadIngestConfig({
         [INGEST_ENV.loopUrl]: 'https://loop.example.test/ ',
+        [INGEST_ENV.studioUrl]: 'https://studio.example.test// ',
         [INGEST_ENV.home]: ' /tmp/ingest ',
         [INGEST_ENV.subject]: ' Ada Lovelace ',
       }),
     ).toEqual({
       loopUrl: 'https://loop.example.test',
+      studioUrl: 'https://studio.example.test',
       home: '/tmp/ingest',
       subject: 'Ada Lovelace',
     });
@@ -42,6 +46,15 @@ describe('loadIngestConfig', () => {
   it('refuses a subject past the contract bound, naming the variable', () => {
     expect(() => loadIngestConfig({ [INGEST_ENV.subject]: 'x'.repeat(121) })).toThrow(
       `${INGEST_ENV.subject} must name the subject in 1 to 120 characters, got 121`,
+    );
+  });
+
+  it('refuses a studio URL it cannot use, naming the variable', () => {
+    expect(() => loadIngestConfig({ [INGEST_ENV.studioUrl]: 'studio' })).toThrow(
+      new RegExp(`^${INGEST_ENV.studioUrl} must be a URL`),
+    );
+    expect(() => loadIngestConfig({ [INGEST_ENV.studioUrl]: 'file:///studio' })).toThrow(
+      new RegExp(`^${INGEST_ENV.studioUrl} must be an http\\(s\\) URL`),
     );
   });
 

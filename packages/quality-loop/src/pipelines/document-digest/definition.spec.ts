@@ -40,6 +40,17 @@ describe('the document-digest pipeline', () => {
     }
   });
 
+  it('[QL-69] the tenure a dated role allows is a rule the deriver writes, the producer computes, the grounding critic allows from stated dates alone, the coverage critic misses and the rules evaluator grades', () => {
+    const tenure = /tenure/i;
+    expect(DOCUMENT_RULES.some((rule) => /whole years and months/.test(rule))).toBe(true);
+    expect(DOCUMENT_DIGEST.task.criterionKinds['rule']).toMatch(tenure);
+    expect(DOCUMENT_DIGEST.deriveCriteria.persona).toMatch(tenure);
+    expect(DOCUMENT_DIGEST.producer.persona).toMatch(tenure);
+    expect(DOCUMENT_DIGEST.critics[0].persona).toMatch(/span .* dates the cited sections state/);
+    expect(DOCUMENT_DIGEST.critics[1].persona).toMatch(tenure);
+    expect(DOCUMENT_DIGEST.evaluators[1].persona).toMatch(tenure);
+  });
+
   it('[QL-40] the qualifier a section puts on a claim is graded, not merely stated: the rule, the kind it is graded under, the deriver that writes its criterion and the lenses that judge it all name it', () => {
     // A rule the deriver does not recognise yields no criterion, and a rule with
     // no criterion is decoration — nothing grades it, and a learning project

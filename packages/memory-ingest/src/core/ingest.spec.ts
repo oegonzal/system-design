@@ -16,9 +16,10 @@ import {
 const bullet = (seed: string): string =>
   `- ${Array.from({ length: 160 }, (_, i) => `${seed}${i}`).join(' ')}`;
 /**
- * Three bullets of ~1330 chars under a 3200-byte budget: the goal's fixed
- * text weighs ~1600 bytes (the kind line included), so one bullet fits with
- * room and two never do — three chunks, one part each.
+ * Three bullets of ~1330 chars under a 4000-byte budget: the goal's fixed
+ * text weighs ~2150 bytes (the kind line included; 2026-10-13, after the
+ * tenure and scope-test rules), so one bullet fits with room and two never do
+ * — three chunks, one part each.
  */
 const NOTES = ['alpha', 'bravo', 'delta'].map(bullet).join('\n');
 const LOOP_URL = 'http://loop.test';
@@ -26,7 +27,7 @@ const LOOP_URL = 'http://loop.test';
 const options = (overrides: Partial<IngestOptions> = {}): IngestOptions => ({
   kind: 'notes',
   subject: 'Ada Lovelace',
-  chunkBytes: 3200,
+  chunkBytes: 4000,
   partsPerChunk: 8,
   date: null,
   limit: null,

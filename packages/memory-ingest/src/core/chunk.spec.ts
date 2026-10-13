@@ -126,7 +126,8 @@ describe('chunkDocument', () => {
     );
 
     const heavy = Array.from({ length: 9 }, (_, i) => `- ${prose(160, `p${i}_`)}`).join('\n');
-    const budget = 3000;
+    // One ~1100-char bullet beside the goal's ~2150 bytes of fixed text fits; two do not.
+    const budget = 4000;
     const packed = chunkDocument(input({ text: heavy, chunkBytes: budget }));
     expect(packed.chunks.length).toBeGreaterThan(1);
     for (const planned of packed.chunks) {

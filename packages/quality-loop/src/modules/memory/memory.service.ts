@@ -13,12 +13,13 @@ import {
   type OnModuleInit,
 } from '@nestjs/common';
 import type {
+  FormRetrievalField,
+  FormRetrievalReportDto,
   OrchestrationStepDto,
   QualityRunDto,
   QualityRunSummaryDto,
   RecallEffectivenessDto,
   RetractedMemoryRunDto,
-  RetrievalHitDto,
   RetrievalProbeDto,
   RetrievalReportDto,
   StandingGapsDto,
@@ -41,6 +42,7 @@ import type { OrchestrationRunRepository } from '../orchestration/ports';
 import { ORCHESTRATION_RUN_REPOSITORY } from '../orchestration/tokens';
 import { RunsService } from '../runs/runs.service';
 import { recallEffectiveness, type RecallingRun } from './reports/effectiveness';
+import { asHit, formRetrievalReport } from './reports/form-report';
 import { goalHashOf, standingGaps, type AttributedRecall } from './reports/gaps';
 import { MEMORY_PORTS } from './tokens';
 import { DEFAULT_CHUNK_KIND } from '../../orchestrators/memory/store/chunks';
@@ -52,13 +54,6 @@ const REPORT_PAGE = 100;
 /** The first text searched is the prompt itself; the rest are the derived probes, aliased in order. */
 const probeLabel = (position: number): string =>
   position === 0 ? 'prompt' : probeAlias(position - 1);
-
-const asHit = (hit: MemoryHit): RetrievalHitDto => ({
-  runId: hit.source.runId,
-  ref: hit.source.ref,
-  score: hit.score,
-  text: hit.text,
-});
 
 /** One searched text with its own rankings: every vector it was searched under, and what each found. */
 const probeReport = (
@@ -189,6 +184,20 @@ export class MemoryService implements OnModuleInit {
         matched: hit.probes.map(probeLabel),
       })),
     };
+  }
+
+  /**
+   * What a form page's recall would retrieve for its fields, without running a
+   * pipeline: the fields' own questions as probes, each named vector's ranking,
+   * each field's fused list and the dealt evidence — the form path's own
+   * measurement, as `retrievalReport` is the curated path's.
+   */
+  async formRetrievalReport(
+    fields: readonly FormRetrievalField[],
+  ): Promise<FormRetrievalReportDto> {
+    const report = await formRetrievalReport(this.ports, fields);
+    if (report === null) throw new BadRequestException('embeddings are unavailable');
+    return report;
   }
 
   /**

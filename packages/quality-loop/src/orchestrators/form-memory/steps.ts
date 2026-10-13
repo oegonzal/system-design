@@ -128,7 +128,7 @@ export async function recall(ctx: Ctx): Promise<StepResult<{ goal: string }>> {
   if (embedded === null) return { status: 'failed', reason: 'embedding-failed', counts: counted };
   let ranked: MemoryHit[][];
   try {
-    ranked = await ctx.ports.store.searchMany(searchProbes(embedded.vectors));
+    ranked = await ctx.ports.store.searchMany(searchProbes(embedded.vectors, probes.limits));
   } catch (error) {
     return {
       status: 'failed',

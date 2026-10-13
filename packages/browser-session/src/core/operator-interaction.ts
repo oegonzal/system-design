@@ -3,6 +3,7 @@ import { randomUUID } from 'node:crypto';
 import {
   closedOptionsOf,
   excerpt,
+  fieldTypeOf,
   PROMPT_LIMITS,
   quoted,
   SUGGESTION_BASES,
@@ -12,7 +13,6 @@ import {
   type SuggestionBasis,
 } from '@sysdesign/contracts';
 
-import { fieldTypeOf } from './field-routing';
 import type { OperatorQuestion } from './ports';
 
 /**

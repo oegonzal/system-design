@@ -1,6 +1,7 @@
 /**
  * `main.js ingest <path…> [--kind resume|notes] [--subject <name>] [--chunk-bytes <n>] [--date <day>] [--limit <n>] [--dry-run] [--force] [--json]`
  * `main.js status [--refresh] [--json]`
+ * `main.js export-studio --out <dir> [--json]`
  *
  * `parseOptions` reads argv; `execute` runs the options over the ports and
  * writes through `io`; `cli` wires the real adapters around them — no
@@ -14,8 +15,10 @@ import { parseArgs } from 'node:util';
 import { HttpLoopClient } from '@sysdesign/loop-client';
 
 import { JsonFileLedger } from './adapters/fs-ledger/json-file-ledger';
+import { fsDocumentWriter } from './adapters/fs-writer/fs-document-writer';
 import { LoopIngestSink } from './adapters/loop-http/loop-ingest-sink';
 import { READERS, tableReader } from './adapters/readers/reader-table';
+import { HttpStudioSource } from './adapters/studio-http/http-studio-source';
 import {
   chunkBytes,
   documentDate,
@@ -24,6 +27,7 @@ import {
   DEFAULT_CHUNK_BYTES,
   DEFAULT_HOME,
   DEFAULT_LOOP_URL,
+  DEFAULT_STUDIO_URL,
   INGEST_ENV,
   INGEST_FLAGS,
   INGEST_KINDS,
@@ -34,9 +38,11 @@ import {
   type IngestFlag,
   type IngestKind,
 } from './config';
+import { exportStudio } from './core/export-studio';
 import { planIngest, runIngest, type IngestDeps } from './core/ingest';
+import type { DocumentWriter, StudioSource } from './core/ports';
 import { refreshStatus } from './core/status';
-import { renderIngest, renderStatus } from './render';
+import { renderExport, renderIngest, renderStatus } from './render';
 
 export const USAGE = `usage: memory-ingest <command> [options]
   ingest  <path…> [--kind ${INGEST_KINDS.join('|')}] [--subject <name>] [--chunk-bytes <n>] [--parts-per-chunk <n>] [--date <day>] [--limit <n>] [--dry-run] [--force] [--json]
@@ -46,8 +52,11 @@ export const USAGE = `usage: memory-ingest <command> [options]
           a chunk whose facts the manifest holds as stored is skipped unless --force
   status  [--refresh] [--json]
           the manifest; --refresh re-reads every recorded orchestration from the loop
+  export-studio --out <dir> [--json]
+          writes the studio's experience profiles and STAR stories as markdown documents under <dir>,
+          one titled section per record, for ingest to read like any notes file
 exit: 0 ok · 1 a chunk failed, was refused or stored nothing · 2 usage, or an input the program cannot use
-environment: ${INGEST_ENV.loopUrl} (default ${DEFAULT_LOOP_URL}), ${INGEST_ENV.home} (default ${DEFAULT_HOME}), ${INGEST_ENV.subject}`;
+environment: ${INGEST_ENV.loopUrl} (default ${DEFAULT_LOOP_URL}), ${INGEST_ENV.studioUrl} (default ${DEFAULT_STUDIO_URL}), ${INGEST_ENV.home} (default ${DEFAULT_HOME}), ${INGEST_ENV.subject}`;
 
 /** Commands, the flags each takes and whether it takes paths — as data. */
 export const COMMANDS = {
@@ -66,6 +75,7 @@ export const COMMANDS = {
     paths: true,
   },
   status: { flags: ['refresh', 'json'], paths: false },
+  'export-studio': { flags: ['out', 'json'], paths: false },
 } as const satisfies Record<string, { flags: readonly IngestFlag[]; paths: boolean }>;
 export type Command = keyof typeof COMMANDS;
 
@@ -84,7 +94,8 @@ export type Options =
       force: boolean;
       json: boolean;
     }
-  | { command: 'status'; refresh: boolean; json: boolean };
+  | { command: 'status'; refresh: boolean; json: boolean }
+  | { command: 'export-studio'; out: string; json: boolean };
 
 /** What `execute` writes to and how it is answered. */
 export interface Io {
@@ -95,6 +106,8 @@ export interface Io {
 export interface CliDeps extends IngestDeps {
   config: IngestConfig;
   cwd: string;
+  studio: StudioSource;
+  writer: DocumentWriter;
 }
 
 const isCommand = (value: string | undefined): value is Command =>
@@ -132,6 +145,11 @@ export function parseOptions(argv: readonly string[]): Options | Error {
         json: (values['json'] as boolean | undefined) ?? false,
       };
     }
+    if (command === 'export-studio') {
+      const out = values['out'] as string | undefined;
+      if (out === undefined || out.trim() === '') return new Error('--out is required');
+      return { command, out, json: (values['json'] as boolean | undefined) ?? false };
+    }
     return {
       command,
       refresh: (values['refresh'] as boolean | undefined) ?? false,
@@ -147,6 +165,17 @@ const print = (io: Io, json: boolean, raw: unknown, text: string): void =>
 
 /** The options over the ports; the exit code. */
 export async function execute(options: Options, deps: CliDeps, io: Io): Promise<number> {
+  if (options.command === 'export-studio') {
+    try {
+      const report = await exportStudio(deps, resolve(deps.cwd, options.out));
+      print(io, options.json, report, renderExport(report));
+      return 0;
+    } catch (error) {
+      // The studio could not be read — unreachable, or it refused a list: nothing was written.
+      io.error(messageOf(error));
+      return 2;
+    }
+  }
   if (options.command === 'status') {
     const refresh = options.refresh ? await refreshStatus(deps) : null;
     const entries = refresh?.entries ?? (await deps.ledger.load());
@@ -206,6 +235,8 @@ export async function cli(
     clock: { now: () => new Date().toISOString() },
     interrupted,
     loopUrl: config.loopUrl,
+    studio: new HttpStudioSource(config.studioUrl),
+    writer: fsDocumentWriter,
   };
   return execute(options, deps, {
     out: (text) => console.log(text),

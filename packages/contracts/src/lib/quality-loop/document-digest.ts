@@ -67,8 +67,8 @@ export type MemoryScope = (typeof MEMORY_SCOPES)[number];
 /** What each scope means, rendered into the digest's schema and the form goals' legend. */
 export const MEMORY_SCOPE_USES: Readonly<Record<MemoryScope, string>> = {
   subject:
-    'true of the subject wherever asked — their record, or their standing answer to a question any form may ask',
-  unit: 'about the one employer, role or application it was recorded for; settles only a question about that same unit of work',
+    'true of the subject wherever asked — the answer is the same whoever asks: their record, their experience, skills, documents, links, status or availability, or their standing answer to a question any form may ask, however the form was asked for one role',
+  unit: 'about the one employer, role or application it was recorded for — the answer would differ for another: whether the subject works or worked there, knows anyone there, consents to its messages, how they heard of this opening, whether this posting suits; settles only a question about that same unit of work',
 };
 
 /** Every document memory written before scopes were declared was a document's fact about the subject. */
@@ -106,7 +106,8 @@ export const DOCUMENT_RULES: readonly string[] = [
   'An insight is a complete statement a form field could take or compute from: absolute dates and figures, names as the document spells them, the subject named.',
   'An appliesWhen names the situation a form puts the subject in — the field or question that calls for the fact.',
   "Where a cited section qualifies a claim — reported rather than audited, a design, a learning exercise or a planned project, an interpretation — the insight carries that qualifier in the section's own words; a section that states a fact plainly needs none.",
-  'A memory is scoped: subject where it holds of the subject wherever a form asks, unit where it holds only of the employer, role or application it was recorded for.',
+  'A memory is scoped by one test — would the answer differ for another employer, role or application? Unit where it would: working or knowing someone there, consents, how it was heard of, whether this posting suits. Subject where it is the same whoever asks, however the form asked it for one role.',
+  "Where cited sections date a role, or the roles a technology was used in, the insight states both ends as given and the span between them in whole years and months, computed from those dates alone; an open end is computed to the document's date, and the insight says so.",
 ];
 
 export const documentIndexSchema = z.strictObject({

@@ -38,7 +38,7 @@ export const DOCUMENT_DIGEST: PipelineDefinition<DocumentDigest> = {
   task: {
     criterionKinds: {
       fact: 'A fact the sections state about the subject that a form could ask for — a role with its employer and dates, a figure of experience, a degree, a location, a right to work, an answer the subject gave — that the digest must capture.',
-      rule: 'A rule the goal states about how a memory may be written: kinded for what it is — a fact, a story kept whole, or a boundary on what may be claimed — scoped for whether it holds of the subject wherever asked or only of the situation it was recorded in, resting only on its cited sections, complete with absolute dates and figures, named for the form situation that calls for it, and carrying any qualifier its cited sections put on the claim.',
+      rule: 'A rule the goal states about how a memory may be written: kinded for what it is — a fact, a story kept whole, or a boundary on what may be claimed — scoped for whether it holds of the subject wherever asked or only of the situation it was recorded in, resting only on its cited sections, complete with absolute dates and figures, a dated role’s tenure computed from its dates alone, named for the form situation that calls for it, and carrying any qualifier its cited sections put on the claim.',
     },
     findingTypes: {
       invented_fact: 'An insight that states something no cited section states.',

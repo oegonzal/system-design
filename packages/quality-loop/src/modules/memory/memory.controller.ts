@@ -1,5 +1,7 @@
 import { Body, Controller, Delete, Get, HttpCode, Param, Post, Query } from '@nestjs/common';
 import type {
+  FormRetrievalReportResponse,
+  FormRetrievalRequest,
   RecallEffectivenessResponse,
   ReindexMemoryRunResponse,
   RetractMemoryRunResponse,
@@ -7,6 +9,7 @@ import type {
   StandingGapsResponse,
 } from '@sysdesign/contracts';
 
+import { formRetrievalRequestSchema } from '@sysdesign/contracts';
 import { ZodValidationPipe } from '@sysdesign/nest-kit';
 
 import { goalRequestSchema } from '../http/goal-request';
@@ -37,6 +40,20 @@ export class MemoryController {
   @HttpCode(200)
   async retract(@Param('id') id: string): Promise<RetractMemoryRunResponse> {
     return { data: await this.memory.retract(id) };
+  }
+
+  /**
+   * What a form page's recall would retrieve for these fields, and why — the
+   * fields' own words as probes, the budget each kind of control takes, each
+   * named vector's ranking, the fused list per field and the dealt evidence.
+   * Runs no pipeline; the measurement seam of the form path.
+   */
+  @Post('form-retrieval-report')
+  @HttpCode(200)
+  async formRetrievalReport(
+    @Body(new ZodValidationPipe(formRetrievalRequestSchema)) body: FormRetrievalRequest,
+  ): Promise<FormRetrievalReportResponse> {
+    return { data: await this.memory.formRetrievalReport(body.fields) };
   }
 
   /**

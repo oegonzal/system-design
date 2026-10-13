@@ -1,5 +1,6 @@
 import {
   fieldQuestionOf,
+  fieldTypeOf,
   GUIDANCE_ANSWER_MAX_LENGTH,
   GUIDANCE_PAGE_MAX_LENGTH,
   GUIDANCE_QUESTION_MAX_LENGTH,
@@ -17,7 +18,6 @@ import {
 
 import type { EngineContext } from './engine-context';
 import { settled } from './field-fill';
-import { fieldTypeOf } from './field-routing';
 import type { AnswerSource } from './operator-interaction';
 import { BrainFaulted } from './ports';
 import { stepJsonFile } from './session-dump';

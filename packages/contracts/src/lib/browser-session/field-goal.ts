@@ -41,7 +41,7 @@ import {
   FORM_PIPELINES,
   type FormPipeline,
 } from './pipelines';
-import { ANSWER_BASES, ANSWER_BASIS_MEANINGS, HIDDEN_TRAITS } from './vocab';
+import { ANSWER_BASES, ANSWER_BASIS_MEANINGS, HIDDEN_TRAITS, type FieldType } from './vocab';
 
 export const FIELD_CONTEXT_MAX_LENGTH = 300;
 export const EVIDENCE_TEXT_MAX_LENGTH = 1200;
@@ -87,6 +87,41 @@ export const fieldSpecOf = (element: ObservedElement): FieldSpec => ({
   hiddenTraits: element.hiddenTraits,
   context: element.context,
 });
+
+/** A field's control kind by its role, where the role settles it. */
+const FIELD_TYPE_BY_ROLE: Readonly<Record<string, FieldType>> = {
+  searchbox: 'text',
+  spinbutton: 'number',
+  combobox: 'select',
+  listbox: 'select',
+  radiogroup: 'radio',
+  radio: 'radio',
+  checkbox: 'checkbox',
+};
+
+/** A field's control kind by its input type, for a role that does not settle it. */
+const FIELD_TYPE_BY_INPUT: Readonly<Record<string, FieldType>> = {
+  number: 'number',
+  date: 'date',
+  file: 'file',
+  select: 'select',
+  textarea: 'textarea',
+  checkbox: 'checkbox',
+  radio: 'radio',
+};
+
+/**
+ * What kind of control asks: the role where it settles it, else the input
+ * type, else a textbox is text and anything else unknown. Read by the
+ * operator's prompt, the guidance record and the recall's budget per field,
+ * so all three agree on what a field is.
+ */
+export function fieldTypeOf(field: Pick<FieldSpec, 'role' | 'inputType'>): FieldType {
+  const byRole = FIELD_TYPE_BY_ROLE[field.role];
+  if (byRole !== undefined) return byRole;
+  if (field.inputType !== null) return FIELD_TYPE_BY_INPUT[field.inputType] ?? 'text';
+  return field.role === 'textbox' ? 'text' : 'unknown';
+}
 
 const tidy = (text: string | null): string => text?.replace(/\s+/g, ' ').trim() ?? '';
 

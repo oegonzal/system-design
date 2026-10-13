@@ -1,14 +1,21 @@
 import { basename } from 'node:path';
 
-import type { OrchestrationRunDto, OrchestrationStepDto } from '@sysdesign/contracts';
+import type {
+  ExperienceProfileDto,
+  OrchestrationRunDto,
+  OrchestrationStepDto,
+  StarStoryDto,
+} from '@sysdesign/contracts';
 
 import type {
   Clock,
   DocumentReader,
+  DocumentWriter,
   IngestLedger,
   IngestSink,
   ManifestEntry,
   PlannedChunk,
+  StudioSource,
 } from '../core/ports';
 
 /**
@@ -121,3 +128,57 @@ export class ScriptedSink implements IngestSink {
     return this.records.get(orchestrationRunId) ?? null;
   }
 }
+
+/** The studio's record as a spec gives it. */
+export class ScriptedStudio implements StudioSource {
+  constructor(
+    private readonly profiles: readonly ExperienceProfileDto[] = [],
+    private readonly starStories: readonly StarStoryDto[] = [],
+  ) {}
+
+  async experiences(): Promise<readonly ExperienceProfileDto[]> {
+    return this.profiles;
+  }
+
+  async stories(): Promise<readonly StarStoryDto[]> {
+    return this.starStories;
+  }
+}
+
+/** Documents written, by path. */
+export class InMemoryWriter implements DocumentWriter {
+  readonly written = new Map<string, string>();
+
+  async write(path: string, text: string): Promise<void> {
+    this.written.set(path, text);
+  }
+}
+
+export const sampleExperience = (
+  overrides: Partial<ExperienceProfileDto> = {},
+): ExperienceProfileDto => ({
+  id: '11111111-1111-4111-8111-111111111111',
+  slug: 'ledger-platform',
+  companyLabel: 'Acme',
+  title: 'Senior Engineer',
+  summary: 'Built the ledger platform.',
+  techStack: ['TypeScript', 'Postgres'],
+  highlights: ['Cut settlement latency by half.', 'Led a team of four.'],
+  createdAt: FIXED_NOW,
+  ...overrides,
+});
+
+export const sampleStory = (overrides: Partial<StarStoryDto> = {}): StarStoryDto => ({
+  id: '22222222-2222-4222-8222-222222222222',
+  title: 'The settlement backlog',
+  situation: 'Settlements queued for hours at month end.',
+  task: 'Bring the backlog under an hour without a rewrite.',
+  action: 'Partitioned the queue by account and added a drain worker.',
+  result: 'Month-end settlement finished in forty minutes.',
+  tags: ['queues', 'postgres'],
+  promptId: null,
+  experienceId: null,
+  createdAt: FIXED_NOW,
+  updatedAt: FIXED_NOW,
+  ...overrides,
+});

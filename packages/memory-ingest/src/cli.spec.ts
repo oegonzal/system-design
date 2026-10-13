@@ -9,7 +9,11 @@ import {
   FIXED_NOW,
   fixedClock,
   InMemoryLedger,
+  InMemoryWriter,
+  sampleExperience,
+  sampleStory,
   ScriptedSink,
+  ScriptedStudio,
   scriptedReader,
   settledOrchestration,
   stepOf,
@@ -76,6 +80,11 @@ describe('parseOptions', () => {
       refresh: true,
       json: true,
     });
+    expect(parsed(['export-studio', '--out', 'docs/ingestion/studio', '--json'])).toEqual({
+      command: 'export-studio',
+      out: 'docs/ingestion/studio',
+      json: true,
+    });
   });
 
   it.each([
@@ -96,6 +105,9 @@ describe('parseOptions', () => {
     [['ingest', 'a.md', '--refresh'], "Unknown option '--refresh'"],
     [['status', '--force'], "Unknown option '--force'"],
     [['status', 'a.md'], "Unexpected argument 'a.md'"],
+    [['export-studio'], '--out is required'],
+    [['export-studio', '--out', ' '], '--out is required'],
+    [['export-studio', '--out', 'd', 'a.md'], "Unexpected argument 'a.md'"],
   ])('refuses %j', (argv, message) => {
     const result = parseOptions(argv);
     expect(result).toBeInstanceOf(Error);
@@ -116,17 +128,25 @@ describe('execute', () => {
   const deps = (overrides: Partial<CliDeps> = {}) => {
     const scripted = new ScriptedSink();
     const ledger = new InMemoryLedger();
+    const writer = new InMemoryWriter();
     const built: CliDeps = {
-      config: { loopUrl: 'http://loop.test', home: 'static/memory-ingest', subject: undefined },
+      config: {
+        loopUrl: 'http://loop.test',
+        studioUrl: 'http://studio.test',
+        home: 'static/memory-ingest',
+        subject: undefined,
+      },
       cwd: '/work',
       reader: scriptedReader({ 'notes.md': NOTES }),
       sink: scripted,
       ledger,
       clock: fixedClock(),
       loopUrl: 'http://loop.test',
+      studio: new ScriptedStudio([sampleExperience()], [sampleStory()]),
+      writer,
       ...overrides,
     };
-    return { ...built, scripted, memory: ledger };
+    return { ...built, scripted, memory: ledger, writer };
   };
 
   it('[ING-1] a dry run prints the chunks and posts nothing, exiting 0', async () => {
@@ -167,7 +187,12 @@ describe('execute', () => {
     expect(errors[0]).toContain(INGEST_ENV.subject);
 
     const named = deps({
-      config: { loopUrl: 'http://loop.test', home: 'static/memory-ingest', subject: 'Ada' },
+      config: {
+        loopUrl: 'http://loop.test',
+        studioUrl: 'http://studio.test',
+        home: 'static/memory-ingest',
+        subject: 'Ada',
+      },
     });
     expect(await execute(parsed(['ingest', 'notes.md', '--dry-run']), named, io().sink)).toBe(0);
   });
@@ -279,5 +304,46 @@ describe('execute', () => {
       entries: [{ chunkHash: 'abc', status: 'complete' }],
       refresh: null,
     });
+  });
+  it('[ING-3] export-studio writes the studio’s record as documents under the folder, relative to the working directory, and exits 2 writing nothing when the studio cannot be read', async () => {
+    const { out, sink } = io();
+    const d = deps();
+    expect(
+      await execute(parsed(['export-studio', '--out', 'docs/ingestion/studio']), d, sink),
+    ).toBe(0);
+    expect([...d.writer.written.keys()]).toEqual([
+      '/work/docs/ingestion/studio/studio-experiences.md',
+      '/work/docs/ingestion/studio/studio-star-stories.md',
+    ]);
+    expect(d.writer.written.get('/work/docs/ingestion/studio/studio-star-stories.md')).toContain(
+      '# The settlement backlog\n\n## Situation',
+    );
+    expect(out).toEqual([
+      '/work/docs/ingestion/studio/studio-experiences.md: 1 record\n/work/docs/ingestion/studio/studio-star-stories.md: 1 record',
+    ]);
+
+    const json = io();
+    expect(
+      await execute(parsed(['export-studio', '--out', 'studio', '--json']), d, json.sink),
+    ).toBe(0);
+    expect(JSON.parse(json.out[0] ?? '')).toEqual({
+      files: [
+        { path: '/work/studio/studio-experiences.md', records: 1 },
+        { path: '/work/studio/studio-star-stories.md', records: 1 },
+      ],
+    });
+
+    const down = io();
+    const unreachable = deps({
+      studio: {
+        experiences: () => Promise.reject(new Error('fetch failed: ECONNREFUSED studio.test')),
+        stories: () => Promise.resolve([]),
+      },
+    });
+    expect(
+      await execute(parsed(['export-studio', '--out', 'studio']), unreachable, down.sink),
+    ).toBe(2);
+    expect(down.errors).toEqual(['fetch failed: ECONNREFUSED studio.test']);
+    expect(unreachable.writer.written.size).toBe(0);
   });
 });

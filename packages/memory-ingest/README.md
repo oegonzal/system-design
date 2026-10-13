@@ -1,6 +1,6 @@
 # memory-ingest
 
-The user's documents — a PDF résumé, markdown notes — chunked deterministically and handed, one chunk at a time, to the quality loop's `document-memory` orchestrator, which digests each into facts about the subject and stores them. A Node command line over `@sysdesign/loop-client`: no framework, no database, no embeddings here — HTTP to the loop and one JSON manifest on disk.
+The user's documents — a PDF résumé, markdown notes, the studio's own record of their experience exported as documents — chunked deterministically and handed, one chunk at a time, to the quality loop's `document-memory` orchestrator, which digests each into facts about the subject and stores them. A Node command line over `@sysdesign/loop-client`: no framework, no database, no embeddings here — HTTP to the loop and the studio, and one JSON manifest on disk.
 
 ```bash
 pnpm memory-ingest ingest notes.md --subject "Ada Lovelace" --dry-run   # print the chunks; post nothing
@@ -9,6 +9,7 @@ pnpm memory-ingest ingest Resume.pdf --kind resume                      # subjec
 pnpm memory-ingest ingest notes.md --force                              # post again what the manifest holds as complete, retracting its earlier digests
 pnpm memory-ingest status                                               # the manifest, as a table
 pnpm memory-ingest status --refresh                                     # re-read every recorded orchestration from the loop
+pnpm memory-ingest export-studio --out docs/ingestion/studio            # the studio's experience profiles and STAR stories, as markdown to ingest
 pnpm exec nx test memory-ingest                                         # one pure vitest project; the in-repo fakes, never a live loop
 ```
 
@@ -16,11 +17,12 @@ Exit codes: `0` ok — every chunk's facts are in the store or were already; `1`
 
 ## Environment
 
-| Variable                | Default                 | Meaning                                                                 |
-| ----------------------- | ----------------------- | ----------------------------------------------------------------------- |
-| `QUALITY_LOOP_URL`      | `http://localhost:3003` | The loop's base URL; must be `http(s)`.                                 |
-| `MEMORY_INGEST_HOME`    | `static/memory-ingest`  | Where `manifest.json` lives, relative to the working directory.         |
-| `MEMORY_INGEST_SUBJECT` | —                       | Whom the facts are about, when `--subject` is not given on the command. |
+| Variable                | Default                     | Meaning                                                                                     |
+| ----------------------- | --------------------------- | ------------------------------------------------------------------------------------------- |
+| `QUALITY_LOOP_URL`      | `http://localhost:3003`     | The loop's base URL; must be `http(s)`.                                                     |
+| `STUDIO_API_URL`        | `http://localhost:3000/api` | The studio API's base URL, its prefix included, read by `export-studio`; must be `http(s)`. |
+| `MEMORY_INGEST_HOME`    | `static/memory-ingest`      | Where `manifest.json` lives, relative to the working directory.                             |
+| `MEMORY_INGEST_SUBJECT` | —                           | Whom the facts are about, when `--subject` is not given on the command.                     |
 
 Both are declared once, as data, in `src/config.ts` (`INGEST_FLAGS`, `INGEST_ENV`); a value that cannot be used is refused by name.
 
@@ -67,6 +69,10 @@ A re-run **skips** a chunk whose latest entry is `complete` and posts everything
 
 Posting is sequential on purpose: one orchestration at a time, awaited to settle (by heartbeat, through `awaitOrchestration`) before the next starts, so the loop is never asked to digest two chunks of one document at once.
 
+## The studio's record, as documents
+
+The studio keeps the subject's experience profiles (the prompts are drawn from them) and STAR stories in its own tables, which this package may not read: the boundaries forbid `memory-ingest → db`, and the one program that posts documents is this one. So the record crosses as documents. `export-studio --out <dir>` reads `GET /experiences` and `GET /star-stories` whole — page by page at the API's largest page — and writes one markdown file per source through a declared field map (`STUDIO_SOURCES` in `src/core/export-studio.ts`): an experience is `# <title> — <company>`, its summary, `Stack: …` and its highlights as bullets; a story is `# <title>` with `## Situation`, `## Task`, `## Action` and `## Result` as its own sections and `Tags: …`, so a chunk's context names which part a fact came from and a `profile_story` can cite the part whole. A source with no records writes nothing — an empty document is nothing to ingest. Then `ingest <dir>/*.md --kind notes --date <the day you exported>`; the manifest skips what was ingested before, and `--force` after a change to the record retracts the earlier digests first. Another source is another entry in the map, never different code.
+
 ## Layout
 
-`src/core` (pure — ports, the chunker, the ingest and its report, the record of a posting, the status refresh) · `src/adapters/readers` (the table, PDF, markdown) · `src/adapters/loop-http` (the sink over `LoopClient`) · `src/adapters/fs-ledger` (the manifest) · `src/config.ts`, `src/cli.ts`, `src/render.ts`, `src/main.ts` · `src/test` (the port fakes and the shared fake loop behind the shipping sink — spec code only, outside the app build). The goal codec and the chunk schema are `@sysdesign/contracts` (`lib/quality-loop/document-digest.ts`); the orchestrator is `packages/quality-loop/src/orchestrators/document-memory`.
+`src/core` (pure — ports, the chunker, the ingest and its report, the record of a posting, the status refresh, the studio export and its field map) · `src/adapters/readers` (the table, PDF, markdown, JSON Lines) · `src/adapters/loop-http` (the sink over `LoopClient`) · `src/adapters/studio-http` (the studio's lists, paged) · `src/adapters/fs-ledger` (the manifest) · `src/adapters/fs-writer` (the exported documents) · `src/config.ts`, `src/cli.ts`, `src/render.ts`, `src/main.ts` · `src/test` (the port fakes and the shared fake loop behind the shipping sink — spec code only, outside the app build). The goal codec and the chunk schema are `@sysdesign/contracts` (`lib/quality-loop/document-digest.ts`); the orchestrator is `packages/quality-loop/src/orchestrators/document-memory`.

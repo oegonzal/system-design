@@ -64,7 +64,7 @@ const day = (at: IsoDateString): string => at.slice(0, 10);
  * another application's, so the operator was asked again.
  */
 export const GUIDANCE_RULE =
-  "A section records the subject's answer to one question: the insight is that answer, nothing more; the appliesWhen is the question as quoted; the scope is unit only when the question asks about the employer, role or application it was asked for; where and when it was asked enters neither.";
+  "A section records the subject's answer to one question: the insight is that answer, nothing more; the appliesWhen is the question as quoted; the scope is unit only when the answer would differ for another employer, role or application; where and when it was asked enters neither.";
 
 /** One answer as a section the digest can cite: the question and the answer first, the provenance after. */
 export function renderGuidanceSection(item: OperatorGuidanceDto): string {

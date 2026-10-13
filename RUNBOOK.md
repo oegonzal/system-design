@@ -300,15 +300,81 @@ Before any of this is useful, give the store facts about you:
 ```bash
 pnpm memory-ingest ingest Resume_a2.pdf --kind resume --subject "Your Name" --dry-run   # what would be posted
 pnpm memory-ingest ingest Resume_a2.pdf notes.md --kind notes --subject "Your Name"    # posts, one chunk at a time
+pnpm memory-ingest export-studio --out docs/ingestion/studio                             # the studio's experience profiles and STAR stories, as documents
+pnpm memory-ingest ingest docs/ingestion/studio/*.md --kind notes --date 2026-10-12      # … ingested like any notes
 pnpm memory-ingest status                                                                # how each chunk's digest went
 ```
 
 Each chunk is one `document-memory` orchestration: a `document-digest` run
 turns the chunk into facts a form field could take, with grounding critics
 in front of the store, and the manifest at `static/memory-ingest/manifest.json`
-skips what was already ingested unless `--force`. Reading it back:
-`POST :3003/memory/retrieval-report {"goal": "How many years of TypeScript?"}`
-should rank the fact first.
+skips what was already ingested unless `--force`. Reading it back the way a
+form page would — the field's own words as the probe, both named vectors, the
+hits per field type, the dealt evidence:
+`POST :3003/memory/form-retrieval-report {"fields": [{"name": "How many years of TypeScript?"}]}`
+should rank the fact first for that field.
+
+### Standing answers: what every form asks and no résumé states
+
+Screening forms ask the same dozen questions however they word them — work
+authorization and sponsorship, where you live and whether you would move,
+remote preference, salary, start date, references, the consents, whether you
+have worked for the employer before — and a résumé states none of them. Say
+each once, in a notes document you keep under `docs/ingestion/` (gitignored),
+and the digest stores them as facts about you that hold wherever a form asks:
+
+```markdown
+# Identity and contact
+
+Ada Lovelace's legal first name is Ada and legal last name is Lovelace.
+Ada Lovelace's phone number is +1 555 010 0100 and email is ada@example.test.
+
+# Work authorization and sponsorship
+
+Ada Lovelace is a citizen of the country she works in and is authorized to work
+there without restriction. Ada Lovelace does not require, and will not require,
+employer sponsorship for a work visa.
+
+# Location, remote and relocation
+
+Ada Lovelace lives in Springfield and will work remotely, hybrid or on site in
+Springfield. Ada Lovelace will not relocate.
+
+# Compensation and start date
+
+Ada Lovelace's expected base salary is $180,000 per year. Ada Lovelace can
+start on 2026-11-02 and needs two weeks' notice.
+
+# Employers
+
+Ada Lovelace worked at Acme from 2021-03 to 2024-06 and at Globex from 2024-07
+to the present. Ada Lovelace has not worked for any other employer since 2021.
+
+# Consents
+
+Ada Lovelace consents to a background check and to recruiting emails.
+Ada Lovelace does not consent to recruiting text messages.
+
+# References
+
+Ada Lovelace provides references on request, after an offer is discussed.
+
+# Links
+
+Ada Lovelace's professional profile is https://example.test/in/ada.
+```
+
+Three rules make a sentence a fact the digest keeps: name the subject in each
+sentence, one fact per sentence, and figures absolute (`$180,000`,
+`2026-11-02`, never "mid-November"). A fact about one employer belongs under
+`# Employers`, dated — that is what settles a "have you worked here before"
+question for every employer, since the answerer reads the record of employers
+rather than an answer given about another application. Then:
+
+```bash
+pnpm memory-ingest ingest docs/ingestion/standing-answers.md --kind notes --subject "Your Name" --date 2026-10-12
+pnpm memory-ingest ingest docs/ingestion/standing-answers.md --kind notes --subject "Your Name" --date 2026-10-19 --force   # after an edit: retracts the earlier digest first
+```
 
 A measured note: a plan costs four model calls and an answer page four more,
 about 45 s each on the subscription login, so one application with three

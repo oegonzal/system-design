@@ -376,22 +376,27 @@ query probes — binds them into the memory orchestrator's ports for the
 orchestration module (which never imports Qdrant), and serves the two tools
 that need them without a run.
 
-| Verb     | Path                                     | Code | Body / query                                      | Answers                                        |
-| -------- | ---------------------------------------- | ---- | ------------------------------------------------- | ---------------------------------------------- |
-| `POST`   | `/orchestrations/:orchestrator`          | 202  | the shared `runRequestSchema`                     | `{ data: { orchestrationRunId, status } }`     |
-| `POST`   | `/orchestrations/:orchestrator/from-run` | 202  | `{ runId }`                                       | the same; steps with a stand-in are provided   |
-| `GET`    | `/orchestrations`                        | 200  | `orchestrator`, `pipeline`, `status`, list paging | `{ data, meta }`, newest first                 |
-| `GET`    | `/orchestrations/:id`                    | 200  | —                                                 | `{ data: OrchestrationRunDto }`, 404 otherwise |
-| `POST`   | `/memory/:id/reindex`                    | 200  | —                                                 | `{ data: OrchestrationStepDto }`               |
-| `DELETE` | `/memory/:id`                            | 200  | —                                                 | `{ data: { runId, removed } }`                 |
-| `POST`   | `/memory/retrieval-report`               | 200  | `{ goal }`, up to 64,000 B                        | `{ data: RetrievalReportDto }`                 |
+| Verb     | Path                                     | Code | Body / query                                          | Answers                                        |
+| -------- | ---------------------------------------- | ---- | ----------------------------------------------------- | ---------------------------------------------- |
+| `POST`   | `/orchestrations/:orchestrator`          | 202  | the shared `runRequestSchema`                         | `{ data: { orchestrationRunId, status } }`     |
+| `POST`   | `/orchestrations/:orchestrator/from-run` | 202  | `{ runId }`                                           | the same; steps with a stand-in are provided   |
+| `GET`    | `/orchestrations`                        | 200  | `orchestrator`, `pipeline`, `status`, list paging     | `{ data, meta }`, newest first                 |
+| `GET`    | `/orchestrations/:id`                    | 200  | —                                                     | `{ data: OrchestrationRunDto }`, 404 otherwise |
+| `POST`   | `/memory/:id/reindex`                    | 200  | —                                                     | `{ data: OrchestrationStepDto }`               |
+| `DELETE` | `/memory/:id`                            | 200  | —                                                     | `{ data: { runId, removed } }`                 |
+| `POST`   | `/memory/retrieval-report`               | 200  | `{ goal }`, up to 64,000 B                            | `{ data: RetrievalReportDto }`                 |
+| `POST`   | `/memory/form-retrieval-report`          | 200  | `{ fields: [{ name, context?, role?, inputType? }] }` | `{ data: FormRetrievalReportDto }`             |
 
 `/memory-runs` is retired, not aliased. The body of a memory orchestration is
 **exactly** the body of a quality run; `output` and `maxIterations` reach the
-target only. The three `/memory` routes run **no pipeline at all**: `reindex`
+target only. The four `/memory` routes run **no pipeline at all**: `reindex`
 re-embeds a memory run's lessons from the digest artifact it already produced,
 which is what makes a generation bump survivable (§6); `retrieval-report`
-answers what a recall _would_ retrieve for a goal without running one; `DELETE
+answers what a recall _would_ retrieve for a goal without running one, and
+`form-retrieval-report` the same for a form page's fields — each field's own
+probe, both named vectors' rankings, the hits its field type takes and the
+dealt evidence, as the `form-memory` orchestrator's recall step would compose
+them; `DELETE
 /memory/:id` retracts every point a digest run stored, by the run's id — one
 writer per digest run — which is how a document taught or ingested again closes
 behind itself (`memory-ingest … --force`, `browser-session teach-again`); a run

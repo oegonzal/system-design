@@ -9,6 +9,7 @@ import {
   fieldIndexSchemaFor,
   FIELDS_HEADING,
   fieldSpecOf,
+  fieldTypeOf,
   readFieldIndex,
   splitFieldGoal,
   valueFaults,
@@ -72,7 +73,7 @@ describe('composeFieldGoal', () => {
       `${FIELD_EVIDENCE_HEADING}\n\nKinds: profile_fact — one thing true of the subject`,
     );
     expect(recalled).toContain(
-      '\nScopes: subject — true of the subject wherever asked — their record, or their standing answer to a question any form may ask; unit — ',
+      '\nScopes: subject — true of the subject wherever asked — the answer is the same whoever asks: their record, their experience, skills, documents, links, status or availability, or their standing answer to a question any form may ask, however the form was asked for one role; unit — ',
     );
     expect(recalled).toContain('\n\n- [m1] profile_fact · subject — Alex Example has 6 years');
     expect(splitFieldGoal(recalled)).toEqual(split);
@@ -158,5 +159,18 @@ describe('fieldAnswersSchema', () => {
     ]) {
       expect(json, `the model is never told: ${rule}`).toContain(rule);
     }
+  });
+});
+
+describe('fieldTypeOf', () => {
+  it("[QL-38] names a field's control kind from its role, else its input type — what asks, for the prompt, the guidance record and the recall's budget", () => {
+    expect(fieldTypeOf({ role: 'textbox', inputType: 'number' })).toBe('number');
+    expect(fieldTypeOf({ role: 'textbox', inputType: 'text' })).toBe('text');
+    expect(fieldTypeOf({ role: 'textbox', inputType: 'textarea' })).toBe('textarea');
+    expect(fieldTypeOf({ role: 'textbox', inputType: null })).toBe('text');
+    expect(fieldTypeOf({ role: 'combobox', inputType: 'select' })).toBe('select');
+    expect(fieldTypeOf({ role: 'radiogroup', inputType: null })).toBe('radio');
+    expect(fieldTypeOf({ role: 'checkbox', inputType: 'checkbox' })).toBe('checkbox');
+    expect(fieldTypeOf({ role: 'button', inputType: null })).toBe('unknown');
   });
 });

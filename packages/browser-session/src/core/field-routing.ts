@@ -8,7 +8,6 @@ import {
   type FieldReadout,
   type FieldsDecision,
   type FieldSpec,
-  type FieldType,
 } from '@sysdesign/contracts';
 
 import type { BrainFaulted } from './ports';
@@ -87,32 +86,4 @@ export function routeFieldsInSession(
         ? faultedReadouts(fields, fault)
         : [];
   return withOperatorCache(readouts, cache);
-}
-
-/** A field's control kind for the operator's prompt and the guidance record, from its role and input type. */
-const FIELD_TYPE_BY_ROLE: Readonly<Record<string, FieldType>> = {
-  searchbox: 'text',
-  spinbutton: 'number',
-  combobox: 'select',
-  listbox: 'select',
-  radiogroup: 'radio',
-  radio: 'radio',
-  checkbox: 'checkbox',
-};
-
-const FIELD_TYPE_BY_INPUT: Readonly<Record<string, FieldType>> = {
-  number: 'number',
-  date: 'date',
-  file: 'file',
-  select: 'select',
-  textarea: 'textarea',
-  checkbox: 'checkbox',
-  radio: 'radio',
-};
-
-export function fieldTypeOf(field: Pick<FieldSpec, 'role' | 'inputType'>): FieldType {
-  const byRole = FIELD_TYPE_BY_ROLE[field.role];
-  if (byRole !== undefined) return byRole;
-  if (field.inputType !== null) return FIELD_TYPE_BY_INPUT[field.inputType] ?? 'text';
-  return field.role === 'textbox' ? 'text' : 'unknown';
 }

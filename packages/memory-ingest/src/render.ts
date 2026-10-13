@@ -1,3 +1,4 @@
+import type { ExportReport } from './core/export-studio';
 import type { ChunkReport, FileReport, IngestReport } from './core/ingest';
 import type { ManifestEntry, ManifestStep } from './core/ports';
 import { whyNotStored } from './core/record';
@@ -118,4 +119,15 @@ export function renderStatus(
       ? null
       : `refreshed ${refresh.refreshed} · still running ${refresh.running} · no longer at the loop ${refresh.missing}`;
   return [body, foot].filter((line): line is string => line !== null).join('\n');
+}
+
+/** One line per source: the document written and how many records it holds, or that there was nothing to write. */
+export function renderExport(report: ExportReport): string {
+  return report.files
+    .map((file) =>
+      file.records === 0
+        ? `${file.path}: no records — nothing written`
+        : `${file.path}: ${count(file.records, 'record')}`,
+    )
+    .join('\n');
 }

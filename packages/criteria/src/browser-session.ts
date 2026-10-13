@@ -110,6 +110,6 @@ export const BROWSER_SESSION_CRITERIA: readonly Criterion[] = [
   {
     id: 'ING-3',
     statement:
-      'A forced re-ingest retracts what a chunk’s earlier digest stored — by the digest run id the manifest keeps, before the chunk is posted again — and the report counts the retractions, so the store never holds two digests of one chunk.',
+      'A forced re-ingest retracts what a chunk’s earlier digest stored — by the digest run id the manifest keeps, before the chunk is posted again — and the report counts the retractions, so the store never holds two digests of one chunk; and the studio’s record of the subject — its experience profiles and STAR stories, read whole from the studio’s paged lists — is written as markdown documents through a declared field map, one titled section per record and a story’s four parts as its own headings, a source with no records writing nothing, so the record is ingested like any other document.',
   },
 ];
