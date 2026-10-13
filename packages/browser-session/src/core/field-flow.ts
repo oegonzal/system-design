@@ -82,6 +82,8 @@ async function ask(
       prefetch,
       refusal === null,
     );
+    // The session is stopping: the field reads as the operator's /stop, and the form loop ends with it.
+    if (outcome.kind === 'stopped') return result(field, 'ask-operator', 'operator', null, 'stop');
     if (outcome.kind === 'filled') {
       const { suggestion, run } = outcome;
       const typed = await fill(ctx, field, suggestion.text, 'memory', null, observation);

@@ -1,14 +1,24 @@
 import { finding } from '@sysdesign/contracts';
 import type { StepPlan } from '@sysdesign/contracts';
 
+import { OperatorInterrupted, QuestionWithdrawn } from './ports';
 import { BrainFaulted } from './ports';
-import { decidedAnswers, decidedPlan, FakeBrowser, FixedClock, refusing } from './testing';
+import { STOPPING } from './session-engine';
+import {
+  decidedAnswers,
+  decidedPlan,
+  FakeBrowser,
+  FixedClock,
+  refusing,
+  ScriptedOperator,
+} from './testing';
 import {
   JOURNEY_ANSWERS as ANSWERS,
   JOURNEY_PLANS as PLANS,
   journeyPages as pages,
 } from './testing-journey';
-import { runScripted as run } from './testing-session';
+import { FakeStopSignal, runScripted as run } from './testing-session';
+import { answeringFixture } from '@sysdesign/contracts';
 
 /**
  * How a plan stops — at the first action the page refuses, or where a judge
@@ -248,6 +258,64 @@ describe('how a plan stops and how a session ends', () => {
     expect(noRubric.outcome.termination.reason).toBe('brain-unavailable');
     expect(noRubric.browser.opened).toBeNull();
     expect(noRubric.detail.status).toBe('stopped');
+  });
+
+  it('[BRW-4] a stop while a question waits on the operator withdraws it as abandoned, asks nothing more, and ends the session operator-stop', async () => {
+    const stop = new FakeStopSignal();
+    const operator = new ScriptedOperator(['Yes', 'Yes', 'Yes']);
+    const withdrawals: unknown[] = [];
+    const ask = operator.ask.bind(operator);
+    // The stop lands while the first question is open.
+    operator.ask = (question, signal) => {
+      signal?.addEventListener('abort', () => withdrawals.push(signal.reason), { once: true });
+      stop.press();
+      return ask(question, signal);
+    };
+    const { outcome, detail } = await run({
+      script: {
+        plans: [PLANS.search, PLANS.results, PLANS.form].map((p) => decidedPlan(p)),
+        answers: [decidedAnswers(ANSWERS)],
+      },
+      operator,
+      stop,
+      // Every kind asks, so the form has more than one question for the operator — only the first is put.
+      answering: answeringFixture(['stated', 'inferred']),
+    });
+    expect(outcome.termination.reason).toBe('operator-stop');
+    expect(outcome.status).toBe('stopped');
+    expect(withdrawals).toEqual([STOPPING]);
+    expect(operator.questions).toHaveLength(1);
+    // The withdrawn field's row reads as the operator's stop, the one path for the signal and the reply.
+    const stopped = detail.decisions.filter(
+      (decision) => decision.kind === 'field-answer' && decision.payload['reply'] === 'stop',
+    );
+    expect(stopped).toHaveLength(1);
+    expect(stopped[0]).toMatchObject({ source: 'operator', answer: null });
+
+    // Ctrl-C at an open terminal question is that same stop, never a failed session.
+    const interrupted = new ScriptedOperator();
+    interrupted.ask = () => Promise.reject(new OperatorInterrupted());
+    const byInterrupt = await run({
+      script: {
+        plans: [PLANS.search, PLANS.results, PLANS.form].map((p) => decidedPlan(p)),
+        answers: [decidedAnswers(ANSWERS)],
+      },
+      operator: interrupted,
+    });
+    expect(byInterrupt.outcome.termination.reason).toBe('operator-stop');
+    expect(byInterrupt.outcome.status).toBe('stopped');
+
+    // A withdrawal that is not the stop is still a withdrawal: nothing here swallows it.
+    const withdrawn = new ScriptedOperator();
+    withdrawn.ask = () => Promise.reject(new QuestionWithdrawn('spec'));
+    const byWithdrawal = await run({
+      script: {
+        plans: [PLANS.search, PLANS.results, PLANS.form].map((p) => decidedPlan(p)),
+        answers: [decidedAnswers(ANSWERS)],
+      },
+      operator: withdrawn,
+    });
+    expect(byWithdrawal.outcome.termination.reason).toBe('error');
   });
 
   it('[BRW-4] counts brain faults in a row: an answered plan clears the count, so faults apart never stop a session and three in a row still do', async () => {

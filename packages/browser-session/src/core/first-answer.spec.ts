@@ -176,4 +176,14 @@ describe('the operator asked on every channel at once', () => {
     operator.notify('step 4');
     expect(terminal.notices).toEqual(['step 4']);
   });
+
+  it('[BRW-10] a question already withdrawn when it is asked goes to no channel', async () => {
+    const terminal = new DeferredChannel('terminal');
+    const phone = new DeferredChannel('notifications');
+    const operator = new FirstAnswer(terminal, [phone]);
+    const stopped = new AbortController();
+    stopped.abort({ reason: 'abandoned', note: 'the session is stopping' });
+    await expect(operator.ask(QUESTION, stopped.signal)).rejects.toBeInstanceOf(QuestionWithdrawn);
+    expect([terminal.withdrawals, phone.withdrawals]).toEqual([[], []]);
+  });
 });

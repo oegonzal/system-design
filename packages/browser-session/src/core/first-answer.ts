@@ -30,6 +30,9 @@ const messageOf = (error: unknown): string =>
  * stopping the question: the others are withdrawn as abandoned, and the
  * interruption goes on to end the session.
  */
+/** Whether the caller withdrew the question — read through a call, since the answer changes while the channels wait. */
+const withdrawn = (signal: AbortSignal | undefined): boolean => signal?.aborted === true;
+
 export class FirstAnswer implements OperatorPort {
   readonly name = 'first-answer';
   private readonly failing = new Set<string>();
@@ -50,6 +53,8 @@ export class FirstAnswer implements OperatorPort {
   }
 
   async ask(question: OperatorQuestion, signal?: AbortSignal): Promise<InteractionAnswer> {
+    // A question already withdrawn is asked of nobody: the listeners below would never fire.
+    if (withdrawn(signal)) throw new QuestionWithdrawn(this.name);
     const channels: readonly OperatorChannel[] = [this.terminal, ...this.others];
     const controllers = channels.map(() => new AbortController());
     const onAbort = (): void => {
@@ -94,7 +99,7 @@ export class FirstAnswer implements OperatorPort {
         failures.push(`${channel.name}: ${messageOf(settled.error)}`);
         this.failed(channel, settled.error, waiting.size > 0);
       }
-      if (signal?.aborted === true) throw new QuestionWithdrawn(this.name);
+      if (withdrawn(signal)) throw new QuestionWithdrawn(this.name);
       throw new Error(`no operator channel could ask: ${failures.join('; ')}`);
     } finally {
       signal?.removeEventListener('abort', onAbort);

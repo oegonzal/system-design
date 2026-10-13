@@ -11,7 +11,13 @@ import {
   type SessionCriteria,
   type SessionDeps,
 } from './engine-context';
-import { BrainFaulted, type BrowserAction, type DerivedRubric, type Termination } from './ports';
+import {
+  BrainFaulted,
+  type BrowserAction,
+  type DerivedRubric,
+  type Termination,
+  type Withdrawal,
+} from './ports';
 import { closeSession, warnOf } from './session-close';
 import { rubricsFile } from './session-dump';
 import { createSessionEvents, startedEvent } from './session-events';
@@ -62,6 +68,9 @@ const byPipeline = <T>(of: (role: Role) => T): Record<string, T> =>
   Object.fromEntries(ROLES.map((role) => [BROWSER_SESSION_PIPELINES[role], of(role)]));
 
 // BOOKMARK
+/** What a question waiting on the operator is withdrawn with when the session is told to stop. */
+export const STOPPING: Withdrawal = { reason: 'abandoned', note: 'the session is stopping' };
+
 export async function runSession(
   deps: SessionDeps,
   options: RunSessionOptions,
@@ -95,11 +104,17 @@ export async function runSession(
   );
   events.publish(startedEvent({ state, options }));
   // Ctrl-C is the operator's word: the session ends after the step in flight,
-  // through every closing write, instead of dying with a running row behind it.
+  // through every closing write, instead of dying with a running row behind it
+  // — and a question waiting on the operator is withdrawn at once, so a step
+  // blocked on one ends too. Measured 2026-10-12: a session blocked on a
+  // question asked on a remote channel could only be killed, and left its row
+  // running.
+  const stopping = new AbortController();
   const release = deps.stop.onStop(() => {
     if (!state.operatorStopped)
       deps.log(`session ${state.sessionId}: interrupted — ending after this step`);
     state.operatorStopped = true;
+    stopping.abort(STOPPING);
   });
   const ticker = startPeriodic(
     { everyMs: SESSION_HEARTBEAT_EVERY_MS, atStart: false },
@@ -115,6 +130,7 @@ export async function runSession(
     queue,
     advisors,
     events,
+    stopping: stopping.signal,
   });
 
   let termination: Termination = { reason: 'error', detail: 'the session ended before deciding' };

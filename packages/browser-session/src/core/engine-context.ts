@@ -103,6 +103,8 @@ export interface EngineContext {
   /** The advisors the mission named, resolved before the session opened. */
   advisors: ResolvedAdvisor[];
   events: SessionEvents;
+  /** Aborted, with the withdrawal, the moment the operator tells the session to stop: a question waiting on them is withdrawn, and none is asked after. */
+  stopping: AbortSignal;
   /** Queue one decision row for the current step; answers its id. */
   record(decision: DecisionInput): string;
   /** Queue dump files; a write that fails is reported under `what`. */
@@ -123,6 +125,7 @@ export interface EngineParts {
   queue: WriteQueue;
   advisors: ResolvedAdvisor[];
   events: SessionEvents;
+  stopping: AbortSignal;
 }
 
 /**

@@ -25,7 +25,7 @@ import {
   type OperatorPrompt,
   type OperatorReply,
 } from './operator-interaction';
-import { QuestionWithdrawn, type Withdrawal } from './ports';
+import { OperatorInterrupted, QuestionWithdrawn, type Withdrawal } from './ports';
 
 /**
  * Putting a field to the operator, with the suggested answers readied for it.
@@ -207,14 +207,22 @@ export function fillableSuggestion(
   return null;
 }
 
-/** What putting a field to the operator came to: their reply, or a suggestion typed in their place. */
+/**
+ * What putting a field to the operator came to: their reply, a suggestion
+ * typed in their place, or the session stopping — the question withdrawn
+ * from every channel, or never asked, and Ctrl-C at an open terminal
+ * question read as that same stop.
+ */
 export type AskOutcome =
   | { kind: 'asked'; answer: InteractionAnswer; reply: OperatorReply; chosen: AnswerSource | null }
   | {
       kind: 'filled';
       suggestion: OfferedSuggestion;
       run: { runId: string | null; orchestrationRunId: string | null };
-    };
+    }
+  | { kind: 'stopped' };
+
+const STOPPED: AskOutcome = { kind: 'stopped' };
 
 /** Who asks for this step, and until when a channel keeps offering the question. */
 const askingOf = (ctx: EngineContext): Asking => {
@@ -245,9 +253,19 @@ export async function askOperator(
     suggestions: readonly OfferedSuggestion[],
     signal?: AbortSignal,
   ): Promise<AskOutcome> => {
+    if (ctx.stopping.aborted) return STOPPED;
     const asked = fieldQuestion({ ...prompt, suggestions }, askingOf(ctx));
-    const answer = await ctx.deps.operator.ask(asked.question, signal);
-    return { kind: 'asked', answer, ...fieldReplyOf(asked, answer) };
+    const withdrawing =
+      signal === undefined ? ctx.stopping : AbortSignal.any([ctx.stopping, signal]);
+    try {
+      const answer = await ctx.deps.operator.ask(asked.question, withdrawing);
+      return { kind: 'asked', answer, ...fieldReplyOf(asked, answer) };
+    } catch (error) {
+      // Ctrl-C at an open terminal question is the operator's stop, as is a question the stop withdrew.
+      if (error instanceof OperatorInterrupted) return STOPPED;
+      if (error instanceof QuestionWithdrawn && ctx.stopping.aborted) return STOPPED;
+      throw error;
+    }
   };
   const typed = (suggestions: readonly OfferedSuggestion[]): OfferedSuggestion | null =>
     typing && prefetch !== null
