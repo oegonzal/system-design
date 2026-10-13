@@ -185,6 +185,6 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
   {
     id: 'GOV-21',
     statement:
-      'Spending arithmetic is pure and declared: fiscal periods start in October, a series is aligned on the periods asked for with the partial month marked, the projection is the declared seasonal mean of prior years scaled by the year-to-date ratio only after the declared base, the horizon walk pages the source by number, is bounded by a page cap and the wall-clock deadline and reports what it reached, and agency periods are aligned on those present, the year asked for an agency’s offices defaulting to the one the source’s own directory reports active.',
+      'Spending arithmetic is pure and declared: fiscal periods start in October, a series is aligned on the periods asked for with the partial month marked, the projection is the declared seasonal mean of prior years scaled by the year-to-date ratio only after the declared base, the horizon walk pages the source by number, finds the page where end dates cross today by doubling and halving, reads forward from the soonest-ending award inside a page bound and the wall-clock deadline, and says how far the window is complete, and agency periods are aligned on those present, the year asked for an agency’s offices defaulting to the one the source’s own directory reports active.',
   },
 ];

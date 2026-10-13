@@ -129,13 +129,27 @@ export interface DigestInput {
   now: Date;
 }
 
+/** What an ending award has obligated on it; null for a finding about the whole scope. */
+const obligatedOn = (alert: GovconAlert): number | null =>
+  alert.topic === GOVCON_TOPICS.awardEnding ? alert.payload.amount : null;
+
+/** The digest's order: a finding about the whole scope first, then the awards with the most obligated on them, by subject among equals. */
+const byWeight = (a: GovconAlert, b: GovconAlert): number => {
+  const [left, right] = [obligatedOn(a), obligatedOn(b)];
+  if (left !== null && right !== null && left !== right) return right - left;
+  if ((left === null) !== (right === null)) return left === null ? -1 : 1;
+  return a.key.subject.localeCompare(b.key.subject);
+};
+
 /**
  * The digest put to a person: the count and the company in the title, at
- * most `ALERT_PROMPT_MAX_ITEMS` lines and a count of the rest, one choice to
- * acknowledge it, expiring after `ALERT_PROMPT_TTL_DAYS`.
+ * most `ALERT_PROMPT_MAX_ITEMS` lines — the weightiest first — and a count
+ * of the rest, one choice to acknowledge it, expiring after
+ * `ALERT_PROMPT_TTL_DAYS`.
  */
 export function alertPromptOf({ id, profile, alerts, now }: DigestInput): InteractionPrompt {
-  const shown = alerts
+  const shown = [...alerts]
+    .sort(byWeight)
     .slice(0, ALERT_PROMPT_MAX_ITEMS)
     .map((alert) => excerpt(describeAlert(alert), PROMPT_LIMITS.detailMaxLength));
   const rest = alerts.length - shown.length;

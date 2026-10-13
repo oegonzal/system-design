@@ -29,11 +29,11 @@ describe('the horizon panels', () => {
     expect(screen.queryByRole('alert')).toBeNull();
     renderWithTheme(<Capped />);
     expect(screen.getByRole('alert').textContent).toContain(
-      'complete only for awards ending after 2026-11-30',
+      'complete only for awards ending before 2026-11-30; later months are partial',
     );
     renderWithTheme(<Unreached />);
     expect(screen.getAllByRole('alert').at(-1)?.textContent).toContain(
-      'before it reached the window: every award it read ends after 2027-05-31. Narrow the scope',
+      'before it could place today among the scope’s awards: no month is complete. Narrow the scope',
     );
   });
 
@@ -68,6 +68,7 @@ describe('the horizon panels', () => {
     });
     expect(link.getAttribute('href')).toBe('/notices/n-1');
     expect(within(list).getByText('Solicitation · due 2026-10-10')).toBeTruthy();
+    expect(screen.getByText(/candidates for its recompete, not a confirmed match/)).toBeTruthy();
 
     renderWithTheme(<Tiles />);
     const grid = screen.getByLabelText('Ending inside the window');

@@ -85,7 +85,7 @@ describe('the spending service', () => {
     expect((await service.pulse({ ...scope, lookback: 2 })).provenance.servedFrom).toBe('source');
   });
 
-  it('[GOV-20] walks the horizon from today through the gate, capped by the page bound and the deadline through the injected clock', async () => {
+  it('[GOV-20] walks the horizon through the gate, ended by the deadline through the injected clock', async () => {
     const paged = fetchedOf({
       rows: [horizonRowOf({ endsAt: '2026-08-01' })],
       rejected: 0,
@@ -98,7 +98,9 @@ describe('the spending service', () => {
       months: 6,
       capped: true,
       stoppedBy: 'deadline',
-      reachedEndsAt: '2026-08-01',
+      // The deadline fell while the walk was still seeking today's place: no month is complete.
+      completeBefore: null,
+      rows: [],
     });
     expect(horizon.buckets).toHaveLength(6);
     expect(sources.requests.ending).toHaveLength(1);

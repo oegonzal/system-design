@@ -18,7 +18,7 @@ const request: HorizonRequest = {
 };
 
 describe('the USAspending ending awards', () => {
-  it("[GOV-11] [GOV-20] asks for End Date on contracts and Last Date to Order on IDVs, sorted newest-ending, pages by number without the source's cursor, and rejects a row without an end date", async () => {
+  it("[GOV-11] [GOV-20] asks for End Date on contracts and Last Date to Order on IDVs, sorted newest-ending, pages by number without the source's cursor, reads a full page as more to come whatever the source's hasNext says, and rejects a row without an end date", async () => {
     const { http, urls, requests } = httpOf([{ body: contracts }]);
     const { result } = await new UsaSpendingEndingAwards(http).page(request);
     expect(urls[0]).toBe(`${USASPENDING_BASE_URL}/api/v2/search/spending_by_award/`);
@@ -40,8 +40,13 @@ describe('the USAspending ending awards', () => {
 
     const page = okValue(result);
     expect(page.rejected).toBe(1);
-    expect(page.hasMore).toBe(true);
-    expect(page).not.toHaveProperty('next');
+    // Three records against a limit of a hundred: the last page.
+    expect(page.hasMore).toBe(false);
+    const full = httpOf([{ body: { ...contracts, page_metadata: { hasNext: false } } }]);
+    expect(
+      okValue((await new UsaSpendingEndingAwards(full.http).page({ ...request, limit: 3 })).result)
+        .hasMore,
+    ).toBe(true);
     expect(page.rows[0]).toEqual({
       externalId: 'CONT_AWD_N6660426P0205_9700_-NONE-_-NONE-',
       piid: 'N6660426P0205',

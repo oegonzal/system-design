@@ -166,7 +166,7 @@ export const spendingHorizonOf = (overrides: Partial<SpendingHorizon> = {}): Spe
   ],
   capped: false,
   stoppedBy: null,
-  reachedEndsAt: null,
+  completeBefore: null,
   // The DLA bracket solicitation shares the first row's NAICS and buyer: one recompete in view.
   openNotices: [
     {

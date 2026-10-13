@@ -3,6 +3,7 @@ import {
   fiscalPeriodOf,
   fiscalYearStart,
   HORIZON_LOOKBACK_YEARS,
+  HORIZON_MAX_DEPTH_AWARDS,
   HORIZON_PAGE_SIZE,
   MAX_HORIZON_PAGES,
   MAX_HORIZON_ROWS,
@@ -26,9 +27,11 @@ export interface HorizonQuery extends SpendingScope {
 /**
  * What is coming up: the scope's active awards ending inside the coming
  * months, by month and family, with the soonest-ending rows. The source has
- * no period-of-performance filter, so the walk goes newest-ending first over
- * an action-date window of `HORIZON_LOOKBACK_YEARS`, bounded by the page cap
- * and the wall-clock deadline, and says how far it got.
+ * no period-of-performance filter, so the walk finds today's place among the
+ * awards of an action-date window of `HORIZON_LOOKBACK_YEARS` — no deeper
+ * than the source pages — and reads forward from the soonest-ending one,
+ * bounded by the page cap and the wall-clock deadline, saying how far it is
+ * complete.
  */
 export const horizonLens = (deps: LensDeps): LensSpec<HorizonQuery, HorizonBody> => ({
   lens: 'horizon',
@@ -47,6 +50,7 @@ export const horizonLens = (deps: LensDeps): LensSpec<HorizonQuery, HorizonBody>
       {
         families,
         maxPages: MAX_HORIZON_PAGES,
+        maxDepth: Math.floor(HORIZON_MAX_DEPTH_AWARDS / HORIZON_PAGE_SIZE),
         deadlineMs: deps.deadlineMs,
         now: deps.now,
         page: (family, index) => {
@@ -83,7 +87,7 @@ export const horizonLens = (deps: LensDeps): LensSpec<HorizonQuery, HorizonBody>
         rows: soonestRows(walk.rows, MAX_HORIZON_ROWS),
         capped: walk.capped,
         stoppedBy: walk.stoppedBy,
-        reachedEndsAt: walk.reachedEndsAt,
+        completeBefore: walk.completeBefore,
       },
       asOf: await asOfFrom(deps),
       requests: tally.requests,

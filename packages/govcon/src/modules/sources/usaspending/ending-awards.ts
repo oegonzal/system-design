@@ -48,17 +48,14 @@ const endingAwardSchema = z.looseObject({
   'End Date': text,
   'Last Date to Order': text,
 });
-const endingEnvelopeSchema = z.looseObject({
-  results: z.array(z.unknown()),
-  page_metadata: z.looseObject({ hasNext: z.boolean().nullish() }).nullish(),
-});
+const endingEnvelopeSchema = z.looseObject({ results: z.array(z.unknown()) });
 
 /**
  * The request as USAspending spells it: sorted by the family's end date,
  * newest first, by page number. Measured 2026-10-13: a request carrying the
  * source's keyset cursor (`last_record_unique_id`, `last_record_sort_value`)
- * answers an empty-body 503 every time, while numbered pages answer — so the
- * cursor is never sent.
+ * answers an empty-body 503 every time, while numbered pages answer down to
+ * the source's 50,000th award — so the cursor is never sent.
  */
 export function toEndingBody(request: HorizonRequest): Record<string, unknown> {
   const endField = END_DATE_FIELD[request.family];
@@ -109,7 +106,12 @@ export function normalizeEndingAward(raw: unknown, family: AwardFamily): Normali
   };
 }
 
-/** `spending_by_award` sorted by end date: one numbered page of one family, and whether another follows. */
+/**
+ * `spending_by_award` sorted by end date: one numbered page of one family,
+ * and whether another follows — a full page says so. The source's own
+ * `hasNext` does not: measured 2026-10-13, it is false from page 100 on while
+ * page 101 still answers a full page.
+ */
 export class UsaSpendingEndingAwards implements EndingAwards {
   readonly id = USASPENDING_SOURCE_ID;
   readonly disclosures = [...USASPENDING_DISCLOSURES.awards, ...USASPENDING_DISCLOSURES.horizon];
@@ -142,7 +144,7 @@ export class UsaSpendingEndingAwards implements EndingAwards {
       attempts,
       result: {
         kind: 'ok',
-        value: { rows, rejected, hasMore: parsed.data.page_metadata?.hasNext === true },
+        value: { rows, rejected, hasMore: parsed.data.results.length >= request.limit },
         recordCount: rows.length + rejected,
         totalRecords: null,
       },

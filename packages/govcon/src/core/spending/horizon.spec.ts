@@ -1,6 +1,5 @@
 import { horizonRowOf, type AwardFamily } from '@sysdesign/contracts';
 
-import type { Gated } from '../budget';
 import type { EndingAwardsPage } from '../ports';
 import { failure } from '../testing';
 import {
@@ -9,40 +8,59 @@ import {
   monthsAhead,
   soonestRows,
   walkHorizon,
+  type HorizonPageAnswer,
   type HorizonWalkDeps,
 } from './horizon';
 
 const TODAY = '2026-06-15';
 const row = (endsAt: string, family: AwardFamily = 'contracts', amount = 100) =>
   horizonRowOf({ externalId: `${family}-${endsAt}`, endsAt, family, amount });
-const page = (
-  rows: EndingAwardsPage['rows'],
-  hasMore = false,
-  rejected = 0,
-): Gated<EndingAwardsPage> => ({ kind: 'ok', value: { rows, rejected, hasMore } });
+/** A page of contracts ending on these dates, newest first as the source lists them. */
+const page = (dates: readonly string[], hasMore = true): EndingAwardsPage => ({
+  rows: dates.map((endsAt) => row(endsAt)),
+  rejected: 0,
+  hasMore,
+});
+const NO_PAGE: EndingAwardsPage = { rows: [], rejected: 0, hasMore: false };
 
-/** Pages per family, answered in order; every ask remembered. */
-function scripted(
-  pages: Partial<Record<AwardFamily, Gated<EndingAwardsPage>[]>>,
-  overrides: Partial<HorizonWalkDeps> = {},
-) {
+/**
+ * Eight pages of contracts, newest-ending first. Today (2026-06-15) falls on
+ * page 5; a twelve-month window ends 2027-05-31, inside page 2.
+ */
+const CONTRACTS: readonly EndingAwardsPage[] = [
+  page(['2031-01-01', '2029-01-01']),
+  page(['2028-06-01', '2027-08-01']),
+  page(['2027-07-01', '2027-03-01']),
+  page(['2027-01-15', '2026-11-01']),
+  page(['2026-09-01', '2026-07-01']),
+  page(['2026-06-20', '2026-06-01']),
+  page(['2026-05-01', '2026-04-01']),
+  page(['2026-03-01', '2026-02-01'], false),
+];
+
+type Book = Partial<Record<AwardFamily, readonly (EndingAwardsPage | HorizonPageAnswer)[]>>;
+
+/** A source that answers each family's pages by index, an empty page past the end, and remembers every ask. */
+function scripted(book: Book, overrides: Partial<HorizonWalkDeps> = {}) {
   const asks: [AwardFamily, number][] = [];
-  const served: Record<AwardFamily, number> = { contracts: 0, idvs: 0 };
   const deps: HorizonWalkDeps = {
     families: ['contracts', 'idvs'],
-    maxPages: 5,
+    maxPages: 30,
+    maxDepth: 500,
     deadlineMs: 60_000,
     now: () => new Date('2026-06-15T12:00:00Z'),
     async page(family, index) {
       asks.push([family, index]);
-      const reply = pages[family]?.[served[family]] ?? page([]);
-      served[family] += 1;
-      return reply;
+      const answer = book[family]?.[index] ?? NO_PAGE;
+      return 'kind' in answer ? answer : { kind: 'ok', value: answer };
     },
     ...overrides,
   };
   return { deps, asks };
 }
+
+const endDates = (rows: readonly { endsAt: string }[]): string[] =>
+  rows.map((kept) => kept.endsAt).sort();
 
 describe('the horizon', () => {
   it('[GOV-21] names the months ahead and the last day of the window, across a year end', () => {
@@ -82,89 +100,144 @@ describe('the horizon', () => {
     ]);
   });
 
-  it('[GOV-20] [GOV-21] walks each family newest-ending first by numbered page, skips what ends past the window, stops when the end date passes today, and reports capped by pages or by the deadline with the earliest end date reached', async () => {
+  it('[GOV-20] [GOV-21] finds the page where the end dates cross today by doubling and halving, then reads forward from the soonest-ending award until a page begins past the window, fetching no page twice', async () => {
     const { deps, asks } = scripted({
-      contracts: [
-        page([row('2030-01-01'), row('2026-08-01'), row('2026-07-01')], true),
-        page([row('2026-06-20'), row('2026-06-10'), row('2026-05-01')], true),
-      ],
-      idvs: [page([row('2026-09-01', 'idvs')])],
+      contracts: CONTRACTS,
+      idvs: [{ rows: [row('2026-08-01', 'idvs')], rejected: 0, hasMore: false }],
     });
     const walk = await walkHorizon(deps, TODAY, 12);
-    expect(walk.rows.map((kept) => kept.externalId)).toEqual([
-      'contracts-2026-08-01',
-      'contracts-2026-07-01',
-      'contracts-2026-06-20',
-      'idvs-2026-09-01',
+    // Doubling: pages 0, 1, 3, 7; halving: 5, 4; reading forward from 5: 4 and 3 are known, 2 is new and begins past the window.
+    expect(asks.filter(([family]) => family === 'contracts').map(([, index]) => index)).toEqual([
+      0, 1, 3, 7, 5, 4, 2,
+    ]);
+    expect(asks.filter(([family]) => family === 'idvs')).toEqual([['idvs', 0]]);
+    expect(endDates(walk.rows)).toEqual([
+      '2026-06-20',
+      '2026-07-01',
+      '2026-08-01',
+      '2026-09-01',
+      '2026-11-01',
+      '2027-01-15',
+      '2027-03-01',
     ]);
     expect(walk).toMatchObject({
       capped: false,
       stoppedBy: null,
-      reachedEndsAt: null,
+      completeBefore: null,
       failure: null,
     });
-    expect(asks).toEqual([
+
+    // Today on the first page, and nothing at all: one page each.
+    const shallow = scripted({ contracts: [page(['2026-07-01', '2026-06-01'])] });
+    const near = await walkHorizon(shallow.deps, TODAY, 12);
+    expect(endDates(near.rows)).toEqual(['2026-07-01']);
+    expect(shallow.asks).toEqual([
       ['contracts', 0],
-      ['contracts', 1],
       ['idvs', 0],
     ]);
-
-    const byPages = scripted(
-      {
-        contracts: [page([row('2026-08-01'), row('2026-07-01')], true)],
-        idvs: [page([row('2026-09-01', 'idvs')])],
-      },
-      { maxPages: 1 },
-    );
-    const capped = await walkHorizon(byPages.deps, TODAY, 12);
-    expect(capped).toMatchObject({ capped: true, stoppedBy: 'pages', reachedEndsAt: '2026-07-01' });
-    expect(capped.rows).toHaveLength(3);
-    expect(byPages.asks.map(([family]) => family)).toEqual(['contracts', 'idvs']);
-
-    const beforeWindow = scripted(
-      { contracts: [page([row('2031-01-01')], true)] },
-      { maxPages: 1, families: ['contracts'] },
-    );
-    expect(await walkHorizon(beforeWindow.deps, TODAY, 12)).toMatchObject({
-      capped: true,
-      stoppedBy: 'pages',
-      reachedEndsAt: horizonEnd(TODAY, 12),
-      rows: [],
-    });
-
-    let tick = Date.parse('2026-06-15T12:00:00Z');
-    const byDeadline = scripted(
-      { contracts: [page([row('2026-08-01')], true), page([row('2026-07-01')], true)] },
-      { deadlineMs: 1_000, now: () => new Date((tick += 600)) },
-    );
-    const late = await walkHorizon(byDeadline.deps, TODAY, 12);
-    expect(late).toMatchObject({
-      capped: true,
-      stoppedBy: 'deadline',
-      reachedEndsAt: '2026-08-01',
-    });
-    expect(byDeadline.asks).toHaveLength(1);
+    expect((await walkHorizon(scripted({}).deps, TODAY, 12)).rows).toEqual([]);
   });
 
-  it('[GOV-20] a rate limit or a spent budget ends the walk with that failure, keeping what came before, and nothing is retried', async () => {
-    const { deps, asks } = scripted({
-      contracts: [page([row('2026-08-01')], true), failure('rate-limited', 429, 'rate limited')],
-    });
+  it('[GOV-21] keeps an award once when it shows on two pages, and reads every page when the list ends before it reaches today', async () => {
+    const { deps, asks } = scripted(
+      {
+        contracts: [page(['2027-02-01', '2026-12-01']), page(['2026-12-01', '2026-08-01'], false)],
+      },
+      { families: ['contracts'] },
+    );
     const walk = await walkHorizon(deps, TODAY, 12);
+    expect(endDates(walk.rows)).toEqual(['2026-08-01', '2026-12-01', '2027-02-01']);
+    expect(walk.capped).toBe(false);
+    expect(asks.map(([, index]) => index)).toEqual([0, 1]);
+  });
+
+  it('[GOV-20] [GOV-21] capped by the page bound while reading forward, the nearest part of the window is complete and said so; capped while still seeking today, or at the source’s depth, nothing is — and the next family still walks', async () => {
+    const reading = scripted(
+      {
+        contracts: CONTRACTS,
+        idvs: [{ rows: [row('2026-08-01', 'idvs')], rejected: 0, hasMore: false }],
+      },
+      { maxPages: 6 },
+    );
+    const partial = await walkHorizon(reading.deps, TODAY, 12);
+    // Six pages found today's place (0, 1, 3, 7, 5, 4); pages 5, 4 and 3 were read, page 2 was not.
+    expect(endDates(partial.rows.filter((kept) => kept.family === 'contracts'))).toEqual([
+      '2026-06-20',
+      '2026-07-01',
+      '2026-09-01',
+      '2026-11-01',
+      '2027-01-15',
+    ]);
+    expect(partial).toMatchObject({
+      capped: true,
+      stoppedBy: 'pages',
+      completeBefore: '2027-01-15',
+    });
+    // The other family has its own page bound: it walked, and all of it is here.
+    expect(reading.asks.filter(([family]) => family === 'idvs')).toHaveLength(1);
+    expect(endDates(partial.rows.filter((kept) => kept.family === 'idvs'))).toEqual(['2026-08-01']);
+
+    const seeking = scripted({ contracts: CONTRACTS }, { maxPages: 5, families: ['contracts'] });
+    expect(await walkHorizon(seeking.deps, TODAY, 12)).toMatchObject({
+      capped: true,
+      stoppedBy: 'pages',
+      completeBefore: null,
+      rows: [],
+    });
+    expect(seeking.asks).toHaveLength(5);
+
+    const deep = scripted({ contracts: CONTRACTS }, { maxDepth: 4, families: ['contracts'] });
+    expect(await walkHorizon(deep.deps, TODAY, 12)).toMatchObject({
+      capped: true,
+      stoppedBy: 'pages',
+      completeBefore: null,
+      rows: [],
+    });
+    expect(deep.asks.map(([, index]) => index)).toEqual([0, 1, 3]);
+  });
+
+  it('[GOV-20] [GOV-21] the wall-clock deadline ends the whole walk, families not begun included', async () => {
+    let tick = Date.parse('2026-06-15T12:00:00Z');
+    const { deps, asks } = scripted(
+      { contracts: CONTRACTS },
+      { deadlineMs: 1_000, now: () => new Date((tick += 600)) },
+    );
+    expect(await walkHorizon(deps, TODAY, 12)).toMatchObject({
+      capped: true,
+      stoppedBy: 'deadline',
+      completeBefore: null,
+      rows: [],
+    });
+    expect(asks).toEqual([['contracts', 0]]);
+  });
+
+  it('[GOV-20] a rate limit or a spent budget ends the walk with that failure, keeping what was read before it, and nothing is retried', async () => {
+    const refusing = [...CONTRACTS.slice(0, 2), failure('rate-limited', 429, 'rate limited')];
+    const { deps, asks } = scripted(
+      { contracts: [...refusing, ...CONTRACTS.slice(3)] },
+      { families: ['contracts'] },
+    );
+    const walk = await walkHorizon(deps, TODAY, 12);
+    // Pages 5, 4 and 3 were read before page 2 refused.
     expect(walk).toMatchObject({
       capped: true,
       stoppedBy: 'source',
-      reachedEndsAt: '2026-08-01',
+      completeBefore: '2027-01-15',
       failure: { outcome: 'rate-limited' },
     });
-    expect(walk.rows).toHaveLength(1);
-    expect(asks).toHaveLength(2);
+    expect(walk.rows).toHaveLength(5);
+    expect(asks.map(([, index]) => index)).toEqual([0, 1, 3, 7, 5, 4, 2]);
 
-    const spent = scripted({
-      contracts: [{ kind: 'budget-exhausted', spent: 3, budget: 3 }],
-    });
+    const both = scripted({ contracts: [...refusing, ...CONTRACTS.slice(3)] });
+    const halted = await walkHorizon(both.deps, TODAY, 12);
+    // The other family never began, so no part of the window is complete.
+    expect(halted).toMatchObject({ stoppedBy: 'source', completeBefore: null });
+    expect(both.asks.some(([family]) => family === 'idvs')).toBe(false);
+
+    const spent = scripted({ contracts: [{ kind: 'budget-exhausted', spent: 3, budget: 3 }] });
     expect(await walkHorizon(spent.deps, TODAY, 12)).toMatchObject({
       rows: [],
+      stoppedBy: 'source',
       failure: { kind: 'budget-exhausted' },
     });
   });

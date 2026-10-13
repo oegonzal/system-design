@@ -67,17 +67,12 @@ export interface HorizonTilesProps {
   horizon: SpendingHorizon;
 }
 
-/** What a capped walk says: how far it got — or that it never reached the window at all, which a wide scope does. */
+/** What a capped walk says: how far the list is complete, from the near end of the window — or that it never placed today, which a scope too wide for the page bound does. */
 const cappedMessage = (horizon: SpendingHorizon): string => {
   const stop = horizon.stoppedBy ?? 'unknown';
-  if (horizon.rows.length === 0) {
-    return `The walk stopped early (${stop}) before it reached the window: every award it read ends after ${horizon.reachedEndsAt ?? 'the window'}. Narrow the scope — one code family, one agency, one award family.`;
-  }
-  return `The walk stopped early (${stop}): the list is partial${
-    horizon.reachedEndsAt === null
-      ? ''
-      : `, complete only for awards ending after ${horizon.reachedEndsAt}`
-  }.`;
+  return horizon.completeBefore === null
+    ? `The walk stopped early (${stop}) before it could place today among the scope’s awards: no month is complete. Narrow the scope — one code family, one agency, one award family.`
+    : `The walk stopped early (${stop}): the list is complete only for awards ending before ${horizon.completeBefore}; later months are partial.`;
 };
 
 /** How much ends inside the window, per family, how many rows already have an open notice, and whether the walk saw all of it. */
@@ -147,6 +142,10 @@ export interface HorizonTableProps {
   limit: number;
   onPage(offset: number): void;
 }
+
+/** What the open-notices column joins on, said under the table: the join names candidates, never a confirmed recompete. */
+const OPEN_NOTICES_NOTE =
+  'Open notices are stored notices in the award’s NAICS code at the same buying sub-agency: candidates for its recompete, not a confirmed match.';
 
 /** The open notices of one expiring award, each a link to the notice with its type and deadline. */
 function OpenNotices({
@@ -230,6 +229,9 @@ export function HorizonTable({ rows, openNotices, offset, limit, onPage }: Horiz
         </tbody>
       </Table>
       <Pager offset={offset} limit={limit} total={rows.length} onChange={onPage} />
+      <Text tone="muted" size="sm">
+        {OPEN_NOTICES_NOTE}
+      </Text>
     </Stack>
   );
 }

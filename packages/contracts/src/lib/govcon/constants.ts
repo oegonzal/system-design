@@ -48,8 +48,10 @@ export const HORIZON_MONTH_CHOICES = [6, 12, 24] as const;
 export type HorizonMonthChoice = (typeof HORIZON_MONTH_CHOICES)[number];
 /** The action-date window that bounds a horizon walk's universe, in fiscal years. */
 export const HORIZON_LOOKBACK_YEARS = 5;
-/** Pages one horizon walk may spend per award family, before the wall-clock deadline. */
+/** Pages one horizon walk may spend per award family — finding today's place and reading forward from it — before the wall-clock deadline. */
 export const MAX_HORIZON_PAGES = 30;
+/** USAspending pages its award search no deeper than this many awards — its "maximum result limit", measured 2026-10-13. */
+export const HORIZON_MAX_DEPTH_AWARDS = 50_000;
 /** USAspending's award page ceiling. */
 export const HORIZON_PAGE_SIZE = 100;
 /** Soonest-ending rows one horizon answer carries. */

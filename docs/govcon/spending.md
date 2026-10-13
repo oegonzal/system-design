@@ -83,20 +83,24 @@ with the fiscal year to date and the prior fiscal year as presets.
 ### Horizon — what is ending
 
 Active awards in the scope ending inside the months ahead, by month and
-family, with the soonest-ending rows. USAspending cannot filter by period of
-performance, so the service walks awards newest-ending first, by numbered
-page, inside a lookback window of action dates (`HORIZON_LOOKBACK_YEARS`),
-and stops when the end dates pass today. The walk is bounded by a page cap
-per family (`MAX_HORIZON_PAGES`) and by the pull deadline; a capped walk says
-so, names what stopped it, and names the earliest end date it reached — the
-months after it are complete, the ones before it may be missing rows. A wide
-scope caps before it reaches the window at all: measured 2026-10-13, the
-four software NAICS together put 3,000 contracts per family all ending after
-September 2027, and 541511 alone across every agency reached January 2027 in
-3,000 — while 541511 at one department (Defense) reached today in nine pages,
-uncapped. The panel says when nothing inside the window was reached; the
-Horizon reads best at one code family and one agency, which is what the
-directory pick sets, and what the daily warm fills.
+family, with the soonest-ending rows. USAspending lists a scope's awards
+newest-ending first and cannot filter by end date, so for each family the
+service finds the page where the end dates cross today — doubling the page
+number, then halving the gap, a handful of requests however deep today
+lies — and reads from there toward later end dates, the soonest-ending awards
+first, inside a lookback window of action dates (`HORIZON_LOOKBACK_YEARS`).
+The walk is bounded by a page cap per family (`MAX_HORIZON_PAGES`, the search
+and the reading together) and by the pull deadline. A capped walk says so,
+names what stopped it, and names the date it is complete before: every award
+ending before `completeBefore` is in the answer — the near months, the ones
+a bidder acts on — and later months are partial. Measured 2026-10-13: 541511
+contracts at Defense over twelve months, uncapped in 12 requests (769
+contracts, the same month counts an earlier far-first walk gave); the four
+software codes at Defense, complete before 2027-02-24 in 41 requests; the
+four codes across every agency — today sits on page 349 of the contracts,
+34,900 active awards deep — complete before 2026-11-09 in 60. A scope whose
+active awards run past the source's 50,000-award depth cannot be placed at
+all, and the panel then says no month is complete.
 
 **Open notices are recompetes.** Each expiring award is joined, on every
 read, to the open notices already stored by the pulls that share its exact
@@ -198,7 +202,7 @@ switch the window and the months — then copy the address.
 ```
 curl -s 'localhost:3004/spending/pulse?naics=541511,541512&lookback=3' | jq '.data | {fiscalYear, projection: .projection.method, servedFrom: .provenance.servedFrom}'
 curl -s 'localhost:3004/spending/breakdown?category=awarding_agency&naics=541511&from=2025-10-01&to=2026-09-30' | jq '.data | {total, truncated, top: .rows[:5]}'
-curl -s 'localhost:3004/spending/horizon?naics=541511&months=12' | jq '.data | {capped, stoppedBy, reachedEndsAt, rows: (.rows|length), open: (.openNotices|length)}'
+curl -s 'localhost:3004/spending/horizon?naics=541511&months=12' | jq '.data | {capped, stoppedBy, completeBefore, rows: (.rows|length), open: (.openNotices|length)}'
 curl -s 'localhost:3004/spending/agencies' | jq '.data.entries | length'
 curl -s 'localhost:3004/spending/agencies/097?fiscalYear=2026' | jq '.data | {name, years: [.years[]|{fiscalYear, periods: (.byPeriod|length)}]}'
 ```
@@ -287,26 +291,34 @@ notice; 6 with no set-aside, 2 total small business, 1 partial. Thin, because
 the saved searches read exact codes over three days; widen the window or
 add family searches to see the open market, and read the Search page.
 
-**Recompetes (Horizon).** 541511 contracts at the Department of Defense: 769
-contracts end in the next twelve months — 31, 57, 91, 72, 58, 119, 71, 73,
-74, 48, 19, 56 a month from October 2026 — read in nine pages, uncapped; 155
-of the 200 soonest-ending rows already have an open stored notice at the
-same sub-agency in 541511 (a candidate recompete, since the join is by
-sub-agency, not office). 541511 contracts across every agency reached only
-January 2027 in 3,000 rows (192, 232 and 374 ending in January, February and
-March 2027 before the cap); the four codes together never reached the window.
-Narrow to an agency to read the horizon.
+**Recompetes (Horizon).** Across every agency the four codes hold about
+34,900 active contracts; the walk is complete for those ending before 2026-11-09 —
+1,291 contracts end between October 13 and 31, 285 more in early
+November — and for IDVs through mid-2027 (608 reach their last date
+to order in what is left of October). At the Department of Defense the four
+codes are complete before 2027-02-24: 254 contracts end in what is left of
+October, 415 in November, 537 in December, 473 in January. 541511 alone at
+Defense: 769 contracts end in the next twelve months — 31, 57, 91, 72, 58,
+119, 71, 73, 74, 48, 19, 56 a month from October 2026 — complete. Each is
+work a buyer may buy again. The open-notices column joins a row to the
+stored notices in its NAICS code at the same buying sub-agency: candidates
+for its recompete, not a confirmed match (at Defense a sub-agency is a whole
+military department, so one open Navy notice shows beside every expiring
+Navy contract in the code).
 
 **The daily warm**, verified on 2026-10-13 from a fresh store seeded with the
-Enfav profile: pulse 1 request, breakdown 2, the profile-wide horizon 60
-(capped before the window), the directory 1; then the horizon narrowed to
-Defense, Veterans Affairs and GSA in 47, 32 and 39 pages, each reaching
-today; 444 awards in the eight Enfav codes end within 90 days at those three
-agencies, 444 alerts were published on the bus and one digest, "444 spending
-alerts for Enfav LLC" (bus event 619), went to the person. Most are IDVs
-whose last date to order falls due, with nothing obligated on them — the
-count is the signal. For a digest a person reads, set `alerts.endingWithinDays`
-to a month, or narrow the profile's codes to the software four.
+Enfav profile (all eight NAICS, the four manufacturing codes included): one
+line per lens, then the horizon and the outlook of Defense, Veterans Affairs
+and GSA — the top three buyers over a rolling year. With the earlier
+far-first walk it found 444 awards ending within 90 days at those three,
+published 444 alerts and one digest, "444 spending alerts for Enfav LLC"
+(bus event 619), and a second warm raised none of them again. The
+nearest-first walk reads the soonest-ending contracts those warms could not
+reach, so the next scheduled warm will find more. Most of the first 444 were
+IDVs at their last date to order with nothing obligated — the count is the
+signal — and many were in the manufacturing codes. For a digest a person
+reads: narrow the profile's NAICS to the software four, and set
+`alerts.endingWithinDays` to a month.
 
 **What the data says for a new software and AI-services business.**
 
@@ -338,8 +350,8 @@ to a month, or narrow the profile's codes to the software four.
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | A first look takes long                                  | The scope is new today: the lens is built from the source. Later reads answer from the snapshot; the warm fills the default profile's scope daily.                                                     |
 | "from an older snapshot — the source refused a refresh"  | USAspending answered 429, 5xx or timed out; the day-old answer is better than none. Read the ledger row for the outcome.                                                                               |
-| "The walk stopped early (pages)"                         | The scope is wide; the months after `reachedEndsAt` are complete. Narrow the scope or the family.                                                                                                      |
-| \"…before it reached the window\"                        | Wider still: every award the walk read ends after the window. Pick an agency in the Agency tab, or one code family.                                                                                    |
+| "The walk stopped early (pages)"                         | The scope is wide: the list is complete for awards ending before the date named, and later months are partial. Narrow the scope or the family to see further.                                          |
+| "…before it could place today"                           | The scope's active awards run deeper than the page bound, or than the 50,000 awards the source pages to. Pick an agency in the Agency tab, or one code family.                                         |
 | "The walk stopped early (source)"                        | A page failed; the answer was not kept, so the next read walks again.                                                                                                                                  |
 | 404 on an agency                                         | The toptier code is not in USAspending's directory (`GET /spending/agencies`).                                                                                                                         |
 | 502 on an agency with `fiscal_year is outside the range` | A fiscal year was asked that the source has no submissions for yet; leave it out and the agency's active year is used.                                                                                 |
@@ -348,26 +360,27 @@ to a month, or narrow the profile's codes to the software four.
 | `warm skipped: no default profile`                       | The store has no profile; the seed runs on an empty store at boot.                                                                                                                                     |
 | `warm pulse refused 400 naics Too big`                   | The profile names more codes than a scope may (`MAX_SCOPE_CODES`).                                                                                                                                     |
 | `alerts not published` / `digest not sent`               | The notifications service at `NOTIFICATIONS_URL` is down or does not know the `govcon.*` topics yet (rebuild it); nothing is recorded, so the same alerts are raised next warm.                        |
-| `fetch failed`, or 500 with \"Web Page Blocked!\"        | USAspending's firewall is refusing this address after a burst of requests. Stored snapshots still answer (as `stale` once past the window); wait before asking again — every retry is another request. |
+| `fetch failed`, or 500 with "Web Page Blocked!"          | USAspending's firewall is refusing this address after a burst of requests. Stored snapshots still answer (as `stale` once past the window); wait before asking again — every retry is another request. |
 
 ## Limits
 
-| Constant                                                    | Value     | Where it binds                                                   |
-| ----------------------------------------------------------- | --------- | ---------------------------------------------------------------- |
-| `MAX_SCOPE_CODES`                                           | 20        | codes of each kind in one scope                                  |
-| `DEFAULT_PULSE_LOOKBACK_YEARS` / `MAX_PULSE_LOOKBACK_YEARS` | 3 / 5     | prior years the pulse shows and projects from                    |
-| `MAX_BREAKDOWN_ROWS`                                        | 25        | rows one breakdown answers (`truncated` says when more exist)    |
-| `HORIZON_MONTH_CHOICES`                                     | 6, 12, 24 | the months the page offers (`MAX_HORIZON_MONTHS` 36 on the wire) |
-| `HORIZON_LOOKBACK_YEARS`                                    | 5         | the action-date window a horizon walk covers                     |
-| `MAX_HORIZON_PAGES` × `HORIZON_PAGE_SIZE`                   | 30 × 100  | pages per family, rows per page                                  |
-| `MAX_HORIZON_ROWS`                                          | 200       | soonest-ending rows one answer lists                             |
-| `MAX_RECOMPETE_NOTICES`                                     | 500       | open notices one horizon read joins                              |
-| `MAX_AGENCY_OFFICES`                                        | 50        | sub-agencies one outlook answers                                 |
-| `ALERT_PROMPT_MAX_ITEMS` / `ALERT_PROMPT_TTL_DAYS`          | 10 / 7    | lines one digest lists; days until it expires                    |
-| `MAX_ALERT_ENDING_DAYS`                                     | 366       | the farthest `alerts.endingWithinDays` may look                  |
-| `WARM_TOP_AGENCIES`                                         | 3         | agency outlooks one warm reads                                   |
-| `SAM_GOV_CACHE_TTL_HOURS`                                   | 24        | the snapshot window                                              |
-| `GOVCON_PULL_DEADLINE_SECONDS`                              | 120       | the wall clock on one horizon walk                               |
+| Constant                                                    | Value     | Where it binds                                                              |
+| ----------------------------------------------------------- | --------- | --------------------------------------------------------------------------- |
+| `MAX_SCOPE_CODES`                                           | 20        | codes of each kind in one scope                                             |
+| `DEFAULT_PULSE_LOOKBACK_YEARS` / `MAX_PULSE_LOOKBACK_YEARS` | 3 / 5     | prior years the pulse shows and projects from                               |
+| `MAX_BREAKDOWN_ROWS`                                        | 25        | rows one breakdown answers (`truncated` says when more exist)               |
+| `HORIZON_MONTH_CHOICES`                                     | 6, 12, 24 | the months the page offers (`MAX_HORIZON_MONTHS` 36 on the wire)            |
+| `HORIZON_LOOKBACK_YEARS`                                    | 5         | the action-date window a horizon walk covers                                |
+| `MAX_HORIZON_PAGES` × `HORIZON_PAGE_SIZE`                   | 30 × 100  | pages per family (finding today's place and reading forward), rows per page |
+| `HORIZON_MAX_DEPTH_AWARDS`                                  | 50,000    | the depth USAspending pages its award search to                             |
+| `MAX_HORIZON_ROWS`                                          | 200       | soonest-ending rows one answer lists                                        |
+| `MAX_RECOMPETE_NOTICES`                                     | 500       | open notices one horizon read joins                                         |
+| `MAX_AGENCY_OFFICES`                                        | 50        | sub-agencies one outlook answers                                            |
+| `ALERT_PROMPT_MAX_ITEMS` / `ALERT_PROMPT_TTL_DAYS`          | 10 / 7    | lines one digest lists; days until it expires                               |
+| `MAX_ALERT_ENDING_DAYS`                                     | 366       | the farthest `alerts.endingWithinDays` may look                             |
+| `WARM_TOP_AGENCIES`                                         | 3         | agency outlooks one warm reads                                              |
+| `SAM_GOV_CACHE_TTL_HOURS`                                   | 24        | the snapshot window                                                         |
+| `GOVCON_PULL_DEADLINE_SECONDS`                              | 120       | the wall clock on one horizon walk                                          |
 
 ## USAspending facts the design rests on
 
@@ -376,7 +389,7 @@ Probed live on 2026-10-12 and 2026-10-13; free, no key.
 - `spending_over_time` reports by **fiscal** period (`month` 1 is October) and a window across October 1 spills into the next fiscal year.
 - The `agencies` filter is by **name**; the service resolves a toptier code through `references/toptier_agencies`, whose `agency_id` is the `id` a category breakdown answers with.
 - `spending_by_award` requires the `sort` field among the requested `fields`; IDVs end at `Last Date to Order`, contracts at `End Date`; `time_period` filters the action date only, never the period of performance.
-- Any `spending_by_award` request carrying the keyset cursor (`last_record_unique_id`, `last_record_sort_value`) answers an empty-body 503 every time; numbered pages answer (page 60 is empty for a six-digit NAICS), so the walk pages by number.
+- Any `spending_by_award` request carrying the keyset cursor (`last_record_unique_id`, `last_record_sort_value`) answers an empty-body 503 every time. Numbered pages answer down to the 50,000th award — page 500 at a hundred a page; deeper is a 422 naming the "maximum result limit 50000" — and `page_metadata.hasNext` is false from page 100 on while later pages still answer full, so a full page, not that flag, says more follow.
 - `budgetary_resources` periods are sparse — a year just begun is empty, older years quarterly — and are shown as reported; `sub_agency` refuses a `fiscal_year` outside its submissions (the new fiscal year, for weeks after October 1), while `references/toptier_agencies` reports each agency's `active_fy`.
 - The source sits behind a firewall with no published limit. Measured 2026-10-13: about 700 requests in fourteen minutes — four renewing warms back to back, the last two within two minutes — and it answered 500 with a "Web Page Blocked!" page, then refused connections from this address; one warm of about 190 requests in a minute had passed three times before that. One warm a day and ordinary browsing stay well under it; a burst does not.
 - `awards/last_updated` is `MM/DD/YYYY`; Department of Defense awards appear 90 days after signing; agency financials are revealed about five to six weeks after the period.

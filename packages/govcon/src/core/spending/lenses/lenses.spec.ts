@@ -179,10 +179,11 @@ describe('the spending lenses', () => {
 
     const partial = harness({
       ending: [
+        // The contracts' one page reaches today and is the last; the IDVs' first page is refused.
         fetchedOf({
           rows: [horizonRowOf({ endsAt: '2026-08-01' })],
           rejected: 1,
-          hasMore: true,
+          hasMore: false,
         }),
         failure('rate-limited', 429, 'rate limited'),
       ],
@@ -195,7 +196,7 @@ describe('the spending lenses', () => {
     });
     expect(horizon).toMatchObject({
       kind: 'ok',
-      body: { capped: true, stoppedBy: 'source', reachedEndsAt: '2026-08-01', today: '2026-06-15' },
+      body: { capped: true, stoppedBy: 'source', completeBefore: null, today: '2026-06-15' },
       provenance: { requests: 2, disclosures: ['horizon disclosure'] },
     });
     if (horizon.kind !== 'ok') throw new Error('expected ok');

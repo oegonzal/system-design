@@ -18,16 +18,16 @@ export const Chart: Story = {};
 
 export const Tiles: Story = { render: () => <HorizonTiles horizon={HORIZON} /> };
 
-/** The walk hit its page cap: the list is partial and says how far it reached. */
+/** The walk hit its page cap while reading forward: the near months are complete, and it says through when. */
 export const Capped: Story = {
   render: () => (
     <HorizonTiles
-      horizon={{ ...HORIZON, capped: true, stoppedBy: 'pages', reachedEndsAt: '2026-11-30' }}
+      horizon={{ ...HORIZON, capped: true, stoppedBy: 'pages', completeBefore: '2026-11-30' }}
     />
   ),
 };
 
-/** A wide scope: thirty pages of awards all ending after the window, so nothing is known inside it. */
+/** A scope too wide to place today inside the page bound: nothing in the window is complete. */
 export const Unreached: Story = {
   render: () => (
     <HorizonTiles
@@ -42,7 +42,7 @@ export const Unreached: Story = {
         })),
         capped: true,
         stoppedBy: 'pages',
-        reachedEndsAt: '2027-05-31',
+        completeBefore: null,
       }}
     />
   ),

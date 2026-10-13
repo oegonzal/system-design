@@ -151,10 +151,11 @@ export interface HorizonBody {
   buckets: HorizonBucket[];
   /** The soonest-ending rows inside the window, bounded. */
   rows: HorizonRow[];
-  /** The walk ended before the universe did; the buckets after `reachedEndsAt` are complete. */
+  /** The walk ended before it covered the window; `stoppedBy` names what ended it. */
   capped: boolean;
   stoppedBy: HorizonStop | null;
-  reachedEndsAt: string | null;
+  /** When capped: awards ending before this date are all here — the near end of the window — and later months may be missing; null when no part of the window is complete. */
+  completeBefore: string | null;
 }
 
 /** A stored notice as the horizon names it beside an expiring award. */

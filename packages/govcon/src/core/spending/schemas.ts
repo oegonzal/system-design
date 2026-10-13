@@ -114,7 +114,7 @@ export const horizonBodySchema = z.strictObject({
   ),
   capped: z.boolean(),
   stoppedBy: z.enum(HORIZON_STOPS).nullable(),
-  reachedEndsAt: isoDate.nullable(),
+  completeBefore: isoDate.nullable(),
 }) satisfies z.ZodType<HorizonBody>;
 
 const directoryEntry = z.strictObject({
