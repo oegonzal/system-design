@@ -9,6 +9,7 @@ import {
   GovconEntity,
   GovconOpportunity,
   GovconSavedSearch,
+  GovconSavedView,
   GovconSearchProfile,
   GovconSourceCall,
   GovconSpendingSnapshot,
@@ -146,7 +147,7 @@ export async function bootGovconHttp(spending: SpendingScript = {}): Promise<Gov
   };
 }
 
-/** Every govcon table emptied — the nine. */
+/** Every govcon table emptied. */
 export const truncateGovcon = (em: EntityManager): Promise<void> =>
   truncateTestTables(em, [
     GovconSourceCall,
@@ -157,6 +158,7 @@ export const truncateGovcon = (em: EntityManager): Promise<void> =>
     GovconBid,
     GovconOpportunity,
     GovconSavedSearch,
+    GovconSavedView,
     GovconSearchProfile,
   ]);
 

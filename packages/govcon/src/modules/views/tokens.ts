@@ -1,0 +1,1 @@
+export const SAVED_VIEW_REPOSITORY = Symbol('SAVED_VIEW_REPOSITORY');

@@ -8,6 +8,7 @@ import { DEFAULT_ALERT_POLICY, type SearchProfile, type StoredProfile } from './
 import type { PullReport, SliceReport } from './pull';
 import type { SavedSearch } from './search';
 import type { Description, SourceCall, SourceStatus } from './source';
+import type { SavedView } from './view';
 
 /**
  * Wire-shaped builders for specs and stories, one per record, each taking
@@ -326,5 +327,15 @@ export const entityOf = (overrides: Partial<Entity> = {}): Entity => ({
   psc: ['5340'],
   excluded: false,
   fetchedAt: '2026-09-27T04:05:00.000Z',
+  ...overrides,
+});
+
+export const savedViewOf = (overrides: Partial<SavedView> = {}): SavedView => ({
+  id: 'v-1',
+  profileId: 'enfav',
+  name: 'Who buys',
+  href: '/spending?naics=541511&tab=where',
+  createdAt: '2026-09-27T03:00:00.000Z',
+  updatedAt: '2026-09-27T03:00:00.000Z',
   ...overrides,
 });

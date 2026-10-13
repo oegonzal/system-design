@@ -9,6 +9,7 @@ import { ProfilesModule } from '../profiles/profiles.module';
 import { PullsModule } from '../pulls/pulls.module';
 import { SourcesModule } from '../sources/sources.module';
 import { SpendingModule } from '../spending/spending.module';
+import { ViewsModule } from '../views/views.module';
 
 @Module({
   imports: [
@@ -21,6 +22,7 @@ import { SpendingModule } from '../spending/spending.module';
     BidsModule,
     EntitiesModule,
     SpendingModule,
+    ViewsModule,
   ],
   controllers: [HealthController],
 })

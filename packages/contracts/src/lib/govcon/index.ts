@@ -20,6 +20,7 @@ export * from './pull';
 export * from './lead';
 export * from './notice';
 export * from './search';
+export * from './view';
 export * from './bid';
 export * from './award';
 export * from './entity';

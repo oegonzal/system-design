@@ -16,3 +16,4 @@ export * from './search';
 export * from './searches';
 export * from './snapshots';
 export * from './spending';
+export * from './views';

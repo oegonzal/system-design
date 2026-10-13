@@ -203,6 +203,11 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
       'The reach count cuts a scope’s new contracts down step by step — made in the lanes named, placed as contracts of their own, won by a small business — one count and one total a cut and the last cut by award size, each read through the gate as its own operation; narrowing only ever takes away, so a cut the scope’s own facets rule out is answered as nothing without a request.',
   },
   {
+    id: 'GOV-28',
+    statement:
+      'A saved view is an address inside the client that a profile keeps by name: an address that is not a path beginning with one slash is refused, saving under a name already kept replaces its address on the same row, views are listed by name and gone with their profile, and an unknown profile or view is a 404.',
+  },
+  {
     id: 'GOV-21',
     statement:
       'Spending arithmetic is pure and declared: fiscal periods start in October, a series is aligned on the periods asked for with the partial month marked, the projection is the declared seasonal mean of prior years scaled by the year-to-date ratio only after the declared base, the horizon walk pages the source by number, finds the page where end dates cross today by doubling and halving, reads forward from the soonest-ending award inside a page bound and the wall-clock deadline, and says how far the window is complete, and agency periods are aligned on those present, the year asked for an agency’s offices defaulting to the one the source’s own directory reports active.',
