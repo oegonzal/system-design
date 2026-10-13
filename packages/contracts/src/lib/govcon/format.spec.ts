@@ -1,6 +1,7 @@
 import {
   agencyOf,
   clip,
+  compactMoney,
   day,
   daysLeftLabel,
   daysUntil,
@@ -31,9 +32,13 @@ describe('govcon formatting', () => {
     expect(clip(null, 5)).toBe('—');
   });
 
-  it('formats money as whole dollars', () => {
+  it('formats money as whole dollars, and compactly for a tick or a tile', () => {
     expect(money(1234567.89)).toBe('$1,234,568');
     expect(money(null)).toBe('—');
+    expect(compactMoney(1234567)).toBe('$1.2M');
+    expect(compactMoney(850000)).toBe('$850K');
+    expect(compactMoney(-3400000)).toBe('-$3.4M');
+    expect(compactMoney(null)).toBe('—');
   });
 
   it('counts whole days up to an instant', () => {

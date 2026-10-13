@@ -3,16 +3,14 @@ import type { SourceAvailability, SpendingRequest } from '@sysdesign/contracts';
 import type { Attempted, Fetched } from '../../../core/budget';
 import type { AwardPage, SpendingAwards } from '../../../core/ports';
 import { issuesOf, type AttemptedHttp } from '../http';
+import { AWARD_TYPE_CODES } from './families';
+import { scopeFilters, timePeriod } from './filters';
 import { normalizeSpendingAward } from './normalize';
 import { spendingEnvelopeSchema } from './schemas';
+import { USASPENDING_BASE_URL, USASPENDING_SOURCE_ID } from './source';
 
-/** USAspending's Advanced Award Search: no key, one POST per page. */
-export const USASPENDING_SOURCE_ID = 'usaspending';
-export const USASPENDING_BASE_URL = 'https://api.usaspending.gov';
+/** USAspending's Advanced Award Search: no key, one POST per page; contracts only. */
 const SEARCH_PATH = '/api/v2/search/spending_by_award/';
-
-/** Contracts only (definitive, purchase orders, delivery orders, BPA calls). */
-const CONTRACT_AWARD_TYPES = ['A', 'B', 'C', 'D'];
 const FIELDS = [
   'Award ID',
   'Recipient Name',
@@ -33,10 +31,8 @@ const FIELDS = [
 export function toSpendingBody(request: SpendingRequest): Record<string, unknown> {
   return {
     filters: {
-      time_period: [{ start_date: request.from, end_date: request.to }],
-      award_type_codes: CONTRACT_AWARD_TYPES,
-      ...(request.naics.length > 0 ? { naics_codes: { require: request.naics } } : {}),
-      ...(request.psc.length > 0 ? { psc_codes: { require: request.psc } } : {}),
+      ...timePeriod(request.from, request.to),
+      ...scopeFilters({ ...request, agency: null, codes: AWARD_TYPE_CODES.contracts }),
     },
     fields: FIELDS,
     page: request.page,

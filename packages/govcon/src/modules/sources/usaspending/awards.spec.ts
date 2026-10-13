@@ -1,7 +1,7 @@
-import { AttemptedHttp } from '../http';
-import { transportOf } from '../sam-gov/testing';
-import { toSpendingBody, USASPENDING_BASE_URL, UsaSpendingAwards } from './awards';
+import { toSpendingBody, UsaSpendingAwards } from './awards';
 import fixture from './fixtures/spending-response.json';
+import { USASPENDING_BASE_URL } from './source';
+import { httpOf } from './testing';
 
 const request = {
   naics: ['332710'],
@@ -12,17 +12,8 @@ const request = {
   limit: 100,
 };
 
-function harness(replies: Parameters<typeof transportOf>[0]) {
-  const { fetch, urls } = transportOf(replies);
-  const requests: RequestInit[] = [];
-  const http = new AttemptedHttp({
-    fetch: (url, init) => {
-      requests.push(init);
-      return fetch(url);
-    },
-    sleep: async () => undefined,
-    now: () => new Date('2026-09-26T12:00:00Z'),
-  });
+function harness(replies: Parameters<typeof httpOf>[0]) {
+  const { http, urls, requests } = httpOf(replies);
   return { source: new UsaSpendingAwards(http), urls, requests };
 }
 

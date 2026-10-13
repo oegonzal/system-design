@@ -1,0 +1,41 @@
+{
+  "toptier_code": "097",
+  "agency_data_by_year": [
+    {
+      "fiscal_year": 2027,
+      "agency_budgetary_resources": null,
+      "agency_total_obligated": null,
+      "agency_total_outlayed": null,
+      "total_budgetary_resources": null,
+      "agency_obligation_by_period": []
+    },
+    {
+      "fiscal_year": 2026,
+      "agency_budgetary_resources": 1300000000000.5,
+      "agency_total_obligated": "640000000000",
+      "agency_total_outlayed": 560000000000,
+      "total_budgetary_resources": 16181198695809.91,
+      "agency_obligation_by_period": [
+        { "period": 3, "obligated": 120000000000 },
+        { "period": 2, "obligated": 70000000000 },
+        { "period": 4, "obligated": 180000000000 },
+        { "period": 4, "obligated": 181000000000 }
+      ]
+    },
+    {
+      "fiscal_year": 2019,
+      "agency_budgetary_resources": 1000000000000,
+      "agency_total_obligated": 900000000000,
+      "agency_total_outlayed": 800000000000,
+      "total_budgetary_resources": 9000000000000,
+      "agency_obligation_by_period": [
+        { "period": 3, "obligated": 200000000000 },
+        { "period": 6, "obligated": 450000000000 },
+        { "period": 9, "obligated": 680000000000 },
+        { "period": 12, "obligated": 900000000000 }
+      ]
+    },
+    { "fiscal_year": null, "agency_obligation_by_period": [] }
+  ],
+  "messages": []
+}

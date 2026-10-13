@@ -1,0 +1,28 @@
+{
+  "limit": 100,
+  "results": [
+    {
+      "internal_id": 362276268,
+      "Award ID": "70Z08026D16007B00",
+      "Recipient Name": "DAMCO, INC",
+      "Award Amount": 0.0,
+      "Awarding Agency": "Department of Homeland Security",
+      "Awarding Agency Code": "070",
+      "Awarding Sub Agency": "U.S. Coast Guard",
+      "Awarding Sub Agency Code": "7008",
+      "Last Date to Order": "2031-09-14",
+      "Contract Award Type": "INDEFINITE DELIVERY / INDEFINITE QUANTITY",
+      "NAICS": { "code": "332710", "description": "MACHINE SHOPS" },
+      "PSC": { "code": "2040", "description": "MARINE HARDWARE AND HULL ITEMS" },
+      "generated_internal_id": "CONT_IDV_70Z08026D16007B00_7008",
+      "awarding_agency_id": 766
+    }
+  ],
+  "page_metadata": {
+    "page": 1,
+    "hasNext": false,
+    "last_record_unique_id": null,
+    "last_record_sort_value": null
+  },
+  "messages": []
+}

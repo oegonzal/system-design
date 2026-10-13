@@ -13,3 +13,5 @@ export * from './profiles';
 export * from './repositories';
 export * from './search';
 export * from './searches';
+export * from './snapshots';
+export * from './spending';

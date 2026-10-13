@@ -1,0 +1,49 @@
+{
+  "limit": 100,
+  "results": [
+    {
+      "internal_id": 362764604,
+      "Award ID": "N6660426P0205",
+      "Recipient Name": "VIRGINIA HIGHLANDS MACHINE INC.",
+      "Recipient UEI": "DMDXQNBUKXV5",
+      "Award Amount": 266963.4,
+      "Awarding Agency": "Department of Defense",
+      "Awarding Agency Code": "097",
+      "Awarding Sub Agency": "Department of the Navy",
+      "Awarding Sub Agency Code": "1700",
+      "End Date": "2030-11-30",
+      "Contract Award Type": "PURCHASE ORDER",
+      "NAICS": { "code": "332710", "description": "MACHINE SHOPS" },
+      "PSC": { "code": "5340", "description": "HARDWARE, COMMERCIAL" },
+      "Description": "HOUSING AND END-PLATES COMPONENTS REQUIRED FOR CRITICAL UNDERWATER SONAR CAPABILITIES.",
+      "generated_internal_id": "CONT_AWD_N6660426P0205_9700_-NONE-_-NONE-",
+      "awarding_agency_id": 1173,
+      "agency_slug": "department-of-defense"
+    },
+    {
+      "internal_id": 352974032,
+      "Award ID": "SPE4A726P0123",
+      "Recipient Name": "PRECISION PARTS CO",
+      "Recipient UEI": null,
+      "Award Amount": "52000",
+      "Awarding Agency": "Department of Defense",
+      "Awarding Agency Code": "097",
+      "Awarding Sub Agency": "Defense Logistics Agency",
+      "Awarding Sub Agency Code": "97AS",
+      "End Date": "2026-07-20 00:00:00",
+      "Contract Award Type": "DELIVERY ORDER",
+      "NAICS": { "code": "332710", "description": "MACHINE SHOPS" },
+      "PSC": null,
+      "Description": null,
+      "generated_internal_id": "CONT_AWD_SPE4A726P0123_9700_SPE4A720D0001_9700"
+    },
+    { "generated_internal_id": "CONT_AWD_NO_END_DATE", "Award ID": "X1", "End Date": null }
+  ],
+  "page_metadata": {
+    "page": 1,
+    "hasNext": true,
+    "last_record_unique_id": 352974032,
+    "last_record_sort_value": "1911513600000"
+  },
+  "messages": []
+}

@@ -33,3 +33,27 @@ export const AWARD_PAGE_SIZE = 100;
 
 /** Entity Management accepts up to a hundred UEIs per request. */
 export const MAX_UEI_BATCH = 100;
+
+/** Codes of each kind one spending scope may name. */
+export const MAX_SCOPE_CODES = 20;
+/** Prior fiscal years the pulse shows and projects from. */
+export const DEFAULT_PULSE_LOOKBACK_YEARS = 3;
+export const MAX_PULSE_LOOKBACK_YEARS = 5;
+/** Rows one breakdown answers; the answer says when more exist. */
+export const MAX_BREAKDOWN_ROWS = 25;
+export const DEFAULT_HORIZON_MONTHS = 12;
+export const MAX_HORIZON_MONTHS = 36;
+/** The horizons the client offers; each is within `MAX_HORIZON_MONTHS`. */
+export const HORIZON_MONTH_CHOICES = [6, 12, 24] as const;
+/** The action-date window that bounds a horizon walk's universe, in fiscal years. */
+export const HORIZON_LOOKBACK_YEARS = 5;
+/** Pages one horizon walk may spend per award family, before the wall-clock deadline. */
+export const MAX_HORIZON_PAGES = 30;
+/** USAspending's award page ceiling. */
+export const HORIZON_PAGE_SIZE = 100;
+/** Soonest-ending rows one horizon answer carries. */
+export const MAX_HORIZON_ROWS = 200;
+/** Sub-agencies one agency outlook answers; the answer says when more exist. */
+export const MAX_AGENCY_OFFICES = 50;
+/** USAspending's award search begins on 2007-10-01, the first day of FY2008. */
+export const FIRST_FISCAL_YEAR = 2008;

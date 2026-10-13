@@ -1,0 +1,55 @@
+{
+  "toptier_code": "097",
+  "fiscal_year": 2026,
+  "page_metadata": {
+    "page": 1,
+    "total": 23,
+    "limit": 3,
+    "next": 2,
+    "previous": null,
+    "hasNext": true,
+    "hasPrevious": false
+  },
+  "results": [
+    {
+      "abbreviation": "USN",
+      "name": "Department of the Navy",
+      "total_obligations": 121331542463.71,
+      "transaction_count": 119558,
+      "new_award_count": 37352,
+      "children": [
+        {
+          "code": "N00024",
+          "name": "NAVSEA HQ",
+          "total_obligations": 37460105417.73,
+          "transaction_count": 4205,
+          "new_award_count": 999
+        },
+        {
+          "code": "N00019",
+          "name": "NAVAL AIR SYSTEMS COMMAND",
+          "total_obligations": "33759202765.48",
+          "transaction_count": 3028,
+          "new_award_count": 313
+        },
+        {
+          "code": "N99999",
+          "name": null,
+          "total_obligations": 1,
+          "transaction_count": 1,
+          "new_award_count": 1
+        }
+      ]
+    },
+    {
+      "abbreviation": null,
+      "name": "Defense Logistics Agency",
+      "total_obligations": 48000000000,
+      "transaction_count": 1200000,
+      "new_award_count": 640000,
+      "children": null
+    },
+    { "abbreviation": "X", "name": null, "total_obligations": 5 }
+  ],
+  "messages": []
+}

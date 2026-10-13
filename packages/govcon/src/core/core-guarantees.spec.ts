@@ -34,6 +34,7 @@ describe('the core', () => {
         'ports/ledger.ts',
         'budget/gate.ts',
         'budget/policy.ts',
+        'spending/lens.ts',
         'scoring.ts',
         'profile.ts',
         'plan.ts',

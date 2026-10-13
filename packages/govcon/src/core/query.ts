@@ -1,6 +1,11 @@
 import { createHash } from 'node:crypto';
 
-import type { OpportunityQuery, SourceCallQueries, SourceOperation } from '@sysdesign/contracts';
+import type {
+  OpportunityQuery,
+  SourceCallQueries,
+  SourceOperation,
+  SpendingLens,
+} from '@sysdesign/contracts';
 
 /**
  * The query's arithmetic: canonical spelling, the ledger's key, the next
@@ -27,10 +32,17 @@ export function callKey<K extends SourceOperation>(
   operation: K,
   query: SourceCallQueries[K],
 ): string {
-  return createHash('sha256')
-    .update(`${source}\n${operation}\n${JSON.stringify(canonicalQuery(query))}`)
-    .digest('hex');
+  return digest(source, operation, query);
 }
+
+/** sha256 hex over the lens and the canonical query — the snapshot table's key. */
+export const snapshotKey = (lens: SpendingLens, query: object): string =>
+  digest('snapshot', lens, query);
+
+const digest = (...parts: [string, string, object]): string =>
+  createHash('sha256')
+    .update(`${parts[0]}\n${parts[1]}\n${JSON.stringify(canonicalQuery(parts[2]))}`)
+    .digest('hex');
 
 /** The following page of the same search. */
 export const nextPage = (query: OpportunityQuery): OpportunityQuery => ({

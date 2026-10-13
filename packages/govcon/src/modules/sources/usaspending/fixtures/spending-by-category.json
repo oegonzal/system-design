@@ -1,0 +1,40 @@
+{
+  "category": "awarding_agency",
+  "spending_level": "transactions",
+  "limit": 5,
+  "page_metadata": {
+    "page": 1,
+    "next": 2,
+    "previous": null,
+    "hasNext": true,
+    "hasPrevious": false
+  },
+  "results": [
+    {
+      "id": 1173,
+      "code": "DOD",
+      "name": "Department of Defense",
+      "agency_slug": "department-of-defense",
+      "amount": 48444127.94,
+      "total_outlays": null
+    },
+    {
+      "id": 862,
+      "code": "NASA",
+      "name": "National Aeronautics and Space Administration",
+      "agency_slug": "national-aeronautics-and-space-administration",
+      "amount": 1031288.89,
+      "total_outlays": null
+    },
+    {
+      "id": 315,
+      "code": "DOS",
+      "name": "Department of State",
+      "amount": "523205.26",
+      "total_outlays": null
+    },
+    { "id": null, "code": null, "name": null, "amount": 1000, "total_outlays": null },
+    { "code": "DOI" }
+  ],
+  "messages": []
+}

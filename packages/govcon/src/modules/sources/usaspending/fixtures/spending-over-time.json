@@ -1,0 +1,36 @@
+{
+  "group": "month",
+  "spending_level": "transactions",
+  "messages": [
+    "For searches, time period start and end dates are currently limited to an earliest date of 2007-10-01."
+  ],
+  "results": [
+    {
+      "aggregated_amount": 267308069.66,
+      "time_period": { "fiscal_year": "2025", "month": "1" },
+      "Contract_Obligations": 260000000.66,
+      "Idv_Obligations": 7308069.0,
+      "Grant_Obligations": 0,
+      "total_outlays": null
+    },
+    {
+      "aggregated_amount": 120000000,
+      "time_period": { "fiscal_year": "2025", "month": "2" },
+      "Contract_Obligations": "120000000",
+      "Idv_Obligations": 0.0
+    },
+    {
+      "aggregated_amount": -500000,
+      "time_period": { "fiscal_year": "2025", "month": "3" },
+      "Contract_Obligations": -500000,
+      "Idv_Obligations": 0
+    },
+    {
+      "aggregated_amount": 36580224.46,
+      "time_period": { "fiscal_year": "2026", "month": "1" },
+      "Contract_Obligations": 36580224.46,
+      "Idv_Obligations": 0.0
+    },
+    { "aggregated_amount": 1, "time_period": { "month": "4" } }
+  ]
+}

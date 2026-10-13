@@ -18,6 +18,7 @@ import { GovconOpportunity } from './entities/govcon-opportunity.entity';
 import { GovconSavedSearch } from './entities/govcon-saved-search.entity';
 import { GovconSearchProfile } from './entities/govcon-search-profile.entity';
 import { GovconSourceCall } from './entities/govcon-source-call.entity';
+import { GovconSpendingSnapshot } from './entities/govcon-spending-snapshot.entity';
 import { Interaction } from './entities/interaction.entity';
 import { InteractionDelivery } from './entities/interaction-delivery.entity';
 import { JobApplication } from './entities/job-application.entity';
@@ -75,6 +76,7 @@ export const ormOptions = {
     GovconBid,
     GovconAward,
     GovconEntity,
+    GovconSpendingSnapshot,
     BusEvent,
     BusSubscription,
     Interaction,

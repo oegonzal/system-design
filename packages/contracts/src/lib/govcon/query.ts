@@ -1,4 +1,11 @@
-import type { NoticeStatus, NoticeTypeCode, SourceOperation } from './vocab';
+import type {
+  AwardFamily,
+  AwardFamilyChoice,
+  BreakdownCategory,
+  NoticeStatus,
+  NoticeTypeCode,
+  SourceOperation,
+} from './vocab';
 
 /**
  * A search as the govcon package spells it: SAM.gov's documented filters under
@@ -80,6 +87,73 @@ export interface ExclusionsRequest {
   uei: string;
 }
 
+/** An awarding agency by its toptier code and the name USAspending filters by. */
+export interface AgencyRef {
+  toptierCode: string;
+  name: string;
+}
+
+/** The codes and the agency every USAspending scope request carries. */
+export interface ScopeRequest {
+  naics: string[];
+  psc: string[];
+  agency: AgencyRef | null;
+}
+
+export type SeriesGroup = 'month' | 'fiscal_year';
+
+/** One `spending_over_time` call: obligations by fiscal period or year over an action-date window. */
+export interface SeriesRequest extends ScopeRequest {
+  awardFamily: AwardFamilyChoice;
+  group: SeriesGroup;
+  /** ISO dates, inclusive, on the action date. */
+  from: string;
+  to: string;
+}
+
+/** One page of `spending_by_category/<category>` over an action-date window. */
+export interface BreakdownRequest extends ScopeRequest {
+  awardFamily: AwardFamilyChoice;
+  category: BreakdownCategory;
+  from: string;
+  to: string;
+  limit: number;
+  page: number;
+}
+
+/** Where the previous horizon page ended, as the provider spells its keyset cursor. */
+export interface HorizonCursor {
+  id: number | string;
+  sortValue: string;
+}
+
+/** One page of the horizon walk: one family, newest-ending first, after the cursor. */
+export interface HorizonRequest extends ScopeRequest {
+  family: AwardFamily;
+  /** The action-date window that bounds the universe walked. */
+  from: string;
+  to: string;
+  limit: number;
+  page: number;
+  after: HorizonCursor | null;
+}
+
+export interface AgencyBudgetRequest {
+  toptierCode: string;
+}
+
+/** One page of an agency's sub-agencies and offices for a fiscal year. */
+export interface AgencyOfficesRequest {
+  toptierCode: string;
+  fiscalYear: number;
+  awardFamily: AwardFamilyChoice;
+  limit: number;
+  page: number;
+}
+
+/** An operation that asks for nothing: the agency directory, the source's freshness. */
+export type NoRequest = Record<string, never>;
+
 /** The query shape of every operation, so a ledger row is typed by its `operation`. */
 export interface SourceCallQueries {
   search: OpportunityQuery;
@@ -89,6 +163,13 @@ export interface SourceCallQueries {
   spending: SpendingRequest;
   entity: EntityRequest;
   exclusions: ExclusionsRequest;
+  series: SeriesRequest;
+  breakdown: BreakdownRequest;
+  horizon: HorizonRequest;
+  'agency-budget': AgencyBudgetRequest;
+  'agency-offices': AgencyOfficesRequest;
+  'agency-directory': NoRequest;
+  freshness: NoRequest;
 }
 
 /** `operation` discriminates `query`: one member per source operation. */
@@ -120,6 +201,9 @@ export function describeQuery(
 const pageOf = (offset: number, limit: number): string =>
   offset > 0 ? ` page ${Math.floor(offset / limit) + 1}` : '';
 
+const scopeOf = (query: ScopeRequest): string =>
+  `naics=${query.naics.join(',') || '*'} psc=${query.psc.join(',') || '*'} agency=${query.agency?.toptierCode ?? '*'}`;
+
 /** One line per operation — the discriminator picks the describer, never the query's shape. */
 const DESCRIBERS: { [K in SourceOperation]: (query: SourceCallQueries[K]) => string } = {
   search: describeQuery,
@@ -132,6 +216,17 @@ const DESCRIBERS: { [K in SourceOperation]: (query: SourceCallQueries[K]) => str
   entity: (query) =>
     query.ueis.length === 1 ? `entity ${query.ueis[0]}` : `entity ${query.ueis.length} ueis`,
   exclusions: (query) => `exclusions ${query.uei}`,
+  series: (query) =>
+    `series ${query.awardFamily} by ${query.group} ${scopeOf(query)} ${query.from}..${query.to}`,
+  breakdown: (query) =>
+    `breakdown ${query.category} ${query.awardFamily} ${scopeOf(query)} ${query.from}..${query.to} page ${query.page}`,
+  horizon: (query) =>
+    `horizon ${query.family} ${scopeOf(query)} ${query.from}..${query.to} page ${query.page}`,
+  'agency-budget': (query) => `agency budget ${query.toptierCode}`,
+  'agency-offices': (query) =>
+    `agency offices ${query.toptierCode} FY${query.fiscalYear} ${query.awardFamily} page ${query.page}`,
+  'agency-directory': () => 'agency directory',
+  freshness: () => 'freshness',
 };
 
 /** A ledger row's query as one line. */

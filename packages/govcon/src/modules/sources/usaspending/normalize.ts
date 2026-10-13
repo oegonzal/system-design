@@ -1,30 +1,8 @@
 import type { AwardDraft } from '../../../core/ports';
 import { spendingAwardSchema, type SpendingAward } from './schemas';
+import { amount, clean, day } from './values';
 
 /** USAspending award → `AwardDraft`. Pure. An award needs its id and a start date (its signing, as far as this source says). */
-const ISO_DAY = /^\d{4}-\d{2}-\d{2}/;
-
-const clean = (value: string | null | undefined): string | null => {
-  if (typeof value !== 'string') return null;
-  const trimmed = value.trim();
-  return trimmed.length > 0 ? trimmed : null;
-};
-
-const day = (value: string | null | undefined): string | null => {
-  const cleaned = clean(value);
-  return cleaned !== null &&
-    ISO_DAY.test(cleaned) &&
-    !Number.isNaN(Date.parse(cleaned.slice(0, 10)))
-    ? cleaned.slice(0, 10)
-    : null;
-};
-
-const amount = (value: number | string | null | undefined): number | null => {
-  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
-  if (typeof value !== 'string') return null;
-  const parsed = Number(value.replace(/[,$\s]/g, ''));
-  return Number.isFinite(parsed) ? parsed : null;
-};
 
 function shape(record: SpendingAward, signedAt: string): AwardDraft {
   const agency = clean(record['Awarding Agency']);

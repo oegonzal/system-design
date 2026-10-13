@@ -8,6 +8,7 @@ export const OPPORTUNITY_SEARCH = Symbol('OPPORTUNITY_SEARCH');
 export const NOTICE_DESCRIPTIONS = Symbol('NOTICE_DESCRIPTIONS');
 export const CONTRACT_AWARDS = Symbol('CONTRACT_AWARDS');
 export const SPENDING_AWARDS = Symbol('SPENDING_AWARDS');
+export const SPENDING_SOURCES = Symbol('SPENDING_SOURCES');
 export const ENTITY_REGISTRY = Symbol('ENTITY_REGISTRY');
 export const SOURCE_CALL_LOG = Symbol('SOURCE_CALL_LOG');
 export const BUDGET_POLICY = Symbol('BUDGET_POLICY');

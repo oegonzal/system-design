@@ -19,6 +19,13 @@ const OPERATIONS = [
   'spending',
   'entity',
   'exclusions',
+  'series',
+  'breakdown',
+  'horizon',
+  'agency-budget',
+  'agency-offices',
+  'agency-directory',
+  'freshness',
 ] as const satisfies ContractOperations;
 
 /**

@@ -1,0 +1,154 @@
+import type { Provenance, ServedFrom, SpendingLens } from '@sysdesign/contracts';
+import type { ZodType } from 'zod';
+
+import type { BudgetExhausted, SourceFailure } from '../budget';
+import type { SnapshotRow, SpendingSnapshotStore } from '../ports';
+import { snapshotKey } from '../query';
+import { messageOf } from '../text';
+
+/** A lens's answer minus the provenance the cache adds. */
+export type LensBody<P extends { provenance: Provenance }> = Omit<P, 'provenance'>;
+
+/** Something the query named that the source does not have — an agency code, say. */
+export interface Missing {
+  kind: 'missing';
+  what: string;
+  id: string;
+}
+
+export type LensRefusal = Missing | BudgetExhausted | SourceFailure;
+
+/** What a lens's load answers: the body, what the source said about its freshness and what it cost — or why not. */
+export type LensLoad<B> =
+  { kind: 'ok'; body: B; asOf: string | null; requests: number } | LensRefusal;
+
+/**
+ * One lens: its name in the snapshot table, what a stored body must still be
+ * before it is trusted, the provider facts it carries, and how it loads.
+ * Every lens is this one shape, so the cache below serves them all.
+ */
+export interface LensSpec<Q extends object, B> {
+  lens: SpendingLens;
+  /** The upstream's id — the provenance's `source`. */
+  source: string;
+  schema: ZodType<B>;
+  disclosures: readonly string[];
+  load(query: Q): Promise<LensLoad<B>>;
+}
+
+export type LensAnswer<B> = { kind: 'ok'; body: B; provenance: Provenance } | LensRefusal;
+
+interface Stored<B> {
+  row: SnapshotRow;
+  body: B;
+}
+
+/**
+ * The one read-through every lens goes through. A stored body inside the
+ * cache window answers as `snapshot` without a request; otherwise the lens
+ * loads from the source, the body is stored, and it answers as `source`. A refresh that the
+ * source refused — a rate limit, a failure, a spent budget — serves the
+ * stored body of any age as `stale`, saying so, because an answer the owner
+ * already had is better than none; something `missing` is never served
+ * stale, since the snapshot cannot vouch for a thing the source does not
+ * have. Freshness is decided here and nowhere else, from the injected clock.
+ *
+ * The store is an optimisation, never a dependency: a read that fails falls
+ * through to the load with a warning, a write that fails loses one snapshot
+ * with a warning, and a stored payload the lens's schema refuses is treated
+ * as absent — refused, never trusted.
+ */
+export class SnapshotCache {
+  constructor(
+    private readonly store: SpendingSnapshotStore,
+    private readonly ttlMs: number,
+    private readonly now: () => Date,
+    private readonly warn: (message: string) => void = () => undefined,
+  ) {}
+
+  async read<Q extends object, B>(spec: LensSpec<Q, B>, query: Q): Promise<LensAnswer<B>> {
+    const key = snapshotKey(spec.lens, query);
+    const at = this.now();
+    const stored = await this.stored(spec, key);
+    if (stored !== null && this.fresh(stored.row, at)) return answer(spec, stored, 'snapshot');
+
+    const fetched = await spec.load(query);
+    if (fetched.kind === 'ok') {
+      const row: SnapshotRow = {
+        lens: spec.lens,
+        queryKey: key,
+        query,
+        fetchedAt: at,
+        asOf: fetched.asOf,
+        requests: fetched.requests,
+        payload: fetched.body,
+      };
+      await this.put(row);
+      return answer(spec, { row, body: fetched.body }, 'source');
+    }
+    if (stored !== null && fetched.kind !== 'missing') {
+      this.warn(
+        `${spec.lens}: refresh failed (${reasonOf(fetched)}); serving the snapshot of ${stored.row.fetchedAt.toISOString()}`,
+      );
+      return answer(spec, stored, 'stale');
+    }
+    return fetched;
+  }
+
+  private fresh(row: SnapshotRow, at: Date): boolean {
+    return this.ttlMs > 0 && at.getTime() - row.fetchedAt.getTime() < this.ttlMs;
+  }
+
+  /** The stored row with its body parsed, or null: absent, unreadable, or a payload the schema refuses. */
+  private async stored<Q extends object, B>(
+    spec: LensSpec<Q, B>,
+    key: string,
+  ): Promise<Stored<B> | null> {
+    let row: SnapshotRow | null;
+    try {
+      row = await this.store.find(spec.lens, key);
+    } catch (error) {
+      this.warn(`${spec.lens}: snapshot not read: ${messageOf(error)}`);
+      return null;
+    }
+    if (row === null) return null;
+    const parsed = spec.schema.safeParse(row.payload);
+    if (!parsed.success) {
+      this.warn(
+        `${spec.lens}: stored payload refused: ${parsed.error.issues[0]?.message ?? 'unreadable'}`,
+      );
+      return null;
+    }
+    return { row, body: parsed.data };
+  }
+
+  private async put(row: SnapshotRow): Promise<void> {
+    try {
+      await this.store.put(row);
+    } catch (error) {
+      this.warn(`${row.lens}: snapshot not written: ${messageOf(error)}`);
+    }
+  }
+}
+
+const answer = <Q extends object, B>(
+  spec: LensSpec<Q, B>,
+  stored: Stored<B>,
+  servedFrom: ServedFrom,
+): LensAnswer<B> => ({
+  kind: 'ok',
+  body: stored.body,
+  provenance: {
+    source: spec.source,
+    fetchedAt: stored.row.fetchedAt.toISOString(),
+    asOf: stored.row.asOf,
+    servedFrom,
+    requests: stored.row.requests,
+    disclosures: [...spec.disclosures],
+  },
+});
+
+const reasonOf = (refusal: BudgetExhausted | SourceFailure): string =>
+  refusal.kind === 'budget-exhausted'
+    ? `budget ${refusal.spent}/${refusal.budget} spent`
+    : `${refusal.outcome}: ${refusal.message}`;

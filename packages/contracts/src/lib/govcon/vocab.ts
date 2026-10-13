@@ -54,8 +54,11 @@ export type SourceCallOutcome = (typeof SOURCE_CALL_OUTCOMES)[number];
 
 /**
  * What one ledger row was. Every operation against SAM.gov spends the one
- * daily bucket; only searches answer the cache; `spending` is USAspending,
- * ledgered for the record and priced at nothing. `exclusions` is reserved:
+ * daily bucket; only searches answer the cache. `spending` and everything
+ * from `series` on are USAspending — one operation per endpoint, ledgered for
+ * the record and priced at nothing: the obligation series, a category
+ * breakdown, a page of the horizon walk, an agency's budget, its offices, the
+ * agency directory, and the source's own freshness. `exclusions` is reserved:
  * a registration carries its exclusion flag, so the exclusions API is not
  * called today.
  */
@@ -67,6 +70,13 @@ export const SOURCE_OPERATIONS = [
   'spending',
   'entity',
   'exclusions',
+  'series',
+  'breakdown',
+  'horizon',
+  'agency-budget',
+  'agency-offices',
+  'agency-directory',
+  'freshness',
 ] as const;
 export type SourceOperation = (typeof SOURCE_OPERATIONS)[number];
 
@@ -97,6 +107,39 @@ export type BidStage = (typeof BID_STAGES)[number];
 /** Where an award record came from. */
 export const AWARD_SOURCES = ['sam.gov', 'usaspending'] as const;
 export type AwardSource = (typeof AWARD_SOURCES)[number];
+
+/** An award's family as USAspending files it: a contract, or an indefinite-delivery vehicle orders are placed under. */
+export const AWARD_FAMILIES = ['contracts', 'idvs'] as const;
+export type AwardFamily = (typeof AWARD_FAMILIES)[number];
+
+/** What a spending scope asks for: one family, or both. */
+export const AWARD_FAMILY_CHOICES = [...AWARD_FAMILIES, 'both'] as const;
+export type AwardFamilyChoice = (typeof AWARD_FAMILY_CHOICES)[number];
+
+/** The ways a scope's obligations can be broken down — USAspending's category endpoints, by name. */
+export const BREAKDOWN_CATEGORIES = [
+  'awarding_agency',
+  'awarding_subagency',
+  'recipient',
+  'naics',
+  'psc',
+  'state_territory',
+] as const;
+export type BreakdownCategory = (typeof BREAKDOWN_CATEGORIES)[number];
+
+/** The spending lenses, as the snapshot table names its rows. */
+export const SPENDING_LENSES = [
+  'pulse',
+  'breakdown',
+  'horizon',
+  'agencies',
+  'agency',
+  'freshness',
+] as const;
+export type SpendingLens = (typeof SPENDING_LENSES)[number];
+
+/** Why a horizon walk ended before the universe did. */
+export const HORIZON_STOPS = ['pages', 'deadline', 'source'] as const;
 
 /** The scorer's factors; a profile prices every one of them. */
 export const FACTOR_IDS = [

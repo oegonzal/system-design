@@ -36,6 +36,17 @@ const dollars = new Intl.NumberFormat('en-US', {
 export const money = (amount: number | null): string =>
   amount === null ? DASH : dollars.format(amount);
 
+const compactDollars = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  notation: 'compact',
+  maximumFractionDigits: 1,
+});
+
+/** Money as an axis tick or a tile figure reads it: `$1.2M`, `$850K`, `-$3.4M`. */
+export const compactMoney = (amount: number | null): string =>
+  amount === null ? DASH : compactDollars.format(amount);
+
 /** Whole days from `nowMs` to the ISO instant, rounded up; null without a date. */
 export const daysUntil = (iso: string | null, nowMs: number): number | null => {
   if (iso === null) return null;

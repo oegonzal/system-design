@@ -14,7 +14,7 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
   {
     id: 'GOVU-2',
     statement:
-      'The client lists leads over the score, tier and limit filters; a selected notice deep-links as ?notice=<id> and shows its factor trace.',
+      'The client lists leads over the score, tier and limit filters; a selected notice opens at /notices/<id> and shows its factor trace.',
   },
   {
     id: 'GOVU-3',
@@ -29,7 +29,7 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
   {
     id: 'GOVU-5',
     statement:
-      'The govcon client is six routes under one shell: the nav is one data table the bar, the titles and the announcer all read, the current route is marked, every client-side navigation is announced, and the active profile is one choice in the header that every page scores against.',
+      'The govcon client is seven routes under one shell: the nav is one data table the bar, the titles and the announcer all read, the current route is marked, every client-side navigation is announced, and the active profile is one choice in the header that every page scores against.',
   },
   {
     id: 'GOVU-6',
@@ -55,6 +55,11 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
     id: 'GOVU-10',
     statement:
       'The settings page edits a profile as data — codes, interests, weights with their live sum, prices, bands and tiers — creates, copies, defaults and removes profiles, shows the service issues per field, and shows the sources and the full ledger.',
+  },
+  {
+    id: 'GOVU-11',
+    statement:
+      'The spending page scopes four free lenses over one scope bar — fiscal periods with a seasonal projection, a ranked breakdown over a fiscal window, awards expiring by month, and an agency’s budget by fiscal year with its sub-agencies — every chart carries a data-table alternative, and every panel states its provenance and the source’s disclosures verbatim.',
   },
   // Government contracting: SAM.gov opportunities (packages/govcon)
   {
@@ -151,5 +156,15 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
     id: 'GOV-19',
     statement:
       'A pull ends at its wall-clock deadline: no slice starts after it, every slice not started is reported as skipped by the deadline, and what was stored before it stays.',
+  },
+  {
+    id: 'GOV-20',
+    statement:
+      'Every spending lens spends through the one request gate as its own ledger operation, answers from the snapshot table inside the cache window without a request, validates a stored payload before trusting it, serves a stale snapshot only when a refresh failed and says so, and carries its provenance — fetched when, as of, served from where, how many attempts, which provider facts.',
+  },
+  {
+    id: 'GOV-21',
+    statement:
+      'Spending arithmetic is pure and declared: fiscal periods start in October, a series is aligned on the periods asked for with the partial month marked, the projection is the declared seasonal mean of prior years scaled by the year-to-date ratio only after the declared base, the horizon walk is bounded by a page cap and the wall-clock deadline and reports what it reached, and agency periods are aligned on those present.',
   },
 ];

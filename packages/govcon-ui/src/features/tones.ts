@@ -1,4 +1,5 @@
 import type {
+  AwardFamily,
   AwardSource,
   BidStage,
   LeadTier,
@@ -33,6 +34,13 @@ export const OPERATION_TONE: Record<SourceOperation, BadgeTone> = {
   spending: 'medium',
   entity: 'high',
   exclusions: 'high',
+  series: 'medium',
+  breakdown: 'medium',
+  horizon: 'medium',
+  'agency-budget': 'neutral',
+  'agency-offices': 'neutral',
+  'agency-directory': 'neutral',
+  freshness: 'neutral',
 };
 
 export const TIER_TONE: Record<LeadTier, BadgeTone> = {
@@ -66,6 +74,11 @@ export const BID_STAGE_TONE: Record<BidStage, BadgeTone> = {
 export const AWARD_SOURCE_TONE: Record<AwardSource, BadgeTone> = {
   'sam.gov': 'accent',
   usaspending: 'neutral',
+};
+
+export const AWARD_FAMILY_TONE: Record<AwardFamily, BadgeTone> = {
+  contracts: 'accent',
+  idvs: 'neutral',
 };
 
 /** A registration's status as SAM.gov spells it — open vocabulary, priced by a default. */

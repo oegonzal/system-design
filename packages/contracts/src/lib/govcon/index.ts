@@ -21,4 +21,7 @@ export * from './search';
 export * from './bid';
 export * from './award';
 export * from './entity';
+export * from './fiscal';
+export * from './spending';
 export * from './fixtures';
+export * from './spending-fixtures';

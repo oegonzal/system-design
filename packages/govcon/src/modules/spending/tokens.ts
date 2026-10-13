@@ -1,0 +1,1 @@
+export const SPENDING_SNAPSHOTS = Symbol('SPENDING_SNAPSHOTS');

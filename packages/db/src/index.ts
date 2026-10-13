@@ -14,6 +14,7 @@ export * from './entities/govcon-opportunity.entity';
 export * from './entities/govcon-saved-search.entity';
 export * from './entities/govcon-search-profile.entity';
 export * from './entities/govcon-source-call.entity';
+export * from './entities/govcon-spending-snapshot.entity';
 export * from './entities/interaction-delivery.entity';
 export * from './entities/interaction.entity';
 export * from './entities/job-application.entity';

@@ -1,0 +1,44 @@
+{
+  "results": [
+    {
+      "agency_id": 1173,
+      "toptier_code": "097",
+      "abbreviation": "DOD",
+      "agency_name": "Department of Defense",
+      "congressional_justification_url": null,
+      "active_fy": "2026",
+      "active_fq": "4",
+      "outlay_amount": 870000000000.25,
+      "obligated_amount": 980000000000,
+      "budget_authority_amount": 1300000000000,
+      "current_total_budget_authority_amount": 16181198695809.91,
+      "percentage_of_total_budget_authority": 0.08,
+      "agency_slug": "department-of-defense"
+    },
+    {
+      "agency_id": 561,
+      "toptier_code": "036",
+      "abbreviation": "VA",
+      "agency_name": "Department of Veterans Affairs",
+      "active_fy": "2026",
+      "active_fq": "4",
+      "outlay_amount": 300000000000,
+      "obligated_amount": 310000000000,
+      "budget_authority_amount": "420000000000",
+      "agency_slug": "department-of-veterans-affairs"
+    },
+    {
+      "agency_id": 1525,
+      "toptier_code": "247",
+      "abbreviation": null,
+      "agency_name": "400 Years of African-American History Commission",
+      "active_fy": null,
+      "active_fq": null,
+      "outlay_amount": 0.0,
+      "obligated_amount": 0.0,
+      "budget_authority_amount": 0.0,
+      "agency_slug": "400-years-of-african-american-history-commission"
+    },
+    { "agency_id": 9, "toptier_code": "", "agency_name": "No code" }
+  ]
+}

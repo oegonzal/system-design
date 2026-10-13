@@ -1,0 +1,255 @@
+import type { ApiResponse } from '../envelope';
+import type { FiscalPeriod } from './fiscal';
+import type { AwardFamily, AwardFamilyChoice, BreakdownCategory } from './vocab';
+
+/**
+ * Spending research over USAspending: four lenses on one scope. Every answer
+ * is a snapshot the service took through the request gate, so each carries
+ * its provenance — when it was fetched, how fresh the source said it was,
+ * whether it was served from the store, how many attempts it cost, and the
+ * provider facts the adapter declares about the data.
+ */
+
+/** What every lens is scoped by: code families, one awarding agency, one or both award families. */
+export interface SpendingScope {
+  /** NAICS codes or families, 2–6 digits; a shorter code is the whole family. */
+  naics: string[];
+  /** PSC codes or families, 1–4 characters. */
+  psc: string[];
+  /** The awarding agency's toptier code (`097`), or every agency. */
+  agency: string | null;
+  awardFamily: AwardFamilyChoice;
+}
+
+/** Where an answer came from: fetched now, the day's snapshot, or an older snapshot because the refresh failed. */
+export type ServedFrom = 'source' | 'snapshot' | 'stale';
+
+export interface Provenance {
+  /** The upstream's id — the ledger's `source`. */
+  source: string;
+  /** ISO 8601 — when the snapshot was taken. */
+  fetchedAt: string;
+  /** ISO date — the source's own "data as of"; null when the source does not say. */
+  asOf: string | null;
+  servedFrom: ServedFrom;
+  /** HTTP attempts the snapshot cost, as the ledger counted them. */
+  requests: number;
+  /** Provider facts the adapter declares about this data, rendered verbatim. */
+  disclosures: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Pulse — obligations by fiscal period, and the remaining periods projected.
+
+export interface PeriodObligations extends FiscalPeriod {
+  contracts: number;
+  idvs: number;
+  total: number;
+  /** The period in progress: its amount is what has been reported so far. */
+  partial: boolean;
+}
+
+export interface ProjectedPeriod extends FiscalPeriod {
+  /** The mean of the lookback years' amounts in this period. */
+  expected: number;
+  /** `expected` scaled by this year's run rate; null before the base periods are complete. */
+  scaled: number | null;
+  low: number;
+  high: number;
+}
+
+/** A declared, deterministic projection of the fiscal year's remaining periods. */
+export interface Projection {
+  method: 'seasonal-mean';
+  /** The complete prior fiscal years the mean was taken over. */
+  lookbackFiscalYears: number[];
+  /** Complete periods of the current year the run rate rests on. */
+  basePeriods: number;
+  /** This year's base over the lookback mean's base; null while the base is too short. */
+  ratio: number | null;
+  periods: ProjectedPeriod[];
+}
+
+export interface SpendingPulse {
+  scope: SpendingScope;
+  /** The fiscal year the answer was computed in. */
+  fiscalYear: number;
+  series: PeriodObligations[];
+  /** Null without a complete prior fiscal year to project from. */
+  projection: Projection | null;
+  provenance: Provenance;
+}
+
+// ---------------------------------------------------------------------------
+// Breakdown — who buys, who wins, what codes and where, over a window.
+
+export interface BreakdownRow {
+  /** The source's own key for the row, when it has one. */
+  id: string | null;
+  /** A displayable code — an abbreviation, a NAICS, a state. */
+  code: string | null;
+  name: string;
+  amount: number;
+  /** `amount` over the scope's total for the window, 0..1. */
+  share: number;
+}
+
+export interface SpendingBreakdown {
+  scope: SpendingScope;
+  category: BreakdownCategory;
+  /** ISO dates, inclusive, on the action date. */
+  from: string;
+  to: string;
+  /** The scope's own obligations over the window — what the shares divide by. */
+  total: number;
+  rows: BreakdownRow[];
+  /** More rows exist beyond the declared bound. */
+  truncated: boolean;
+  provenance: Provenance;
+}
+
+// ---------------------------------------------------------------------------
+// Horizon — active awards ending inside the coming months.
+
+export interface FamilyTotals {
+  count: number;
+  amount: number;
+}
+
+/** One calendar month of the horizon, per award family. */
+export type HorizonBucket = Record<AwardFamily, FamilyTotals> & { year: number; month: number };
+
+export type HorizonStop = 'pages' | 'deadline' | 'source';
+
+export interface HorizonRow {
+  externalId: string;
+  piid: string | null;
+  family: AwardFamily;
+  /** The source's own award type, e.g. `PURCHASE ORDER`. */
+  typeDescription: string | null;
+  recipientName: string | null;
+  recipientUei: string | null;
+  /** Obligated so far; an IDV's is often zero. */
+  amount: number;
+  /** ISO date — the current end date, or an IDV's last date to order. */
+  endsAt: string;
+  agencyPath: string | null;
+  /** `toptier.subtier` codes. */
+  agencyCode: string | null;
+  naicsCode: string | null;
+  pscCode: string | null;
+  description: string | null;
+}
+
+export interface SpendingHorizon {
+  scope: SpendingScope;
+  /** ISO date the walk counted from. */
+  today: string;
+  months: number;
+  buckets: HorizonBucket[];
+  /** The soonest-ending rows inside the window, bounded. */
+  rows: HorizonRow[];
+  /** The walk ended before the universe did; the buckets after `reachedEndsAt` are complete. */
+  capped: boolean;
+  stoppedBy: HorizonStop | null;
+  reachedEndsAt: string | null;
+  provenance: Provenance;
+}
+
+// ---------------------------------------------------------------------------
+// Agencies — the directory, and one agency's budget by year and offices.
+
+export interface AgencyDirectoryEntry {
+  /** USAspending's own id, the key its category breakdowns answer with. */
+  agencyId: number;
+  toptierCode: string;
+  abbreviation: string;
+  name: string;
+  budgetAuthority: number;
+  obligated: number;
+  outlayed: number;
+  activeFiscalYear: number | null;
+  activeQuarter: number | null;
+}
+
+export interface AgencyDirectory {
+  entries: AgencyDirectoryEntry[];
+  provenance: Provenance;
+}
+
+export interface PeriodObligated {
+  period: number;
+  obligated: number;
+}
+
+export interface AgencyYear {
+  fiscalYear: number;
+  budgetaryResources: number | null;
+  obligated: number | null;
+  outlayed: number | null;
+  /** The periods the source reported, ascending — monthly in recent years, quarterly before. */
+  byPeriod: PeriodObligated[];
+}
+
+export interface OfficeObligations {
+  code: string | null;
+  name: string;
+  obligations: number;
+  transactions: number;
+  newAwards: number;
+}
+
+export interface SubAgencyObligations extends OfficeObligations {
+  abbreviation: string | null;
+  offices: OfficeObligations[];
+}
+
+export interface AgencyOutlook {
+  toptierCode: string;
+  name: string;
+  abbreviation: string | null;
+  years: AgencyYear[];
+  officesFiscalYear: number;
+  awardFamily: AwardFamilyChoice;
+  subAgencies: SubAgencyObligations[];
+  /** More sub-agencies exist beyond the declared bound. */
+  truncated: boolean;
+  provenance: Provenance;
+}
+
+// ---------------------------------------------------------------------------
+// The wire: queries and envelopes.
+
+/** The scope as a query string: lists are comma-joined on the wire and read back as lists. */
+export interface ScopeQuery {
+  naics?: string[];
+  psc?: string[];
+  agency?: string;
+  awardFamily?: AwardFamilyChoice;
+}
+
+export interface SpendingPulseQuery extends ScopeQuery {
+  /** Prior fiscal years to show and project from. */
+  lookback?: number;
+}
+
+export interface SpendingBreakdownQuery extends ScopeQuery {
+  category: BreakdownCategory;
+  from: string;
+  to: string;
+}
+
+export interface SpendingHorizonQuery extends ScopeQuery {
+  months?: number;
+}
+
+export interface AgencyOutlookQuery {
+  fiscalYear?: number;
+  awardFamily?: AwardFamilyChoice;
+}
+
+export type GetSpendingPulseResponse = ApiResponse<SpendingPulse>;
+export type GetSpendingBreakdownResponse = ApiResponse<SpendingBreakdown>;
+export type GetSpendingHorizonResponse = ApiResponse<SpendingHorizon>;
+export type GetAgenciesResponse = ApiResponse<AgencyDirectory>;
+export type GetAgencyOutlookResponse = ApiResponse<AgencyOutlook>;

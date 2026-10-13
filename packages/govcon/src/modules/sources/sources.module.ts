@@ -19,6 +19,7 @@ import {
   REQUEST_GATE,
   SOURCE_CALL_LOG,
   SPENDING_AWARDS,
+  SPENDING_SOURCES,
 } from './tokens';
 
 const logger = new Logger('Govcon');
@@ -45,6 +46,7 @@ const spending = createUsaSpendingSources(process.env, { warn });
     { provide: NOTICE_DESCRIPTIONS, useValue: sources.descriptions },
     { provide: CONTRACT_AWARDS, useValue: sources.awards },
     { provide: SPENDING_AWARDS, useValue: spending.awards },
+    { provide: SPENDING_SOURCES, useValue: spending.spending },
     { provide: ENTITY_REGISTRY, useValue: sources.entities },
     {
       provide: REQUEST_GATE,
@@ -62,6 +64,7 @@ const spending = createUsaSpendingSources(process.env, { warn });
     NOTICE_DESCRIPTIONS,
     CONTRACT_AWARDS,
     SPENDING_AWARDS,
+    SPENDING_SOURCES,
     ENTITY_REGISTRY,
     REQUEST_GATE,
   ],
