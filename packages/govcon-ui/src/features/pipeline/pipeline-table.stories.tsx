@@ -16,6 +16,9 @@ const meta: Meta<typeof PipelineTable> = {
     offset: 0,
     nowMs: NOW,
     onStageChange: fn(),
+    onEdit: fn(),
+    onSave: fn(),
+    onRemove: fn(),
     onPage: fn(),
   },
 };
@@ -28,6 +31,17 @@ export const Default: Story = {};
 
 /** A second page of a longer pipeline. */
 export const Paged: Story = { args: { total: 120, offset: 50 } };
+
+/** One bid open under its row: the stage, reminder, estimate and notes are written from there. */
+export const Editing: Story = { args: { editing: PIPELINE_ROWS[0]?.bid.noticeId ?? null } };
+
+/** The service refused the write: the open bid says why and keeps what was typed. */
+export const Refused: Story = {
+  args: {
+    editing: PIPELINE_ROWS[0]?.bid.noticeId ?? null,
+    error: 'estimatedValue: must not be negative',
+  },
+};
 
 /** A stage being written: the selects wait. */
 export const Saving: Story = { args: { saving: PIPELINE_ROWS[0]?.bid.noticeId ?? null } };
