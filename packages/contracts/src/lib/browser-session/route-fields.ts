@@ -15,6 +15,7 @@ import { parseLenient } from '../bounds';
 import type { Admission } from '../quality-loop/admission';
 import type { IterationTrace } from '../quality-loop/decision';
 import type { QualityRunDto } from '../quality-loop/runs';
+import type { AnsweringSettings } from './answering';
 import { fieldAnswersSchema, type FieldAnswer } from './field-answers.schema';
 import type { FieldSpec } from './field-goal';
 import { fieldLocation, type WithheldRef } from './pipelines';
@@ -110,8 +111,17 @@ const unsettled = (
         withheld,
       );
 
-/** The model's decision, read with its confidence and basis once nothing on the page or in the report has settled the field. */
-function answerRoute(fieldCase: FieldCase, answer: FieldAnswer): FieldReadout {
+/**
+ * The model's decision, once nothing on the page or in the report has settled
+ * the field: a value is typed when the answering settings fill the kind it
+ * declares it rests on, and is the operator's otherwise — one table, declared
+ * in a file, never a confidence word read here.
+ */
+function answerRoute(
+  fieldCase: FieldCase,
+  answer: FieldAnswer,
+  fills: AnsweringSettings['fills'],
+): FieldReadout {
   const { position, field } = fieldCase;
   const grounded = answer.basis.length > 0;
   const source = grounded ? 'memory' : 'loop';
@@ -145,10 +155,10 @@ function answerRoute(fieldCase: FieldCase, answer: FieldAnswer): FieldReadout {
           `holds it already: ${answer.reason}`,
         );
       }
-      if (answer.confidence === 'high' || (answer.confidence === 'medium' && grounded)) {
+      if (fills[answer.rests] === 'fill') {
         return readout(position, field, answer, 'fill', source, answer.reason);
       }
-      return unsettled(fieldCase, 'loop', `${answer.confidence} confidence: ${answer.reason}`);
+      return unsettled(fieldCase, 'loop', `rests ${answer.rests}: ${answer.reason}`);
   }
 }
 
@@ -156,12 +166,14 @@ function answerRoute(fieldCase: FieldCase, answer: FieldAnswer): FieldReadout {
  * One field's route, by declared order of precedence: the page's own facts
  * first (a hidden field stays blank whatever the model said), then an
  * admission that says nothing was judged at all, then what the report
- * withholds at the field, then the model's decision.
+ * withholds at the field, then the model's decision through the answering
+ * settings.
  */
 function fieldRoute(
   fieldCase: FieldCase,
   admission: Admission,
   withheld: readonly WithheldRef[],
+  fills: AnsweringSettings['fills'],
 ): FieldReadout {
   const { position, field, answer } = fieldCase;
   if (field.hiddenTraits.length > 0) {
@@ -179,7 +191,7 @@ function fieldRoute(
   }
   if (withheld.length > 0) return unsettled(fieldCase, 'loop', 'withheld', withheld);
   if (answer === null) return unsettled(fieldCase, 'engine', 'unanswered');
-  return answerRoute(fieldCase, answer);
+  return answerRoute(fieldCase, answer, fills);
 }
 
 /**
@@ -188,10 +200,11 @@ function fieldRoute(
  * an admission that says nothing was judged at all, then what the
  * orchestration's report withholds at the field — as the pipeline declares
  * each finding type and validator withholds, never "any finding" — then the
- * model's decision read with its confidence and basis. The operator is asked
- * only for a field the page needs a value in — one it marks required, or a
- * choice it asks with nothing chosen: any other the answers could not settle
- * is left blank, and the row says why.
+ * model's decision, typed when the answering settings fill the kind the value
+ * declares it rests on. The operator is asked only for a field the page needs
+ * a value in — one it marks required, or a choice it asks with nothing
+ * chosen: any other the answers could not settle is left blank, and the row
+ * says why.
  *
  * A run that fell short is recorded on the row and demotes nothing by
  * itself: the judges' objections arrive as what the report withholds at the
@@ -201,7 +214,11 @@ function fieldRoute(
  * answered right from memory, all three already filled by the site — and two
  * optional search controls asked as fields cost twelve minutes at the terminal.
  */
-export function routeFields(decided: FieldsDecision, fields: readonly FieldSpec[]): FieldReadout[] {
+export function routeFields(
+  decided: FieldsDecision,
+  fields: readonly FieldSpec[],
+  answering: AnsweringSettings,
+): FieldReadout[] {
   const answers = answersOf(bestIterationOf(decided.run));
   const atField = (position: number): WithheldRef[] =>
     decided.withheld.filter((item) => item.ref === fieldLocation(position));
@@ -210,6 +227,7 @@ export function routeFields(decided: FieldsDecision, fields: readonly FieldSpec[
       { position, field, answer: answers.get(field.ref) ?? null },
       decided.admission,
       atField(position),
+      answering.fills,
     ),
   );
 }

@@ -1,0 +1,12 @@
+{
+  "fills": {
+    "stated": "fill",
+    "restated": "fill",
+    "derived": "fill",
+    "mapped": "fill",
+    "inferred": "fill",
+    "composed": "fill",
+    "policy": "fill",
+    "none": "ask"
+  }
+}

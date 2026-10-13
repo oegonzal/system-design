@@ -1,1 +1,6 @@
-{ "capture": "field-entries", "session": "standard", "operator": "terminal-and-notifications" }
+{
+  "capture": "field-entries",
+  "session": "standard",
+  "operator": "terminal-and-notifications",
+  "answering": "standard"
+}

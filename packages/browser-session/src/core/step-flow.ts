@@ -91,7 +91,7 @@ function recordBrainFault(ctx: EngineContext, error: BrainFaulted, durationMs: n
     ref: null,
     question: null,
     answer: null,
-    confidence: null,
+    rests: null,
     durationMs,
     payload: { fault: error.reason, message: error.message },
   });
@@ -171,7 +171,7 @@ function recordPlan(
     ref: null,
     question: null,
     answer: null,
-    confidence: null,
+    rests: null,
     durationMs,
     payload: planPayload(readout, decided, advice),
   });

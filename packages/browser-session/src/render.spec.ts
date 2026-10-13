@@ -83,7 +83,7 @@ describe('the CLI renderer', () => {
           ref: 'e2',
           question: 'Work authorisation',
           answer: 'Yes',
-          confidence: 'low',
+          rests: 'inferred',
           payload: {},
           durationMs: 1200,
           createdAt: '2026-10-03T10:02:00.000Z',
@@ -117,7 +117,7 @@ describe('the CLI renderer', () => {
     expect(text).toMatch(/1\s+Senior Engineer at Acme\s+company=Acme\s+complete\s+done\s+2–4/);
     expect(text).toContain('subject Alex Example');
     expect(text).toMatch(
-      /3\.2\s+field-answer\s+operator\s+run-9\s+e2\s+Work authorisation\s+Yes\s+low\s+teach-1/,
+      /3\.2\s+field-answer\s+operator\s+run-9\s+e2\s+Work authorisation\s+Yes\s+inferred\s+teach-1/,
     );
     expect(renderSession({ ...session(), tasks: [], decisions: [] }, NOW)).toContain(
       'no units of work',

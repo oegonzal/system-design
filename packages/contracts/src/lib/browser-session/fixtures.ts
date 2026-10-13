@@ -7,9 +7,11 @@
 import type { DocumentChunk } from '../quality-loop/document-digest';
 import { DOCUMENT_RULES } from '../quality-loop/document-digest';
 import { NO_UNITS_ON_RECORD } from '../units/record';
+import type { AnsweringSettings } from './answering';
 import type { ObservedElement, PageObservation, TaskLedgerSummary } from './observation.schema';
 import { stopsOf, stopsOnPage } from './mission-stops';
 import type { StepGoalInput } from './step-goal';
+import { ANSWER_BASES, type AnswerBasis } from './vocab';
 
 /** One element as the page reports it, every fact the quiet default; a spec overrides what it is about. */
 export const observedElement = (
@@ -252,3 +254,14 @@ export const stepGoalInput = (overrides: Partial<StepGoalInput> = {}): StepGoalI
     ...overrides,
   };
 };
+
+/**
+ * Answering settings for a spec: every kind a value may rest on fills, but
+ * `none` and the kinds listed, which ask — the shipped file's shape, chosen
+ * per case so a spec can watch the one lever the settings are.
+ */
+export const answeringFixture = (asks: readonly AnswerBasis[] = []): AnsweringSettings => ({
+  fills: Object.fromEntries(
+    ANSWER_BASES.map((kind) => [kind, kind === 'none' || asks.includes(kind) ? 'ask' : 'fill']),
+  ) as AnsweringSettings['fills'],
+});

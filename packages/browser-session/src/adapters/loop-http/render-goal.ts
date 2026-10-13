@@ -163,8 +163,17 @@ export function composeStepGoalWithinBudget(
   throw new GoalBudgetExceeded(textBytes(input.mission), budget);
 }
 
-/** The prose half of a field-answer goal: the mission verbatim, and the unit of work the fields belong to. */
+/**
+ * The prose half of a field-answer goal: the mission verbatim, and the unit of
+ * work the fields belong to — with the identity its mission declared, so a
+ * question about "this employer" is answered against a declared value, never a
+ * reading of the label.
+ */
 export function renderFieldProse(input: Pick<FieldsInput, 'mission' | 'task'>): string {
+  const facets =
+    input.task === null || input.task.facets.length === 0
+      ? ''
+      : ` · ${input.task.facets.map((facet) => `${facet.name} ${quoted(facet.value)}`).join(' · ')}`;
   return [
     input.mission.trim(),
     '',
@@ -172,6 +181,6 @@ export function renderFieldProse(input: Pick<FieldsInput, 'mission' | 'task'>): 
     '',
     input.task === null
       ? 'No unit of work is open.'
-      : `${quoted(input.task.label)} at ${input.task.url}`,
+      : `${quoted(input.task.label)} at ${input.task.url}${facets}`,
   ].join('\n');
 }

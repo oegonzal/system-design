@@ -168,7 +168,7 @@ const decisionOf = (
   ref: field.field.ref,
   question: field.field.name,
   answer: outcome.value,
-  confidence: field.answer?.confidence ?? null,
+  rests: field.answer?.rests ?? null,
   durationMs,
   payload: {
     route: outcome.route,
@@ -248,7 +248,11 @@ async function decideFields(
         task:
           state.tasks.open === null
             ? null
-            : { label: state.tasks.open.label, url: state.tasks.open.url },
+            : {
+                label: state.tasks.open.label,
+                url: state.tasks.open.url,
+                facets: [...state.tasks.open.facets],
+              },
         fields: open,
         criteria: ctx.criteria.answer,
       });
@@ -328,7 +332,7 @@ export async function askFields(
   const { decided, fault, durationMs } = await decideFields(ctx, open);
   const routed = routedOf(
     fields,
-    routeFieldsInSession(decided, fault, open, ctx.state.operatorAnswers),
+    routeFieldsInSession(decided, fault, open, ctx.state.operatorAnswers, ctx.options.answering),
   );
   const prefetch = SuggestionsPrefetch.for(ctx, routed);
   const { results, stopped } = await settleAll(

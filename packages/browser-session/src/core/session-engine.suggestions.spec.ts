@@ -70,7 +70,7 @@ const ANSWERS: FieldAnswers = {
       ref: 'e7',
       decision: 'ask-operator',
       value: null,
-      confidence: 'low',
+      rests: 'none',
       basis: [],
       reason: 'nothing recalled on the question',
     },

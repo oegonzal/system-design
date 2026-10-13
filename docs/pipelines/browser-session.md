@@ -79,8 +79,9 @@ ends `complete`, reason `target-reached`, once n units have closed `done`.
 
 Read, per form page: one `form-memory` orchestration whose `recall` step
 counts `{probes, candidates, evidence}` and whose `target` step reports
-`admission`; operator prompts only for fields a judge faulted, the model
-routed to you, or the model answered with low confidence; after each
+`admission`; operator prompts only for fields the report withheld, the model
+routed to you, or whose value rests on a kind the answering settings do not
+fill; after each
 `taskDone`, one `document-memory` orchestration whose id lands on that unit's
 operator-sourced decision rows. The dump's `fields.json` per step names the
 route and source of every field.

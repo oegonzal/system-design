@@ -33,6 +33,18 @@ describe('the session settings', () => {
     // The operator is asked at the terminal and through the notifications service.
     expect(shipped.sources.operator).toMatch(/config\/operator\/terminal-and-notifications\.json$/);
     expect(Object.keys(shipped.operator.channels)).toEqual(['notifications']);
+    // [BRW-16] What the session types without asking is a total table over the kinds a value may rest on.
+    expect(shipped.sources.answering).toMatch(/config\/answering\/standard\.json$/);
+    expect(shipped.answering.fills).toEqual({
+      stated: 'fill',
+      restated: 'fill',
+      derived: 'fill',
+      mapped: 'fill',
+      inferred: 'fill',
+      composed: 'fill',
+      policy: 'fill',
+      none: 'ask',
+    });
     // One window per service the session rides out, all three declared on the session.
     expect(Object.keys(shipped.session)).toEqual([
       'headed',
@@ -46,12 +58,18 @@ describe('the session settings', () => {
     // Every file a choice could name is a complete, valid configuration of its kind.
     expect(profiles('capture').sort()).toEqual(['every-action', 'field-entries', 'observations']);
     expect(profiles('operator').sort()).toEqual(['terminal', 'terminal-and-notifications']);
+    expect(profiles('answering')).toEqual(['standard']);
     for (const capture of profiles('capture')) {
       for (const session of profiles('session')) {
         for (const operator of profiles('operator')) {
-          expect(() =>
-            readSessionSettings(PACKAGE_ROOT, choosing({ capture, session, operator })),
-          ).not.toThrow();
+          for (const answering of profiles('answering')) {
+            expect(() =>
+              readSessionSettings(
+                PACKAGE_ROOT,
+                choosing({ capture, session, operator, answering }),
+              ),
+            ).not.toThrow();
+          }
         }
       }
     }

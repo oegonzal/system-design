@@ -104,7 +104,11 @@ export class SuggestionsPrefetch {
         task:
           state.tasks.open === null
             ? null
-            : { label: state.tasks.open.label, url: state.tasks.open.url },
+            : {
+                label: state.tasks.open.label,
+                url: state.tasks.open.url,
+                facets: [...state.tasks.open.facets],
+              },
         fields,
         criteria: ctx.criteria.suggest,
       })

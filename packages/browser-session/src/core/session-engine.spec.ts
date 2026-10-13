@@ -226,10 +226,10 @@ describe('the session engine', () => {
       lines: ['Yes'],
     });
     const fields = detail.decisions.filter((d) => d.kind === 'field-answer' && d.step === 3);
-    expect(fields.map((d) => [d.ref, d.source, d.answer, d.confidence])).toEqual([
-      ['e1', 'memory', '6', 'high'],
-      ['e2', 'operator', 'Yes', 'low'],
-      ['e3', 'blank', null, 'high'],
+    expect(fields.map((d) => [d.ref, d.source, d.answer, d.rests])).toEqual([
+      ['e1', 'memory', '6', 'stated'],
+      ['e2', 'operator', 'Yes', 'inferred'],
+      ['e3', 'blank', null, 'stated'],
     ]);
     expect(fields[2]?.payload['reason']).toContain('trap-skipped');
     expect(fields.every((d) => d.loopRunId !== null && d.loopOrchestrationId !== null)).toBe(true);
@@ -239,7 +239,7 @@ describe('the session engine', () => {
     expect(prompt?.title).toBe('Work authorisation');
     expect(prompt?.choices.map((choice) => choice.label)).toEqual(['Yes', 'No']);
     expect(prompt?.choices[0]?.note).toMatch(
-      /^the answerer's pick — not trusted: .*low confidence/,
+      /^the answerer's pick — not trusted: .*rests inferred/,
     );
     expect(prompt?.details).toContainEqual(
       expect.stringMatching(/^Suggested: "Yes" — not trusted: /),

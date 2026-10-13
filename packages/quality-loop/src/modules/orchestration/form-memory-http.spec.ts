@@ -66,7 +66,7 @@ const answers = () => {
       item.ref === 'e2'
         ? answer('e2', {
             decision: 'ask-operator',
-            confidence: 'low',
+            rests: 'none',
             reason: 'no evidence states the authorisation',
           })
         : item,

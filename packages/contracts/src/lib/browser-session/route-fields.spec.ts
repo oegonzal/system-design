@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
+import type { AnswerBasis } from './vocab';
 import { ANSWER_REASON_BOUND, type FieldAnswers } from './field-answers.schema';
-import { fieldSpecOf } from './field-goal';
-import { formObservation } from './fixtures';
+import { fieldSpecOf, type FieldSpec } from './field-goal';
+import { answeringFixture, formObservation } from './fixtures';
 import { type WithheldRef } from './pipelines';
 import { routeFields, type FieldsDecision } from './route-fields';
 import { judgedRun } from './read-back.testing';
@@ -26,6 +27,13 @@ const byFinding = (ref: string, by: string, note: string | null = null): Withhel
   note,
 });
 
+/** Routed under settings that fill every kind but `inferred` and the kinds listed — the lever these cases watch. */
+const route = (
+  decision: FieldsDecision,
+  specs: readonly FieldSpec[],
+  asks: readonly AnswerBasis[] = ['inferred'],
+) => routeFields(decision, specs, answeringFixture(asks));
+
 const answers = (
   overrides: Partial<Record<string, Partial<FieldAnswers['fields'][number]>>> = {},
 ): FieldAnswers => ({
@@ -35,7 +43,7 @@ const answers = (
       ref: 'e1',
       decision: 'answer',
       value: '6',
-      confidence: 'high',
+      rests: 'stated',
       basis: ['m1'],
       reason: 'from m1',
     },
@@ -43,7 +51,7 @@ const answers = (
       ref: 'e2',
       decision: 'answer',
       value: 'Yes',
-      confidence: 'medium',
+      rests: 'inferred',
       basis: [],
       reason: 'likely',
     },
@@ -51,7 +59,7 @@ const answers = (
       ref: 'e3',
       decision: 'answer',
       value: 'https://x',
-      confidence: 'high',
+      rests: 'stated',
       basis: [],
       reason: 'oops',
     },
@@ -59,7 +67,7 @@ const answers = (
       ref: 'e4',
       decision: 'leave-blank',
       value: null,
-      confidence: 'high',
+      rests: 'none',
       basis: [],
       reason: 'bait',
     },
@@ -67,8 +75,8 @@ const answers = (
 });
 
 describe('routeFields', () => {
-  it('[QL-37] fills a grounded answer, asks for an ungrounded medium one, and blanks a hidden field whatever the model said', () => {
-    const routes = routeFields(decided(judgedRun({ artifact: answers() })), fields());
+  it('[QL-37] [BRW-16] fills a value whose declared kind the settings fill, asks for one they do not, and blanks a hidden field whatever the model said', () => {
+    const routes = route(decided(judgedRun({ artifact: answers() })), fields());
     expect(routes.map((r) => [r.field.ref, r.route, r.source])).toEqual([
       ['e1', 'fill', 'memory'],
       ['e2', 'ask-operator', 'loop'],
@@ -76,7 +84,18 @@ describe('routeFields', () => {
       ['e4', 'leave-blank', 'blank'],
     ]);
     expect(routes[0].value).toBe('6');
+    expect(routes[1].reason).toBe('rests inferred: likely');
     expect(routes[2].reason).toContain('trap-skipped');
+    // The settings are the one lever: the same answers under a table that fills inferred values type e2.
+    const filling = route(decided(judgedRun({ artifact: answers() })), fields(), []);
+    expect(filling[1]).toMatchObject({ route: 'fill', source: 'loop', value: 'Yes' });
+    // A value declared to rest on nothing is never typed, whatever the table says.
+    const nothing = route(
+      decided(judgedRun({ artifact: answers({ e1: { rests: 'none' } }) })),
+      fields(),
+      [],
+    );
+    expect(nothing[0]).toMatchObject({ route: 'ask-operator', reason: 'rests none: from m1' });
   });
 
   it('[QL-37] never fills a field the report withholds, carries what withheld it for the operator, and reads nothing off the findings itself', () => {
@@ -103,7 +122,7 @@ describe('routeFields', () => {
       by: 'limits',
       note: 'not an option',
     };
-    const routes = routeFields(
+    const routes = route(
       decided(run, 'admitted', [byFinding('field.1', 'ungrounded', 'no evidence says 6'), limits]),
       fields(),
     );
@@ -112,26 +131,20 @@ describe('routeFields', () => {
     expect(routes[0].value).toBe('6');
     expect(routes[1].withheld).toEqual([limits]);
     // The same run with nothing withheld: the findings on it change no route.
-    const unwithheld = routeFields(decided(run), fields());
+    const unwithheld = route(decided(run), fields());
     expect(unwithheld[0].route).toBe('fill');
     expect(unwithheld.every((route) => route.withheld.length === 0)).toBe(true);
   });
 
   it('[QL-37] a run that fell short demotes nothing by itself; a page nothing judged asks for its required fields and blanks the optional ones; a required field left blank is asked', () => {
-    const fellShort = routeFields(
-      decided(judgedRun({ artifact: answers() }), 'fell-short'),
-      fields(),
-    );
+    const fellShort = route(decided(judgedRun({ artifact: answers() }), 'fell-short'), fields());
     expect(fellShort.map((r) => r.route)).toEqual([
       'fill',
       'ask-operator',
       'leave-blank',
       'leave-blank',
     ]);
-    const unjudged = routeFields(
-      decided(judgedRun({ artifact: answers() }), 'no-rubric'),
-      fields(),
-    );
+    const unjudged = route(decided(judgedRun({ artifact: answers() }), 'no-rubric'), fields());
     expect(unjudged.map((r) => [r.route, r.source])).toEqual([
       ['ask-operator', 'engine'],
       ['ask-operator', 'engine'],
@@ -141,7 +154,7 @@ describe('routeFields', () => {
     expect(unjudged[0].reason).toBe('page-escalated: no-rubric');
     expect(unjudged[3].reason).toBe('optional, left blank: page-escalated: no-rubric');
 
-    const blankRequired = routeFields(
+    const blankRequired = route(
       decided(judgedRun({ artifact: answers({ e1: { decision: 'leave-blank', value: null } }) })),
       fields(),
     );
@@ -153,24 +166,24 @@ describe('routeFields', () => {
     const holding = fields().map((field) =>
       field.ref === 'e1' ? { ...field, value: '6' } : field,
     );
-    const kept = routeFields(
+    const kept = route(
       decided(judgedRun({ artifact: answers({ e1: { decision: 'keep', value: null } }) })),
       holding,
     );
     expect(kept[0]).toMatchObject({ route: 'keep', value: '6', source: 'memory' });
-    const same = routeFields(decided(judgedRun({ artifact: answers() })), holding);
+    const same = route(decided(judgedRun({ artifact: answers() })), holding);
     expect(same[0]).toMatchObject({
       route: 'keep',
       value: '6',
       reason: 'holds it already: from m1',
     });
-    const empty = routeFields(
+    const empty = route(
       decided(judgedRun({ artifact: answers({ e1: { decision: 'keep', value: null } }) })),
       fields(),
     );
     expect(empty[0]).toMatchObject({ route: 'ask-operator', reason: 'nothing to keep: from m1' });
     // The report withheld an optional field: left blank with the withholding on the row, never the operator's.
-    const withheld = routeFields(
+    const withheld = route(
       decided(
         judgedRun({ artifact: answers({ e4: { decision: 'answer', value: 'none' } }) }),
         'admitted',
@@ -203,31 +216,32 @@ describe('routeFields', () => {
             }
           : field,
       );
-    const asked = routeFields(
+    const asked = route(
       decided(judgedRun({ artifact: answers({ e4: { decision: 'ask-operator', value: null } }) })),
       question(null),
     );
     expect(asked[3]).toMatchObject({ route: 'ask-operator', source: 'loop' });
-    const blanked = routeFields(decided(judgedRun({ artifact: answers() })), question(null));
+    const blanked = route(decided(judgedRun({ artifact: answers() })), question(null));
     expect(blanked[3]).toMatchObject({
       route: 'ask-operator',
       reason: 'unanswered choice left blank: bait',
     });
-    const answered = routeFields(decided(judgedRun({ artifact: answers() })), question('Yes'));
+    const answered = route(decided(judgedRun({ artifact: answers() })), question('Yes'));
     expect(answered[3]).toMatchObject({ route: 'leave-blank', source: 'blank' });
   });
 
-  it('[QL-37] asks when the model answered with low confidence or did not answer at all', () => {
-    const low = routeFields(
-      decided(judgedRun({ artifact: answers({ e1: { confidence: 'low' } }) })),
+  it('[QL-37] asks when the model answered resting on a kind the settings do not fill, or did not answer at all', () => {
+    const asked = route(
+      decided(judgedRun({ artifact: answers({ e1: { rests: 'derived' } }) })),
       fields(),
+      ['derived'],
     );
-    expect(low[0].route).toBe('ask-operator');
-    expect(low[0].value).toBe('6');
+    expect(asked[0].route).toBe('ask-operator');
+    expect(asked[0]).toMatchObject({ value: '6', reason: 'rests derived: from m1' });
 
     const partial = answers();
     partial.fields = partial.fields.filter((f) => f.ref !== 'e2');
-    const missing = routeFields(decided(judgedRun({ artifact: partial })), fields());
+    const missing = route(decided(judgedRun({ artifact: partial })), fields());
     expect(missing[1]).toMatchObject({
       route: 'ask-operator',
       reason: 'unanswered',
@@ -237,10 +251,7 @@ describe('routeFields', () => {
 
   it('[QL-37] [QL-58] routes every answer of a page whose reason the seam kept just past its ceiling', () => {
     const reason = 'r'.repeat(ANSWER_REASON_BOUND.ceiling + 1);
-    const routes = routeFields(
-      decided(judgedRun({ artifact: answers({ e1: { reason } }) })),
-      fields(),
-    );
+    const routes = route(decided(judgedRun({ artifact: answers({ e1: { reason } }) })), fields());
     expect(routes.map((r) => [r.field.ref, r.route, r.source])).toEqual([
       ['e1', 'fill', 'memory'],
       ['e2', 'ask-operator', 'loop'],

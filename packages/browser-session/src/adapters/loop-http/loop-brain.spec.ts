@@ -40,9 +40,7 @@ const PLAN: StepPlan = {
 
 const ANSWERS: FieldAnswers = {
   summary: 'one field',
-  fields: [
-    { ref: 'e1', decision: 'answer', value: '6', confidence: 'high', basis: [], reason: 'cv' },
-  ],
+  fields: [{ ref: 'e1', decision: 'answer', value: '6', rests: 'stated', basis: [], reason: 'cv' }],
 };
 
 const CRITERIA = [{ id: 'c1', kind: 'progress', statement: 'Open the next listing.' }];
@@ -171,7 +169,7 @@ describe('the loop brain', () => {
     const input = {
       session: SESSION,
       mission: MISSION_FIXTURE,
-      task: { label: 'Acme', url: 'https://x.test/1' },
+      task: { label: 'Acme', url: 'https://x.test/1', facets: [] },
       fields,
       criteria: CRITERIA,
     };

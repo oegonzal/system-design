@@ -1,4 +1,5 @@
 import type {
+  AnsweringSettings,
   BROWSER_SESSION_PIPELINES,
   SessionRailsDto,
   SuccessCriterion,
@@ -76,6 +77,8 @@ export interface RunSessionOptions {
   questionExpiresAfterMs: number;
   /** How many times a question is put back once the page refused the operator's answer to it. */
   asksAfterRefusal: number;
+  /** Which kinds of evidence-backed value are typed without asking the operator, by the kind each answer declares. */
+  answering: AnsweringSettings;
   /** The settings files in force, by kind, as the manifest records them. */
   settingsSources: Readonly<Record<string, string>>;
 }
@@ -164,7 +167,7 @@ export function createEngineContext(parts: EngineParts): EngineContext {
         ref: null,
         question: null,
         answer: null,
-        confidence: null,
+        rests: null,
         durationMs: null,
         payload: {
           reason: termination.reason,

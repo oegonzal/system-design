@@ -49,6 +49,7 @@ export type RunOptions = Omit<
   | 'settingsSources'
   | 'questionExpiresAfterMs'
   | 'asksAfterRefusal'
+  | 'answering'
 > & {
   subject?: string | undefined;
 };
@@ -80,7 +81,7 @@ export class SessionService {
   ) {}
 
   run(options: RunOptions): Promise<SessionOutcome> {
-    const { capture, operator, session, sources } = this.config.settings;
+    const { capture, operator, session, answering, sources } = this.config.settings;
     // A configuration read once at boot is invisible afterwards: say which files are in force.
     this.operator.notify(
       `settings: ${Object.entries(sources)
@@ -112,6 +113,7 @@ export class SessionService {
         capture,
         questionExpiresAfterMs: operator.expiresAfterMs,
         asksAfterRefusal: operator.asksAfterRefusal,
+        answering,
         settingsSources: sources,
       },
     );

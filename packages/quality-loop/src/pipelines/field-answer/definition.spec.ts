@@ -33,7 +33,7 @@ describe('the field-answer pipeline', () => {
     }
   });
 
-  it('[QL-37] references block and limits warn, the answerer may be briefed with criteria and memories, and only a trap gates', () => {
+  it('[QL-37] [QL-68] references block and limits warn, the answerer may be briefed with criteria and memories, and only a trap gates', () => {
     const summary = describePipeline(FIELD_ANSWER as never);
     expect(summary.validators).toEqual([
       { id: 'references', gate: 'block' },
@@ -48,6 +48,40 @@ describe('the field-answer pipeline', () => {
     expect(gated).toEqual(['trap_answered']);
     // A critic's severity word never vetoes a page: the gate above is the only one.
     expect(FIELD_ANSWER.policy.blockingSeverities).toEqual([]);
+    // What each type withholds from the fill is declared: a wrong value every ref, a disagreement about
+    // how a true value rests none, a field with no value to withhold none; the limits warning every ref.
+    const withholds = Object.fromEntries(
+      Object.entries(FIELD_ANSWER.policy.findingTypes).map(([type, mapped]) => [
+        type,
+        mapped.withholds,
+      ]),
+    );
+    expect(withholds).toEqual({
+      ungrounded: 'every-ref',
+      overstated: 'none',
+      misfit_option: 'every-ref',
+      inconsistent: 'every-ref',
+      trap_answered: 'every-ref',
+      needless_ask: 'none',
+      blank_required: 'none',
+    });
+    expect(FIELD_ANSWER.validators.find((validator) => validator.id === 'limits')?.withholds).toBe(
+      'every-ref',
+    );
+    // The judges name the kinds the answerer declares, in the words of one table.
+    expect(FIELD_ANSWER.critics[0].persona).toContain('overstated');
+    expect(FIELD_ANSWER.critics[1].persona).toContain('misfit_option');
+    for (const kind of [
+      'stated',
+      'restated',
+      'derived',
+      'mapped',
+      'inferred',
+      'composed',
+      'policy',
+    ]) {
+      expect(FIELD_ANSWER.producer.persona).toContain(kind);
+    }
     const personas = [
       FIELD_ANSWER.deriveCriteria.persona,
       FIELD_ANSWER.producer.persona,
@@ -96,9 +130,9 @@ describe('the field-answer pipeline', () => {
       'field.5',
     ]);
     expect(rendered).toContain(
-      '[field.1] e1 — answer "6" — confidence high — basis m1 — m1 states six years of Python',
+      '[field.1] e1 — answer "6" — rests stated — basis m1 — m1 states six years of Python',
     );
-    expect(rendered).toContain('[field.4] e4 — leave-blank — confidence high — basis none');
+    expect(rendered).toContain('[field.4] e4 — leave-blank — rests none — basis none');
     expect(fieldAnswersOutput.schema.safeParse(answers).success).toBe(true);
   });
 

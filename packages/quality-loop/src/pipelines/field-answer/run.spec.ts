@@ -1,4 +1,4 @@
-import { routeFields } from '@sysdesign/contracts';
+import { answeringFixture, routeFields } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { runPipeline } from '../../core/loop/run-pipeline';
@@ -75,11 +75,22 @@ describe('the field-answer loop', () => {
       ['references', 'block'],
       ['limits', 'warn'],
     ]);
+    // Each invented value also declares it rests on the evidence while citing none: a located warning too.
     expect(only.validation.flatMap((report) => report.problems)).toEqual([
+      {
+        severity: 'medium',
+        locationRefs: ['field.3'],
+        message: 'e3 rests stated on the evidence yet cites none',
+      },
       {
         severity: 'medium',
         locationRefs: ['field.5'],
         message: 'e5 takes at most 200 characters; the value runs to 220',
+      },
+      {
+        severity: 'medium',
+        locationRefs: ['field.5'],
+        message: 'e5 rests stated on the evidence yet cites none',
       },
     ]);
     expect(only.ledger.findings).toMatchObject([
@@ -107,6 +118,7 @@ describe('the field-answer loop', () => {
         withheld: withheldOf(FIELD_ANSWER, outputs),
       },
       sampleFields(),
+      answeringFixture(),
     );
     expect(routed.map((field) => [field.field.ref, field.route, field.source])).toEqual([
       ['e1', 'fill', 'memory'],
@@ -118,7 +130,10 @@ describe('the field-answer loop', () => {
     expect(routed[2]).toMatchObject({
       reason: 'optional, left blank: withheld',
       value: 'Acme',
-      withheld: [expect.objectContaining({ ref: 'field.3', source: 'finding', by: 'ungrounded' })],
+      withheld: expect.arrayContaining([
+        expect.objectContaining({ ref: 'field.3', source: 'finding', by: 'ungrounded' }),
+        expect.objectContaining({ ref: 'field.3', source: 'validator', by: 'limits' }),
+      ]),
     });
     expect(routed[4]).toMatchObject({
       reason: 'optional, left blank: withheld',
@@ -159,6 +174,7 @@ describe('the field-answer loop', () => {
         withheld: withheldOf(FIELD_ANSWER, outputs),
       },
       sampleFields(),
+      answeringFixture(),
     );
     expect(routed.map((field) => field.route)).toEqual([
       'fill',

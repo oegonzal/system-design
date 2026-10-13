@@ -128,9 +128,41 @@ export const FIELD_DECISIONS = ['answer', 'keep', 'ask-operator', 'leave-blank']
 export const SUGGESTION_BASES = ['record', 'transfer', 'invented'] as const;
 export type SuggestionBasis = (typeof SUGGESTION_BASES)[number];
 
-/** Ordinal confidence a producer states — never a number it invents. */
-export const CONFIDENCE_LEVELS = ['high', 'medium', 'low'] as const;
-export type ConfidenceLevel = (typeof CONFIDENCE_LEVELS)[number];
+/**
+ * How a value rests on the listed evidence: the one word the read-back routes
+ * by, through the answering settings' table of which kinds fill. Declared by
+ * the answerer, checked by the judges, never a number. Measured 2026-10-12:
+ * under a three-word confidence the read-back could not tell a fact
+ * transferred from another wording from a fact invented, and 36 answered
+ * fields went to the operator — 30 of the 34 whose answer is known were right.
+ */
+export const ANSWER_BASES = [
+  'stated',
+  'restated',
+  'derived',
+  'mapped',
+  'inferred',
+  'composed',
+  'policy',
+  'none',
+] as const;
+export type AnswerBasis = (typeof ANSWER_BASES)[number];
+
+/** What each kind means, rendered into the answerer's schema and the goal's Limits from this one table. */
+export const ANSWER_BASIS_MEANINGS: Readonly<Record<AnswerBasis, string>> = {
+  stated: 'the evidence states the value as the field asks for it',
+  restated:
+    'the evidence states the same fact in other words, to another question or in another unit of work; the latest statement stands',
+  derived:
+    'computed or split from stated facts: a span from dates, a part from a whole, one form of an identifier from another',
+  mapped: "a stated fact fitted onto this field's options, exactly one option fitting",
+  inferred: 'what adjacent evidence makes likely without stating it',
+  composed:
+    "prose assembled from stated facts, in the answerer's words, adding nothing they do not state",
+  policy:
+    'what a line of the Answering policy names as the value this question takes, whatever the record holds',
+  none: 'nothing listed bears on it',
+};
 
 /** What the session did with a field, after the decision and the routing rules; `keep` touches nothing. */
 export const FIELD_ROUTES = ['fill', 'keep', 'ask-operator', 'leave-blank'] as const;

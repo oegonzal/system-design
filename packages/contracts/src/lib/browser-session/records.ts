@@ -11,8 +11,8 @@ import type {
   BrowserDecisionSource,
   BrowserSessionStatus,
   BrowserSessionTermination,
+  AnswerBasis,
   BrowserTaskStatus,
-  ConfidenceLevel,
   TaskOutcome,
 } from './vocab';
 
@@ -95,8 +95,9 @@ export interface BrowserDecisionDto {
   /** The field's label — the join key for "was this asked before". */
   question: string | null;
   answer: string | null;
-  confidence: ConfidenceLevel | null;
-  /** The decision's own shape: a plan's page kind and outcome, a field's route, basis and findings. */
+  /** How a field answer's value rests on the evidence, as the answerer declared it; null for anything else. */
+  rests: AnswerBasis | null;
+  /** The decision's own shape: a plan's page kind and outcome, a field's route, basis and what the report withheld. */
   payload: Record<string, unknown>;
   durationMs: number | null;
   createdAt: IsoDateString;

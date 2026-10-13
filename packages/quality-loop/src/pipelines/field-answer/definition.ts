@@ -46,7 +46,7 @@ export const FIELD_ANSWER: PipelineDefinition<FieldAnswers> = {
   task: {
     criterionKinds: {
       grounding:
-        'A value about the subject must rest on listed evidence, cited by alias; a field no evidence settles is asked of the operator.',
+        'A value about the subject must rest on listed evidence, cited by alias and declared by how it rests; a field nothing bears on is asked of the operator.',
       compliance:
         "A line of the mission's answering policy or its never-do list the answers must honour: a hidden field left blank, a bot question never answered, nothing invented.",
       coverage:
@@ -54,7 +54,11 @@ export const FIELD_ANSWER: PipelineDefinition<FieldAnswers> = {
     },
     findingTypes: {
       ungrounded:
-        'A value about the subject that no cited evidence states, or that rests on no evidence at all.',
+        'A value, or a claim within a composed one, that nothing listed bears on — an empty basis, or cited evidence about something else — given as resting on the evidence.',
+      overstated:
+        'A declared kind that claims more than the evidence gives: stated for what it only yields, maps to or suggests; restated for an earlier answer to another thing, figure or period, or about the unit of work it names; derived from figures or parts the evidence does not list.',
+      misfit_option:
+        'A mapped value whose option does not carry the fact it rests on, or where another listed option carries it as well.',
       inconsistent:
         'Two answers that cannot both be true, or a value that contradicts the evidence it cites.',
       trap_answered:
@@ -124,16 +128,23 @@ export const FIELD_ANSWER: PipelineDefinition<FieldAnswers> = {
     // the session reads the page back through the orchestration's report
     // (`withheldItems`): a field it withholds is never filled, and goes to the
     // operator with the finding's words. A value nothing bears on, a value that
-    // contradicts its evidence, and a value given to a trap are wrong values —
-    // typed into someone's form they would speak falsely for the subject — so
-    // each withholds the field it names. A field asked needlessly, or left
-    // blank although required, has no value to withhold: the finding is priced
-    // and the route stands. Declared here rather than left to the strict
-    // default so the read-back never again demotes on "any finding".
+    // contradicts its evidence, a mapped value on the wrong option, and a value
+    // given to a trap are wrong VALUES — typed into someone's form they would
+    // speak falsely for the subject — so each withholds the field it names. An
+    // overstated kind is a disagreement about how a true value rests, and the
+    // answering settings already say which kinds fill: it is priced on the
+    // grounding dimension and withholds nothing, since under a table that
+    // fills every kind no re-labelling could change the route — a session that
+    // asks on some kind must come with `overstated: every-ref`. A field asked
+    // needlessly, or left blank although required, has no value to withhold.
+    // Declared here rather than left to the strict default so the read-back
+    // never again demotes on "any finding".
     findingTypes: {
       // Priced, not gated: a withheld field is the operator's, and the page's
       // other fields are still worth filling.
       ungrounded: { dimension: 'grounding', gate: false, withholds: 'every-ref' },
+      overstated: { dimension: 'grounding', gate: false, withholds: 'none' },
+      misfit_option: { dimension: 'grounding', gate: false, withholds: 'every-ref' },
       inconsistent: { dimension: 'grounding', gate: false, withholds: 'every-ref' },
       // The one defect no score can offset: a value in a trap flags the account.
       trap_answered: { dimension: 'compliance', gate: true, withholds: 'every-ref' },

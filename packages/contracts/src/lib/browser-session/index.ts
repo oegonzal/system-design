@@ -13,6 +13,7 @@ export * from './step-goal-units';
 export * from './step-index';
 export * from './step-limits';
 export * from './field-answers.schema';
+export * from './answering';
 export * from './answer-suggestions.schema';
 export * from './field-goal';
 export * from './read-back';

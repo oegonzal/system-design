@@ -341,6 +341,11 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
       "Two read-only reports answer what the memory tier could not say about itself: for every run that recalled, what became of each defect the recall searched for, read from the engine's own transitions and attributed at run level because the curator's words are prose; and for every brief, the needs no recall could serve, kept against the brief taken bare so the same prompt groups once.",
   },
   {
+    id: 'QL-68',
+    statement:
+      'A field answer declares how its value rests on the evidence by one word of a closed vocabulary shown to the answerer and the judges from one table; the limits validator warns, located and withholding, on a value resting on nothing, a kind that cites no evidence, a mapping with no options to map onto, and a kind declared on a decision that fills nothing; the grounding critic faults a value nothing bears on and a kind claiming more than the evidence gives, the form critic an option that does not carry the fact or that another option carries as well; and what each type withholds is declared on the policy — a value nothing bears on, a contradicted value, a misfit option and a trap every ref; an overstated kind, a needless ask and a required blank none.',
+  },
+  {
     id: 'QL-69',
     statement:
       'A document memory declares where it holds — of the subject wherever asked, or of the one unit of work it was recorded for — by a closed scope the digest writes, the stored point carries, the form goals render beside the kind under one legend, and a point written before scopes reads as the default; a fact scoped where it does not hold is a gated falsehood that withholds every memory it names, and provenance leaking into a subject fact is wording that withholds nothing; and a document digest judged below the bar is still drawn on where the engine’s own gates held — an artifact present that the validators passed — with every memory a confirmed finding withholds still withheld, the step saying it stored what was judged and not refuted.',

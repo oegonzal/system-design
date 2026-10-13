@@ -126,7 +126,7 @@ export const JOURNEY_SEQUENCE: StepPlan[] = [
   JOURNEY_PLANS.end,
 ];
 
-/** e1 rests on evidence (filled), e2 is a low-confidence guess (asked), e3 is the hidden trap (blank whatever it says). */
+/** e1 rests on evidence (filled), e2 rests on an inference (asked, unless the settings fill inferred), e3 is the hidden trap (blank whatever it says). */
 export const JOURNEY_ANSWERS: FieldAnswers = {
   summary: 'Two fields from evidence, one hidden.',
   fields: [
@@ -134,7 +134,7 @@ export const JOURNEY_ANSWERS: FieldAnswers = {
       ref: 'e1',
       decision: 'answer',
       value: '6',
-      confidence: 'high',
+      rests: 'stated',
       basis: ['m1'],
       reason: 'résumé',
     },
@@ -142,10 +142,10 @@ export const JOURNEY_ANSWERS: FieldAnswers = {
       ref: 'e2',
       decision: 'answer',
       value: 'Yes',
-      confidence: 'low',
+      rests: 'inferred',
       basis: [],
       reason: 'a guess',
     },
-    { ref: 'e3', decision: 'answer', value: 'x', confidence: 'high', basis: [], reason: 'oops' },
+    { ref: 'e3', decision: 'answer', value: 'x', rests: 'stated', basis: [], reason: 'oops' },
   ],
 };

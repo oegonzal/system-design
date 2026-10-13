@@ -84,7 +84,7 @@ const decisionRows = (decisions: readonly BrowserDecisionDto[]): string =>
   decisions.length === 0
     ? 'no decisions'
     : table(
-        ['step', 'kind', 'source', 'run', 'ref', 'question', 'answer', 'conf', 'taught'],
+        ['step', 'kind', 'source', 'run', 'ref', 'question', 'answer', 'rests', 'taught'],
         decisions.map((decision) => [
           `${decision.step}.${decision.ordinal}`,
           decision.kind,
@@ -93,7 +93,7 @@ const decisionRows = (decisions: readonly BrowserDecisionDto[]): string =>
           decision.ref ?? '',
           excerpt(decision.question ?? '', 40),
           excerpt(decision.answer ?? '', 32),
-          decision.confidence ?? '',
+          decision.rests ?? '',
           decision.teachOrchestrationId ?? '',
         ]),
       );

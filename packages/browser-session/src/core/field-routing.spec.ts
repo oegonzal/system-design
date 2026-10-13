@@ -1,9 +1,12 @@
 import {
+  answeringFixture,
   fieldQuestionOf,
   fieldSpecOf,
   formObservation,
+  type AnsweringSettings,
   type FieldAnswers,
   type FieldSpec,
+  type FieldsDecision,
   finding,
 } from '@sysdesign/contracts';
 
@@ -20,43 +23,46 @@ const fields = formObservation()
   .elements.filter((e) => ['e1', 'e2', 'e3', 'e4'].includes(e.ref))
   .map(fieldSpecOf);
 
+/** The settings these cases run under: every kind fills but `inferred`, the one lever the cases watch. */
+const ASKING_INFERRED = answeringFixture(['inferred']);
+const route = (
+  decided: FieldsDecision | null,
+  fault: BrainFaulted | null,
+  specs: readonly FieldSpec[],
+  cache: ReadonlyMap<string, string> = new Map(),
+  answering: AnsweringSettings = ASKING_INFERRED,
+) => routeFieldsInSession(decided, fault, specs, cache, answering);
+
 const answers: FieldAnswers = {
   summary: 'four fields',
   fields: [
-    { ref: 'e1', decision: 'answer', value: '6', confidence: 'high', basis: ['m1'], reason: 'cv' },
-    {
-      ref: 'e2',
-      decision: 'answer',
-      value: 'Yes',
-      confidence: 'medium',
-      basis: [],
-      reason: 'likely',
-    },
-    { ref: 'e3', decision: 'answer', value: 'x', confidence: 'high', basis: [], reason: 'oops' },
-    {
-      ref: 'e4',
-      decision: 'leave-blank',
-      value: null,
-      confidence: 'high',
-      basis: [],
-      reason: 'bait',
-    },
+    { ref: 'e1', decision: 'answer', value: '6', rests: 'stated', basis: ['m1'], reason: 'cv' },
+    { ref: 'e2', decision: 'answer', value: 'Yes', rests: 'inferred', basis: [], reason: 'likely' },
+    { ref: 'e3', decision: 'answer', value: 'x', rests: 'stated', basis: [], reason: 'oops' },
+    { ref: 'e4', decision: 'leave-blank', value: null, rests: 'none', basis: [], reason: 'bait' },
   ],
 };
 
 describe('field routing in a session', () => {
-  it('[BRW-3] follows the declared precedence — hidden traits before the model, confidence and basis after — and the cache stands in for an ask alone', () => {
+  it('[BRW-3] [BRW-16] follows the declared precedence — hidden traits before the model, the declared kind through the answering settings after — and the cache stands in for an ask alone', () => {
     const decided = decidedAnswers(answers);
-    const routed = routeFieldsInSession(decided, null, fields, new Map());
+    const routed = route(decided, null, fields);
     expect(routed.map((r) => [r.field.ref, r.route, r.source])).toEqual([
       ['e1', 'fill', 'memory'],
       ['e2', 'ask-operator', 'loop'],
       ['e3', 'leave-blank', 'blank'],
       ['e4', 'leave-blank', 'blank'],
     ]);
+    // The settings are the lever: under a table that fills inferred values, the same answers type e2.
+    expect(route(decided, null, fields, new Map(), answeringFixture())[1]).toMatchObject({
+      route: 'fill',
+      source: 'loop',
+      value: 'Yes',
+    });
+    expect(routed[1]?.reason).toBe('rests inferred: likely');
     // The operator answered the work-authorisation question earlier this session — cached under
     // what the field asks, label and help text as one — so it is filled, not asked, and said so.
-    const cached = routeFieldsInSession(
+    const cached = route(
       decided,
       null,
       fields,
@@ -78,21 +84,21 @@ describe('field routing in a session', () => {
       findings: [finding('ungrounded', ['field.1'])],
       withheld: [withheldBy('field.1', 'ungrounded', 'ungrounded seen')],
     });
-    expect(routeFieldsInSession(judged, null, fields, new Map())[0]).toMatchObject({
+    expect(route(judged, null, fields, new Map())[0]).toMatchObject({
       route: 'ask-operator',
       withheld: [withheldBy('field.1', 'ungrounded', 'ungrounded seen')],
     });
     const unreported = decidedAnswers(answers, { findings: [finding('ungrounded', ['field.1'])] });
-    expect(routeFieldsInSession(unreported, null, fields, new Map())[0]?.route).toBe('fill');
+    expect(route(unreported, null, fields, new Map())[0]?.route).toBe('fill');
     // A run that fell short demotes nothing by itself: the judges' objections arrive as faults.
     const fellShort = decidedAnswers(answers, { admission: 'fell-short' });
-    expect(routeFieldsInSession(fellShort, null, fields, new Map())[0]).toMatchObject({
+    expect(route(fellShort, null, fields, new Map())[0]).toMatchObject({
       route: 'fill',
       source: 'memory',
     });
     // Nothing judged at all: a required field is the operator's, an optional one is left blank.
     const unjudged = decidedAnswers(answers, { admission: 'no-rubric' });
-    expect(routeFieldsInSession(unjudged, null, fields, new Map()).map((r) => r.route)).toEqual([
+    expect(route(unjudged, null, fields, new Map()).map((r) => r.route)).toEqual([
       'ask-operator',
       'ask-operator',
       'leave-blank',
@@ -113,10 +119,8 @@ describe('field routing in a session', () => {
     expect(routed[3]?.reason).toBe(
       'optional, left blank: brain unreachable: brain unreachable: nobody home',
     );
-    expect(routeFieldsInSession(null, fault, fields, new Map([['Website', 'x']]))[2]?.route).toBe(
-      'leave-blank',
-    );
-    expect(routeFieldsInSession(null, null, fields, new Map())).toEqual([]);
+    expect(route(null, fault, fields, new Map([['Website', 'x']]))[2]?.route).toBe('leave-blank');
+    expect(route(null, null, fields, new Map())).toEqual([]);
     expect(withOperatorCache([], new Map())).toEqual([]);
   });
 
@@ -148,12 +152,12 @@ describe('field routing in a session', () => {
         ref: field.ref,
         decision: 'ask-operator' as const,
         value: null,
-        confidence: 'low' as const,
+        rests: 'none' as const,
         basis: [],
         reason: 'no evidence',
       })),
     });
-    const routed = routeFieldsInSession(
+    const routed = route(
       asked,
       null,
       questions,

@@ -1,7 +1,12 @@
 import { relative, resolve } from 'node:path';
 
 import { CONFIG_DIR, ENGINE_FILE, readChosen, type ReadFile } from '@sysdesign/config-kit';
-import { recoverySchema, type SessionRailsDto } from '@sysdesign/contracts';
+import {
+  answeringSettingsSchema,
+  recoverySchema,
+  type AnsweringSettings,
+  type SessionRailsDto,
+} from '@sysdesign/contracts';
 import { z } from 'zod';
 
 import { SessionConfigError, targetWithinBudget } from './config';
@@ -19,7 +24,7 @@ import { BROWSER_ACTION_KINDS } from './core/ports';
  * Each field's meaning, and what its value was measured against, is said
  * here; the value itself only in the file, so the two can never disagree.
  */
-type SettingsKind = 'capture' | 'session' | 'operator';
+type SettingsKind = 'capture' | 'session' | 'operator' | 'answering';
 
 const unique = (kinds: readonly string[]): boolean => new Set(kinds).size === kinds.length;
 
@@ -134,6 +139,14 @@ export interface SessionSettings {
   capture: CapturePolicy;
   session: SessionDefaults;
   operator: OperatorSettings;
+  /**
+   * Which kinds of evidence-backed value a session types without asking, by
+   * the kind each answer declares it rests on — the contracts' schema, since
+   * the read-back routes by it; total over the vocabulary, `none` always asked.
+   * Measured 2026-10-12: of 34 such values the read-back had sent to the
+   * operator with a known answer, 30 matched what the operator then typed.
+   */
+  answering: AnsweringSettings;
   /** Where each kind's settings came from, as a path from the working directory. */
   sources: Readonly<Record<SettingsKind, string>>;
 }
@@ -157,10 +170,17 @@ export function readSessionSettings(root: string, read?: ReadFile): SessionSetti
   const capture = chosen('capture', capturePolicySchema);
   const session = chosen('session', sessionDefaultsSchema);
   const operator = chosen('operator', operatorSettingsSchema);
+  const answering = chosen('answering', answeringSettingsSchema);
   return {
     capture: capture.config,
     session: session.config,
     operator: operator.config,
-    sources: { capture: capture.source, session: session.source, operator: operator.source },
+    answering: answering.config,
+    sources: {
+      capture: capture.source,
+      session: session.source,
+      operator: operator.source,
+      answering: answering.source,
+    },
   };
 }

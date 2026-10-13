@@ -27,7 +27,7 @@ const promptOf = (
 ): OperatorPrompt => ({
   field,
   untrusted,
-  why: 'low confidence: a guess',
+  why: 'rests inferred: a guess',
   task: 'Senior Engineer at Acme',
   page: 'Apply',
   suggestions,
@@ -50,7 +50,7 @@ describe('a field put to the operator', () => {
         {
           id: 'c1',
           label: 'Yes',
-          note: "the answerer's pick — not trusted: low confidence: a guess",
+          note: "the answerer's pick — not trusted: rests inferred: a guess",
         },
         { id: 'c2', label: 'No', note: null },
       ],
@@ -76,7 +76,7 @@ describe('a field put to the operator', () => {
     expect(question.prompt.details).toContain(
       '40 more options are not listed: type the one you mean',
     );
-    expect(question.prompt.details).toContain('No suggested value — low confidence: a guess');
+    expect(question.prompt.details).toContain('No suggested value — rests inferred: a guess');
   });
 
   it('[BRW-11] offers a field with no options the answerer’s value as a choice, fills its whole value, and reads words, commands, and nothing it never offered', () => {
@@ -86,7 +86,7 @@ describe('a field put to the operator', () => {
     expect(asked.question.prompt.choices).toEqual([
       expect.objectContaining({
         id: 'c1',
-        note: "the answerer's value — not trusted: low confidence: a guess",
+        note: "the answerer's value — not trusted: rests inferred: a guess",
       }),
     ]);
     expect(asked.question.prompt.choices[0]?.label).toHaveLength(
@@ -137,7 +137,7 @@ describe('a field put to the operator', () => {
       {
         id: 'c4',
         label: 'Seven years.',
-        note: "the answerer's value — not trusted: low confidence: a guess",
+        note: "the answerer's value — not trusted: rests inferred: a guess",
       },
     ]);
     expect(fieldReplyOf(other, answer({ kind: 'choice', choiceId: 'c1' }))).toEqual({

@@ -19,7 +19,7 @@ export const BROWSER_SESSION_CRITERIA: readonly Criterion[] = [
   {
     id: 'BRW-3',
     statement:
-      "Fields are routed by declared precedence — the page's own hidden traits, the page's admission, what the orchestration's report withholds at the field (consumed, never recomputed from the run's findings or warnings), then the model's decision with its confidence and basis — and an operator's answer is filled, recorded with its source, cached for the session, and taught back as a guidance document whose orchestration id lands on the rows it came from; an answer the page refuses is put back to the operator with why, not offered again, as many times as the operator settings declare, so a field fixed in the browser is read back and kept, and past that the refusal stands.",
+      "Fields are routed by declared precedence — the page's own hidden traits, the page's admission, what the orchestration's report withholds at the field (consumed, never recomputed from the run's findings or warnings), then the model's decision by the kind it declares its value rests on, through the answering settings — and an operator's answer is filled, recorded with its source, cached for the session, and taught back as a guidance document whose orchestration id lands on the rows it came from; an answer the page refuses is put back to the operator with why, not offered again, as many times as the operator settings declare, so a field fixed in the browser is read back and kept, and past that the refusal stands.",
   },
   {
     id: 'BRW-4',
@@ -80,6 +80,11 @@ export const BROWSER_SESSION_CRITERIA: readonly Criterion[] = [
     id: 'BRW-15',
     statement:
       'A session says what happened for whoever keeps a record of its units beyond it — started, unit opened, unit closed, ended — as declared bus topics carrying the engine-minted unit id, its declared identity and the session’s own lifetime, published on a queue of their own so a bus riding out a restart never holds a row behind it, the end said before the drain, the close waiting one window for them all and recording what stayed unsent; and a recorded session’s events can be published again from its rows.',
+  },
+  {
+    id: 'BRW-16',
+    statement:
+      'A field is filled or put to the operator by two declarations and nothing else: the kind its answer declares its value rests on, read through the answering settings’ table of which kinds fill — total over the vocabulary, a value resting on nothing never filled, chosen in a settings file like every other kind — and the locations the orchestration’s report withholds; the open unit of work reaches the answerer with the identity its mission declared; and the decision row records the kind.',
   },
   {
     id: 'BRW-17',

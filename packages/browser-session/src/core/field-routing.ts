@@ -4,6 +4,7 @@ import {
   needsValue,
   quoted,
   routeFields,
+  type AnsweringSettings,
   type FieldReadout,
   type FieldsDecision,
   type FieldSpec,
@@ -77,10 +78,11 @@ export function routeFieldsInSession(
   fault: BrainFaulted | null,
   fields: readonly FieldSpec[],
   cache: ReadonlyMap<string, string>,
+  answering: AnsweringSettings,
 ): RoutedField[] {
   const readouts =
     decided !== null
-      ? routeFields(decided, fields)
+      ? routeFields(decided, fields, answering)
       : fault !== null
         ? faultedReadouts(fields, fault)
         : [];

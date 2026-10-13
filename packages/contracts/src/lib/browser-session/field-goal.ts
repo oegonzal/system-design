@@ -41,7 +41,7 @@ import {
   FORM_PIPELINES,
   type FormPipeline,
 } from './pipelines';
-import { HIDDEN_TRAITS } from './vocab';
+import { ANSWER_BASES, ANSWER_BASIS_MEANINGS, HIDDEN_TRAITS } from './vocab';
 
 export const FIELD_CONTEXT_MAX_LENGTH = 300;
 export const EVIDENCE_TEXT_MAX_LENGTH = 1200;
@@ -230,6 +230,7 @@ const FORM_GOAL_TERMS: Readonly<
       '- Answer every listed field exactly once, by its ref, in the order listed.',
       "- A value stays within the field's character limit; a selectable field takes one of its listed options, or where the list counts more the page offers, one of those verbatim; a number field takes a number.",
       '- A field the page hides is left blank. A value about the subject rests only on listed evidence, cited by alias; with no evidence for it, ask the operator.',
+      `- Each value declares how it rests on the evidence, by one word: ${ANSWER_BASES.map((kind) => `${kind} — ${ANSWER_BASIS_MEANINGS[kind]}`).join('; ')}. A value resting on the evidence cites it; a mapped value needs options to map onto; a keep, an ask or a blank rests on none.`,
       '- Validators check these limits; they are not criteria.',
     ],
   },

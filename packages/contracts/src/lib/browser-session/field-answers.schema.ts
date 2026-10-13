@@ -8,7 +8,7 @@ import { z } from 'zod';
 
 import { bound, bounded } from '../bounds';
 import { ELEMENT_REF } from './observation.schema';
-import { CONFIDENCE_LEVELS, FIELD_DECISIONS } from './vocab';
+import { ANSWER_BASES, ANSWER_BASIS_MEANINGS, FIELD_DECISIONS } from './vocab';
 
 export const FIELDS_BOUND = bound(40, 'list');
 export const BASIS_BOUND = bound(6, 'list');
@@ -33,7 +33,11 @@ export const fieldAnswerSchema = z.strictObject({
         'The exact text to type or the option to pick; null unless the decision is answer.',
     })
     .nullable(),
-  confidence: z.enum(CONFIDENCE_LEVELS),
+  rests: z
+    .enum(ANSWER_BASES)
+    .describe(
+      `How the value rests on the evidence. ${ANSWER_BASES.map((kind) => `${kind}: ${ANSWER_BASIS_MEANINGS[kind]}`).join(' | ')}. A keep, an ask or a blank rests on none.`,
+    ),
   basis: bounded.list(BASIS_BOUND, z.string().regex(EVIDENCE_ALIAS), {
     description:
       'The evidence aliases the value rests on, exactly as listed; empty when none supports it.',

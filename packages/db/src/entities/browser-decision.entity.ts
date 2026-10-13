@@ -25,8 +25,17 @@ const SOURCES = [
   'engine',
 ] as const satisfies ContractSources;
 
-type ContractConfidences = (typeof Contracts)['CONFIDENCE_LEVELS'];
-const CONFIDENCES = ['high', 'medium', 'low'] as const satisfies ContractConfidences;
+type ContractBases = (typeof Contracts)['ANSWER_BASES'];
+const BASES = [
+  'stated',
+  'restated',
+  'derived',
+  'mapped',
+  'inferred',
+  'composed',
+  'policy',
+  'none',
+] as const satisfies ContractBases;
 
 /**
  * One decision the session acted on: a plan for a page, an answer for a
@@ -57,8 +66,8 @@ const CONFIDENCES = ['high', 'medium', 'low'] as const satisfies ContractConfide
   expression: `source in (${SOURCES.map((s) => `'${s}'`).join(', ')})`,
 })
 @Check({
-  name: 'browser_decision_confidence_check',
-  expression: `confidence is null or confidence in (${CONFIDENCES.map((c) => `'${c}'`).join(', ')})`,
+  name: 'browser_decision_rests_check',
+  expression: `rests is null or rests in (${BASES.map((b) => `'${b}'`).join(', ')})`,
 })
 export class BrowserDecision {
   @PrimaryKey({ type: 'uuid' })
@@ -111,9 +120,9 @@ export class BrowserDecision {
   @Property({ type: 'text', nullable: true })
   answer: string | null = null;
 
-  /** The producer's stated confidence in a field answer; null for anything else. */
+  /** How a field answer's value rests on the evidence, as the answerer declared it; null for anything else. */
   @Property({ type: 'text', nullable: true })
-  confidence: Contracts.ConfidenceLevel | null = null;
+  rests: Contracts.AnswerBasis | null = null;
 
   @Property({ type: 'json' })
   payload!: Record<string, unknown>;

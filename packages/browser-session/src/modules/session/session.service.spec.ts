@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import { Test, type TestingModule } from '@nestjs/testing';
 import { EntityManager } from '@mikro-orm/postgresql';
 import {
+  answeringFixture,
   BROWSER_SESSION_PIPELINES,
   BROWSER_STEP_PIPELINE_ID,
   DOCUMENT_MEMORY_ORCHESTRATOR_ID,
@@ -101,8 +102,9 @@ describe('the session service, end to end', () => {
       profilesDir: join(home, 'profiles'),
       subject: 'Alex Example',
       advisors: [],
-      // The settings this package ships, so the run below is the one a session gets.
-      settings: readSessionSettings(PACKAGE_ROOT),
+      // The settings this package ships — but asking on an inferred value, so the journey's one
+      // guess reaches the operator and the teach path runs end to end; the shipped table fills it.
+      settings: { ...readSessionSettings(PACKAGE_ROOT), answering: answeringFixture(['inferred']) },
     };
     core = new FakeLoop({ now: () => new Date().toISOString() });
     const client = new FakeLoopClient(core);

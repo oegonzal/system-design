@@ -62,7 +62,9 @@ describe('the field-answer validators', () => {
       { severity: 'medium', locationRefs: ['field.1'], message: 'e1 is answered with no value' },
     ]);
     expect(
-      problems(withAnswer('e3', answer('e3', { decision: 'ask-operator', value: 'Acme' }))).limits,
+      problems(
+        withAnswer('e3', answer('e3', { decision: 'ask-operator', rests: 'none', value: 'Acme' })),
+      ).limits,
     ).toEqual([
       {
         severity: 'medium',
@@ -73,7 +75,9 @@ describe('the field-answer validators', () => {
   });
 
   it('[QL-37] a value the field cannot take is a warning located at its field: length, option, number', () => {
-    expect(problems(withAnswer('e5', answer('e5', { value: fill(201) }))).limits).toEqual([
+    expect(
+      problems(withAnswer('e5', answer('e5', { value: fill(201), basis: ['m1'] }))).limits,
+    ).toEqual([
       {
         severity: 'medium',
         locationRefs: ['field.5'],
@@ -113,7 +117,8 @@ describe('the field-answer validators', () => {
 
   it('[QL-37] a hidden field given a value warns high, and a required visible field left blank warns', () => {
     expect(
-      problems(withAnswer('e4', answer('e4', { value: 'https://alex.example' }))).limits,
+      problems(withAnswer('e4', answer('e4', { value: 'https://alex.example', basis: ['m1'] })))
+        .limits,
     ).toEqual([
       {
         severity: 'high',
@@ -123,8 +128,12 @@ describe('the field-answer validators', () => {
       },
     ]);
     expect(
-      problems(withAnswer('e2', answer('e2', { decision: 'leave-blank', reason: 'unsure' })))
-        .limits,
+      problems(
+        withAnswer(
+          'e2',
+          answer('e2', { decision: 'leave-blank', rests: 'none', reason: 'unsure' }),
+        ),
+      ).limits,
     ).toEqual([
       {
         severity: 'medium',
@@ -134,6 +143,53 @@ describe('the field-answer validators', () => {
     ]);
     // The hidden field is the one field blank is right for, required or not.
     expect(problems(sampleAnswers()).limits).toEqual([]);
+  });
+
+  it('[QL-68] how a value rests is declared data the read-back routes by, so a declaration the answer contradicts is a located warning: a value resting on nothing, a kind citing no evidence, a mapping with no options, a kind on a decision that fills nothing', () => {
+    expect(problems(withAnswer('e1', answer('e1', { value: '6', rests: 'none' }))).limits).toEqual([
+      {
+        severity: 'medium',
+        locationRefs: ['field.1'],
+        message: 'e1 is answered with a value resting on nothing',
+      },
+    ]);
+    expect(
+      problems(withAnswer('e1', answer('e1', { value: '6', rests: 'restated' }))).limits,
+    ).toEqual([
+      {
+        severity: 'medium',
+        locationRefs: ['field.1'],
+        message: 'e1 rests restated on the evidence yet cites none',
+      },
+    ]);
+    // A policy value rests on the Answering policy, not on the evidence: no citation is owed.
+    expect(
+      problems(withAnswer('e1', answer('e1', { value: '6', rests: 'policy' }))).limits,
+    ).toEqual([]);
+    expect(
+      problems(withAnswer('e1', answer('e1', { value: '6', rests: 'mapped', basis: ['m1'] })))
+        .limits,
+    ).toEqual([
+      {
+        severity: 'medium',
+        locationRefs: ['field.1'],
+        message: 'e1 is mapped yet offers no options',
+      },
+    ]);
+    expect(
+      problems(withAnswer('e2', answer('e2', { value: 'Yes', rests: 'mapped', basis: ['m2'] })))
+        .limits,
+    ).toEqual([]);
+    expect(
+      problems(withAnswer('e3', answer('e3', { decision: 'ask-operator', rests: 'inferred' })))
+        .limits,
+    ).toEqual([
+      {
+        severity: 'medium',
+        locationRefs: ['field.3'],
+        message: 'e3 declares how a value rests although the decision is ask-operator',
+      },
+    ]);
   });
 
   it('[QL-37] a goal without an index blocks once; an ill-formed artifact is left to the schema validator', () => {

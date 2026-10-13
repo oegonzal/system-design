@@ -1,4 +1,9 @@
-import { MISSION_FIXTURE, type SessionRailsDto } from '@sysdesign/contracts';
+import {
+  answeringFixture,
+  MISSION_FIXTURE,
+  type AnsweringSettings,
+  type SessionRailsDto,
+} from '@sysdesign/contracts';
 
 import type { CapturePolicy } from './engine-context';
 import type { StopSignal } from './ports';
@@ -91,6 +96,12 @@ export interface Scenario {
   capture?: CapturePolicy;
   /** How many times a refused answer is put back; the shipped settings' once unless a scenario says. */
   asksAfterRefusal?: number;
+  /**
+   * Which kinds fill without asking. The journeys answer one field as a guess
+   * the record only makes likely (`inferred`), so unless a scenario says, that
+   * kind asks here — the one lever the settings are, kept visible in the specs.
+   */
+  answering?: AnsweringSettings;
 }
 
 export async function runScripted(scenario: Scenario) {
@@ -130,6 +141,7 @@ export async function runScripted(scenario: Scenario) {
       capture: scenario.capture ?? NO_CAPTURE,
       questionExpiresAfterMs: SPEC_QUESTION_EXPIRY_MS,
       asksAfterRefusal: scenario.asksAfterRefusal ?? SPEC_ASKS_AFTER_REFUSAL,
+      answering: scenario.answering ?? answeringFixture(['inferred']),
       settingsSources: {},
     },
   );

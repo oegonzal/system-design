@@ -77,6 +77,28 @@ function answerFaults(answer: FieldAnswer, field: FieldSpec): Fault[] {
   if (answer.decision === 'leave-blank' && field.required && field.hiddenTraits.length === 0) {
     fault('medium', `${ref} is required and visible, yet left blank`);
   }
+  // How a value rests is declared data the read-back routes by: a declaration
+  // the answer itself contradicts is withheld, never filled on its word.
+  if (answer.decision === 'answer' && answer.rests === 'none') {
+    fault('medium', `${ref} is answered with a value resting on nothing`);
+  }
+  if (
+    answer.decision === 'answer' &&
+    answer.rests !== 'policy' &&
+    answer.rests !== 'none' &&
+    answer.basis.length === 0
+  ) {
+    fault('medium', `${ref} rests ${answer.rests} on the evidence yet cites none`);
+  }
+  if (answer.rests === 'mapped' && field.options === null) {
+    fault('medium', `${ref} is mapped yet offers no options`);
+  }
+  if (answer.decision !== 'answer' && answer.rests !== 'none') {
+    fault(
+      'medium',
+      `${ref} declares how a value rests although the decision is ${answer.decision}`,
+    );
+  }
   return faults;
 }
 
