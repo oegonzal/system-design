@@ -196,12 +196,42 @@ describe('ingest', () => {
 
     const forced = harness([], first.ledger);
     const report = await ingest(['notes.md'], options({ force: true }), forced.deps);
-    expect(report).toMatchObject({ posted: 3, skipped: 0, retracted: 3 });
+    expect(report).toMatchObject({ posted: 3, skipped: 0, retracted: 1 });
     expect(forced.posted).toHaveLength(3);
-    // Each stored chunk's earlier digest run, as the manifest recorded it, went before the chunk was posted again.
-    expect(forced.loop.retracted).toEqual(['digest-run-1', 'digest-run-1', 'digest-run-1']);
+    // The document's one stored digest run, as the manifest recorded it, went once, before its first chunk was posted again.
+    expect(forced.loop.retracted).toEqual(['digest-run-1']);
     expect(first.ledger.entries).toHaveLength(6);
     expect(latestByHash(first.ledger.entries).size).toBe(3);
+  });
+
+  it('[ING-3] a forced re-ingest retracts by the document, so a change that renames every chunk still takes the earlier facts with it, and a dry run retracts nothing', async () => {
+    const first = harness();
+    await ingest(['notes.md'], options(), first.deps);
+    // The same document under a different budget renders different goals, so no chunk hash is known.
+    const renamed = harness([], first.ledger);
+    const dry = await ingest(
+      ['notes.md'],
+      options({ force: true, dryRun: true, chunkBytes: 4500 }),
+      renamed.deps,
+    );
+    expect(dry).toMatchObject({ dryRun: true, retracted: 0 });
+    expect(renamed.loop.retracted).toEqual([]);
+    const report = await ingest(
+      ['notes.md'],
+      options({ force: true, chunkBytes: 4500 }),
+      renamed.deps,
+    );
+    expect(report).toMatchObject({ skipped: 0, retracted: 1 });
+    expect(report.posted).toBeGreaterThan(0);
+    expect(renamed.loop.retracted).toEqual(['digest-run-1']);
+    // Another document's digests are not this document's to retract.
+    const other = harness([], first.ledger);
+    other.deps.reader = scriptedReader({
+      'notes.md': NOTES,
+      'other.md': NOTES.replace(/alpha/g, 'omega'),
+    });
+    await ingest(['other.md'], options({ force: true }), other.deps);
+    expect(other.loop.retracted).toEqual([]);
   });
 
   it('[ING-1] an orchestration the loop settled without storing anything is recorded unstored — never complete — with the step that stopped it, and a re-run posts it again', async () => {

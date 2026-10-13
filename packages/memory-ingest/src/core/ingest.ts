@@ -23,10 +23,15 @@ import { entryOf, identityOf, statusOf } from './record';
  * refuses the whole run up front. `runIngest` then posts one chunk at a time,
  * awaiting each orchestration to settle before the next, and records every
  * outcome in the ledger. A chunk whose facts the ledger holds as stored is
- * skipped unless forced — and forced, the points its earlier digest stored
- * are retracted by that digest run's id before the chunk is posted again, so
- * the store never holds two digests of one chunk; a refusal from the loop
- * stops the run, because the next chunk would be refused the same way.
+ * skipped unless forced — and a forced document is digested again whole:
+ * every digest the ledger holds as stored for that document is retracted by
+ * its run id before the document's first chunk is posted, so the store never
+ * holds two digests of one document. Retraction goes by the document, not by
+ * the chunk hash, because the hash is of the rendered goal, and a change to
+ * the goal's rules renames every chunk at once (measured 2026-10-13: a forced
+ * résumé re-ingest after a rules change retracted nothing and left 48 facts
+ * beside their 50 replacements). A refusal from the loop stops the run,
+ * because the next chunk would be refused the same way.
  */
 export interface IngestOptions {
   kind: IngestKind;
@@ -115,7 +120,7 @@ export interface IngestReport {
   skipped: number;
   /** Failed and refused together. */
   failed: number;
-  /** Digest runs retracted before a forced re-post: the points an earlier digest of the same chunk had stored, gone. */
+  /** Digest runs retracted before a forced document was posted again: everything its earlier digests had stored, gone. */
   retracted: number;
   /** Set when a refusal stopped the run before every chunk was posted. */
   stopped: { document: string; chunk: number; message: string } | null;
@@ -134,6 +139,17 @@ export interface PlannedDocument {
 
 /** Statuses a re-run does not post again: the chunk's facts are in the store. */
 const INGESTED: ReadonlySet<IngestStatus> = new Set(['complete']);
+
+/** The digest runs a document's stored postings went through, each once, in the order recorded. */
+const storedDigestsOf = (entries: readonly ManifestEntry[], document: string): string[] => [
+  ...new Set(
+    entries.flatMap((entry) =>
+      entry.document === document && INGESTED.has(entry.status) && entry.digestRunId !== null
+        ? [entry.digestRunId]
+        : [],
+    ),
+  ),
+];
 
 /** Start failures that are an outcome of one chunk, not a fault in the program. */
 const START_FAILURES = [LoopUnreachable, LoopTimeout] as const;
@@ -298,6 +314,13 @@ export async function runIngest(
   let posted = 0;
 
   for (const [fileIndex, { document, plan }] of documents.entries()) {
+    // A forced document goes whole: what every earlier digest of it stored goes before its first chunk is posted.
+    if (options.force && !options.dryRun && report.stopped === null && report.halted === null) {
+      for (const digestRunId of storedDigestsOf(entries, document)) {
+        await deps.sink.retract(digestRunId);
+        report.retracted += 1;
+      }
+    }
     for (const [chunkIndex, planned] of plan.chunks.entries()) {
       if (report.stopped !== null || report.halted !== null) return report;
       const row = (files[fileIndex] as FileReport).chunks[chunkIndex] as ChunkReport;
@@ -308,11 +331,6 @@ export async function runIngest(
         continue;
       }
       if (options.dryRun) continue;
-      // Forced past a stored posting: what its digest stored goes before the chunk is digested again.
-      if (prior?.digestRunId != null && INGESTED.has(prior.status)) {
-        await deps.sink.retract(prior.digestRunId);
-        report.retracted += 1;
-      }
 
       const entry = await postOne(planned, document, deps);
       entries.push(entry);
