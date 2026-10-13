@@ -45,6 +45,12 @@ describe('the session settings', () => {
       policy: 'fill',
       none: 'ask',
     });
+    // [BRW-18] The record's own suggestion is typed; a draft is offered.
+    expect(shipped.answering.drafts).toEqual({
+      record: 'fill',
+      transfer: 'offer',
+      invented: 'offer',
+    });
     // One window per service the session rides out, all three declared on the session.
     expect(Object.keys(shipped.session)).toEqual([
       'headed',

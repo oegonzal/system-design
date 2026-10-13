@@ -2,12 +2,16 @@ import {
   answerSuggestionsSchema,
   bestIterationOf,
   parseLenient,
+  SUGGESTION_BASES,
   suggestionLocation,
   type Admission,
+  type AnsweringSettings,
   type FieldSpec,
   type InteractionAnswer,
   type QualityRunDto,
   type WithheldRef,
+  excerpt,
+  quoted,
 } from '@sysdesign/contracts';
 
 import type { EngineContext } from './engine-context';
@@ -32,6 +36,15 @@ import { QuestionWithdrawn, type Withdrawal } from './ports';
  * Measured 2026-10-11 on the subscription, a form run takes 50 s at the median
  * and 142 s at p90; no fixed wait would be right for both. A run that fails,
  * or offers nothing, leaves the question as it was asked.
+ *
+ * A suggestion the answering settings' `drafts` table fills — the first in
+ * lettering order whose basis it says to type, the record's own by the shipped
+ * file — is typed instead of asked: ready before the question, no question
+ * goes out; arriving while one waits, the question is withdrawn saying what
+ * was filled, an answer given in the same moment standing. Measured
+ * 2026-10-12: offered drafts, the operator picked a letter 19 times and typed
+ * 4, and a record suggestion is the record's own words — asking only costs the
+ * wait.
  */
 
 /** The suggestions a run offers each field, by ref, the ones a reader of the run withholds left out. */
@@ -172,6 +185,37 @@ export class SuggestionsPrefetch {
 
 const SUPERSEDED: Withdrawal = { reason: 'superseded', note: 'suggested answers arrived' };
 
+/** How much of a typed suggestion the withdrawal quotes. */
+const FILLED_QUOTED = 60;
+
+/** The question withdrawn because a suggestion was typed in its place. */
+const filledWithdrawal = (suggestion: OfferedSuggestion): Withdrawal => ({
+  reason: 'superseded',
+  note: `filled from your record: ${quoted(excerpt(suggestion.text, FILLED_QUOTED))}`,
+});
+
+/** The first suggestion in lettering order whose basis the settings type, or null when every one is offered. */
+export function fillableSuggestion(
+  suggestions: readonly OfferedSuggestion[],
+  drafts: AnsweringSettings['drafts'],
+): OfferedSuggestion | null {
+  for (const basis of SUGGESTION_BASES) {
+    if (drafts[basis] !== 'fill') continue;
+    const found = suggestions.find((suggestion) => suggestion.basis === basis);
+    if (found !== undefined) return found;
+  }
+  return null;
+}
+
+/** What putting a field to the operator came to: their reply, or a suggestion typed in their place. */
+export type AskOutcome =
+  | { kind: 'asked'; answer: InteractionAnswer; reply: OperatorReply; chosen: AnswerSource | null }
+  | {
+      kind: 'filled';
+      suggestion: OfferedSuggestion;
+      run: { runId: string | null; orchestrationRunId: string | null };
+    };
+
 /** Who asks for this step, and until when a channel keeps offering the question. */
 const askingOf = (ctx: EngineContext): Asking => {
   const task = ctx.state.tasks.open?.label ?? null;
@@ -185,20 +229,47 @@ const askingOf = (ctx: EngineContext): Asking => {
   };
 };
 
-/** The operator's answer to a field, with the suggestions readied for it as they come. */
+/**
+ * The operator's answer to a field, with the suggestions readied for it as
+ * they come — or a suggestion typed in their place, when the settings fill
+ * its basis and `typing` is allowed (a suggestion the page refused is asked
+ * again, never typed again).
+ */
 export async function askOperator(
   ctx: EngineContext,
   prompt: Omit<OperatorPrompt, 'suggestions'>,
   prefetch: SuggestionsPrefetch | null,
-): Promise<{ answer: InteractionAnswer; reply: OperatorReply; chosen: AnswerSource | null }> {
-  const ask = async (suggestions: readonly OfferedSuggestion[], signal?: AbortSignal) => {
+  typing = true,
+): Promise<AskOutcome> {
+  const ask = async (
+    suggestions: readonly OfferedSuggestion[],
+    signal?: AbortSignal,
+  ): Promise<AskOutcome> => {
     const asked = fieldQuestion({ ...prompt, suggestions }, askingOf(ctx));
     const answer = await ctx.deps.operator.ask(asked.question, signal);
-    return { answer, ...fieldReplyOf(asked, answer) };
+    return { kind: 'asked', answer, ...fieldReplyOf(asked, answer) };
+  };
+  const typed = (suggestions: readonly OfferedSuggestion[]): OfferedSuggestion | null =>
+    typing && prefetch !== null
+      ? fillableSuggestion(suggestions, ctx.options.answering.drafts)
+      : null;
+  const filled = (suggestion: OfferedSuggestion): AskOutcome => {
+    const record = prefetch?.record();
+    return {
+      kind: 'filled',
+      suggestion,
+      run: {
+        runId: record?.runId ?? null,
+        orchestrationRunId: record?.orchestrationRunId ?? null,
+      },
+    };
   };
   const ref = prompt.field.ref;
   const ready = prefetch?.now(ref) ?? null;
-  if (prefetch === null || !prefetch.covers(ref) || ready !== null) return ask(ready ?? []);
+  if (prefetch === null || !prefetch.covers(ref) || ready !== null) {
+    const auto = typed(ready ?? []);
+    return auto === null ? ask(ready ?? []) : filled(auto);
+  }
   const withdrawing = new AbortController();
   const first = ask([], withdrawing.signal);
   const arrived = await Promise.race([
@@ -209,12 +280,13 @@ export async function askOperator(
     prefetch.later(ref),
   ]);
   if (arrived === null || arrived.length === 0) return first;
-  withdrawing.abort(SUPERSEDED);
+  const auto = typed(arrived);
+  withdrawing.abort(auto === null ? SUPERSEDED : filledWithdrawal(auto));
   try {
     // An answer given in the same moment stands.
     return await first;
   } catch (error) {
     if (!(error instanceof QuestionWithdrawn)) throw error;
-    return ask(arrived);
+    return auto === null ? ask(arrived) : filled(auto);
   }
 }

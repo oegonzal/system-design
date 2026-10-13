@@ -8,5 +8,10 @@
     "composed": "fill",
     "policy": "fill",
     "none": "ask"
+  },
+  "drafts": {
+    "record": "fill",
+    "transfer": "offer",
+    "invented": "offer"
   }
 }

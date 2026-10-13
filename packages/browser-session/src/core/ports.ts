@@ -194,7 +194,6 @@ export interface FormReport {
 export interface FieldsInput {
   session: SessionStepRef;
   mission: string;
-  /** The open unit of work, with the identity its mission declares — the organisation a question about "this employer" is about, as data. */
   task: { label: string; url: string; facets: readonly UnitFacet[] } | null;
   fields: readonly FieldSpec[];
   criteria: readonly SuccessCriterion[];
@@ -278,7 +277,7 @@ export interface NewDecision {
   ref: string | null;
   question: string | null;
   answer: string | null;
-  /** How a field answer's value rests on the evidence, as the answerer declared it; null for anything else. */
+  /** How a field answer's value rests on the evidence, as declared; null for anything else. */
   rests: AnswerBasis | null;
   payload: Record<string, unknown>;
   durationMs: number | null;

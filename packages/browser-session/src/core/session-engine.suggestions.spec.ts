@@ -1,5 +1,6 @@
 import {
   ANSWER_SUGGESTIONS_PIPELINE_ID,
+  answeringFixture,
   FAKE_RUBRIC,
   observedElement,
   suggestionLocation,
@@ -8,8 +9,9 @@ import {
   type StepPlan,
 } from '@sysdesign/contracts';
 
-import { BrainFaulted, type OperatorQuestion } from './ports';
+import { ActionFailed, BrainFaulted, type OperatorQuestion } from './ports';
 import {
+  actionKey,
   decidedAnswers,
   decidedPlan,
   decidedSuggestions,
@@ -108,6 +110,11 @@ const script = (extra: Partial<BrainScript>): BrainScript => ({
 const asked = (questions: readonly OperatorQuestion[]) =>
   questions.filter((question) => question.prompt.title === QUESTION);
 
+/** The settings the asking cases run under: every suggestion offered, so the question goes out with them. */
+const OFFERING = answeringFixture(['inferred'], []);
+/** The shipped shape: the record's own suggestion is typed, a draft is offered. */
+const TYPING_RECORD = answeringFixture(['inferred']);
+
 const rowOf = <D extends { kind: string; ref: string | null }>(decisions: readonly D[]) =>
   decisions.find((decision) => decision.kind === 'field-answer' && decision.ref === 'e7');
 
@@ -121,6 +128,7 @@ describe('suggested answers in the session', () => {
       script: script({ suggestions: [suggested()] }),
       lines: ['Yes', 'b'],
       browser: new FakeBrowser(pages()),
+      answering: OFFERING,
     });
     expect(brain.derived.map((derived) => derived.pipeline)).toContain(
       ANSWER_SUGGESTIONS_PIPELINE_ID,
@@ -176,6 +184,7 @@ describe('suggested answers in the session', () => {
       script: script({ suggestions: [suggested()], suggestionsGate }),
       operator,
       browser: new FakeBrowser(pages()),
+      answering: OFFERING,
     });
     expect(asked(operator.questions).map((question) => question.prompt.choices.length)).toEqual([
       0, 3,
@@ -190,6 +199,7 @@ describe('suggested answers in the session', () => {
       script: script({ suggestions: [suggested()], suggestionsGate: new Promise(() => undefined) }),
       lines: ['Yes', 'Five years of event-driven services.'],
       browser: new FakeBrowser(pages()),
+      answering: OFFERING,
     });
     expect(asked(operator.questions)).toHaveLength(1);
     expect(rowOf(detail.decisions)).toMatchObject({
@@ -204,6 +214,7 @@ describe('suggested answers in the session', () => {
       script: script({ suggestions: [new BrainFaulted('unreachable', 'the loop is down')] }),
       lines: ['Yes', 'Five years.'],
       browser: new FakeBrowser(pages()),
+      answering: OFFERING,
     });
     expect(asked(faulted.operator.questions).map((q) => q.prompt.choices)).toEqual([[]]);
     expect(suggestionsFile(faulted.dumps)).toMatchObject({
@@ -218,6 +229,7 @@ describe('suggested answers in the session', () => {
       script: script({ suggestions: [suggested({ admission: 'no-rubric' })] }),
       lines: ['Yes', 'Five years.'],
       browser: new FakeBrowser(pages()),
+      answering: OFFERING,
     });
     expect(asked(unjudged.operator.questions).map((q) => q.prompt.choices)).toEqual([[]]);
     expect(suggestionsFile(unjudged.dumps)).toMatchObject({
@@ -225,5 +237,111 @@ describe('suggested answers in the session', () => {
       admission: 'no-rubric',
       offered: {},
     });
+  });
+
+  it('[BRW-18] types the record’s own suggestion without a question when the settings fill it: from memory, naming the suggestions run, cached, taught to nobody', async () => {
+    const { brain, operator, detail, dumps, warnings } = await run({
+      script: script({ suggestions: [suggested()] }),
+      lines: ['Yes'],
+      browser: new FakeBrowser(pages()),
+      answering: TYPING_RECORD,
+    });
+    // Whether the suggestions were ready before the question or arrived while it waited, nobody answered it.
+    expect(
+      asked(operator.questions).every((question) => question.prompt.choices.length === 0),
+    ).toBe(true);
+    const row = rowOf(detail.decisions);
+    expect(row).toMatchObject({ source: 'memory', answer: RECORD });
+    expect(row?.payload).toMatchObject({ chosen: 'record', route: 'fill' });
+    expect(row?.loopRunId).toBe(suggestionsFile(dumps)['runId']);
+    expect(brain.taught.some((taught) => taught.parts[0]?.includes(RECORD))).toBe(false);
+    expect(warnings).toEqual([]);
+  });
+
+  it('[BRW-18] arriving while the question waits, the fillable suggestion withdraws it saying what was filled', async () => {
+    let arrive = (): void => undefined;
+    const suggestionsGate = new Promise<void>((resolve) => {
+      arrive = resolve;
+    });
+    const withdrawals: unknown[] = [];
+    const operator = new ScriptedOperator(['Yes']);
+    const ask = operator.ask.bind(operator);
+    operator.ask = (question, signal) => {
+      if (question.prompt.title === QUESTION) {
+        signal?.addEventListener('abort', () => withdrawals.push(signal.reason), { once: true });
+        arrive();
+      }
+      return ask(question, signal);
+    };
+    const { detail } = await run({
+      script: script({ suggestions: [suggested()], suggestionsGate }),
+      operator,
+      browser: new FakeBrowser(pages()),
+      answering: TYPING_RECORD,
+    });
+    expect(asked(operator.questions)).toHaveLength(1);
+    expect(withdrawals).toEqual([
+      {
+        reason: 'superseded',
+        note: 'filled from your record: "Six years building event-driven services at Acme, from the …"',
+      },
+    ]);
+    expect(rowOf(detail.decisions)).toMatchObject({ source: 'memory', answer: RECORD });
+  });
+
+  it('[BRW-18] with no suggestion the settings type, the question goes out with the drafts as before', async () => {
+    const draftsOnly: AnswerSuggestions = {
+      ...SUGGESTIONS,
+      fields: [
+        {
+          ref: 'e7',
+          suggestions: SUGGESTIONS.fields[0].suggestions.filter((item) => item.basis !== 'record'),
+        },
+      ],
+    };
+    const { operator, detail } = await run({
+      script: script({
+        suggestions: [decidedSuggestions(draftsOnly, { withheld: [] })],
+      }),
+      lines: ['Yes', 'a'],
+      browser: new FakeBrowser(pages()),
+      answering: TYPING_RECORD,
+    });
+    expect(asked(operator.questions).map((question) => question.prompt.choices.length)).toContain(
+      3,
+    );
+    expect(rowOf(detail.decisions)).toMatchObject({ source: 'operator', answer: TRANSFER });
+  });
+
+  it('[BRW-18] a typed suggestion the page refuses is asked as any refused answer, with the drafts, and never typed again', async () => {
+    // The page refuses the record's own words and nothing else: the journey's other fills land.
+    const browser = new FakeBrowser(pages());
+    const act = browser.act.bind(browser);
+    browser.act = async (action) => {
+      if (action.kind === 'fill' && action.value === RECORD) {
+        throw new ActionFailed(actionKey(action), 'the element is detached');
+      }
+      return act(action);
+    };
+    const { operator, detail, brain } = await run({
+      script: script({ suggestions: [suggested()] }),
+      lines: ['Yes', 'b'],
+      browser,
+      answering: TYPING_RECORD,
+    });
+    const questions = asked(operator.questions).filter(
+      (question) => question.prompt.choices.length > 0,
+    );
+    expect(questions).toHaveLength(1);
+    expect(questions[0]?.prompt.details.join(' ')).toContain('the page refused');
+    expect(questions[0]?.prompt.choices.map((choice) => choice.label)).toEqual([
+      RECORD,
+      TRANSFER,
+      INVENTED,
+    ]);
+    // The operator's pick is typed and taught as a chosen draft; the refused record was typed once.
+    expect(rowOf(detail.decisions)).toMatchObject({ source: 'operator', answer: TRANSFER });
+    expect(rowOf(detail.decisions)?.payload).toMatchObject({ chosen: 'transfer', outcome: 'ok' });
+    expect(brain.taught.some((taught) => taught.parts[0]?.includes(TRANSFER))).toBe(true);
   });
 });

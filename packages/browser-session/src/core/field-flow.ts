@@ -43,12 +43,16 @@ type FieldsDecided = Decided<FieldAnswers> & FormReport;
 const REFUSED_ANSWER_QUOTED = 80;
 
 /**
- * The operator's answer to a field. An answer the page refuses is put back,
- * with why, as many times as the operator settings declare — the person can
- * choose again, or fix the field in the browser and have it read back, which
- * keeps and teaches what they chose — and only past that does the refusal
- * stand. Measured 2026-10-11: a refused answer the operator then fixed by hand
- * was never recorded, and the next form asked the same question again.
+ * The operator's answer to a field — or a suggestion the answering settings
+ * type in their place, recorded from memory naming the run that drafted it,
+ * cached as what the field now holds, and taught to nobody: the record
+ * already holds it. An answer the page refuses is put back, with why, as many
+ * times as the operator settings declare — the person can choose again, or
+ * fix the field in the browser and have it read back, which keeps and teaches
+ * what they chose — and only past that does the refusal stand; a typed
+ * suggestion the page refused is asked the same way, and never typed again.
+ * Measured 2026-10-11: a refused answer the operator then fixed by hand was
+ * never recorded, and the next form asked the same question again.
  */
 async function ask(
   ctx: EngineContext,
@@ -60,12 +64,12 @@ async function ask(
   await deps.browser.highlight(field.field.ref).catch(() => undefined);
   let refusal: string | null = null;
   for (let asked = 0; ; asked += 1) {
-    const { answer, reply, chosen } = await askOperator(
+    const outcome = await askOperator(
       ctx,
       {
         field: field.field,
         // A refused answer is not offered back; the question says why it returned.
-        untrusted: refusal === null ? field.value : null,
+        unfilled: refusal === null ? field.value : null,
         why:
           refusal ??
           [
@@ -76,7 +80,18 @@ async function ask(
         page: observation.title,
       },
       prefetch,
+      refusal === null,
     );
+    if (outcome.kind === 'filled') {
+      const { suggestion, run } = outcome;
+      const typed = await fill(ctx, field, suggestion.text, 'memory', null, observation);
+      if (typed.outcome === 'ok') return { ...typed, chosen: suggestion.basis, filledFrom: run };
+      const answered = quoted(excerpt(suggestion.text, REFUSED_ANSWER_QUOTED));
+      refusal = `the page refused ${answered}, suggested from your record (${typed.detail ?? 'no reason given'}): choose, or fill it in the browser and read it back`;
+      deps.log(`step ${state.step}: ${quoted(field.field.name)} refused ${answered}; asking`);
+      continue;
+    }
+    const { answer, reply, chosen } = outcome;
     const asking = { via: answer.via.channel, chosen };
     switch (reply.kind) {
       case 'stop':
@@ -163,8 +178,10 @@ const decisionOf = (
 ): DecisionInput => ({
   kind: 'field-answer',
   source: outcome.source,
-  loopRunId: decided?.runId ?? null,
-  loopOrchestrationId: decided?.orchestrationRunId ?? null,
+  // The run that produced the value: the suggestions run for a typed suggestion, else the answers run.
+  loopRunId: outcome.filledFrom?.runId ?? decided?.runId ?? null,
+  loopOrchestrationId:
+    outcome.filledFrom?.orchestrationRunId ?? decided?.orchestrationRunId ?? null,
   ref: field.field.ref,
   question: field.field.name,
   answer: outcome.value,

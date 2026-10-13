@@ -11,7 +11,7 @@ import type { AnsweringSettings } from './answering';
 import type { ObservedElement, PageObservation, TaskLedgerSummary } from './observation.schema';
 import { stopsOf, stopsOnPage } from './mission-stops';
 import type { StepGoalInput } from './step-goal';
-import { ANSWER_BASES, type AnswerBasis } from './vocab';
+import { ANSWER_BASES, SUGGESTION_BASES, type AnswerBasis, type SuggestionBasis } from './vocab';
 
 /** One element as the page reports it, every fact the quiet default; a spec overrides what it is about. */
 export const observedElement = (
@@ -257,11 +257,19 @@ export const stepGoalInput = (overrides: Partial<StepGoalInput> = {}): StepGoalI
 
 /**
  * Answering settings for a spec: every kind a value may rest on fills, but
- * `none` and the kinds listed, which ask — the shipped file's shape, chosen
- * per case so a spec can watch the one lever the settings are.
+ * `none` and the kinds listed, which ask; and a suggestion whose basis is
+ * listed in `typed` is typed for a field the operator would be asked, the
+ * rest offered — the shipped file's shape, chosen per case so a spec can
+ * watch the two levers the settings are.
  */
-export const answeringFixture = (asks: readonly AnswerBasis[] = []): AnsweringSettings => ({
+export const answeringFixture = (
+  asks: readonly AnswerBasis[] = [],
+  typed: readonly SuggestionBasis[] = ['record'],
+): AnsweringSettings => ({
   fills: Object.fromEntries(
     ANSWER_BASES.map((kind) => [kind, kind === 'none' || asks.includes(kind) ? 'ask' : 'fill']),
   ) as AnsweringSettings['fills'],
+  drafts: Object.fromEntries(
+    SUGGESTION_BASES.map((basis) => [basis, typed.includes(basis) ? 'fill' : 'offer']),
+  ) as AnsweringSettings['drafts'],
 });

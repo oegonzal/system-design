@@ -79,12 +79,14 @@ ends `complete`, reason `target-reached`, once n units have closed `done`.
 
 Read, per form page: one `form-memory` orchestration whose `recall` step
 counts `{probes, candidates, evidence}` and whose `target` step reports
-`admission`; operator prompts only for fields the report withheld, the model
-routed to you, or whose value rests on a kind the answering settings do not
-fill; after each
-`taskDone`, one `document-memory` orchestration whose id lands on that unit's
-operator-sourced decision rows. The dump's `fields.json` per step names the
-route and source of every field.
+`admission` and what it withheld; an operator prompt only for a field the
+report withheld, the model routed to you, or whose value rests on a kind the
+answering settings do not fill — and none when the record's own suggestion
+fills it (the answering settings' `drafts`); for each answer you give, one
+`document-memory` orchestration at once, whose id lands on the decision row
+it came from — the step's `teach.json` lists them. The dump's `fields.json`
+per step names the route and source of every field, and what became of its
+suggestions.
 
 To read why a step did what it did, walk its debate from the dump: the step's
 `plan.json` names the loop run, and

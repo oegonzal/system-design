@@ -20,7 +20,7 @@ import type { OperatorQuestion } from './ports';
  * answer read back as what the session does with the field. The question is
  * the notifications contracts' prompt: the field's options as lettered
  * choices — or, for a field with none, the suggested answers readied for it,
- * labelled by what they rest on, and the answerer's untrusted value — free
+ * labelled by what they rest on, and the answerer's unfilled value — free
  * text where the field takes it, and the commands a person may give instead
  * of an answer. Each choice's full value is kept by its id, so what is filled
  * is never a label shortened to fit.
@@ -41,7 +41,7 @@ export type OperatorReply =
   { kind: 'answer'; text: string } | { kind: 'read-back' } | { kind: 'blank' } | { kind: 'stop' };
 
 /**
- * Where a filled answer came from: a listed option, the answerer's untrusted
+ * Where a filled answer came from: a listed option, the answerer's unfilled
  * value, a suggestion by what it rests on, or the person's own words.
  */
 export type AnswerSource = 'option' | 'answerer' | SuggestionBasis | 'typed';
@@ -64,8 +64,8 @@ const SUGGESTION_NOTES: Readonly<Record<SuggestionBasis, string>> = {
 export interface OperatorPrompt {
   field: FieldSpec;
   /** The answerer's value, offered for the operator to accept or replace; null when it gave none. */
-  untrusted: string | null;
-  /** Why it was not trusted: the route's reason and what a judge or validator said. */
+  unfilled: string | null;
+  /** Why it was not filled: the route's reason and what a judge or validator said. */
   why: string;
   task: string | null;
   page: string;
@@ -109,9 +109,7 @@ export function fieldQuestion(prompt: OperatorPrompt, asking: Asking): AskedFiel
       choose(
         option,
         'option',
-        option === prompt.untrusted
-          ? note(`the answerer's pick — not trusted: ${prompt.why}`)
-          : null,
+        option === prompt.unfilled ? note(`the answerer's pick — not filled: ${prompt.why}`) : null,
       );
     }
   } else {
@@ -121,13 +119,9 @@ export function fieldQuestion(prompt: OperatorPrompt, asking: Asking): AskedFiel
         choose(suggestion.text, basis, note(`${SUGGESTION_NOTES[basis]} — ${suggestion.why}`));
       }
     }
-    const offered = prompt.suggestions.some((suggestion) => suggestion.text === prompt.untrusted);
-    if (prompt.untrusted !== null && !offered) {
-      choose(
-        prompt.untrusted,
-        'answerer',
-        note(`the answerer's value — not trusted: ${prompt.why}`),
-      );
+    const offered = prompt.suggestions.some((suggestion) => suggestion.text === prompt.unfilled);
+    if (prompt.unfilled !== null && !offered) {
+      choose(prompt.unfilled, 'answerer', note(`the answerer's value — not filled: ${prompt.why}`));
     }
   }
   const title = titleOf(field);
@@ -144,9 +138,9 @@ export function fieldQuestion(prompt: OperatorPrompt, asking: Asking): AskedFiel
       : []),
     `Page: ${prompt.page}`,
     ...(prompt.task === null ? [] : [`Unit of work: ${prompt.task}`]),
-    prompt.untrusted === null
+    prompt.unfilled === null
       ? `No suggested value — ${prompt.why}`
-      : `Suggested: ${quoted(prompt.untrusted)} — not trusted: ${prompt.why}`,
+      : `Suggested: ${quoted(prompt.unfilled)} — not filled: ${prompt.why}`,
   ].map(detail);
   return {
     question: {

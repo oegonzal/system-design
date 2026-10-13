@@ -233,16 +233,14 @@ describe('the session engine', () => {
     ]);
     expect(fields[2]?.payload['reason']).toContain('trap-skipped');
     expect(fields.every((d) => d.loopRunId !== null && d.loopOrchestrationId !== null)).toBe(true);
-    // The operator saw the options lettered, the answerer's pick marked with why it was not trusted, once.
+    // The operator saw the options lettered, the answerer's pick marked with why it was not filled, once.
     expect(operator.questions).toHaveLength(1);
     const prompt = operator.questions[0]?.prompt;
     expect(prompt?.title).toBe('Work authorisation');
     expect(prompt?.choices.map((choice) => choice.label)).toEqual(['Yes', 'No']);
-    expect(prompt?.choices[0]?.note).toMatch(
-      /^the answerer's pick — not trusted: .*rests inferred/,
-    );
+    expect(prompt?.choices[0]?.note).toMatch(/^the answerer's pick — not filled: .*rests inferred/);
     expect(prompt?.details).toContainEqual(
-      expect.stringMatching(/^Suggested: "Yes" — not trusted: /),
+      expect.stringMatching(/^Suggested: "Yes" — not filled: /),
     );
     expect(prompt?.freeText).toBeNull();
     expect(fields[1]?.payload).toMatchObject({ via: 'scripted', chosen: 'option' });

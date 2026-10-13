@@ -16,8 +16,8 @@ const asked = (): OperatorQuestion =>
   fieldQuestion(
     {
       field: fieldSpecOf(formObservation().elements[1]),
-      untrusted: 'Yes',
-      why: 'low confidence: a guess',
+      unfilled: 'Yes',
+      why: 'rests inferred: a guess',
       task: 'Senior Engineer at Acme',
       page: 'Apply — additional questions',
       suggestions: [],
@@ -56,9 +56,9 @@ describe('the terminal operator', () => {
       'Are you authorised to work in this country?',
       'Page: Apply — additional questions',
       'Unit of work: Senior Engineer at Acme',
-      'Suggested: "Yes" — not trusted: low confidence: a guess',
+      'Suggested: "Yes" — not filled: rests inferred: a guess',
       '',
-      "  a) Yes   (the answerer's pick — not trusted: low confidence: a guess)",
+      "  a) Yes   (the answerer's pick — not filled: rests inferred: a guess)",
       '  b) No',
       '',
       '  /readback  I filled it in the browser: read it back   (Enter alone)',

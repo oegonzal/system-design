@@ -39,6 +39,8 @@ export interface FieldResult {
   detail: string | null;
   /** The answer the operator gave here, taught back as soon as it was given. */
   guidance: OperatorGuidanceDto | null;
+  /** The run whose suggestion was typed, when the value came from one rather than from the answers run. */
+  filledFrom: { runId: string | null; orchestrationRunId: string | null } | null;
 }
 
 /** The browser action that puts a value into a field: an option for a selectable one, text otherwise. */
@@ -75,6 +77,7 @@ export const result = (
   cached: field.cached,
   detail,
   guidance: null,
+  filledFrom: null,
 });
 
 /** What the session settled for a field, kept by what the field asks; one that asks nothing it can be told by is kept by nothing. */

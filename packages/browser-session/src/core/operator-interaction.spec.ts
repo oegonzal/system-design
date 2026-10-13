@@ -22,11 +22,11 @@ const fieldOf = (ref: string): FieldSpec => {
 
 const promptOf = (
   field: FieldSpec,
-  untrusted: string | null,
+  unfilled: string | null,
   suggestions: OfferedSuggestion[] = [],
 ): OperatorPrompt => ({
   field,
-  untrusted,
+  unfilled,
   why: 'rests inferred: a guess',
   task: 'Senior Engineer at Acme',
   page: 'Apply',
@@ -50,7 +50,7 @@ describe('a field put to the operator', () => {
         {
           id: 'c1',
           label: 'Yes',
-          note: "the answerer's pick — not trusted: rests inferred: a guess",
+          note: "the answerer's pick — not filled: rests inferred: a guess",
         },
         { id: 'c2', label: 'No', note: null },
       ],
@@ -86,7 +86,7 @@ describe('a field put to the operator', () => {
     expect(asked.question.prompt.choices).toEqual([
       expect.objectContaining({
         id: 'c1',
-        note: "the answerer's value — not trusted: rests inferred: a guess",
+        note: "the answerer's value — not filled: rests inferred: a guess",
       }),
     ]);
     expect(asked.question.prompt.choices[0]?.label).toHaveLength(
@@ -137,7 +137,7 @@ describe('a field put to the operator', () => {
       {
         id: 'c4',
         label: 'Seven years.',
-        note: "the answerer's value — not trusted: rests inferred: a guess",
+        note: "the answerer's value — not filled: rests inferred: a guess",
       },
     ]);
     expect(fieldReplyOf(other, answer({ kind: 'choice', choiceId: 'c1' }))).toEqual({

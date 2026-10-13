@@ -58,9 +58,9 @@ select, required
 Are you authorised to work in this country?
 Page: Apply — additional questions
 Unit of work: Senior Engineer at Acme
-Suggested: "Yes" — not trusted: rests inferred: a guess
+Suggested: "Yes" — not filled: rests inferred: a guess
 
-  a) Yes   (the answerer's pick — not trusted: rests inferred: a guess)
+  a) Yes   (the answerer's pick — not filled: rests inferred: a guess)
   b) No
 
   /readback  I filled it in the browser: read it back   (Enter alone)

@@ -59,12 +59,17 @@ export const BROWSER_SESSION_CRITERIA: readonly Criterion[] = [
   {
     id: 'BRW-11',
     statement:
-      'A field is put to the operator one way on every channel: its options as lettered choices, the answerer’s untrusted pick marked with why, free text where the field takes it, and the commands to read back, leave blank or stop; a reply is read with the contracts’ one resolver, the full value behind a choice is what is filled, the decision row records the channel and what the answer was chosen from, and a line typed at the terminal with no question open is said to be unused, never kept for the next.',
+      'A field is put to the operator one way on every channel: its options as lettered choices, the answerer’s pick marked as not filled with why, free text where the field takes it, and the commands to read back, leave blank or stop; a reply is read with the contracts’ one resolver, the full value behind a choice is what is filled, the decision row records the channel and what the answer was chosen from, and a line typed at the terminal with no question open is said to be unused, never kept for the next.',
   },
   {
     id: 'BRW-12',
     statement:
       'A field with no options that goes to the operator is asked at once, and suggested answers are asked for once per form, for exactly those fields, under the session’s own derived rubric: they are lettered record first, then the drafts labelled apart as transferable or invented, less every one the run’s report withholds and none from a run no judge saw; when they arrive before an answer the question is withdrawn as superseded and asked again with them, an answer given first is taken and nothing is asked again, a faulted run is warned once and leaves the question as asked, the full text behind a letter is what is filled, cached and taught, the decision row records what it rested on, and the fields file records what became of the suggestions.',
+  },
+  {
+    id: 'BRW-18',
+    statement:
+      'The first suggestion in lettering order whose basis the answering settings’ drafts table types is filled without a question — ready before the question, none goes out; arriving while one waits, the question is withdrawn saying what was filled, an answer given in the same moment standing — recorded from memory naming the run that drafted it, cached as what the field holds, taught to nobody since the record already holds it; a typed suggestion the page refuses is asked as any refused answer and never typed again; and a suggestion whose basis the table offers reaches the operator as before.',
   },
   {
     id: 'BRW-13',

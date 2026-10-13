@@ -26,7 +26,7 @@ const QUESTION: OperatorQuestion = fieldQuestion(
       hiddenTraits: [],
       context: null,
     },
-    untrusted: null,
+    unfilled: null,
     why: 'no evidence',
     task: null,
     page: 'Apply',
