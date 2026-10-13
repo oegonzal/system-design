@@ -91,7 +91,8 @@ every page scores against): **Dashboard** (the buckets, a pull, what is due
 this week, the ten best leads, the company's own registration), **Search**
 (the store over every filter, free; SAM.gov over every `QueryFilter` field,
 run and saved, each saved search togglable into the daily pull), **Pipeline**
-(tracked notices by stage, the stage editable inline), **Notice** (facts,
+(tracked notices by stage; the stage changes in the row, and the whole bid —
+stage, reminder, estimate and notes — opens under it), **Notice** (facts,
 place and contacts, the attachments as public links, the score trace, the
 description on demand, the awards of its solicitation and NAICS, the bid
 panel), **Intel** (fetch and summarize awards, look registrants up), **Spending**

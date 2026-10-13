@@ -60,7 +60,9 @@ Tab into a chart, move with the arrow keys, Escape hides the tooltip. The
 tooltip sits beside its column and never leaves the plot: in a narrow window
 it slides back over the column instead. The page is laid out for a desktop window: the charts
 scale with the page, so at phone width they are small and the data table
-under each is the readable form, and a wide table scrolls the page sideways.
+under each is the readable form. A table with more columns than the window
+has room for scrolls sideways inside its own frame, which a keyboard can
+focus, and the page itself never moves sideways.
 
 ### Pulse — when the money moves
 
@@ -76,6 +78,20 @@ year to date, the prior year to the same period with the change, the
 projected remainder with its band, and the projected total. Without a
 complete prior year there is no projection, and the panel says so.
 
+**What the source has not published yet.** USAspending shows Department of
+Defense awards 90 days after they are signed, so for a scope that counts
+Defense the last three months are short, and reading them as real makes a
+growing market look like a falling one. The adapter declares that lag; the
+service counts back from the source's own "data as of" to the last day that
+is all in, and marks every period ending after it **unpublished**. Those
+periods are drawn lighter like the month in progress, are projected instead
+of trusted, and never enter this year's run rate; a prior year that still
+holds one is no year the projection averages. The change against the prior
+year is taken over the periods both years have settled, and its label says
+how far that reaches ("vs the prior year through May"). A note under the
+chart names the agency, the lag and the day. A scope of one agency that
+publishes on time carries no mark.
+
 ### Where — where the money goes
 
 The scope's obligations over a window, ranked by awarding agency,
@@ -85,7 +101,9 @@ add up to it). The window opens on the last twelve months — a whole year on
 any day, where the fiscal year to date is thirteen days long on October 13 —
 with the fiscal year to date and the prior fiscal year as presets.
 "Truncated" means more rows exist beyond the declared bound
-(`MAX_BREAKDOWN_ROWS`).
+(`MAX_BREAKDOWN_ROWS`). When the window reaches past the last day a late
+agency has published, a note says the total and that agency's rows are
+short; the prior fiscal year is the window to read for whole shares.
 
 ### Horizon — what is ending
 
@@ -117,6 +135,15 @@ pull that stores new notices shows them on the next look without a refresh,
 and it is never snapshotted. "With an open notice" counts the listed rows
 that have one. The join reads up to `MAX_RECOMPETE_NOTICES` notices and says
 when that bound cut.
+
+**"Ends" is the current end.** The date listed is the end of the period
+already exercised. Options not yet exercised can carry an award further,
+and USAspending's award search does not return that date (it answers null
+for it), so the list cannot show it. Measured 2026-10-13 on the eight
+largest software awards ending that week: four ran on with options, to
+January 2027, September 2027, October 2028 and October 2029. An award about
+to "end" is often an option decision, not a recompete; the award's own
+record holds both dates.
 
 ### Agency — how much is left
 
@@ -270,7 +297,8 @@ and hosting) — every agency, contracts and IDVs.
 $70.8B, and $71.1B so far for FY2026; FY2027 period 1 had $0.37B by
 October 12. FY2025 is the last year the data holds whole: the Department of
 Defense publishes awards 90 days after signing, so on this date its FY2026
-stops in mid-July, and the lens counts nothing for it in the months after.
+stops in mid-July; the Pulse marks the periods after it unpublished and
+rests no projection on that year.
 Measured directly from USAspending for the three 5415 codes, contracts only:
 Defense shows $0.6B for July through September 2026 against $8.6B a year
 earlier; through June it ran 21% ahead of FY2025 ($16.1B against $13.4B),
@@ -315,13 +343,14 @@ and USAspending fetched for June–October 2026). Of the 500 most recent 5415
 awards from SAM.gov, 453 (90.6%) were open competition, 34 total small
 business set-asides, 8 service-disabled veteran-owned, 3 women-owned, 2
 8(a). That sample is not the market: more than half of the stored SAM.gov
-awards are GSA schedule records, which carry no set-aside and 999 offers, a
-placeholder. The summary counts the placeholder as many offers (333 many, 60
-few, 83 one, 24 unknown), so its "many" is not a count of bidders: 466 of
-the 871 stored SAM.gov awards carry 999, and 464 of those are Federal
-Acquisition Service records. Among the 336 with a real count, 154 (46%) drew
-one offer, 118 (35%) two to four and 64 (19%) five or more; of the 62
-small-business set-asides among them, 11 drew one offer and 35 two to four.
+awards are GSA schedule records, which carry no set-aside and no count of
+offers. The source writes 999 on them, a placeholder the adapter reads as
+unknown: 466 of the 871 stored SAM.gov awards carried it, 464 of them
+Federal Acquisition Service records, and before the adapter read it so the
+summary counted them as many offers. Among the 336 with a real count, 154
+(46%) drew one offer, 118 (35%) two to four and 64 (19%) five or more; of
+the 62 small-business set-asides among them, 11 drew one offer and 35 two to
+four.
 Measured directly from USAspending for FY2025, the three 5415 codes,
 contracts only: small businesses took 46% of the dollars, at least 22% of
 the dollars carry a set-aside on the award itself, and 87% were competed.
@@ -473,7 +502,9 @@ Probed live on 2026-10-12 and 2026-10-13; free, no key.
 - `psc_codes` as a flat list matches by prefix at any length (`["DA"]` is the family, `["DA01"]` the code, `["7"]` every product code beginning with 7); `{ "require": [...] }` wants a path through the PSC tree per entry (`["Service", "D", "DA", "DA01"]`) and answers 422 to a bare code. `naics_codes.require` takes families of 2, 4 or 6 digits and answers 400 to any other length.
 - `budgetary_resources` periods are sparse — a year just begun is empty, older years quarterly — and are shown as reported; `sub_agency` refuses a `fiscal_year` outside its submissions (the new fiscal year, for weeks after October 1), while `references/toptier_agencies` reports each agency's `active_fy`.
 - The source sits behind a firewall with no published limit. Measured 2026-10-13: about 700 requests in fourteen minutes — four renewing warms back to back, the last two within two minutes — and it answered 500 with a "Web Page Blocked!" page, then refused connections from this address; one warm of about 190 requests in a minute had passed three times before that. One warm a day and ordinary browsing stay well under it; a burst does not.
-- `awards/last_updated` is `MM/DD/YYYY`; Department of Defense awards appear 90 days after signing; agency financials are revealed about five to six weeks after the period.
+- `awards/last_updated` is `MM/DD/YYYY`; agency financials are revealed about five to six weeks after the period.
+- Department of Defense awards appear 90 days after signing. Measured 2026-10-13 against data as of 2026-10-12: Defense reported $43.3B for June 2026, $12.2B for July and $0.02B for August. The Army Corps of Engineers awards under Defense's code; as an awarding agency of its own (`096`) it reports no contract obligations. The adapter declares the lag as data (`USASPENDING_PUBLICATION_LAGS`), and the lenses derive everything else from it.
+- `spending_by_award` answers null for an award's end date with options, under every name tried; `awards/{id}` returns it as `period_of_performance.potential_end_date`.
 
 ## Reviewing a build live
 
