@@ -1,3 +1,4 @@
+import { NO_FACETS, NO_SET_ASIDE } from './facets';
 import { FISCAL_PERIODS } from './fiscal';
 import { opportunityOf } from './fixtures';
 import {
@@ -13,6 +14,7 @@ import {
   type SpendingBreakdown,
   type SpendingHorizon,
   type SpendingPulse,
+  type SpendingReach,
   type SpendingScope,
 } from './spending';
 
@@ -28,6 +30,7 @@ export const spendingScopeOf = (overrides: Partial<SpendingScope> = {}): Spendin
   psc: [],
   agency: null,
   awardFamily: 'both',
+  facets: NO_FACETS,
   ...overrides,
 });
 
@@ -133,6 +136,42 @@ export const spendingBreakdownOf = (
   provenance: provenanceOf(),
   ...overrides,
 });
+
+/** The story's lanes: open competition and the two small-business set-asides. */
+const LANES = [NO_SET_ASIDE, 'SBA', 'SBP'];
+
+/** A year of new contracts cut down to the ones a small firm with those lanes won without a vehicle. */
+export const spendingReachOf = (overrides: Partial<SpendingReach> = {}): SpendingReach => {
+  const fresh = { ...NO_FACETS, newOnly: true };
+  const inLanes = { ...fresh, setAside: LANES };
+  const standalone = { ...inLanes, placement: 'standalone' as const };
+  return {
+    scope: spendingScopeOf({ awardFamily: 'contracts' }),
+    from: '2025-06-16',
+    to: '2026-06-15',
+    lanes: LANES,
+    cuts: [
+      { id: 'new', facets: fresh, awards: 4_800, amount: 96_000_000 },
+      { id: 'lanes', facets: inLanes, awards: 3_100, amount: 52_000_000 },
+      { id: 'standalone', facets: standalone, awards: 620, amount: 21_000_000 },
+      {
+        id: 'small',
+        facets: { ...standalone, recipientSize: 'small' },
+        awards: 410,
+        amount: 9_500_000,
+      },
+    ],
+    bands: [
+      { id: 'micro', awards: 150 },
+      { id: 'simplified', awards: 205 },
+      { id: 'mid', awards: 40 },
+      { id: 'large', awards: 15 },
+    ],
+    delay: null,
+    provenance: provenanceOf({ requests: 12 }),
+    ...overrides,
+  };
+};
 
 export const horizonRowOf = (overrides: Partial<HorizonRow> = {}): HorizonRow => ({
   externalId: 'CONT_AWD_N6660426P0205_9700_-NONE-_-NONE-',

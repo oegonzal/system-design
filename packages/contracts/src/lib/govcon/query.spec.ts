@@ -1,3 +1,4 @@
+import { NO_FACETS } from './facets';
 import { describeCall, describeQuery } from './query';
 
 describe('describeQuery', () => {
@@ -58,7 +59,12 @@ describe('describeCall', () => {
     );
     expect(describeCall({ operation: 'entity', query: { ueis: ['A'] } })).toBe('entity A');
     expect(describeCall({ operation: 'exclusions', query: { uei: 'A' } })).toBe('exclusions A');
-    const scope = { naics: ['332710'], psc: [], agency: { toptierCode: '097', name: 'DoD' } };
+    const scope = {
+      naics: ['332710'],
+      psc: [],
+      agency: { toptierCode: '097', name: 'DoD' },
+      facets: NO_FACETS,
+    };
     expect(
       describeCall({
         operation: 'series',
@@ -110,6 +116,27 @@ describe('describeCall', () => {
         query: { toptierCode: '097', fiscalYear: 2026, awardFamily: 'both', limit: 50, page: 1 },
       }),
     ).toBe('agency offices 097 FY2026 both page 1');
+    expect(
+      describeCall({
+        operation: 'award-count',
+        query: {
+          ...scope,
+          agency: null,
+          facets: {
+            ...NO_FACETS,
+            recipientSize: 'small',
+            setAside: ['NONE', 'SBA'],
+            amount: { min: null, max: 15000 },
+            newOnly: true,
+          },
+          awardFamily: 'contracts',
+          from: '2024-10-01',
+          to: '2025-09-30',
+        },
+      }),
+    ).toBe(
+      'count contracts naics=332710 psc=* agency=* recipientSize=small setAside=NONE,SBA amount=-15000 newOnly=true 2024-10-01..2025-09-30',
+    );
     expect(describeCall({ operation: 'agency-directory', query: {} })).toBe('agency directory');
     expect(describeCall({ operation: 'freshness', query: {} })).toBe('freshness');
     expect(

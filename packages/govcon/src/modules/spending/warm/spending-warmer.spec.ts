@@ -126,6 +126,7 @@ describe('the spending warmer', () => {
     expect(outcomes(report)).toEqual([
       ['pulse', 'ok', null],
       ['breakdown', 'ok', null],
+      ['reach', 'ok', null],
       ['horizon', 'ok', null],
       ['agencies', 'ok', null],
       ['horizon 097', 'ok', null],
@@ -147,6 +148,14 @@ describe('the spending warmer', () => {
       category: 'awarding_agency',
       from: '2025-06-15',
       to: '2026-06-15',
+    });
+    // The reach count is taken over the same year, for the lanes the profile prices above nothing.
+    expect(sources.requests.counts[1]).toMatchObject({
+      naics: ['332710', '5415'],
+      awardFamily: 'contracts',
+      from: '2025-06-15',
+      to: '2026-06-15',
+      facets: { newOnly: true, setAside: ['NONE', 'SBA', 'SBP'] },
     });
     expect(
       (sources.requests.ending as HorizonRequest[]).map((request) => [
@@ -189,6 +198,7 @@ describe('the spending warmer', () => {
     expect(outcomes(report)).toEqual([
       ['pulse', 'refused', 502],
       ['breakdown', 'refused', 502],
+      ['reach', 'refused', 502],
       ['horizon', 'ok', null],
       ['agencies', 'ok', null],
     ]);
@@ -203,6 +213,7 @@ describe('the spending warmer', () => {
     expect(outcomes(widened)).toEqual([
       ['pulse', 'refused', 400],
       ['breakdown', 'refused', 400],
+      ['reach', 'refused', 400],
       ['horizon', 'refused', 400],
       ['agencies', 'ok', null],
     ]);

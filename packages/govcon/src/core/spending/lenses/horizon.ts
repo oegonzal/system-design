@@ -15,7 +15,7 @@ import {
 import { bucketHorizon, soonestRows, walkHorizon } from '../horizon';
 import type { LensSpec } from '../lens';
 import { horizonBodySchema } from '../schemas';
-import { scopeOf, spend, type LensDeps } from './deps';
+import { scopeOf, scopeRequestOf, spend, type LensDeps } from './deps';
 import { asOfFrom, resolveAgency } from './shared';
 
 /** The scope, how many months ahead, and the day the walk counts from — so a snapshot is never served for another day. */
@@ -55,9 +55,7 @@ export const horizonLens = (deps: LensDeps): LensSpec<HorizonQuery, HorizonBody>
         now: deps.now,
         page: (family, index) => {
           const request: HorizonRequest = {
-            naics: scope.naics,
-            psc: scope.psc,
-            agency: agency.value,
+            ...scopeRequestOf(scope, agency.value),
             family,
             from,
             to: query.today,

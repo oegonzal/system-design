@@ -1,3 +1,4 @@
+import { facetParams, type SpendingFacets } from './facets';
 import type {
   AwardFamily,
   AwardFamilyChoice,
@@ -93,11 +94,12 @@ export interface AgencyRef {
   name: string;
 }
 
-/** The codes and the agency every USAspending scope request carries. */
+/** The codes, the agency and the facets every USAspending scope request carries. */
 export interface ScopeRequest {
   naics: string[];
   psc: string[];
   agency: AgencyRef | null;
+  facets: SpendingFacets;
 }
 
 export type SeriesGroup = 'month' | 'fiscal_year';
@@ -129,6 +131,13 @@ export interface HorizonRequest extends ScopeRequest {
   to: string;
   limit: number;
   page: number;
+}
+
+/** One `spending_by_award_count` call: how many awards a scope holds over an action-date window. */
+export interface CountRequest extends ScopeRequest {
+  awardFamily: AwardFamilyChoice;
+  from: string;
+  to: string;
 }
 
 export interface AgencyBudgetRequest {
@@ -163,6 +172,7 @@ export interface SourceCallQueries {
   'agency-offices': AgencyOfficesRequest;
   'agency-directory': NoRequest;
   freshness: NoRequest;
+  'award-count': CountRequest;
 }
 
 /** `operation` discriminates `query`: one member per source operation. */
@@ -179,7 +189,8 @@ const PAGING_KEYS = ['postedFrom', 'postedTo', 'limit', 'offset'];
  * `naics=332710 status=active`, `naics=332710 page 2`, or `all notices`.
  */
 export function describeQuery(
-  query: QueryFilter & Partial<Pick<OpportunityQuery, 'limit' | 'offset'>>,
+  query: QueryFilter &
+    Partial<Pick<OpportunityQuery, 'postedFrom' | 'postedTo' | 'limit' | 'offset'>>,
 ): string {
   const filters = Object.entries(query)
     .filter(([key, value]) => !PAGING_KEYS.includes(key) && value !== undefined)
@@ -195,7 +206,12 @@ const pageOf = (offset: number, limit: number): string =>
   offset > 0 ? ` page ${Math.floor(offset / limit) + 1}` : '';
 
 const scopeOf = (query: ScopeRequest): string =>
-  `naics=${query.naics.join(',') || '*'} psc=${query.psc.join(',') || '*'} agency=${query.agency?.toptierCode ?? '*'}`;
+  [
+    `naics=${query.naics.join(',') || '*'}`,
+    `psc=${query.psc.join(',') || '*'}`,
+    `agency=${query.agency?.toptierCode ?? '*'}`,
+    ...Object.entries(facetParams(query.facets)).map(([id, value]) => `${id}=${value}`),
+  ].join(' ');
 
 /** One line per operation — the discriminator picks the describer, never the query's shape. */
 const DESCRIBERS: { [K in SourceOperation]: (query: SourceCallQueries[K]) => string } = {
@@ -220,6 +236,8 @@ const DESCRIBERS: { [K in SourceOperation]: (query: SourceCallQueries[K]) => str
     `agency offices ${query.toptierCode} FY${query.fiscalYear} ${query.awardFamily} page ${query.page}`,
   'agency-directory': () => 'agency directory',
   freshness: () => 'freshness',
+  'award-count': (query) =>
+    `count ${query.awardFamily} ${scopeOf(query)} ${query.from}..${query.to}`,
 };
 
 /** A ledger row's query as one line. */

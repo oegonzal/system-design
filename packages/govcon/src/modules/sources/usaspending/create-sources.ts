@@ -3,6 +3,7 @@ import { AttemptedHttp, type AttemptedHttpOptions } from '../http';
 import { UsaSpendingAgencyBudgets } from './agency-budgets';
 import { UsaSpendingAgencyCatalog } from './agency-catalog';
 import { UsaSpendingAgencyOffices } from './agency-offices';
+import { UsaSpendingAwardCounts } from './award-counts';
 import { UsaSpendingAwards } from './awards';
 import { UsaSpendingBreakdowns } from './breakdowns';
 import { UsaSpendingEndingAwards } from './ending-awards';
@@ -14,8 +15,8 @@ import { USASPENDING_BASE_URL } from './source';
  *   USASPENDING_BASE_URL   the API host (default production). No key: the API is open.
  *
  * Every adapter rides one transport and one base URL: the award search the
- * intel page fetches with, and the seven capabilities the spending lenses
- * read through.
+ * intel page fetches with, and every capability the spending lenses read
+ * through.
  */
 export function createUsaSpendingSources(
   env: NodeJS.ProcessEnv = process.env,
@@ -30,6 +31,7 @@ export function createUsaSpendingSources(
       series: new UsaSpendingSeries(http, baseUrl, warn),
       breakdowns: new UsaSpendingBreakdowns(http, baseUrl, warn),
       ending: new UsaSpendingEndingAwards(http, baseUrl, warn),
+      counts: new UsaSpendingAwardCounts(http, baseUrl),
       budgets: new UsaSpendingAgencyBudgets(http, baseUrl, warn),
       offices: new UsaSpendingAgencyOffices(http, baseUrl, warn),
       catalog: new UsaSpendingAgencyCatalog(http, baseUrl, warn),

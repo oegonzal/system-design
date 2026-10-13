@@ -1,4 +1,4 @@
-import { callKey, canonicalQuery, nextPage, type OpportunityQuery } from './query';
+import { callKey, canonicalQuery, nextPage, snapshotKey, type OpportunityQuery } from './query';
 
 const base: OpportunityQuery = {
   postedFrom: '2026-09-20',
@@ -28,6 +28,29 @@ describe('the query key', () => {
       'postedFrom',
       'postedTo',
     ]);
+  });
+
+  it('[GOV-26] spells an object the same at every depth, so a scope’s facets key one snapshot however they were assembled, and keeps a list in its order', () => {
+    const scope = {
+      naics: ['541511'],
+      facets: { recipientSize: 'small', amount: { min: 1, max: 2 }, setAside: ['NONE', 'SBA'] },
+    };
+    const reassembled = {
+      facets: { setAside: ['NONE', 'SBA'], amount: { max: 2, min: 1 }, recipientSize: 'small' },
+      naics: ['541511'],
+    };
+    expect(snapshotKey('pulse', reassembled)).toBe(snapshotKey('pulse', scope));
+    expect(JSON.stringify(canonicalQuery(reassembled))).toBe(JSON.stringify(canonicalQuery(scope)));
+    expect(
+      snapshotKey('pulse', { ...scope, facets: { ...scope.facets, amount: { min: 1, max: 3 } } }),
+    ).not.toBe(snapshotKey('pulse', scope));
+    expect(
+      snapshotKey('pulse', { ...scope, facets: { ...scope.facets, setAside: ['SBA', 'NONE'] } }),
+    ).not.toBe(snapshotKey('pulse', scope));
+    expect(canonicalQuery({ b: { d: undefined, c: null }, a: [{ z: 1, y: 2 }] })).toEqual({
+      a: [{ y: 2, z: 1 }],
+      b: { c: null },
+    });
   });
 
   it('[GOV-9] keys a description call in its own namespace, so it can never read as a fresh search', () => {

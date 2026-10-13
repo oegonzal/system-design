@@ -9,6 +9,8 @@ import {
 } from '@nestjs/common';
 import {
   currentFiscalPeriod,
+  facetsOfQuery,
+  familyUnder,
   isoDateOf,
   type AgencyDirectory,
   type AgencyOutlook,
@@ -17,6 +19,7 @@ import {
   type SpendingBreakdown,
   type SpendingHorizon,
   type SpendingPulse,
+  type SpendingReach,
   type SpendingScope,
 } from '@sysdesign/contracts';
 
@@ -33,6 +36,7 @@ import type { LensDeps } from '../../core/spending/lenses/deps';
 import { directoryLens } from '../../core/spending/lenses/directory';
 import { horizonLens } from '../../core/spending/lenses/horizon';
 import { pulseLens } from '../../core/spending/lenses/pulse';
+import { reachLens } from '../../core/spending/lenses/reach';
 import { horizonNaics, matchOpenNotices, openNoticesFilter } from '../../core/spending/recompetes';
 import { OPPORTUNITY_REPOSITORY } from '../opportunities/tokens';
 import { BUDGET_POLICY, CLOCK, REQUEST_GATE, SPENDING_SOURCES } from '../sources/tokens';
@@ -41,18 +45,26 @@ import type {
   BreakdownQueryInput,
   HorizonQueryInput,
   PulseQueryInput,
+  ReachQueryInput,
+  ScopeInput,
 } from './spending-requests';
 import { SPENDING_SNAPSHOTS } from './tokens';
 
-/** The scope out of a validated query: absent agency means every agency. */
-const scopeOf = (
-  query: Pick<PulseQueryInput, 'naics' | 'psc' | 'agency' | 'awardFamily'>,
-): SpendingScope => ({
-  naics: query.naics,
-  psc: query.psc,
-  agency: query.agency ?? null,
-  awardFamily: query.awardFamily,
-});
+/**
+ * The scope out of a validated query: an absent agency means every agency,
+ * every facet not named is unset, and the family is the one the facets
+ * leave — so one scope has one spelling, and one snapshot.
+ */
+const scopeOf = (query: ScopeInput): SpendingScope => {
+  const facets = facetsOfQuery(query);
+  return {
+    naics: query.naics,
+    psc: query.psc,
+    agency: query.agency ?? null,
+    awardFamily: familyUnder(query.awardFamily, facets),
+    facets,
+  };
+};
 
 /**
  * The spending lenses as a service: every read goes through the one snapshot
@@ -111,6 +123,17 @@ export class SpendingService {
       this.cache.read(
         breakdownLens(this.deps),
         { ...scopeOf(query), category: query.category, from: query.from, to: query.to },
+        options,
+      ),
+    );
+  }
+
+  reach(query: ReachQueryInput, options: ReadOptions = {}): Promise<SpendingReach> {
+    const { naics, psc, agency, facets } = scopeOf({ ...query, awardFamily: 'contracts' });
+    return this.answer(
+      this.cache.read(
+        reachLens(this.deps),
+        { naics, psc, agency, facets, from: query.from, to: query.to, lanes: query.lanes },
         options,
       ),
     );

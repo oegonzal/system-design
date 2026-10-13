@@ -6,7 +6,7 @@ import type { ObligationSeries, SeriesPoint } from '../../../core/ports';
 import { issuesOf, type AttemptedHttp } from '../http';
 import { USASPENDING_DISCLOSURES } from './disclosures';
 import { awardTypeCodesOf } from './families';
-import { scopeFilters, timePeriod } from './filters';
+import { awardFilters } from './filters';
 import { USASPENDING_BASE_URL, USASPENDING_SOURCE_ID } from './source';
 import { amount, integer } from './values';
 
@@ -28,10 +28,7 @@ const seriesEnvelopeSchema = z.looseObject({ results: z.array(z.unknown()) });
 export function toSeriesBody(request: SeriesRequest): Record<string, unknown> {
   return {
     group: request.group,
-    filters: {
-      ...timePeriod(request.from, request.to),
-      ...scopeFilters({ ...request, codes: awardTypeCodesOf(request.awardFamily) }),
-    },
+    filters: awardFilters(request, awardTypeCodesOf(request.awardFamily)),
   };
 }
 

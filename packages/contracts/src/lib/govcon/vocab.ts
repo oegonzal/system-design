@@ -58,7 +58,8 @@ export type SourceCallOutcome = (typeof SOURCE_CALL_OUTCOMES)[number];
  * from `series` on are USAspending — one operation per endpoint, ledgered for
  * the record and priced at nothing: the obligation series, a category
  * breakdown, a page of the horizon walk, an agency's budget, its offices, the
- * agency directory, and the source's own freshness. `exclusions` is reserved:
+ * agency directory, the source's own freshness, and a count of the awards a
+ * scope holds. `exclusions` is reserved:
  * a registration carries its exclusion flag, so the exclusions API is not
  * called today.
  */
@@ -77,6 +78,7 @@ export const SOURCE_OPERATIONS = [
   'agency-offices',
   'agency-directory',
   'freshness',
+  'award-count',
 ] as const;
 export type SourceOperation = (typeof SOURCE_OPERATIONS)[number];
 
@@ -135,8 +137,17 @@ export const SPENDING_LENSES = [
   'agencies',
   'agency',
   'freshness',
+  'reach',
 ] as const;
 export type SpendingLens = (typeof SPENDING_LENSES)[number];
+
+/**
+ * The cuts of a reach count, each narrowing the one before it: the scope's
+ * new awards, those made in a lane the profile may bid, those placed as
+ * contracts of their own, and those a small business won.
+ */
+export const REACH_CUTS = ['new', 'lanes', 'standalone', 'small'] as const;
+export type ReachCutId = (typeof REACH_CUTS)[number];
 
 /** Why a horizon walk ended before the universe did. */
 export const HORIZON_STOPS = ['pages', 'deadline', 'source'] as const;

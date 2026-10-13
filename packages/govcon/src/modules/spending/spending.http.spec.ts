@@ -8,6 +8,7 @@ import {
   type SpendingBreakdown,
   type SpendingHorizon,
   type SpendingPulse,
+  type SpendingReach,
 } from '@sysdesign/contracts';
 import { GovconSpendingSnapshot } from '@sysdesign/db';
 
@@ -141,6 +142,90 @@ describe('the spending routes', () => {
     // Nothing warmed behind the suite's back: the sink saw no alert and no digest.
     expect(http.sink.published).toEqual([]);
     expect(http.sink.prompts).toEqual([]);
+  });
+
+  it('[GOV-8] [GOV-26] [GOV-27] reads a scope’s facets from the query string in their one spelling, refuses a value outside the vocabulary, keys a scope with a placement as one of contracts whatever family was asked, and answers the reach count through its own operation', async () => {
+    const narrowed =
+      'naics=541511&recipientSize=small&placement=standalone&amount=15000.01-350000&newOnly=true';
+    const pulse = await get<Envelope<SpendingPulse>>(
+      url,
+      `/spending/pulse?${narrowed}&setAside=SBP,NONE,SBP`,
+    );
+    expect(pulse.data.scope).toEqual({
+      naics: ['541511'],
+      psc: [],
+      agency: null,
+      awardFamily: 'contracts',
+      facets: {
+        recipientSize: 'small',
+        placement: 'standalone',
+        setAside: ['NONE', 'SBP'],
+        amount: { min: 15000.01, max: 350000 },
+        newOnly: true,
+      },
+    });
+    // The same scope asked with a family a placement cannot have, its lanes in another order: one snapshot row.
+    const pulses = () => http.em.fork().count(GovconSpendingSnapshot, { lens: 'pulse' });
+    await get(url, `/spending/pulse?${narrowed}&setAside=NONE,SBP&awardFamily=idvs`);
+    expect(await pulses()).toBe(1);
+    await get(url, `/spending/pulse?${narrowed}&setAside=NONE`);
+    expect(await pulses()).toBe(2);
+
+    for (const bad of [
+      'recipientSize=huge',
+      'placement=sideways',
+      'amount=10-5',
+      'amount=lots',
+      'newOnly=yes',
+      'setAside=not%20a%20code',
+    ]) {
+      expect((await fetch(`${url}/spending/pulse?${bad}`)).status, bad).toBe(400);
+    }
+    const badRange = await fetch(`${url}/spending/horizon?amount=-`);
+    expect((await json<Issues>(badRange)).issues).toEqual([
+      {
+        path: 'amount',
+        message: 'a range is min-max in dollars, either end open, the floor not above the ceiling',
+      },
+    ]);
+
+    const reach = await get<Envelope<SpendingReach>>(
+      url,
+      '/spending/reach?naics=332710&from=2025-09-27&to=2026-09-26&lanes=SBA,NONE',
+    );
+    expect(reach.data).toMatchObject({
+      scope: { naics: ['332710'], awardFamily: 'contracts' },
+      from: '2025-09-27',
+      to: '2026-09-26',
+      lanes: ['NONE', 'SBA'],
+      delay: null,
+      provenance: { source: 'usaspending', servedFrom: 'source', requests: 12 },
+    });
+    expect(reach.data.cuts.map((cut) => cut.id)).toEqual(['new', 'lanes', 'standalone', 'small']);
+    expect(reach.data.cuts.at(-1)?.facets).toEqual({
+      recipientSize: 'small',
+      placement: 'standalone',
+      setAside: ['NONE', 'SBA'],
+      amount: null,
+      newOnly: true,
+    });
+    expect(reach.data.bands.map((band) => band.id)).toEqual([
+      'micro',
+      'simplified',
+      'mid',
+      'large',
+    ]);
+    // Reach names no family, and its window is checked like any other.
+    const base = `${url}/spending/reach?naics=332710`;
+    expect((await fetch(`${base}&awardFamily=idvs&from=2026-01-01&to=2026-02-01`)).status).toBe(
+      400,
+    );
+    expect((await fetch(`${base}&from=2026-02-01&to=2026-01-01`)).status).toBe(400);
+    expect((await fetch(base)).status).toBe(400);
+
+    const counted = await get<Page<SourceCall>>(url, '/source/calls?operation=award-count');
+    expect(counted.meta.total).toBe(8);
+    expect(counted.data[0]?.query).toMatchObject({ awardFamily: 'contracts', from: '2025-09-27' });
   });
 
   it('[GOV-8] [GOV-23] joins the horizon’s expiring awards to the open stored notices sharing NAICS and agency sub-tier at read time, says the bound did not cut, and stores none of it', async () => {

@@ -10,6 +10,7 @@ const LENSES = [
   'agencies',
   'agency',
   'freshness',
+  'reach',
 ] as const satisfies ContractLenses;
 
 /**

@@ -4,6 +4,7 @@ import type {
   AgencyOfficesRequest,
   AgencyYear,
   BreakdownRequest,
+  CountRequest,
   HorizonRequest,
   HorizonRow,
   SeriesRequest,
@@ -58,6 +59,12 @@ export interface OfficesPage {
   hasMore: boolean;
 }
 
+/** How many awards a scope holds, by family. */
+export interface AwardCounts {
+  contracts: number;
+  idvs: number;
+}
+
 export interface ObligationSeries extends SpendingPort {
   series(request: SeriesRequest): Promise<Attempted<Fetched<SeriesPoint[]>>>;
 }
@@ -68,6 +75,10 @@ export interface SpendingBreakdowns extends SpendingPort {
 
 export interface EndingAwards extends SpendingPort {
   page(request: HorizonRequest): Promise<Attempted<Fetched<EndingAwardsPage>>>;
+}
+
+export interface SpendingCounts extends SpendingPort {
+  count(request: CountRequest): Promise<Attempted<Fetched<AwardCounts>>>;
 }
 
 export interface AgencyBudgets extends SpendingPort {
@@ -96,11 +107,12 @@ export interface DataFreshness extends SpendingPort {
   lastUpdated(): Promise<Attempted<Fetched<string>>>;
 }
 
-/** The seven, as one injected bundle: one token, every capability. */
+/** Every capability as one injected bundle: one token for all of them. */
 export interface SpendingSources {
   series: ObligationSeries;
   breakdowns: SpendingBreakdowns;
   ending: EndingAwards;
+  counts: SpendingCounts;
   budgets: AgencyBudgets;
   offices: AgencyOffices;
   catalog: AgencyCatalog;

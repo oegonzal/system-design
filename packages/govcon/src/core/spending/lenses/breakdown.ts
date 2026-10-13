@@ -9,8 +9,8 @@ import {
 
 import type { LensBody, LensSpec } from '../lens';
 import { breakdownBodySchema } from '../schemas';
-import { scopeOf, spend, type LensDeps } from './deps';
-import { publicationOf, resolveAgency } from './shared';
+import { scopeOf, scopeRequestOf, spend, type LensDeps } from './deps';
+import { delayOver, publicationOf, resolveAgency } from './shared';
 
 export interface BreakdownQuery extends SpendingScope {
   category: BreakdownCategory;
@@ -40,9 +40,7 @@ export const breakdownLens = (
     const tally = { requests: 0 };
 
     const rowsRequest: BreakdownRequest = {
-      naics: scope.naics,
-      psc: scope.psc,
-      agency: agency.value,
+      ...scopeRequestOf(scope, agency.value),
       awardFamily: scope.awardFamily,
       category: query.category,
       from: query.from,
@@ -59,9 +57,7 @@ export const breakdownLens = (
     if (rows.kind !== 'ok') return rows;
 
     const totalRequest: SeriesRequest = {
-      naics: scope.naics,
-      psc: scope.psc,
-      agency: agency.value,
+      ...scopeRequestOf(scope, agency.value),
       awardFamily: scope.awardFamily,
       group: 'fiscal_year',
       from: query.from,
@@ -90,7 +86,7 @@ export const breakdownLens = (
           share: total > 0 ? row.amount / total : 0,
         })),
         truncated: rows.value.hasMore,
-        delay: delay !== null && query.to > delay.completeThrough ? delay : null,
+        delay: delayOver(delay, query.to),
       },
       asOf,
       requests: tally.requests,

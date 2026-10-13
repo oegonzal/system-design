@@ -15,13 +15,20 @@ import type {
  */
 export type { OpportunityQuery } from '@sysdesign/contracts';
 
-/** The same query however it was assembled: keys sorted, absent filters dropped. */
-export function canonicalQuery<T extends object>(query: T): T {
-  const entries = Object.entries(query)
-    .filter(([, value]) => value !== undefined)
-    .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
-  return Object.fromEntries(entries) as T;
-}
+/** One spelling of a value: an object's keys sorted and its absent ones dropped, at every depth; a list keeps its order, which may mean something. */
+const canonical = (value: unknown): unknown => {
+  if (Array.isArray(value)) return value.map(canonical);
+  if (value === null || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, item]) => item !== undefined)
+      .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
+      .map(([key, item]) => [key, canonical(item)]),
+  );
+};
+
+/** The same query however it was assembled: keys sorted, absent filters dropped — in the query and in every object it holds. */
+export const canonicalQuery = <T extends object>(query: T): T => canonical(query) as T;
 
 /**
  * sha256 hex over the source, the operation and the canonical query — the

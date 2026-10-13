@@ -7,6 +7,7 @@ import {
 import {
   agencyDirectoryEntryOf,
   horizonRowOf,
+  NO_FACETS,
   noticeRefOf,
   opportunityOf,
 } from '@sysdesign/contracts';
@@ -76,7 +77,14 @@ function harness({
   };
 }
 
-const scope = { naics: ['332710'], psc: [], awardFamily: 'both' as const };
+/** A scope as the request schema hands it on: no facet set. */
+const scope = {
+  naics: ['332710'],
+  psc: [],
+  awardFamily: 'both' as const,
+  setAside: [],
+  newOnly: false,
+};
 
 describe('the spending service', () => {
   it('[GOV-20] answers the pulse from the source once, then from the snapshot inside the TTL with no new ledger row, keyed on the fiscal period the clock names', async () => {
@@ -86,7 +94,7 @@ describe('the spending service', () => {
     const first = await service.pulse({ ...scope, lookback: 3 });
     expect(first).toMatchObject({
       fiscalYear: 2026,
-      scope: { ...scope, agency: null },
+      scope: { naics: ['332710'], psc: [], agency: null, awardFamily: 'both', facets: NO_FACETS },
       provenance: { servedFrom: 'source', requests: 1, asOf: '2026-06-14' },
     });
     expect(first.series).toHaveLength(3 * 12 + 9);

@@ -1,10 +1,10 @@
-import type { SourceAvailability, SpendingRequest } from '@sysdesign/contracts';
+import { NO_FACETS, type SourceAvailability, type SpendingRequest } from '@sysdesign/contracts';
 
 import type { Attempted, Fetched } from '../../../core/budget';
 import type { AwardPage, SpendingAwards } from '../../../core/ports';
 import { issuesOf, type AttemptedHttp } from '../http';
 import { AWARD_TYPE_CODES } from './families';
-import { scopeFilters, timePeriod } from './filters';
+import { awardFilters } from './filters';
 import { normalizeSpendingAward } from './normalize';
 import { spendingEnvelopeSchema } from './schemas';
 import { USASPENDING_BASE_URL, USASPENDING_SOURCE_ID } from './source';
@@ -34,10 +34,10 @@ const FIELDS = [
 /** The request as USAspending spells it. */
 export function toSpendingBody(request: SpendingRequest): Record<string, unknown> {
   return {
-    filters: {
-      ...timePeriod(request.from, request.to),
-      ...scopeFilters({ ...request, agency: null, codes: AWARD_TYPE_CODES.contracts }),
-    },
+    filters: awardFilters(
+      { ...request, agency: null, facets: NO_FACETS },
+      AWARD_TYPE_CODES.contracts,
+    ),
     fields: FIELDS,
     page: request.page,
     limit: request.limit,

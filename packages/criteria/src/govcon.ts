@@ -193,6 +193,16 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
       'A fiscal period that ends after the last day the source has wholly published for a scope — its data-as-of date less the longest lag the adapter declares for an agency the scope counts — is marked unpublished: it is projected and never counted in the run rate’s base, a prior year holding one is no year a mean rests on, and a breakdown whose window reaches past that day carries the delay, as the pulse of such a scope always does.',
   },
   {
+    id: 'GOV-26',
+    statement:
+      'A spending scope’s facets — the winner’s size, how the award was placed, its set-aside lanes, its dollar range, new awards only — are declared data: one table gives each its one spelling as a parameter, the request schema refuses a value outside it, every award search maps each facet through one table to the source’s filters, a placement makes the scope one of contracts whatever family was asked, and a snapshot is keyed by the scope’s one spelling at every depth.',
+  },
+  {
+    id: 'GOV-27',
+    statement:
+      'The reach count cuts a scope’s new contracts down step by step — made in the lanes named, placed as contracts of their own, won by a small business — one count and one total a cut and the last cut by award size, each read through the gate as its own operation; narrowing only ever takes away, so a cut the scope’s own facets rule out is answered as nothing without a request.',
+  },
+  {
     id: 'GOV-21',
     statement:
       'Spending arithmetic is pure and declared: fiscal periods start in October, a series is aligned on the periods asked for with the partial month marked, the projection is the declared seasonal mean of prior years scaled by the year-to-date ratio only after the declared base, the horizon walk pages the source by number, finds the page where end dates cross today by doubling and halving, reads forward from the soonest-ending award inside a page bound and the wall-clock deadline, and says how far the window is complete, and agency periods are aligned on those present, the year asked for an agency’s offices defaulting to the one the source’s own directory reports active.',

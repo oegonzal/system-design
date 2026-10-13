@@ -1,4 +1,9 @@
-import { AWARD_FAMILIES, type AwardFamily, type AwardFamilyChoice } from '@sysdesign/contracts';
+import {
+  AWARD_FAMILIES,
+  type AwardFamily,
+  type AwardFamilyChoice,
+  type AwardPlacement,
+} from '@sysdesign/contracts';
 
 /**
  * An award family as USAspending's `award_type_codes` spell it. Contracts are
@@ -9,6 +14,16 @@ import { AWARD_FAMILIES, type AwardFamily, type AwardFamilyChoice } from '@sysde
 export const AWARD_TYPE_CODES: Record<AwardFamily, readonly string[]> = {
   contracts: ['A', 'B', 'C', 'D'],
   idvs: ['IDV_A', 'IDV_B', 'IDV_B_A', 'IDV_B_B', 'IDV_B_C', 'IDV_C', 'IDV_D', 'IDV_E'],
+};
+
+/**
+ * How a contract was placed, as the same codes spell it: a purchase order
+ * (`B`) and a definitive contract (`D`) stand alone; a BPA call (`A`) and a
+ * delivery or task order (`C`) are placed under a vehicle.
+ */
+export const PLACEMENT_TYPE_CODES: Record<AwardPlacement, readonly string[]> = {
+  standalone: ['B', 'D'],
+  order: ['A', 'C'],
 };
 
 export const awardTypeCodesOf = (choice: AwardFamilyChoice): string[] =>

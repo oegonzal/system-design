@@ -1,4 +1,4 @@
-import { agencyDirectoryEntryOf, horizonRowOf } from '@sysdesign/contracts';
+import { agencyDirectoryEntryOf, horizonRowOf, NO_FACETS } from '@sysdesign/contracts';
 
 import { RequestGate } from '../../budget';
 import { attemptOf, attempted, failure, InMemorySourceCallLog } from '../../testing';
@@ -17,9 +17,16 @@ import { directoryLens } from './directory';
 import { freshnessLens } from './freshness';
 import { horizonLens } from './horizon';
 import { pulseLens } from './pulse';
+import { reachLens } from './reach';
 
 const NOW = new Date('2026-06-15T12:00:00Z');
-const SCOPE = { naics: ['332710'], psc: [], agency: '097', awardFamily: 'both' as const };
+const SCOPE = {
+  naics: ['332710'],
+  psc: [],
+  agency: '097',
+  awardFamily: 'both' as const,
+  facets: NO_FACETS,
+};
 
 function harness(script: SpendingScript = {}) {
   const sources = scriptedSpendingSources(script);
@@ -66,6 +73,7 @@ describe('the spending lenses', () => {
       naics: ['332710'],
       psc: [],
       agency: { toptierCode: '097', name: 'Department of Defense' },
+      facets: NO_FACETS,
       awardFamily: 'both',
       group: 'month',
       from: '2023-10-01',
@@ -118,6 +126,88 @@ describe('the spending lenses', () => {
     expect(await deps.read(freshnessLens(deps), {})).toMatchObject({
       body: { lastUpdated: '2026-06-14' },
       provenance: { servedFrom: 'snapshot' },
+    });
+  });
+
+  it('[GOV-11] [GOV-27] the reach lens counts contracts cut by cut — one count and one total a cut, then the last cut by size — each through the gate as its own operation, and answers a cut the scope rules out as nothing without a request', async () => {
+    const counted = (contracts: number) => fetchedOf({ contracts, idvs: 0 });
+    const { deps, sources, operations } = harness({
+      counts: [counted(900), counted(600), counted(120), counted(80), counted(30), counted(50)],
+      series: [fetchedOf([seriesPointOf({ period: null, total: 7_000 })])],
+    });
+    const query = {
+      naics: SCOPE.naics,
+      psc: SCOPE.psc,
+      agency: null,
+      facets: NO_FACETS,
+      from: '2025-06-16',
+      to: '2026-06-15',
+      lanes: ['NONE', 'SBA'],
+    };
+    const reach = await deps.read(reachLens(deps), query);
+    if (reach.kind !== 'ok') throw new Error('expected ok');
+    expect(reach.body.scope).toEqual({ ...SCOPE, agency: null, awardFamily: 'contracts' });
+    expect(reach.body.cuts.map((cut) => [cut.id, cut.awards, cut.amount])).toEqual([
+      ['new', 900, 7_000],
+      ['lanes', 600, 7_000],
+      ['standalone', 120, 7_000],
+      ['small', 80, 7_000],
+    ]);
+    expect(reach.body.bands).toEqual([
+      { id: 'micro', awards: 30 },
+      { id: 'simplified', awards: 50 },
+      { id: 'mid', awards: 50 },
+      { id: 'large', awards: 50 },
+    ]);
+    expect(reach.provenance).toMatchObject({ requests: 12, disclosures: ['count disclosure'] });
+    expect(operations().filter((operation) => operation === 'award-count')).toHaveLength(8);
+    expect(operations().filter((operation) => operation === 'series')).toHaveLength(4);
+    // Every request is of contracts, over the window, under the cut's own facets.
+    expect(sources.requests.counts[3]).toEqual({
+      naics: ['332710'],
+      psc: [],
+      agency: null,
+      facets: {
+        recipientSize: 'small',
+        placement: 'standalone',
+        setAside: ['NONE', 'SBA'],
+        amount: null,
+        newOnly: true,
+      },
+      awardFamily: 'contracts',
+      from: '2025-06-16',
+      to: '2026-06-15',
+    });
+    expect(sources.requests.counts[4]).toMatchObject({
+      facets: { recipientSize: 'small', amount: { min: null, max: 15_000 } },
+    });
+    expect(sources.requests.series[0]).toMatchObject({
+      group: 'fiscal_year',
+      awardFamily: 'contracts',
+      facets: { newOnly: true },
+    });
+
+    // A scope of orders: the stand-alone cut and everything after it cost nothing.
+    const orders = harness({ counts: [counted(400), counted(300)] });
+    const ruledOut = await orders.deps.read(reachLens(orders.deps), {
+      ...query,
+      facets: { ...NO_FACETS, placement: 'order' },
+    });
+    if (ruledOut.kind !== 'ok') throw new Error('expected ok');
+    expect(ruledOut.body.cuts.map((cut) => [cut.awards, cut.facets === null])).toEqual([
+      [400, false],
+      [300, false],
+      [0, true],
+      [0, true],
+    ]);
+    expect(ruledOut.body.bands.every((band) => band.awards === 0)).toBe(true);
+    expect(orders.sources.requests.counts).toHaveLength(2);
+
+    // The source refusing a count is the lens's refusal.
+    const refused = harness({ counts: [failure('rate-limited', 429, 'slow down')] });
+    expect(await refused.deps.read(reachLens(refused.deps), query)).toMatchObject({
+      kind: 'error',
+      outcome: 'rate-limited',
     });
   });
 

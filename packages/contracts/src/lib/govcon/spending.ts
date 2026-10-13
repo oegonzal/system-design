@@ -1,7 +1,9 @@
 import type { ApiResponse } from '../envelope';
+import type { FacetQuery, SpendingFacets } from './facets';
 import type { FiscalPeriod } from './fiscal';
 import type { Opportunity } from './opportunity';
-import type { AwardFamily, AwardFamilyChoice, BreakdownCategory } from './vocab';
+import type { AwardSizeBandId } from './thresholds';
+import type { AwardFamily, AwardFamilyChoice, BreakdownCategory, ReachCutId } from './vocab';
 
 /**
  * Spending research over USAspending: four lenses on one scope. Every answer
@@ -11,7 +13,7 @@ import type { AwardFamily, AwardFamilyChoice, BreakdownCategory } from './vocab'
  * provider facts the adapter declares about the data.
  */
 
-/** What every lens is scoped by: code families, one awarding agency, one or both award families. */
+/** What every lens is scoped by: code families, one awarding agency, one or both award families, and the facets that narrow those. */
 export interface SpendingScope {
   /** NAICS codes or families, 2–6 digits; a shorter code is the whole family. */
   naics: string[];
@@ -20,6 +22,7 @@ export interface SpendingScope {
   /** The awarding agency's toptier code (`097`), or every agency. */
   agency: string | null;
   awardFamily: AwardFamilyChoice;
+  facets: SpendingFacets;
 }
 
 /** Where an answer came from: fetched now, the day's snapshot, or an older snapshot because the refresh failed. */
@@ -127,6 +130,44 @@ export interface SpendingBreakdown {
   rows: BreakdownRow[];
   /** More rows exist beyond the declared bound. */
   truncated: boolean;
+  /** Null unless the window reaches past what an agency the scope counts has published. */
+  delay: PublicationDelay | null;
+  provenance: Provenance;
+}
+
+// ---------------------------------------------------------------------------
+// Reach — how much of a scope's new work a firm could have competed for.
+
+export interface ReachCut {
+  id: ReachCutId;
+  /** The facets the cut counted under: the scope's own, narrowed this far. Null when they leave the cut nothing to count. */
+  facets: SpendingFacets | null;
+  awards: number;
+  /** Obligated on those awards inside the window. */
+  amount: number;
+}
+
+export interface ReachBand {
+  id: AwardSizeBandId;
+  awards: number;
+}
+
+/**
+ * A scope's new contracts over a window, cut down step by step to the ones a
+ * firm with the given lanes could have won as it stands. Contracts only: a
+ * vehicle is not work until an order is placed under it.
+ */
+export interface SpendingReach {
+  scope: SpendingScope;
+  /** ISO dates, inclusive, on the action date. */
+  from: string;
+  to: string;
+  /** The set-aside lanes the count was taken for. */
+  lanes: string[];
+  /** In `REACH_CUTS` order; each narrows the one before it. */
+  cuts: ReachCut[];
+  /** The last cut by award size; the bands add up to it. */
+  bands: ReachBand[];
   /** Null unless the window reaches past what an agency the scope counts has published. */
   delay: PublicationDelay | null;
   provenance: Provenance;
@@ -290,8 +331,8 @@ export interface AgencyOutlook {
 // ---------------------------------------------------------------------------
 // The wire: queries and envelopes.
 
-/** The scope as a query string: lists are comma-joined on the wire and read back as lists. */
-export interface ScopeQuery {
+/** The scope as a query string: lists are comma-joined on the wire and read back as lists, and a facet travels only when set. */
+export interface ScopeQuery extends FacetQuery {
   naics?: string[];
   psc?: string[];
   agency?: string;
@@ -313,6 +354,14 @@ export interface SpendingHorizonQuery extends ScopeQuery {
   months?: number;
 }
 
+/** Reach names no award family: it counts contracts. */
+export interface SpendingReachQuery extends Omit<ScopeQuery, 'awardFamily'> {
+  from: string;
+  to: string;
+  /** The set-aside lanes to count for; none named counts every lane. */
+  lanes?: string[];
+}
+
 export interface AgencyOutlookQuery {
   fiscalYear?: number;
   awardFamily?: AwardFamilyChoice;
@@ -321,5 +370,6 @@ export interface AgencyOutlookQuery {
 export type GetSpendingPulseResponse = ApiResponse<SpendingPulse>;
 export type GetSpendingBreakdownResponse = ApiResponse<SpendingBreakdown>;
 export type GetSpendingHorizonResponse = ApiResponse<SpendingHorizon>;
+export type GetSpendingReachResponse = ApiResponse<SpendingReach>;
 export type GetAgenciesResponse = ApiResponse<AgencyDirectory>;
 export type GetAgencyOutlookResponse = ApiResponse<AgencyOutlook>;

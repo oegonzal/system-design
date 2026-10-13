@@ -1,4 +1,4 @@
-import type { BreakdownRequest } from '@sysdesign/contracts';
+import { NO_FACETS, type BreakdownRequest } from '@sysdesign/contracts';
 
 import { toBreakdownBody, UsaSpendingBreakdowns } from './breakdowns';
 import fixture from './fixtures/spending-by-category.json';
@@ -9,6 +9,7 @@ const request: BreakdownRequest = {
   naics: ['332710'],
   psc: [],
   agency: null,
+  facets: NO_FACETS,
   awardFamily: 'contracts',
   category: 'awarding_agency',
   from: '2025-10-01',

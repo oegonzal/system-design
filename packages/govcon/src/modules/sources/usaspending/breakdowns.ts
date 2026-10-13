@@ -6,7 +6,7 @@ import type { CategoryPage, CategoryRow, SpendingBreakdowns } from '../../../cor
 import { issuesOf, type AttemptedHttp } from '../http';
 import { USASPENDING_DISCLOSURES } from './disclosures';
 import { awardTypeCodesOf } from './families';
-import { scopeFilters, timePeriod } from './filters';
+import { awardFilters } from './filters';
 import { USASPENDING_BASE_URL, USASPENDING_SOURCE_ID } from './source';
 import { amount, clean } from './values';
 
@@ -31,10 +31,7 @@ export const breakdownPath = (category: BreakdownCategory): string =>
 
 export function toBreakdownBody(request: BreakdownRequest): Record<string, unknown> {
   return {
-    filters: {
-      ...timePeriod(request.from, request.to),
-      ...scopeFilters({ ...request, codes: awardTypeCodesOf(request.awardFamily) }),
-    },
+    filters: awardFilters(request, awardTypeCodesOf(request.awardFamily)),
     limit: request.limit,
     page: request.page,
   };

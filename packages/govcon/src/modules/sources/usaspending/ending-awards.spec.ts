@@ -1,4 +1,4 @@
-import type { HorizonRequest } from '@sysdesign/contracts';
+import { NO_FACETS, type HorizonRequest } from '@sysdesign/contracts';
 
 import { normalizeEndingAward, toEndingBody, UsaSpendingEndingAwards } from './ending-awards';
 import contracts from './fixtures/spending-by-award-ending-contracts.json';
@@ -10,6 +10,7 @@ const request: HorizonRequest = {
   naics: ['332710'],
   psc: [],
   agency: null,
+  facets: NO_FACETS,
   family: 'contracts',
   from: '2021-10-01',
   to: '2026-06-15',

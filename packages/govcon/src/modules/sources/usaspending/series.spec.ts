@@ -1,4 +1,4 @@
-import type { SeriesRequest } from '@sysdesign/contracts';
+import { NO_FACETS, type SeriesRequest } from '@sysdesign/contracts';
 
 import fixture from './fixtures/spending-over-time.json';
 import { toSeriesBody, UsaSpendingSeries } from './series';
@@ -9,6 +9,7 @@ const request: SeriesRequest = {
   naics: ['332710', '541511'],
   psc: [],
   agency: { toptierCode: '097', name: 'Department of Defense' },
+  facets: NO_FACETS,
   awardFamily: 'both',
   group: 'month',
   from: '2025-10-01',
@@ -16,6 +17,52 @@ const request: SeriesRequest = {
 };
 
 describe('the USAspending series', () => {
+  it('[GOV-26] spells every facet as the source filters by it — the winner’s size, the set-asides with NONE for none, a dollar range with an open end left out, new awards as the window’s date type — and a placement names the award types outright, whatever family was asked', () => {
+    const narrowed = toSeriesBody({
+      ...request,
+      agency: null,
+      facets: {
+        recipientSize: 'small',
+        placement: 'standalone',
+        setAside: ['NONE', 'SBA', 'SBP'],
+        amount: { min: 15000.01, max: 350000 },
+        newOnly: true,
+      },
+    });
+    expect(narrowed).toEqual({
+      group: 'month',
+      filters: {
+        time_period: [
+          { start_date: '2025-10-01', end_date: '2026-09-30', date_type: 'new_awards_only' },
+        ],
+        award_type_codes: ['B', 'D'],
+        naics_codes: { require: ['332710', '541511'] },
+        recipient_type_names: ['small_business'],
+        set_aside_type_codes: ['NONE', 'SBA', 'SBP'],
+        award_amounts: [{ lower_bound: 15000.01, upper_bound: 350000 }],
+      },
+    });
+
+    const open = toSeriesBody({
+      ...request,
+      facets: {
+        ...NO_FACETS,
+        recipientSize: 'other',
+        placement: 'order',
+        amount: { min: 900000.01, max: null },
+      },
+    }) as { filters: Record<string, unknown> };
+    expect(open.filters).toMatchObject({
+      award_type_codes: ['A', 'C'],
+      recipient_type_names: ['other_than_small_business'],
+      award_amounts: [{ lower_bound: 900000.01 }],
+    });
+    expect(open.filters).not.toHaveProperty('set_aside_type_codes');
+    expect(open.filters['time_period']).toEqual([
+      { start_date: '2025-10-01', end_date: '2026-09-30' },
+    ]);
+  });
+
   it('[GOV-11] [GOV-20] posts spending_over_time by month with the scope filters, the family’s codes and the agency’s name, and normalizes fiscal periods', async () => {
     const { http, urls, requests } = httpOf([{ body: fixture }]);
     const { attempts, result } = await new UsaSpendingSeries(http).series(request);

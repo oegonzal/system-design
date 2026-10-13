@@ -9,6 +9,8 @@
 // in `Response`.
 export * from './vocab';
 export * from './constants';
+export * from './thresholds';
+export * from './facets';
 export * from './opportunity';
 export * from './query';
 export * from './format';

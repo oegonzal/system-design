@@ -10,6 +10,7 @@ import {
 } from '@nestjs/common';
 import {
   alertKeyOf,
+  biddableSetAsides,
   startPeriodic,
   WARM_TOP_AGENCIES,
   windowOf,
@@ -33,7 +34,12 @@ import type { ReadOptions } from '../../../core/spending/lens';
 import { messageOf } from '../../../core/text';
 import { ProfilesService } from '../../profiles/profiles.service';
 import { CLOCK } from '../../sources/tokens';
-import { breakdownQuerySchema, horizonQuerySchema, pulseQuerySchema } from '../spending-requests';
+import {
+  breakdownQuerySchema,
+  horizonQuerySchema,
+  pulseQuerySchema,
+  reachQuerySchema,
+} from '../spending-requests';
 import { SpendingService } from '../spending.service';
 import { ALERT_LEDGER, ALERT_SINK, SPENDING_WARM_POLICY } from '../tokens';
 import type { SpendingWarmPolicy } from './warm-policy';
@@ -97,7 +103,8 @@ const uniqueByKey = (alerts: readonly GovconAlert[]): GovconAlert[] => {
 /**
  * The daily warm: the default profile's scope through every lens — renewed
  * on schedule, read from the window at a start — so the client's first look
- * is a snapshot; for each top agency the breakdown
+ * is a snapshot, the reach count taken for the lanes the profile may bid;
+ * for each top agency the breakdown
  * names, the horizon narrowed to it — the scope a directory pick opens, and
  * the one whose walk reaches today where a wide scope's caps first — and its
  * outlook; then the alert rules over every horizon and the pulse, each alert
@@ -177,12 +184,20 @@ export class SpendingWarmer implements OnModuleDestroy {
       this.spending.pulse(pulseQuerySchema.parse(wire), options),
     );
     // A rolling year, as the page opens: the fiscal year to date is thirteen days long on October 13.
+    const year = windowOf('last-12-months', this.now().getTime());
     const breakdown = await read('breakdown', () =>
       this.spending.breakdown(
-        breakdownQuerySchema.parse({
-          ...wire,
-          category: 'awarding_agency',
-          ...windowOf('last-12-months', this.now().getTime()),
+        breakdownQuerySchema.parse({ ...wire, category: 'awarding_agency', ...year }),
+        options,
+      ),
+    );
+    await read('reach', () =>
+      this.spending.reach(
+        reachQuerySchema.parse({
+          naics: wire.naics,
+          psc: wire.psc,
+          lanes: biddableSetAsides(profile.scoring.setAside),
+          ...year,
         }),
         options,
       ),

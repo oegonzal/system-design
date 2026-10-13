@@ -38,6 +38,10 @@ export interface Publication {
   delay: PublicationDelay | null;
 }
 
+/** The delay as a window ending on `to` carries it: only when the window reaches past the last day that is all in. */
+export const delayOver = (delay: PublicationDelay | null, to: string): PublicationDelay | null =>
+  delay !== null && to > delay.completeThrough ? delay : null;
+
 /**
  * How far the source has published a scope's awards: its "data as of", and
  * the delay the declared lags put on the scope's agency — counted back from

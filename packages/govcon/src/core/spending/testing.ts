@@ -13,6 +13,7 @@ import type { Attempted, Fetched } from '../budget';
 import type {
   AlertLedger,
   AlertSink,
+  AwardCounts,
   CategoryPage,
   EndingAwardsPage,
   OfficesPage,
@@ -27,7 +28,7 @@ import { asAttempted, type Scripted } from '../testing';
 
 /**
  * Pure fakes for the spending lenses: a snapshot store in memory, and the
- * seven USAspending ports scripted per capability. No vitest imports, so a
+ * USAspending ports scripted per capability. No vitest imports, so a
  * spec anywhere — the core, the service, the HTTP suite — can lean on them.
  */
 export class InMemorySnapshotStore implements SpendingSnapshotStore {
@@ -83,6 +84,7 @@ interface ScriptValues {
   series: SeriesPoint[];
   breakdowns: CategoryPage;
   ending: EndingAwardsPage;
+  counts: AwardCounts;
   budgets: AgencyYear[];
   offices: OfficesPage;
   catalog: AgencyDirectoryEntry[];
@@ -105,6 +107,7 @@ const withDefaults = (script: SpendingScript): Required<SpendingScript> => ({
   series: script.series ?? [fetchedOf<SeriesPoint[]>([])],
   breakdowns: script.breakdowns ?? [fetchedOf<CategoryPage>({ rows: [], hasMore: false })],
   ending: script.ending ?? [fetchedOf<EndingAwardsPage>({ rows: [], rejected: 0, hasMore: false })],
+  counts: script.counts ?? [fetchedOf<AwardCounts>({ contracts: 0, idvs: 0 })],
   budgets: script.budgets ?? [fetchedOf<AgencyYear[]>([])],
   offices: script.offices ?? [fetchedOf<OfficesPage>({ subAgencies: [], hasMore: false })],
   catalog: script.catalog ?? [fetchedOf([agencyDirectoryEntryOf()])],
@@ -112,7 +115,7 @@ const withDefaults = (script: SpendingScript): Required<SpendingScript> => ({
 });
 
 /**
- * The seven ports over a script, answered in order and repeating the last
+ * Every port over a script, answered in order and repeating the last
  * reply; `script()` starts them over. Disclosures are one declared line per
  * port, so a spec can see them carried through; no agency publishes late
  * unless the spec declares the lags.
@@ -126,6 +129,7 @@ export function scriptedSpendingSources(
     series: [],
     breakdowns: [],
     ending: [],
+    counts: [],
     budgets: [],
     offices: [],
     catalog: [],
@@ -135,6 +139,7 @@ export function scriptedSpendingSources(
     series: 0,
     breakdowns: 0,
     ending: 0,
+    counts: 0,
     budgets: 0,
     offices: 0,
     catalog: 0,
@@ -160,6 +165,7 @@ export function scriptedSpendingSources(
     series: { id, disclosures: ['series disclosure'], series: replier('series') },
     breakdowns: { id, disclosures: ['breakdown disclosure'], breakdown: replier('breakdowns') },
     ending: { id, disclosures: ['horizon disclosure'], page: replier('ending') },
+    counts: { id, disclosures: ['count disclosure'], count: replier('counts') },
     budgets: { id, disclosures: ['budget disclosure'], budgets: replier('budgets') },
     offices: { id, disclosures: ['offices disclosure'], offices: replier('offices') },
     catalog: { id, disclosures: ['catalog disclosure'], agencies: replier('catalog') },

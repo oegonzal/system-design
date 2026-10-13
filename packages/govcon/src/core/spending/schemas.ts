@@ -1,12 +1,18 @@
 import {
   AWARD_FAMILY_CHOICES,
+  AWARD_PLACEMENTS,
+  AWARD_SIZE_BANDS,
   BREAKDOWN_CATEGORIES,
   HORIZON_STOPS,
+  REACH_CUTS,
+  RECIPIENT_SIZES,
   type AgencyDirectory,
   type AgencyOutlook,
   type HorizonBody,
   type SpendingBreakdown,
+  type SpendingFacets,
   type SpendingPulse,
+  type SpendingReach,
 } from '@sysdesign/contracts';
 import { z } from 'zod';
 
@@ -23,11 +29,24 @@ const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
 const code = z.string().min(1);
 const label = z.string();
 
+/** The ids of a declared list of choices, as the enum a value must be one of. */
+export const idsOf = <T extends string>(choices: readonly { id: T }[]) =>
+  z.enum(choices.map((choice) => choice.id) as [T, ...T[]]);
+
+const facetsSchema = z.strictObject({
+  recipientSize: idsOf(RECIPIENT_SIZES).nullable(),
+  placement: idsOf(AWARD_PLACEMENTS).nullable(),
+  setAside: z.array(code),
+  amount: z.strictObject({ min: amount.nullable(), max: amount.nullable() }).nullable(),
+  newOnly: z.boolean(),
+}) satisfies z.ZodType<SpendingFacets>;
+
 const scopeSchema = z.strictObject({
   naics: z.array(code),
   psc: z.array(code),
   agency: code.nullable(),
   awardFamily: z.enum(AWARD_FAMILY_CHOICES),
+  facets: facetsSchema,
 });
 
 const fiscalPeriod = { fiscalYear: z.number().int(), period: z.number().int().min(1).max(12) };
@@ -87,6 +106,23 @@ export const breakdownBodySchema = z.strictObject({
   truncated: z.boolean(),
   delay: publicationDelay,
 }) satisfies z.ZodType<LensBody<SpendingBreakdown>>;
+
+export const reachBodySchema = z.strictObject({
+  scope: scopeSchema,
+  from: isoDate,
+  to: isoDate,
+  lanes: z.array(code),
+  cuts: z.array(
+    z.strictObject({
+      id: z.enum(REACH_CUTS),
+      facets: facetsSchema.nullable(),
+      awards: count,
+      amount,
+    }),
+  ),
+  bands: z.array(z.strictObject({ id: idsOf(AWARD_SIZE_BANDS), awards: count })),
+  delay: publicationDelay,
+}) satisfies z.ZodType<LensBody<SpendingReach>>;
 
 const familyTotals = z.strictObject({ count, amount });
 

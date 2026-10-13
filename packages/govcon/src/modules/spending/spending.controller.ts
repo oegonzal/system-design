@@ -5,6 +5,7 @@ import type {
   GetSpendingBreakdownResponse,
   GetSpendingHorizonResponse,
   GetSpendingPulseResponse,
+  GetSpendingReachResponse,
 } from '@sysdesign/contracts';
 import { ZodValidationPipe } from '@sysdesign/nest-kit';
 
@@ -13,15 +14,17 @@ import {
   breakdownQuerySchema,
   horizonQuerySchema,
   pulseQuerySchema,
+  reachQuerySchema,
   toptierCodeSchema,
   type AgencyOutlookQueryInput,
   type BreakdownQueryInput,
   type HorizonQueryInput,
   type PulseQueryInput,
+  type ReachQueryInput,
 } from './spending-requests';
 import { SpendingService } from './spending.service';
 
-/** The four spending lenses and the agency directory — reads, each answered from the day's snapshot or fetched free. */
+/** The spending lenses and the agency directory — reads, each answered from the day's snapshot or fetched free. */
 @Controller('spending')
 export class SpendingController {
   constructor(private readonly spending: SpendingService) {}
@@ -38,6 +41,13 @@ export class SpendingController {
     @Query(new ZodValidationPipe(breakdownQuerySchema)) query: BreakdownQueryInput,
   ): Promise<GetSpendingBreakdownResponse> {
     return { data: await this.spending.breakdown(query) };
+  }
+
+  @Get('reach')
+  async reach(
+    @Query(new ZodValidationPipe(reachQuerySchema)) query: ReachQueryInput,
+  ): Promise<GetSpendingReachResponse> {
+    return { data: await this.spending.reach(query) };
   }
 
   @Get('horizon')

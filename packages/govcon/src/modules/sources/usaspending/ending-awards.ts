@@ -7,7 +7,7 @@ import type { EndingAwards, EndingAwardsPage } from '../../../core/ports';
 import { issuesOf, type AttemptedHttp } from '../http';
 import { USASPENDING_DISCLOSURES } from './disclosures';
 import { AWARD_TYPE_CODES, END_DATE_FIELD } from './families';
-import { scopeFilters, timePeriod } from './filters';
+import { awardFilters } from './filters';
 import { USASPENDING_BASE_URL, USASPENDING_SOURCE_ID } from './source';
 import { amount, clean, day } from './values';
 
@@ -61,10 +61,7 @@ const endingEnvelopeSchema = z.looseObject({ results: z.array(z.unknown()) });
 export function toEndingBody(request: HorizonRequest): Record<string, unknown> {
   const endField = END_DATE_FIELD[request.family];
   return {
-    filters: {
-      ...timePeriod(request.from, request.to),
-      ...scopeFilters({ ...request, codes: AWARD_TYPE_CODES[request.family] }),
-    },
+    filters: awardFilters(request, AWARD_TYPE_CODES[request.family]),
     fields: [...BASE_FIELDS, endField],
     sort: endField,
     order: 'desc',

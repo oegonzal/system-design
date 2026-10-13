@@ -1,4 +1,4 @@
-import type { SourceOperation, SpendingScope } from '@sysdesign/contracts';
+import type { AgencyRef, ScopeRequest, SourceOperation, SpendingScope } from '@sysdesign/contracts';
 
 import type {
   Attempted,
@@ -52,11 +52,20 @@ export async function spend<K extends SourceOperation, T>(
 export const missing = (what: string, id: string): Missing => ({ kind: 'missing', what, id });
 
 /** The scope alone, out of a lens query that carries more. */
-export const scopeOf = ({ naics, psc, agency, awardFamily }: SpendingScope): SpendingScope => ({
+export const scopeOf = ({
   naics,
   psc,
   agency,
   awardFamily,
+  facets,
+}: SpendingScope): SpendingScope => ({ naics, psc, agency, awardFamily, facets });
+
+/** What every source request carries of a scope: its codes, its facets, and its agency as the source filters by it. */
+export const scopeRequestOf = (scope: SpendingScope, agency: AgencyRef | null): ScopeRequest => ({
+  naics: scope.naics,
+  psc: scope.psc,
+  agency,
+  facets: scope.facets,
 });
 
 /** The provider facts of several ports, each once. */

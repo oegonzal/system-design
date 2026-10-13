@@ -10,7 +10,7 @@ import type { LensBody, LensSpec } from '../lens';
 import { PROJECTION_POLICY, projectFiscalYear } from '../projection';
 import { pulseBodySchema } from '../schemas';
 import { alignSeries } from '../series';
-import { scopeOf, spend, type LensDeps } from './deps';
+import { scopeOf, scopeRequestOf, spend, type LensDeps } from './deps';
 import { publicationOf, resolveAgency } from './shared';
 
 /** The scope, how many prior years, and the fiscal period the answer is computed in — so a snapshot is never served for another period. */
@@ -36,9 +36,7 @@ export const pulseLens = (deps: LensDeps): LensSpec<PulseQuery, LensBody<Spendin
       toFiscalYear: query.fiscalYear,
     };
     const request: SeriesRequest = {
-      naics: scope.naics,
-      psc: scope.psc,
-      agency: agency.value,
+      ...scopeRequestOf(scope, agency.value),
       awardFamily: scope.awardFamily,
       group: 'month',
       from: fiscalYearStart(window.fromFiscalYear),

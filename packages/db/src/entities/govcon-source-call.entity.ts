@@ -26,6 +26,7 @@ const OPERATIONS = [
   'agency-offices',
   'agency-directory',
   'freshness',
+  'award-count',
 ] as const satisfies ContractOperations;
 
 /**
