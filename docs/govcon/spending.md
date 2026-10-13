@@ -178,6 +178,21 @@ expiring after seven days — is published as a prompt, which is what the
 Telegram channel renders. Only what was published is recorded, so a bus that
 cannot be reached is one warning and the same alerts are raised next warm.
 
+**How many to expect.** The ending rule reads the rows each horizon lists —
+the 200 soonest-ending awards of its scope (`MAX_HORIZON_ROWS`), for the
+profile's scope and for each top agency's — so the window bounds a digest
+only where a list reaches past it. In a dense scope the 200 rows all end
+within days and every one is inside any window; in a sparse one the window
+cuts the list. Measured 2026-10-13 on the four software codes: the rows
+listed across every agency ended by October 17, at Defense by October 31, at
+Veterans Affairs by November 30 and at GSA by December 28, so a 30-day
+window held 559 awards and a 90-day one 740. After the first digest each
+award is raised once, on the day it first shows in a list inside the window:
+a day's count is roughly the awards ending per day in the scope, whatever
+the window, and the window sets how many days ahead a sparse list tells you.
+The digest shows the ten with the most obligated and counts the rest. Fewer
+codes on the profile shorten it; `0` turns the rule off.
+
 ## How it works
 
 Every lens is one `LensSpec` — its name in the snapshot table, the schema a
@@ -337,12 +352,30 @@ far-first walk the same warm had found 444, published them and one digest,
 raised none of them again; with the notifications service unreachable the
 warm logged one warning, published nothing and recorded nothing, so the same
 alerts are raised next time. A restart inside the day answered each lens
-that had a snapshot from it, without a request. Most of what it finds are IDVs at their
-last date to order with nothing obligated, and many are in the manufacturing
-codes: 643 lines is a count, not a reading list. For a digest a person
-reads, narrow the profile's NAICS to the software four and set
-`alerts.endingWithinDays` to a month; the digest lists the ten awards with
-the most obligated on them first.
+that had a snapshot from it, without a request. Of the 643, 569 were
+contracts and 74 IDVs (70 of those at their last date to order with nothing
+obligated); 369 were in the software codes and 274 in the manufacturing
+ones — small delivery orders, median $26,000, most at the Defense Logistics
+Agency and GSA's Federal Acquisition Service — and those kept the lists
+short-sighted: the 200 rows listed across every agency ended by October 14,
+at Defense by October 15.
+
+**The profile, narrowed.** Later that day the profile was set in Settings to
+the four software codes with `alerts.endingWithinDays` at 30. Read on the
+horizons the next warm reads: 559 awards inside the window (511 contracts,
+48 IDVs), every one in the software codes, 289 of them already raised under
+the earlier settings — about 270 for the next digest, against 740 and about
+343 had the window stayed at 90 days. The lists reach farther without the
+delivery orders, to October 17 across every agency and October 31 at
+Defense, and at Veterans Affairs and GSA the 30-day window is what cuts them
+(150 and 69 of 200). The count stays in the hundreds because the market is
+dense — 1,291 contracts in the four codes end in the rest of October alone,
+with $4.7B obligated on them — so read a digest by its ten lines, the awards
+with the most obligated first, and the months ahead on the Horizon tab. The
+stored leads followed the profile at once: the seven manufacturing notices
+fell to the low tier and the eight software notices lead. Left as they were:
+the four manufacturing saved searches still in the daily pull, and the PSC
+families and interests that name parts and repair.
 
 **What the data says for a new software and AI-services business.**
 
