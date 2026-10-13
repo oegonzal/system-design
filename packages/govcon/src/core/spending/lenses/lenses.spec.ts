@@ -1,4 +1,4 @@
-import { horizonRowOf } from '@sysdesign/contracts';
+import { agencyDirectoryEntryOf, horizonRowOf } from '@sysdesign/contracts';
 
 import { RequestGate } from '../../budget';
 import { attemptOf, attempted, failure, InMemorySourceCallLog } from '../../testing';
@@ -37,7 +37,7 @@ function harness(script: SpendingScript = {}) {
 }
 
 describe('the spending lenses', () => {
-  it('[GOV-11] [GOV-20] every lens spends through the gate under its own operation and counts its HTTP attempts into provenance', async () => {
+  it('[GOV-11] [GOV-20] every lens spends through the gate under its own operation, counts its HTTP attempts into provenance, and an agency’s offices default to the year its directory entry reports active', async () => {
     const twice = attempted(fetchedOf([seriesPointOf({ fiscalYear: 2026, period: 1 })]), [
       attemptOf(failure('error', 503, 'status 503')),
       attemptOf(fetchedOf([])),
@@ -91,6 +91,26 @@ describe('the spending lenses', () => {
       page: 1,
     });
     expect(operations().slice(4)).toEqual(['agency-budget', 'agency-offices']);
+
+    // No year asked: the agency's active year as the directory reports it, else the clock's.
+    const defaulted = await deps.read(agencyLens(deps), {
+      toptierCode: '097',
+      fiscalYear: null,
+      awardFamily: 'both',
+    });
+    expect(defaulted).toMatchObject({ kind: 'ok', body: { officesFiscalYear: 2026 } });
+    const undated = harness({
+      catalog: [
+        fetchedOf([agencyDirectoryEntryOf({ activeFiscalYear: null, activeQuarter: null })]),
+      ],
+    });
+    const byClock = await undated.deps.read(agencyLens(undated.deps), {
+      toptierCode: '097',
+      fiscalYear: null,
+      awardFamily: 'both',
+    });
+    expect(byClock).toMatchObject({ kind: 'ok', body: { officesFiscalYear: 2026 } });
+    expect(undated.sources.requests.offices[0]).toMatchObject({ fiscalYear: 2026 });
 
     expect(await deps.read(directoryLens(deps), {})).toMatchObject({
       provenance: { servedFrom: 'snapshot' },

@@ -1,4 +1,5 @@
 import {
+  currentFiscalPeriod,
   MAX_AGENCY_OFFICES,
   type AgencyOfficesRequest,
   type AgencyOutlook,
@@ -14,14 +15,18 @@ import { asOfFrom } from './shared';
 
 export interface AgencyQuery {
   toptierCode: string;
-  fiscalYear: number;
+  /** The offices' fiscal year; null asks for the agency's active year as the directory reports it. */
+  fiscalYear: number | null;
   awardFamily: AwardFamilyChoice;
 }
 
 /**
  * One agency's headroom: its budgetary resources, obligations and outlays
  * by fiscal year with the cadence by period, and its sub-agencies and
- * offices for the year asked, with their new-award counts.
+ * offices for the year asked — or, when none is asked, for the year the
+ * source's own directory reports active for that agency, since USAspending
+ * refuses a year outside its submissions (measured 2026-10-13: the new
+ * fiscal year on October 13). The clock's year is the last resort.
  */
 export const agencyLens = (deps: LensDeps): LensSpec<AgencyQuery, LensBody<AgencyOutlook>> => ({
   lens: 'agency',
@@ -33,6 +38,10 @@ export const agencyLens = (deps: LensDeps): LensSpec<AgencyQuery, LensBody<Agenc
     if (directory.kind !== 'ok') return directory;
     const entry = agencyNamed(directory.body.entries, query.toptierCode);
     if (entry === null) return missing('agency', query.toptierCode);
+    const fiscalYear =
+      query.fiscalYear ??
+      entry.activeFiscalYear ??
+      currentFiscalPeriod(deps.now().getTime()).fiscalYear;
     const tally = { requests: 0 };
 
     const budgetRequest = { toptierCode: query.toptierCode };
@@ -46,7 +55,7 @@ export const agencyLens = (deps: LensDeps): LensSpec<AgencyQuery, LensBody<Agenc
 
     const officesRequest: AgencyOfficesRequest = {
       toptierCode: query.toptierCode,
-      fiscalYear: query.fiscalYear,
+      fiscalYear,
       awardFamily: query.awardFamily,
       limit: MAX_AGENCY_OFFICES,
       page: 1,
@@ -66,7 +75,7 @@ export const agencyLens = (deps: LensDeps): LensSpec<AgencyQuery, LensBody<Agenc
         name: entry.name,
         abbreviation: entry.abbreviation.length > 0 ? entry.abbreviation : null,
         years: alignAgencyYears(budgets.value),
-        officesFiscalYear: query.fiscalYear,
+        officesFiscalYear: fiscalYear,
         awardFamily: query.awardFamily,
         subAgencies: offices.value.subAgencies,
         truncated: offices.value.hasMore,

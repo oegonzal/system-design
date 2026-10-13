@@ -137,8 +137,9 @@ export class SpendingService {
     options: ReadOptions = {},
   ): Promise<AgencyOutlook> {
     const current = currentFiscalPeriod(this.now().getTime());
-    const fiscalYear = query.fiscalYear ?? current.fiscalYear;
-    if (fiscalYear > current.fiscalYear) {
+    // No year asked: the lens takes the agency's active year from the directory.
+    const fiscalYear = query.fiscalYear ?? null;
+    if (fiscalYear !== null && fiscalYear > current.fiscalYear) {
       throw new BadRequestException(`fiscal year ${fiscalYear} has not begun`);
     }
     return this.answer(
