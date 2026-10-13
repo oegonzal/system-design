@@ -49,7 +49,7 @@ export const horizonLens = (deps: LensDeps): LensSpec<HorizonQuery, LensBody<Spe
         maxPages: MAX_HORIZON_PAGES,
         deadlineMs: deps.deadlineMs,
         now: deps.now,
-        page: (family, after, index) => {
+        page: (family, index) => {
           const request: HorizonRequest = {
             naics: scope.naics,
             psc: scope.psc,
@@ -59,7 +59,6 @@ export const horizonLens = (deps: LensDeps): LensSpec<HorizonQuery, LensBody<Spe
             to: query.today,
             limit: HORIZON_PAGE_SIZE,
             page: index + 1,
-            after,
           };
           return spend(
             deps,

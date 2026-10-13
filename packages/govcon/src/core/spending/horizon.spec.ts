@@ -1,4 +1,4 @@
-import { horizonRowOf, type AwardFamily, type HorizonCursor } from '@sysdesign/contracts';
+import { horizonRowOf, type AwardFamily } from '@sysdesign/contracts';
 
 import type { Gated } from '../budget';
 import type { EndingAwardsPage } from '../ports';
@@ -17,25 +17,24 @@ const row = (endsAt: string, family: AwardFamily = 'contracts', amount = 100) =>
   horizonRowOf({ externalId: `${family}-${endsAt}`, endsAt, family, amount });
 const page = (
   rows: EndingAwardsPage['rows'],
-  next: HorizonCursor | null = null,
+  hasMore = false,
   rejected = 0,
-): Gated<EndingAwardsPage> => ({ kind: 'ok', value: { rows, rejected, next } });
-const cursor = (id: number): HorizonCursor => ({ id, sortValue: String(id) });
+): Gated<EndingAwardsPage> => ({ kind: 'ok', value: { rows, rejected, hasMore } });
 
 /** Pages per family, answered in order; every ask remembered. */
 function scripted(
   pages: Partial<Record<AwardFamily, Gated<EndingAwardsPage>[]>>,
   overrides: Partial<HorizonWalkDeps> = {},
 ) {
-  const asks: [AwardFamily, HorizonCursor | null, number][] = [];
+  const asks: [AwardFamily, number][] = [];
   const served: Record<AwardFamily, number> = { contracts: 0, idvs: 0 };
   const deps: HorizonWalkDeps = {
     families: ['contracts', 'idvs'],
     maxPages: 5,
     deadlineMs: 60_000,
     now: () => new Date('2026-06-15T12:00:00Z'),
-    async page(family, after, index) {
-      asks.push([family, after, index]);
+    async page(family, index) {
+      asks.push([family, index]);
       const reply = pages[family]?.[served[family]] ?? page([]);
       served[family] += 1;
       return reply;
@@ -83,11 +82,11 @@ describe('the horizon', () => {
     ]);
   });
 
-  it('[GOV-20] [GOV-21] walks each family newest-ending first, skips what ends past the window, stops when the end date passes today, and reports capped by pages or by the deadline with the earliest end date reached', async () => {
+  it('[GOV-20] [GOV-21] walks each family newest-ending first by numbered page, skips what ends past the window, stops when the end date passes today, and reports capped by pages or by the deadline with the earliest end date reached', async () => {
     const { deps, asks } = scripted({
       contracts: [
-        page([row('2030-01-01'), row('2026-08-01'), row('2026-07-01')], cursor(1)),
-        page([row('2026-06-20'), row('2026-06-10'), row('2026-05-01')], cursor(2)),
+        page([row('2030-01-01'), row('2026-08-01'), row('2026-07-01')], true),
+        page([row('2026-06-20'), row('2026-06-10'), row('2026-05-01')], true),
       ],
       idvs: [page([row('2026-09-01', 'idvs')])],
     });
@@ -105,14 +104,14 @@ describe('the horizon', () => {
       failure: null,
     });
     expect(asks).toEqual([
-      ['contracts', null, 0],
-      ['contracts', cursor(1), 1],
-      ['idvs', null, 0],
+      ['contracts', 0],
+      ['contracts', 1],
+      ['idvs', 0],
     ]);
 
     const byPages = scripted(
       {
-        contracts: [page([row('2026-08-01'), row('2026-07-01')], cursor(1))],
+        contracts: [page([row('2026-08-01'), row('2026-07-01')], true)],
         idvs: [page([row('2026-09-01', 'idvs')])],
       },
       { maxPages: 1 },
@@ -123,7 +122,7 @@ describe('the horizon', () => {
     expect(byPages.asks.map(([family]) => family)).toEqual(['contracts', 'idvs']);
 
     const beforeWindow = scripted(
-      { contracts: [page([row('2031-01-01')], cursor(1))] },
+      { contracts: [page([row('2031-01-01')], true)] },
       { maxPages: 1, families: ['contracts'] },
     );
     expect(await walkHorizon(beforeWindow.deps, TODAY, 12)).toMatchObject({
@@ -135,7 +134,7 @@ describe('the horizon', () => {
 
     let tick = Date.parse('2026-06-15T12:00:00Z');
     const byDeadline = scripted(
-      { contracts: [page([row('2026-08-01')], cursor(1)), page([row('2026-07-01')], cursor(2))] },
+      { contracts: [page([row('2026-08-01')], true), page([row('2026-07-01')], true)] },
       { deadlineMs: 1_000, now: () => new Date((tick += 600)) },
     );
     const late = await walkHorizon(byDeadline.deps, TODAY, 12);
@@ -149,10 +148,7 @@ describe('the horizon', () => {
 
   it('[GOV-20] a rate limit or a spent budget ends the walk with that failure, keeping what came before, and nothing is retried', async () => {
     const { deps, asks } = scripted({
-      contracts: [
-        page([row('2026-08-01')], cursor(1)),
-        failure('rate-limited', 429, 'rate limited'),
-      ],
+      contracts: [page([row('2026-08-01')], true), failure('rate-limited', 429, 'rate limited')],
     });
     const walk = await walkHorizon(deps, TODAY, 12);
     expect(walk).toMatchObject({

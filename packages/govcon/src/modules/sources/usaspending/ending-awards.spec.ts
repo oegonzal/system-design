@@ -15,11 +15,10 @@ const request: HorizonRequest = {
   to: '2026-06-15',
   limit: 100,
   page: 1,
-  after: null,
 };
 
 describe('the USAspending ending awards', () => {
-  it('[GOV-11] [GOV-20] asks for End Date on contracts and Last Date to Order on IDVs, sorted newest-ending, echoes the keyset cursor, and rejects a row without an end date', async () => {
+  it("[GOV-11] [GOV-20] asks for End Date on contracts and Last Date to Order on IDVs, sorted newest-ending, pages by number without the source's cursor, and rejects a row without an end date", async () => {
     const { http, urls, requests } = httpOf([{ body: contracts }]);
     const { result } = await new UsaSpendingEndingAwards(http).page(request);
     expect(urls[0]).toBe(`${USASPENDING_BASE_URL}/api/v2/search/spending_by_award/`);
@@ -41,7 +40,8 @@ describe('the USAspending ending awards', () => {
 
     const page = okValue(result);
     expect(page.rejected).toBe(1);
-    expect(page.next).toEqual({ id: 352974032, sortValue: '1911513600000' });
+    expect(page.hasMore).toBe(true);
+    expect(page).not.toHaveProperty('next');
     expect(page.rows[0]).toEqual({
       externalId: 'CONT_AWD_N6660426P0205_9700_-NONE-_-NONE-',
       piid: 'N6660426P0205',
@@ -72,14 +72,10 @@ describe('the USAspending ending awards', () => {
       ...request,
       family: 'idvs',
       page: 2,
-      after: { id: 352974032, sortValue: '1911513600000' },
     }) as Record<string, unknown>;
-    expect(paged).toMatchObject({
-      sort: 'Last Date to Order',
-      page: 2,
-      last_record_unique_id: 352974032,
-      last_record_sort_value: '1911513600000',
-    });
+    expect(paged).toMatchObject({ sort: 'Last Date to Order', page: 2 });
+    expect(paged).not.toHaveProperty('last_record_unique_id');
+    expect(paged).not.toHaveProperty('last_record_sort_value');
     expect(paged['fields']).toContain('Last Date to Order');
     expect((paged['filters'] as Record<string, unknown>)['award_type_codes']).toEqual([
       'IDV_A',
@@ -100,7 +96,7 @@ describe('the USAspending ending awards', () => {
         })
       ).result,
     );
-    expect(idvPage.next).toBeNull();
+    expect(idvPage.hasMore).toBe(false);
     expect(idvPage.rows[0]).toMatchObject({
       externalId: 'CONT_IDV_70Z08026D16007B00_7008',
       family: 'idvs',

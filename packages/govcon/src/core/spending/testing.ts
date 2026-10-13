@@ -123,7 +123,7 @@ export function scriptedSpendingSources(script: SpendingScript = {}): ScriptedSp
     requests.breakdowns,
   );
   const ending = replier(
-    script.ending ?? [fetchedOf<EndingAwardsPage>({ rows: [], rejected: 0, next: null })],
+    script.ending ?? [fetchedOf<EndingAwardsPage>({ rows: [], rejected: 0, hasMore: false })],
     requests.ending,
   );
   const budgets = replier(script.budgets ?? [fetchedOf<AgencyYear[]>([])], requests.budgets);

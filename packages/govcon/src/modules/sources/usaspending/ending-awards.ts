@@ -1,4 +1,4 @@
-import type { AwardFamily, HorizonCursor, HorizonRequest, HorizonRow } from '@sysdesign/contracts';
+import type { AwardFamily, HorizonRequest, HorizonRow } from '@sysdesign/contracts';
 import { z } from 'zod';
 
 import type { Attempted, Fetched } from '../../../core/budget';
@@ -50,16 +50,16 @@ const endingAwardSchema = z.looseObject({
 });
 const endingEnvelopeSchema = z.looseObject({
   results: z.array(z.unknown()),
-  page_metadata: z
-    .looseObject({
-      hasNext: z.boolean().nullish(),
-      last_record_unique_id: z.union([z.number(), z.string()]).nullish(),
-      last_record_sort_value: z.union([z.string(), z.number()]).nullish(),
-    })
-    .nullish(),
+  page_metadata: z.looseObject({ hasNext: z.boolean().nullish() }).nullish(),
 });
 
-/** The request as USAspending spells it: sorted by the family's end date, newest first, after the cursor. */
+/**
+ * The request as USAspending spells it: sorted by the family's end date,
+ * newest first, by page number. Measured 2026-10-13: a request carrying the
+ * source's keyset cursor (`last_record_unique_id`, `last_record_sort_value`)
+ * answers an empty-body 503 every time, while numbered pages answer — so the
+ * cursor is never sent.
+ */
 export function toEndingBody(request: HorizonRequest): Record<string, unknown> {
   const endField = END_DATE_FIELD[request.family];
   return {
@@ -72,12 +72,6 @@ export function toEndingBody(request: HorizonRequest): Record<string, unknown> {
     order: 'desc',
     limit: request.limit,
     page: request.page,
-    ...(request.after !== null
-      ? {
-          last_record_unique_id: request.after.id,
-          last_record_sort_value: request.after.sortValue,
-        }
-      : {}),
   };
 }
 
@@ -115,17 +109,7 @@ export function normalizeEndingAward(raw: unknown, family: AwardFamily): Normali
   };
 }
 
-const cursorOf = (
-  metadata: z.output<typeof endingEnvelopeSchema>['page_metadata'],
-): HorizonCursor | null => {
-  if (metadata?.hasNext !== true) return null;
-  const id = metadata.last_record_unique_id;
-  const sortValue = metadata.last_record_sort_value;
-  if (id === null || id === undefined || sortValue === null || sortValue === undefined) return null;
-  return { id, sortValue: String(sortValue) };
-};
-
-/** `spending_by_award` sorted by end date: one page of one family, with the keyset cursor to the next. */
+/** `spending_by_award` sorted by end date: one numbered page of one family, and whether another follows. */
 export class UsaSpendingEndingAwards implements EndingAwards {
   readonly id = USASPENDING_SOURCE_ID;
   readonly disclosures = [...USASPENDING_DISCLOSURES.awards, ...USASPENDING_DISCLOSURES.horizon];
@@ -158,7 +142,7 @@ export class UsaSpendingEndingAwards implements EndingAwards {
       attempts,
       result: {
         kind: 'ok',
-        value: { rows, rejected, next: cursorOf(parsed.data.page_metadata) },
+        value: { rows, rejected, hasMore: parsed.data.page_metadata?.hasNext === true },
         recordCount: rows.length + rejected,
         totalRecords: null,
       },

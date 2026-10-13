@@ -3,7 +3,6 @@ import {
   type AwardFamily,
   type FamilyTotals,
   type HorizonBucket,
-  type HorizonCursor,
   type HorizonRow,
   type HorizonStop,
 } from '@sysdesign/contracts';
@@ -18,12 +17,8 @@ export interface HorizonWalkDeps {
   /** Wall-clock budget for the whole walk; no page is asked for after it. */
   deadlineMs: number;
   now: () => Date;
-  /** One page of one family, newest-ending first, after the cursor. */
-  page(
-    family: AwardFamily,
-    after: HorizonCursor | null,
-    index: number,
-  ): Promise<Gated<EndingAwardsPage>>;
+  /** One page of one family, newest-ending first; `index` counts from 0 and the page asked for is `index + 1`. */
+  page(family: AwardFamily, index: number): Promise<Gated<EndingAwardsPage>>;
 }
 
 export interface HorizonWalk {
@@ -67,7 +62,7 @@ const later = (a: string | null, b: string): string => (a === null || b > a ? b 
 
 /**
  * The walk, as pure orchestration over the gate: each family in turn, pages
- * newest-ending first, keeping what ends inside the window, skipping what
+ * numbered from one, newest-ending first, keeping what ends inside the window, skipping what
  * ends past it, and done with a family the moment a row ends before today —
  * the predicate is checked on the page just received, before the next is
  * asked for. Three things cap it and name themselves: the page bound (per
@@ -98,14 +93,13 @@ export async function walkHorizon(
   };
 
   for (const family of deps.families) {
-    let after: HorizonCursor | null = null;
     let earliest: string | null = null;
     for (let index = 0; index < deps.maxPages; index += 1) {
       if (deps.now().getTime() - startedAt >= deps.deadlineMs) {
         cap('deadline', earliest);
         return walk;
       }
-      const result = await deps.page(family, after, index);
+      const result = await deps.page(family, index);
       if (result.kind === 'cached') break;
       if (result.kind !== 'ok') {
         walk.failure = result;
@@ -113,7 +107,7 @@ export async function walkHorizon(
         return walk;
       }
       walk.rejected += result.value.rejected;
-      let done = result.value.next === null;
+      let done = !result.value.hasMore;
       for (const row of result.value.rows) {
         if (row.endsAt > windowEnd) continue;
         if (row.endsAt < today) {
@@ -128,7 +122,6 @@ export async function walkHorizon(
         cap('pages', earliest);
         break;
       }
-      after = result.value.next;
     }
   }
   return walk;

@@ -98,7 +98,6 @@ describe('describeCall', () => {
           to: '2026-06-15',
           limit: 100,
           page: 2,
-          after: { id: 1, sortValue: '2' },
         },
       }),
     ).toBe('horizon idvs naics=332710 psc=* agency=097 2021-10-01..2026-06-15 page 2');

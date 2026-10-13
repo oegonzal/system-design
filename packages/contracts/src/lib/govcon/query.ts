@@ -121,13 +121,7 @@ export interface BreakdownRequest extends ScopeRequest {
   page: number;
 }
 
-/** Where the previous horizon page ended, as the provider spells its keyset cursor. */
-export interface HorizonCursor {
-  id: number | string;
-  sortValue: string;
-}
-
-/** One page of the horizon walk: one family, newest-ending first, after the cursor. */
+/** One page of the horizon walk: one family, newest-ending first, by page number — the source's keyset cursor is not used. */
 export interface HorizonRequest extends ScopeRequest {
   family: AwardFamily;
   /** The action-date window that bounds the universe walked. */
@@ -135,7 +129,6 @@ export interface HorizonRequest extends ScopeRequest {
   to: string;
   limit: number;
   page: number;
-  after: HorizonCursor | null;
 }
 
 export interface AgencyBudgetRequest {

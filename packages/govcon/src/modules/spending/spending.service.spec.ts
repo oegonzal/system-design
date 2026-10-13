@@ -80,7 +80,7 @@ describe('the spending service', () => {
     const paged = fetchedOf({
       rows: [horizonRowOf({ endsAt: '2026-08-01' })],
       rejected: 0,
-      next: { id: 1, sortValue: '1' },
+      hasMore: true,
     });
     const { service, sources } = harness({ ending: [paged] }, { pullDeadlineMs: 1_500 }, 1_000);
     const horizon = await service.horizon({ ...scope, awardFamily: 'contracts', months: 6 });

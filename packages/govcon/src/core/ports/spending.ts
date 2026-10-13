@@ -4,7 +4,6 @@ import type {
   AgencyOfficesRequest,
   AgencyYear,
   BreakdownRequest,
-  HorizonCursor,
   HorizonRequest,
   HorizonRow,
   SeriesRequest,
@@ -46,12 +45,12 @@ export interface CategoryPage {
   hasMore: boolean;
 }
 
-/** One page of awards, newest-ending first, and where the next page starts. */
+/** One page of awards, newest-ending first, and whether another page follows. */
 export interface EndingAwardsPage {
   rows: HorizonRow[];
   /** Records the source returned that did not normalize — counted, never kept. */
   rejected: number;
-  next: HorizonCursor | null;
+  hasMore: boolean;
 }
 
 export interface OfficesPage {

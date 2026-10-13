@@ -162,7 +162,7 @@ describe('the spending lenses', () => {
         fetchedOf({
           rows: [horizonRowOf({ endsAt: '2026-08-01' })],
           rejected: 1,
-          next: { id: 1, sortValue: '1' },
+          hasMore: true,
         }),
         failure('rate-limited', 429, 'rate limited'),
       ],
@@ -192,7 +192,6 @@ describe('the spending lenses', () => {
       to: '2026-06-15',
       limit: 100,
       page: 1,
-      after: null,
     });
     // Cut short by the source, so not kept: the next read walks again instead of serving a snapshot.
     const again = await partial.deps.read(horizonLens(partial.deps), {

@@ -11,7 +11,7 @@ export const USASPENDING_DISCLOSURES = {
     'Agency budgetary resources and obligations arrive by submission period and are revealed weeks after the period ends.',
   ],
   horizon: [
-    'USAspending cannot filter by period of performance: awards are walked newest-ending first within the lookback window, so a wide scope may be capped before it reaches today.',
+    'USAspending cannot filter by period of performance and its keyset cursor is not usable: awards are walked newest-ending first by numbered page within the lookback window, so a wide scope may be capped before it reaches today.',
     'An indefinite-delivery vehicle’s amount is what has been obligated on it so far, often zero — its count is the signal.',
   ],
 } as const;
