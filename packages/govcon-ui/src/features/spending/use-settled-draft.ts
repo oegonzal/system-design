@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 
 /**
- * A draft whose typed fields settle before they are handed on, while its
- * chosen fields are handed on at once — for a form whose owner writes the
- * value somewhere slow, such as the address. `type` echoes a keystroke
- * locally and starts the pause; `commit` hands the merged draft on now, as
- * a chip or a select does; `settle` — a field left — hands on what is still
- * pending. The echo covers the value until a commit or a settle, so the
- * owner's normalized spelling never changes the text under the typing.
+ * A draft over a value its owner writes somewhere slow — the address, say.
+ * Every change is echoed at once, so the control never waits on the owner.
+ * `settleLater` hands the merged draft on once changes pause, the way typed
+ * text or a run of chip presses should reach the owner as one change;
+ * `commit` hands it on now, as a select does; `settleNow` — a field left —
+ * hands on what is still pending. The echo covers the value until the
+ * owner's value next changes after a hand-on, and then gives way to it: the
+ * control shows what the owner holds, and an outside change shows through.
  */
 export function useSettledDraft<T extends object>(
   value: T,
@@ -15,6 +16,15 @@ export function useSettledDraft<T extends object>(
   delayMs: number,
 ) {
   const [echo, setEcho] = useState<Partial<T> | null>(null);
+  /** The owner's value as it stood at the last hand-on; null while nothing was handed on. */
+  const [handedOnOver, setHandedOnOver] = useState<string | null>(null);
+  const standing = JSON.stringify(value);
+  // The owner's value moved after a hand-on: it now says what the echo said, or something newer.
+  if (echo !== null && handedOnOver !== null && handedOnOver !== standing) {
+    setEcho(null);
+    setHandedOnOver(null);
+  }
+
   const latest = useRef({ value, onChange, echo });
   useEffect(() => {
     latest.current = { value, onChange, echo };
@@ -35,25 +45,33 @@ export function useSettledDraft<T extends object>(
   );
 
   const handOn = (patch: Partial<T>): void => {
-    const { value: current, onChange: emit, echo: typed } = latest.current;
-    emit({ ...current, ...typed, ...patch });
+    const { value: current, onChange: emit, echo: drafted } = latest.current;
+    setHandedOnOver(JSON.stringify(current));
+    emit({ ...current, ...drafted, ...patch });
   };
-  const type = (patch: Partial<T>): void => {
+  const drafting = (patch: Partial<T>): void => {
     setEcho((previous) => ({ ...previous, ...patch }));
+    setHandedOnOver(null);
     cancel();
+  };
+  const settleLater = (patch: Partial<T>): void => {
+    drafting(patch);
     timer.current = setTimeout(() => {
       timer.current = null;
       handOn(patch);
     }, delayMs);
   };
   const commit = (patch: Partial<T>): void => {
-    cancel();
+    drafting(patch);
     handOn(patch);
-    setEcho(null);
   };
-  const settle = (): void => {
+  const settleNow = (): void => {
     if (cancel()) handOn({});
-    setEcho(null);
   };
-  return { shown: echo === null ? value : { ...value, ...echo }, type, commit, settle };
+  return {
+    shown: echo === null ? value : { ...value, ...echo },
+    settleLater,
+    commit,
+    settleNow,
+  };
 }

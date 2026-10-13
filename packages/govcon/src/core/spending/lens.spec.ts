@@ -176,6 +176,56 @@ describe('the snapshot cache', () => {
     expect(lens.queries).toHaveLength(3);
   });
 
+  it('[GOV-20] never loads one query twice at once: readers arriving while a load is in flight share its answer, another query loads beside it, and a refused load is tried again', async () => {
+    const store = new InMemorySnapshotStore();
+    const queries: string[] = [];
+    const release: (() => void)[] = [];
+    const replies: LensLoad<Body>[] = [ok(1), ok(2), failure('error', 502, 'status 502'), ok(4)];
+    const spec: LensSpec<{ id: string }, Body> = {
+      lens: 'pulse',
+      source: 'usaspending',
+      schema: bodySchema,
+      disclosures: [],
+      async load(query) {
+        const reply = replies[queries.length];
+        queries.push(query.id);
+        await new Promise<void>((resolve) => release.push(resolve));
+        if (!reply) throw new Error('no reply');
+        return reply;
+      },
+    };
+    const cache = new SnapshotCache(store, 24 * HOUR, () => T0);
+    const settled = async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    };
+
+    const first = cache.read(spec, { id: 'a' });
+    const second = cache.read(spec, { id: 'a' });
+    const renewing = cache.read(spec, { id: 'a' }, { refresh: true });
+    const other = cache.read(spec, { id: 'b' });
+    await settled();
+    expect(queries).toEqual(['a', 'b']);
+    for (const done of release.splice(0)) done();
+    const answers = await Promise.all([first, second, renewing]);
+    expect(answers.map((given) => (given.kind === 'ok' ? given.body.value : null))).toEqual([
+      1, 1, 1,
+    ]);
+    expect(await other).toMatchObject({ body: { value: 2 } });
+
+    // A refused load is shared by those waiting on it, and the next reader asks again.
+    const refusedA = cache.read(spec, { id: 'c' });
+    const refusedB = cache.read(spec, { id: 'c' });
+    await settled();
+    for (const done of release.splice(0)) done();
+    expect(await refusedA).toMatchObject({ kind: 'error', status: 502 });
+    expect(await refusedB).toMatchObject({ kind: 'error', status: 502 });
+    const again = cache.read(spec, { id: 'c' });
+    await settled();
+    for (const done of release.splice(0)) done();
+    expect(await again).toMatchObject({ body: { value: 4 } });
+    expect(queries).toEqual(['a', 'b', 'c', 'c']);
+  });
+
   it('[GOV-2] [GOV-20] a store that cannot be read or written falls through with a warning', async () => {
     const { store, read, warnings, lens } = harness([ok(1)]);
     store.failing = new Error('down');

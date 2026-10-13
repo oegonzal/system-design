@@ -64,7 +64,7 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
   {
     id: 'GOVU-12',
     statement:
-      'A spending view is its address: a link without a scope opens on the active profile’s NAICS, and the scope, the tab and each lens’s settings travel in the URL, so a reload, a shared link and a return by Back all open the same view; typed codes settle before they are written; a directory pick narrows the scope to that agency; every column chart answers hover and focus with one tooltip naming every series at that x; and an expiring award says which open notices already exist for its NAICS and buyer, each a link to the notice.',
+      'A spending view is its address: a link without a scope opens on the active profile’s NAICS, and the scope, the tab and each lens’s settings travel in the URL, so a reload, a shared link and a return by Back all open the same view; codes, typed or pressed, settle before they are written as one change; a directory pick narrows the scope to that agency; every column chart answers hover and focus with one tooltip naming every series at that x; and an expiring award says which open notices already exist for its NAICS and buyer, each a link to the notice.',
   },
   // Government contracting: SAM.gov opportunities (packages/govcon)
   {
@@ -165,7 +165,7 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
   {
     id: 'GOV-20',
     statement:
-      'Every spending lens spends through the one request gate as its own ledger operation, answers from the snapshot table inside the cache window without a request, validates a stored payload before trusting it, serves a stale snapshot only when a refresh failed and says so, and carries its provenance — fetched when, as of, served from where, how many attempts, which provider facts.',
+      'Every spending lens spends through the one request gate as its own ledger operation, answers from the snapshot table inside the cache window without a request, never loads one query twice at once, validates a stored payload before trusting it, serves a stale snapshot only when a refresh failed and says so, and carries its provenance — fetched when, as of, served from where, how many attempts, which provider facts.',
   },
   {
     id: 'GOV-22',

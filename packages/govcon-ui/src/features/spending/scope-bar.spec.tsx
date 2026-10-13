@@ -9,25 +9,35 @@ import * as stories from './scope-bar.stories';
 const { Default, DirectoryLoading, DirectoryFailed } = composeStories(stories);
 
 describe('ScopeBar', () => {
-  it('[GOVU-11] [GOVU-12] toggles profile codes into the typed list at once, offers the directory as agencies, chooses the family, and settles typed codes before handing them on', () => {
+  it('[GOVU-11] [GOVU-12] presses profile codes into the typed list, offers the directory as agencies, chooses the family at once, and hands a run of code changes — pressed or typed — on as one once it pauses', () => {
     vi.useFakeTimers();
     const onChange = vi.fn();
     renderWithTheme(<Default onChange={onChange} />);
     const chosen = screen.getByRole('button', { name: '332710' });
     expect(chosen.getAttribute('aria-pressed')).toBe('true');
+
+    // Two presses inside the pause: shown at once, handed on together.
     fireEvent.click(screen.getByRole('button', { name: '541511' }));
-    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ naics: '332710, 541511' }));
+    expect(screen.getByRole('button', { name: '541511' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
     fireEvent.click(chosen);
-    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ naics: '' }));
+    expect(chosen.getAttribute('aria-pressed')).toBe('false');
+    expect(onChange).not.toHaveBeenCalled();
+    act(() => vi.advanceTimersByTime(CODES_SETTLE_MS));
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ naics: '541511' }));
 
     fireEvent.change(screen.getByLabelText('Agency'), { target: { value: '036' } });
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ agency: '036' }));
     expect(screen.getByRole('option', { name: 'DOD — Department of Defense' })).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Award family'), { target: { value: 'idvs' } });
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ awardFamily: 'idvs' }));
+
+    const calls = onChange.mock.calls.length;
     fireEvent.change(screen.getByLabelText('PSC codes'), { target: { value: 'ac13' } });
     expect((screen.getByLabelText('PSC codes') as HTMLInputElement).value).toBe('AC13');
-    expect(onChange).not.toHaveBeenLastCalledWith(expect.objectContaining({ psc: 'AC13' }));
+    expect(onChange).toHaveBeenCalledTimes(calls);
     act(() => vi.advanceTimersByTime(CODES_SETTLE_MS));
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ psc: 'AC13' }));
     expect(screen.getByText(/Free: USAspending needs no key/)).toBeTruthy();

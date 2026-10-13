@@ -67,8 +67,10 @@ interface Stored<B> {
  * stale, since the snapshot cannot vouch for a thing the source does not
  * have. An answer a lens marks `keep: false` — one the source cut short — is
  * served as `source` and not stored, so the next read asks again. A read
- * asked to `refresh` skips the window and asks the source. Freshness is
- * decided here and nowhere else, from the injected clock.
+ * asked to `refresh` skips the window and asks the source. One query is
+ * never loaded twice at once: a reader that arrives while its load is in
+ * flight waits on that load. Freshness is decided here and nowhere else,
+ * from the injected clock.
  *
  * The store is an optimisation, never a dependency: a read that fails falls
  * through to the load with a warning, a write that fails loses one snapshot
@@ -76,6 +78,9 @@ interface Stored<B> {
  * as absent — refused, never trusted.
  */
 export class SnapshotCache {
+  /** Loads in flight, by snapshot key. */
+  private readonly loading = new Map<string, Promise<LensAnswer<unknown>>>();
+
   constructor(
     private readonly store: SpendingSnapshotStore,
     private readonly ttlMs: number,
@@ -94,7 +99,23 @@ export class SnapshotCache {
     if (stored !== null && options.refresh !== true && this.fresh(stored.row, at)) {
       return answer(spec, stored, 'snapshot');
     }
+    const inFlight = this.loading.get(key);
+    if (inFlight !== undefined) return inFlight as Promise<LensAnswer<B>>;
+    const load = this.loadThrough(spec, query, { key, at, stored });
+    this.loading.set(key, load);
+    try {
+      return await load;
+    } finally {
+      this.loading.delete(key);
+    }
+  }
 
+  /** The source's answer stored and served — or, refused, the stored one as stale. */
+  private async loadThrough<Q extends object, B>(
+    spec: LensSpec<Q, B>,
+    query: Q,
+    { key, at, stored }: { key: string; at: Date; stored: Stored<B> | null },
+  ): Promise<LensAnswer<B>> {
     const fetched = await spec.load(query);
     if (fetched.kind === 'ok') {
       const row: SnapshotRow = {

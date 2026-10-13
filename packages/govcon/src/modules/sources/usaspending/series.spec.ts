@@ -60,7 +60,7 @@ describe('the USAspending series', () => {
         time_period: [{ start_date: '2025-10-01', end_date: '2026-09-30' }],
         award_type_codes: ['A', 'B', 'C', 'D'],
         naics_codes: { require: ['332710', '541511'] },
-        psc_codes: { require: ['5340'] },
+        psc_codes: ['5340'],
       },
     });
 

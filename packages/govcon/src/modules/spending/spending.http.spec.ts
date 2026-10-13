@@ -107,6 +107,11 @@ describe('the spending routes', () => {
     expect((await fetch(`${url}/spending/agencies/abc`)).status).toBe(400);
     expect((await fetch(`${url}/spending/horizon?months=0`)).status).toBe(400);
     expect((await fetch(`${url}/spending/pulse?naics=12345678`)).status).toBe(400);
+    const oddFamily = await fetch(`${url}/spending/pulse?naics=54151`);
+    expect(oddFamily.status).toBe(400);
+    expect((await json<Issues>(oddFamily)).issues).toEqual([
+      { path: 'naics.0', message: 'a NAICS family is 2, 4 or 6 digits' },
+    ]);
     expect(
       (await fetch(`${url}/spending/breakdown?category=nope&from=2026-01-01&to=2026-02-01`)).status,
     ).toBe(400);

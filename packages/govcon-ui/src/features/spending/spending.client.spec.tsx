@@ -91,7 +91,8 @@ describe('SpendingClient', () => {
     fireEvent.click(screen.getByRole('button', { name: '332710' }));
     const rest = PROFILE.naics.filter((code) => code !== '332710');
     const restParams = rest.map((code) => `naics=${code}`).join('&');
-    expect(lastReplace()).toBe(`/spending?${restParams}`);
+    expect(routerMock.replace).not.toHaveBeenCalled();
+    await waitFor(() => expect(lastReplace()).toBe(`/spending?${restParams}`));
     await applyLastReplace(rerender);
     const narrowed = `naics=${naicsOf(rest)}&awardFamily=both`;
     await waitFor(() => {
@@ -181,7 +182,7 @@ describe('SpendingClient', () => {
     expect(routerMock.replace).not.toHaveBeenCalled();
   });
 
-  it('[GOVU-12] writes typed codes to the address once typing pauses', async () => {
+  it('[GOVU-12] writes codes to the address once they pause', async () => {
     stubApi(routes());
     mount();
     await screen.findByRole('img', { name: 'Obligations by fiscal period' });

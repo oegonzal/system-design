@@ -10,8 +10,8 @@ import { AWARD_FAMILY_LABEL, SPENDING_COST } from './costs';
 import { toggleCode, type ScopeDraft } from './scope';
 import { useSettledDraft } from './use-settled-draft';
 
-/** How long typing may pause before the codes are handed on. */
-export const CODES_SETTLE_MS = 300;
+/** How long a run of code changes — typed or pressed — may pause before it is handed on as one. A read behind it can cost the source dozens of pages. */
+export const CODES_SETTLE_MS = 600;
 
 export interface ScopeBarProps {
   value: ScopeDraft;
@@ -26,8 +26,9 @@ export interface ScopeBarProps {
 
 /**
  * What every lens is scoped by: code families, one awarding agency, one or
- * both award families. Chips and selects are handed on at once; typed codes
- * settle first, since the owner writes the scope to the address.
+ * both award families. Codes — typed or pressed — are handed on once they
+ * pause, so composing a scope is one change; the agency and the family are
+ * handed on at once.
  */
 export function ScopeBar({
   value,
@@ -37,7 +38,11 @@ export function ScopeBar({
   agenciesError = null,
   disabled = false,
 }: ScopeBarProps) {
-  const { shown, type, commit, settle } = useSettledDraft(value, onChange, CODES_SETTLE_MS);
+  const { shown, settleLater, commit, settleNow } = useSettledDraft(
+    value,
+    onChange,
+    CODES_SETTLE_MS,
+  );
   const chosen = codesOf(shown.naics);
   const sorted =
     agencies === null ? [] : [...agencies].sort((a, b) => a.name.localeCompare(b.name));
@@ -56,7 +61,7 @@ export function ScopeBar({
             selected={chosen.includes(code)}
             aria-pressed={chosen.includes(code)}
             disabled={disabled}
-            onClick={() => commit({ naics: toggleCode(shown.naics, code) })}
+            onClick={() => settleLater({ naics: toggleCode(shown.naics, code) })}
           >
             {code}
           </Button>
@@ -65,18 +70,18 @@ export function ScopeBar({
       <Stack direction="row" gap={4} align="end" wrap>
         <TextField
           label="NAICS codes"
-          hint="Codes or families, comma-separated"
+          hint="Codes or families of 2, 4 or 6 digits, comma-separated"
           value={shown.naics}
           disabled={disabled}
-          onChange={(event) => type({ naics: event.target.value })}
-          onBlur={settle}
+          onChange={(event) => settleLater({ naics: event.target.value })}
+          onBlur={settleNow}
         />
         <TextField
           label="PSC codes"
           value={shown.psc}
           disabled={disabled}
-          onChange={(event) => type({ psc: event.target.value.toUpperCase() })}
-          onBlur={settle}
+          onChange={(event) => settleLater({ psc: event.target.value.toUpperCase() })}
+          onBlur={settleNow}
         />
         <SelectField
           label="Agency"

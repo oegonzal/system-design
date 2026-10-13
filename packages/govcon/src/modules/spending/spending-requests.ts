@@ -16,7 +16,8 @@ import {
 import { z } from 'zod';
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-const naics = z.string().regex(/^\d{2,6}$/);
+/** USAspending filters NAICS by families of 2, 4 or 6 digits and refuses any other length, so a scope names only those. */
+const naics = z.string().regex(/^(\d{2}|\d{4}|\d{6})$/, 'a NAICS family is 2, 4 or 6 digits');
 const psc = z.string().regex(/^[A-Z0-9]{1,4}$/);
 
 /**

@@ -60,7 +60,7 @@ describe('the USAspending awards', () => {
         time_period: [{ start_date: '2026-06-01', end_date: '2026-09-29' }],
         award_type_codes: ['A', 'B', 'C', 'D'],
         naics_codes: { require: ['332710'] },
-        psc_codes: { require: ['4920'] },
+        psc_codes: ['4920'],
       },
       page: 1,
       limit: 100,

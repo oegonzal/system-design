@@ -18,9 +18,12 @@ the service's routes, environment and budget semantics are in
 **Scope bar.** The active profile's NAICS codes are chips, all pressed when
 the page opens: a link without a scope opens on the profile's codes, which is
 also the scope the daily warm fills, so the first look is a snapshot. Codes
-typed into the NAICS and PSC fields match families (`5415` is every code under
-it) and are handed on once typing pauses; chips, the agency and the award
-family are handed on at once. USAspending ANDs the code filters, so a PSC
+match families: a NAICS family is 2, 4 or 6 digits (`5415` is every code
+under it; USAspending refuses other lengths, so the service does too), and a
+PSC is matched by prefix at any length (`DA` is the family, `DA01` the
+code). Codes — typed or pressed — are handed on as one change once they
+pause, since a read behind them can cost the source dozens of pages; the
+agency and the award family are handed on at once. USAspending ANDs the code filters, so a PSC
 narrows a NAICS scope rather than widening it; leave PSC empty to see the
 whole industry. The agency select is the directory USAspending publishes.
 
@@ -182,7 +185,8 @@ ledger row under its own operation), the body is stored and answers as
 `source`; a refresh the source refused serves the stored body of any age as
 `stale`, saying so; a walk the source cut short answers but is not kept, so
 the next read walks again; a read asked to `refresh` — the warm — skips the
-window. Snapshot keys carry the clock's inputs (the fiscal period, today), so
+window; and one query is never loaded twice at once — a reader that arrives
+while its load is in flight waits on that load. Snapshot keys carry the clock's inputs (the fiscal period, today), so
 a row is never served for another day. Pure arithmetic lives in
 `packages/govcon/src/core/spending/` (the series aligner, the projection,
 the horizon walk, the agency alignment, the recompete join, the alert rules);
@@ -354,6 +358,7 @@ reads: narrow the profile's NAICS to the software four, and set
 | "…before it could place today"                           | The scope's active awards run deeper than the page bound, or than the 50,000 awards the source pages to. Pick an agency in the Agency tab, or one code family.                                         |
 | "The walk stopped early (source)"                        | A page failed; the answer was not kept, so the next read walks again.                                                                                                                                  |
 | 404 on an agency                                         | The toptier code is not in USAspending's directory (`GET /spending/agencies`).                                                                                                                         |
+| 400 `a NAICS family is 2, 4 or 6 digits`                 | The scope names a 3- or 5-digit NAICS family, which USAspending does not filter by. Name the 4-digit family or the 6-digit codes.                                                                      |
 | 502 on an agency with `fiscal_year is outside the range` | A fiscal year was asked that the source has no submissions for yet; leave it out and the agency's active year is used.                                                                                 |
 | "No projection"                                          | No complete prior fiscal year in the lookback with anything obligated.                                                                                                                                 |
 | Every "Open notices" is 0                                | No pull has stored notices in these codes yet (`pnpm govcon pull`), or none is open.                                                                                                                   |
@@ -390,6 +395,7 @@ Probed live on 2026-10-12 and 2026-10-13; free, no key.
 - The `agencies` filter is by **name**; the service resolves a toptier code through `references/toptier_agencies`, whose `agency_id` is the `id` a category breakdown answers with.
 - `spending_by_award` requires the `sort` field among the requested `fields`; IDVs end at `Last Date to Order`, contracts at `End Date`; `time_period` filters the action date only, never the period of performance.
 - Any `spending_by_award` request carrying the keyset cursor (`last_record_unique_id`, `last_record_sort_value`) answers an empty-body 503 every time. Numbered pages answer down to the 50,000th award — page 500 at a hundred a page; deeper is a 422 naming the "maximum result limit 50000" — and `page_metadata.hasNext` is false from page 100 on while later pages still answer full, so a full page, not that flag, says more follow.
+- `psc_codes` as a flat list matches by prefix at any length (`["DA"]` is the family, `["DA01"]` the code, `["7"]` every product code beginning with 7); `{ "require": [...] }` wants a path through the PSC tree per entry (`["Service", "D", "DA", "DA01"]`) and answers 422 to a bare code. `naics_codes.require` takes families of 2, 4 or 6 digits and answers 400 to any other length.
 - `budgetary_resources` periods are sparse — a year just begun is empty, older years quarterly — and are shown as reported; `sub_agency` refuses a `fiscal_year` outside its submissions (the new fiscal year, for weeks after October 1), while `references/toptier_agencies` reports each agency's `active_fy`.
 - The source sits behind a firewall with no published limit. Measured 2026-10-13: about 700 requests in fourteen minutes — four renewing warms back to back, the last two within two minutes — and it answered 500 with a "Web Page Blocked!" page, then refused connections from this address; one warm of about 190 requests in a minute had passed three times before that. One warm a day and ordinary browsing stay well under it; a burst does not.
 - `awards/last_updated` is `MM/DD/YYYY`; Department of Defense awards appear 90 days after signing; agency financials are revealed about five to six weeks after the period.
