@@ -86,6 +86,26 @@ describe('the answer-suggestions pipeline', () => {
     ).toEqual([]);
   });
 
+  it('[QL-64] a suggestion says nothing about the unit of work its evidence does not state, a record suggestion answers to the Answering policy, and a group field takes one entry', () => {
+    // Measured 2026-10-13 (static/runs/2026-10-13T20-05-27-375-1b0cf5-quality): three of four drafts for one fit
+    // question were withheld as ungrounded — one for a claim about the role alone, one for a claim of alignment with
+    // the role and "in production systems", one for calling the subject's own project "production-oriented".
+    expect(ANSWER_SUGGESTIONS.producer.persona).toMatch(
+      /says nothing about the open unit of work or the organisation it is for/,
+    );
+    expect(ANSWER_SUGGESTIONS.producer.persona).toMatch(
+      /as long and as concrete as the Suggesting policy asks/,
+    );
+    // Record suggestions are typed in the operator's place, so the Answering policy binds them.
+    expect(ANSWER_SUGGESTIONS.producer.persona).toMatch(
+      /A record suggestion may be typed in the operator's place/,
+    );
+    expect(ANSWER_SUGGESTIONS.producer.persona).toMatch(
+      /takes a record suggestion only from the entry/,
+    );
+    expect(ANSWER_SUGGESTIONS.critics[0].persona).toMatch(/listed without the rest of its group/);
+  });
+
   it('[QL-4] [QL-49] every bound its producer and deriver are shown sits above what they have measurably written', () => {
     // The deriver is measured too where a run derived its own criteria — a replay through POST /runs, outside a session.
     expect(

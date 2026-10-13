@@ -102,6 +102,23 @@ describe('the field-answer pipeline', () => {
     expect(FIELD_ANSWER.producer.persona).toMatch(/threshold/);
     expect(FIELD_ANSWER.producer.persona).toMatch(/names no subject/);
     expect(FIELD_ANSWER.critics[0].persona).toMatch(/threshold .* derived/);
+    // A group describing one unnamed entry of a list is filled from one entry, in the order the policy declares,
+    // and an earlier answer to one of its questions settles it only for the entry it was given about.
+    expect(FIELD_ANSWER.producer.persona).toMatch(
+      /the one the Answering policy's order for that list takes/,
+    );
+    expect(FIELD_ANSWER.producer.persona).toMatch(
+      /settles it only for the entry it was given about/,
+    );
+    expect(FIELD_ANSWER.critics[0].persona).toMatch(
+      /a group mixing entries, or restating an earlier answer/,
+    );
+    // Whatever its kind, a value claims nothing about the unit of work its evidence does not state, and a part
+    // of the question nothing bears on is left out and named — never filled with an unstated stance.
+    expect(FIELD_ANSWER.producer.persona).toMatch(/how the subject measures against it/);
+    expect(FIELD_ANSWER.producer.persona).toMatch(
+      /a part of the question nothing listed bears on is left out/,
+    );
   });
 
   it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage has measurably written, and every bound the producer is shown sits above what it has written', () => {
