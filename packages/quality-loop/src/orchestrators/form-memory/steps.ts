@@ -15,6 +15,7 @@ import {
   FIELD_ANSWER_PIPELINE_ID,
   FORM_PIPELINES,
   GoalBudgetExceeded,
+  parseLenient,
   splitFieldGoal,
   type FieldSpec,
   type FormMemoryStepReason,
@@ -79,9 +80,10 @@ export function withheldOf<T>(
 ): WithheldItem[] {
   const { best } = outputs;
   if (best === null) return [];
-  const parsed = definition.task.output.schema.safeParse(best.artifact);
-  if (!parsed.success) return [];
-  const items = definition.task.output.locate(parsed.data).map((location) => location.id);
+  // Read as the session reads it: a text a little past its bound is kept and noted, never a reason to withhold nothing.
+  const parsed = parseLenient(definition.task.output.schema, best.artifact);
+  if (!parsed.ok) return [];
+  const items = definition.task.output.locate(parsed.value).map((location) => location.id);
   return withheldItems(best.ledger, items, withholdingOf(definition));
 }
 

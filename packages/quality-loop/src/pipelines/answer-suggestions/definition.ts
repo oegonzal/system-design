@@ -91,13 +91,14 @@ export const ANSWER_SUGGESTIONS: PipelineDefinition<AnswerSuggestions> = {
   },
 
   // Caps a fifth above what this pipeline's own runs wrote (`measured.json`,
-  // `pnpm measure:bounds`; 32 runs on the subscription, 2026-10-11): the
-  // grounding critic ran to 18,190 output tokens and past 8,000 in 7 of 32,
-  // the evaluator to 10,337, the fit critic to 6,283, the producer to 6,096;
-  // the five derivations to 2,209. A cap is also the call's time limit, so
-  // one a stage outwrites is a call cut short.
+  // `pnpm measure:bounds`; 46 runs on the subscription, 2026-10-13): the
+  // grounding critic ran to 18,190 output tokens, the producer to 14,047 —
+  // past its 8,000 — the fit critic to 11,533, the evaluator to 10,502. The
+  // producer's cap is sized past that for the drafts the suggesting policy
+  // now asks for, two to four paragraphs each. A cap is also the call's time
+  // limit, so one a stage outwrites is a call cut short.
   deriveCriteria: { persona: deriveCriteria, maxTokens: 10000 },
-  producer: { persona: producer, maxTokens: 8000, consumes: ['criteria'] },
+  producer: { persona: producer, maxTokens: 20000, consumes: ['criteria'] },
   validators: [referencesValidator, citationsValidator, limitsValidator],
   controller: STANDARD,
 
@@ -109,7 +110,7 @@ export const ANSWER_SUGGESTIONS: PipelineDefinition<AnswerSuggestions> = {
       maxItems: 10,
       maxTokens: 22000,
     },
-    { id: 'critic.fit', persona: criticFit, samples: 1, maxItems: 10, maxTokens: 8000 },
+    { id: 'critic.fit', persona: criticFit, samples: 1, maxItems: 10, maxTokens: 14000 },
   ],
 
   evaluators: [
@@ -120,7 +121,7 @@ export const ANSWER_SUGGESTIONS: PipelineDefinition<AnswerSuggestions> = {
       // Beside the critics rather than after them: the operator waits on this
       // run, and measured on field-answer's stages that is a third off its time.
       consumes: [],
-      maxTokens: 12500,
+      maxTokens: 13000,
       criterionKinds: ['grounding', 'compliance', 'fit'],
     },
   ],

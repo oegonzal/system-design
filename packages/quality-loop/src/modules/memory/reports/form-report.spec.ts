@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { HITS_PER_FIELD_TYPE } from '../../../orchestrators/form-memory/probes';
 import { memoryPorts, sampleFacts } from '../../../orchestrators/memory/steps.testing';
 import { mutedEmbeddings } from '../testing';
 import { formRetrievalReport } from './form-report';
@@ -18,14 +19,16 @@ describe('the form retrieval report', () => {
     expect(report.fields.map((field) => [field.ref, field.type, field.probe, field.limit])).toEqual(
       [
         ['f1', 'text', 'Years of Python experience', 3],
-        ['cover', 'textarea', 'Tell us about a project you led', 6],
+        ['cover', 'textarea', 'Tell us about a project you led', HITS_PER_FIELD_TYPE.textarea],
         ['f3', 'text', null, 3],
       ],
     );
     const [first, second, third] = report.fields;
     expect(first?.ranked.map((list) => list.using)).toEqual(['condition', 'lesson']);
     for (const list of first?.ranked ?? []) expect(list.hits.length).toBeLessThanOrEqual(3);
-    for (const list of second?.ranked ?? []) expect(list.hits.length).toBeLessThanOrEqual(6);
+    for (const list of second?.ranked ?? []) {
+      expect(list.hits.length).toBeLessThanOrEqual(HITS_PER_FIELD_TYPE.textarea);
+    }
     expect(third).toMatchObject({ ranked: [], fused: [] });
     // Every hit the evidence carries is named by its alias in the field that fused it, and the aliases are the goal's.
     const aliased = report.fields.flatMap((field) =>

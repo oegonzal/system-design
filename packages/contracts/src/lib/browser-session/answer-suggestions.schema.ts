@@ -17,12 +17,15 @@ import { SUGGESTION_BASES } from './vocab';
 /** Up to this many per field — lettered a to d where the operator is asked. */
 export const SUGGESTIONS_BOUND = bound(4, 'list');
 /*
- * Measured 2026-10-11 on the pipeline's own runs (`answer-suggestions/
- * measured.json`, 32 runs, 73 suggestions): text ran to 613 characters,
- * cites to 3, why to 281 (9 past the 240 first asked), the summary to 727
- * (3 past 600). Each target is the most written and a fifth more.
+ * Measured 2026-10-13 on the pipeline's own runs (`answer-suggestions/
+ * measured.json`, 46 runs, 113 suggestions): text ran to 613 characters,
+ * cites to 3, why to 302, the summary to 810. The text bound is not the most
+ * written and a fifth more: it is the length the model is told to write to,
+ * and the goals' suggesting policy asks for two to four short paragraphs on
+ * a question about the subject's experience — about 2,500 characters — where
+ * 1,000 had every draft stop at a paragraph (max 613, 2026-10-13).
  */
-const SUGGESTION_TEXT_BOUND = bound(1000);
+const SUGGESTION_TEXT_BOUND = bound(2500);
 const SUGGESTION_CITES_BOUND = bound(4, 'list');
 const SUGGESTION_WHY_BOUND = bound(340);
 const SUGGESTIONS_SUMMARY_BOUND = bound(880);

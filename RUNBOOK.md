@@ -364,9 +364,14 @@ Ada Lovelace provides references on request, after an offer is discussed.
 Ada Lovelace's professional profile is https://example.test/in/ada.
 ```
 
-Three rules make a sentence a fact the digest keeps: name the subject in each
-sentence, one fact per sentence, and figures absolute (`$180,000`,
-`2026-11-02`, never "mid-November"). A fact about one employer belongs under
+Four rules make a sentence a fact the digest keeps: name the subject in each
+sentence, one fact per sentence, figures absolute (`$180,000`, `2026-11-02`,
+never "mid-November"), and a figure stated as a figure or a date, never as the
+threshold a form once asked ("has used Node.js professionally since 2017-06",
+not "at least 2 years of Node.js") — a threshold settles only that one
+question, a figure settles every threshold a form will ever ask of it. Label
+compensation as a minimum, a range and a desired figure, each its own
+sentence. A fact about one employer belongs under
 `# Employers`, dated — that is what settles a "have you worked here before"
 question for every employer, since the answerer reads the record of employers
 rather than an answer given about another application. Then:

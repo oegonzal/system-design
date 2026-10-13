@@ -77,7 +77,7 @@ describe('the form recall’s probes', () => {
   });
 
   it('[QL-70] a probe takes as many hits as the kind of control asking it: a free-text field draws deeper than a control that takes one value, and a question two controls share takes the deeper budget', () => {
-    expect(hitsFor(field('e1', 'Cover letter', null, 'textarea'))).toBe(6);
+    expect(hitsFor(field('e1', 'Cover letter', null, 'textarea'))).toBe(10);
     expect(hitsFor(field('e2', 'City'))).toBe(3);
     expect(hitsFor({ role: 'radiogroup', inputType: null })).toBe(3);
     // Every declared field type is classified — a new kind is a build error, never a silent default.
@@ -90,7 +90,7 @@ describe('the form recall’s probes', () => {
     expect(probes).toEqual({
       texts: ['Tell us about yourself', 'City'],
       byField: [0, 1, 1],
-      limits: [6, 6],
+      limits: [10, 10],
     });
   });
 
@@ -139,14 +139,15 @@ describe('the form recall’s probes', () => {
       field('e2', 'City'),
     ]);
     const story = (rank: number) => hitOf(`story part ${rank}`, 'digest-9', `memory.${rank}`);
-    const stories = [1, 2, 3, 4, 5, 6].map(story);
-    // The textarea's lists run six deep under both vectors; the city's one hit stands alone.
+    const ranks = Array.from({ length: HITS_PER_FIELD_TYPE.textarea }, (_, i) => i + 1);
+    const stories = ranks.map(story);
+    // The textarea's lists run its whole budget deep under both vectors; the city's one hit stands alone.
     const ranked = [stories, stories, [c], [c]];
     const chosen = fieldEvidence(probes, ranked);
     expect(chosen.map((hit) => hit.text)).toEqual([
       'story part 1',
       c.text,
-      ...[2, 3, 4, 5, 6].map((rank) => `story part ${rank}`),
+      ...ranks.slice(1).map((rank) => `story part ${rank}`),
     ]);
   });
 

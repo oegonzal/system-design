@@ -98,6 +98,10 @@ describe('the field-answer pipeline', () => {
     expect(FIELD_ANSWER.deriveCriteria.persona).toContain('Never do');
     // The grounding critic marks an ungrounded value as the operator's to settle.
     expect(FIELD_ANSWER.critics[0].persona).toContain('requires_user');
+    // A threshold is answered from a stated figure, declared derived — and the critic grades it as such.
+    expect(FIELD_ANSWER.producer.persona).toMatch(/threshold/);
+    expect(FIELD_ANSWER.producer.persona).toMatch(/names no subject/);
+    expect(FIELD_ANSWER.critics[0].persona).toMatch(/threshold .* derived/);
   });
 
   it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage has measurably written, and every bound the producer is shown sits above what it has written', () => {

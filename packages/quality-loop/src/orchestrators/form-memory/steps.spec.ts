@@ -6,6 +6,7 @@ import type {
 } from '@sysdesign/contracts';
 import {
   FIELD_EVIDENCE_HEADING,
+  finding,
   readFieldIndex,
   renderDocumentGoal,
   resumeChunk,
@@ -234,5 +235,33 @@ describe('the form-memory steps', () => {
       status: 'skipped',
       reason: 'pipeline-unavailable',
     });
+  });
+
+  it('[QL-65] reads the answerer’s artifact as the session does: a value a little past its bound is kept and noted, and what the judges withheld is still reported', async () => {
+    const recalled = (await recall(ctx(null))).output;
+    if (recalled === undefined) throw new Error('the recall hands on a goal');
+    // 5,200 characters: past the value bound's ceiling (5,000), within what a lenient read keeps whole.
+    const long = sampleAnswers();
+    const [first, ...rest] = long.fields;
+    if (first === undefined) throw new Error('the sample answers a field');
+    const artifact = { ...long, fields: [{ ...first, value: 'x'.repeat(5_200) }, ...rest] };
+    const faulted = (goal: string): RunRecord =>
+      childRun(
+        'field-answer',
+        readoutTrace({
+          pipeline: 'field-answer',
+          goal,
+          artifact,
+          locations: ['summary', 'field.1', 'field.2', 'field.3', 'field.4', 'field.5'],
+          criteria: [{ id: 'c1', kind: 'grounding', statement: 'values rest on evidence' }],
+          results: [passed('c1', 'grounding', ['field.2'])],
+          findings: [finding('ungrounded', ['field.1'], 'nothing listed bears on it')],
+        }),
+      );
+    const run = await target(ctx(faulted, { outputs: { recall: recalled } }));
+    expect(run.status).toBe('complete');
+    expect(run.report?.withheld).toEqual([
+      expect.objectContaining({ ref: 'field.1', by: 'ungrounded' }),
+    ]);
   });
 });

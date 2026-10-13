@@ -32,13 +32,16 @@ export const MAX_FIELD_PROBES = 40;
  * How many hits one probe contributes per named vector before its field's
  * fusion, by what kind of control asks. A control that takes one value — a
  * radio, a select, a short text — is settled by the one fact that answers it,
- * and more hits only crowd the page's cap; a free-text field draws on a story
- * and the several facts a paragraph is composed from. A table over every
- * declared field type, so a new kind is classified or the build refuses.
+ * and more hits only crowd the page's cap; a free-text field draws on several
+ * stories and the facts a few paragraphs are composed from. Measured
+ * 2026-10-13 on a cover letter replayed against the store: eleven candidates,
+ * six dealt, and the drafts ran to a paragraph; the account the record held
+ * a story for ran to three. A table over every declared field type, so a new
+ * kind is classified or the build refuses.
  */
 export const HITS_PER_FIELD_TYPE: Readonly<Record<FieldType, number>> = {
   text: 3,
-  textarea: 6,
+  textarea: 10,
   number: 3,
   date: 3,
   select: 3,

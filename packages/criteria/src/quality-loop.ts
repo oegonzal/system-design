@@ -298,7 +298,7 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-64',
     statement:
-      "Suggested answers for a form's operator questions are labelled by what they rest on — the record, recorded work carried over, or experience the record does not hold where the goal's suggesting policy allows — with what each label promises fixed for every goal; a suggestion for a field the form never listed or resting on an alias it never listed blocks the iteration, while one that cites nothing it should or that its field cannot take only warns at that suggestion; every faulted suggestion but a repeat is withheld from whoever offers them, nothing gates, and the run is judged once.",
+      "Suggested answers for a form's operator questions are labelled by what they rest on — the record, recorded work carried over, or experience the record does not hold where the goal's suggesting policy allows — with what each label promises fixed for every goal; a suggestion for a field the form never listed or resting on an alias it never listed blocks the iteration, while one that cites nothing it should or that its field cannot take only warns at that suggestion; every faulted suggestion but a repeat is withheld from whoever offers them, nothing gates, and the run is judged once; a suggestion for an account of experience is as long and as concrete as the goal's suggesting policy asks, and the orchestrator reads the artifact as the session does — a text a little past its bound withholds nothing by itself.",
   },
   {
     id: 'QL-65',
@@ -343,7 +343,7 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-68',
     statement:
-      'A field answer declares how its value rests on the evidence by one word of a closed vocabulary shown to the answerer and the judges from one table; the limits validator warns, located and withholding, on a value resting on nothing, a kind that cites no evidence, a mapping with no options to map onto, and a kind declared on a decision that fills nothing; the grounding critic faults a value nothing bears on and a kind claiming more than the evidence gives, the form critic an option that does not carry the fact or that another option carries as well; and what each type withholds is declared on the policy — a value nothing bears on, a contradicted value, a misfit option and a trap every ref; an overstated kind, a needless ask and a required blank none.',
+      'A field answer declares how its value rests on the evidence by one word of a closed vocabulary shown to the answerer and the judges from one table; the limits validator warns, located and withholding, on a value resting on nothing, a kind that cites no evidence, a mapping with no options to map onto, and a kind declared on a decision that fills nothing; the grounding critic faults a value nothing bears on and a kind claiming more than the evidence gives, the form critic an option that does not carry the fact or that another option carries as well; and what each type withholds is declared on the policy — a value nothing bears on, a contradicted value, a misfit option and a trap every ref; an overstated kind, a needless ask and a required blank none. A yes or no against a threshold the question states rests, derived, on the figure or span the evidence states for that same skill or category, summed over the dated roles that used it; one from a figure for another category is overstated.',
   },
   {
     id: 'QL-69',
