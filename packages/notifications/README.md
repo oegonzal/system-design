@@ -25,7 +25,7 @@ Delivery is at least once: a pull hands out the same events until they are ackno
 
 A prompt (`interaction.prompted`) declares how it is answered — lettered choices, free text within a length, slash commands — and every channel reads a reply with the contracts' `readReply`, so `b` means the same everywhere. The dispatcher, an ordinary subscriber of the bus, delivers each prompt once per channel, and shows on every message it sent how the prompt ended: an answer (`interaction.answered`, published by the service), a withdrawal by its asker (`interaction.withdrawn`), or its expiry. A reply resolves to the prompt whose message it replies to, else to the one prompt open on its address.
 
-The browser session publishes a second family for whoever keeps a record of its units beyond it — `session.started`, `session.unit.opened`, `session.unit.closed`, `session.ended` — declared in the contracts like any other topic, each carrying the session, the subject, the unit by the id its row has and its declared identity; the bus knows nothing more of them than their schemas.
+The browser session publishes a second family for whoever keeps a record of its units beyond it — `session.started`, `session.unit.opened`, `session.unit.closed`, `session.ended` — declared in the contracts like any other topic, each carrying the session, the subject, the unit by the id its row has and its declared identity; the bus knows nothing more of them than their schemas. govcon publishes a third — `govcon.award.ending`, `govcon.pulse.above-band` — from its daily spending warm, and puts the digest of them to a person as a prompt.
 
 ## Telegram
 
