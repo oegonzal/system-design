@@ -52,3 +52,33 @@ export const Default: Story = {
     </Table>
   ),
 };
+
+const COLUMNS = ['Ends', 'Award', 'Recipient', 'Obligated', 'Buyer', 'NAICS', 'Open notices'];
+
+/** More columns than a phone has room for: the table scrolls inside its frame, which a keyboard can focus, and the page stays put. */
+export const Wide: Story = {
+  render: () => (
+    <div style={{ width: 320 }}>
+      <Table aria-label="Expiring awards">
+        <thead>
+          <tr>
+            {COLUMNS.map((column) => (
+              <th key={column} scope="col" style={{ whiteSpace: 'nowrap' }}>
+                {column}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            {COLUMNS.map((column) => (
+              <td key={column} style={{ whiteSpace: 'nowrap' }}>
+                {column} value
+              </td>
+            ))}
+          </tr>
+        </tbody>
+      </Table>
+    </div>
+  ),
+};

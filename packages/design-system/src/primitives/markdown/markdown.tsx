@@ -113,18 +113,13 @@ const Article = styled.div`
     max-width: 100%;
   }
 
-  /* A table scrolls (TableScroller) rather than squeeze, so its cells wrap
+  /* A table scrolls in its own frame rather than squeeze, so its cells wrap
      between words and never inside one: 'anywhere' would let a cell shrink to
      a letter's width, breaking 'availability' mid-word in a narrow column. */
   th,
   td {
     overflow-wrap: break-word;
   }
-`;
-
-/** Lets a wide table scroll on its own instead of stretching the column. */
-const TableScroller = styled.div`
-  overflow-x: auto;
 `;
 
 interface Rendered {
@@ -184,18 +179,15 @@ function ListItem({ className, children }: RenderedListItem) {
   return <li className={className}>{task ? <label>{children}</label> : children}</li>;
 }
 
-function ScrollingTable({ children }: Rendered) {
-  return (
-    <TableScroller>
-      <Table>{children}</Table>
-    </TableScroller>
-  );
+/** The design system's table, which scrolls in its own frame; the parser's other props stay off the DOM. */
+function MarkdownTable({ children }: Rendered) {
+  return <Table>{children}</Table>;
 }
 
 const BLOCKS: Components = {
   a: Anchor,
   li: ListItem,
-  table: ScrollingTable,
+  table: MarkdownTable,
 };
 
 const COMPONENT_SETS = new Map<number, Components>();
