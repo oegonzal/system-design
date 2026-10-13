@@ -9,11 +9,12 @@ const HOUR = 60 * 60 * 1000;
 const bodySchema = z.strictObject({ value: z.number() });
 type Body = z.output<typeof bodySchema>;
 
-const ok = (value: number, requests = 1): LensLoad<Body> => ({
+const ok = (value: number, requests = 1, keep?: boolean): LensLoad<Body> => ({
   kind: 'ok',
   body: { value },
   asOf: '2026-06-14',
   requests,
+  ...(keep === undefined ? {} : { keep }),
 });
 
 /** A lens that answers the scripted replies in order, repeating the last, and remembers every query. */
@@ -133,6 +134,21 @@ describe('the snapshot cache', () => {
     const uncached = harness([ok(1), ok(2)], 0);
     await uncached.read();
     expect(await uncached.read()).toMatchObject({ body: { value: 2 } });
+  });
+
+  it('[GOV-20] serves an answer marked not to keep from the source, stores nothing, and asks again next time', async () => {
+    const { store, read, lens } = harness([ok(1, 1, false), ok(2)]);
+    expect(await read()).toMatchObject({
+      body: { value: 1 },
+      provenance: { servedFrom: 'source' },
+    });
+    expect(store.rows.size).toBe(0);
+    expect(await read()).toMatchObject({
+      body: { value: 2 },
+      provenance: { servedFrom: 'source' },
+    });
+    expect(store.rows.size).toBe(1);
+    expect(lens.queries).toHaveLength(2);
   });
 
   it('[GOV-2] [GOV-20] a store that cannot be read or written falls through with a warning', async () => {

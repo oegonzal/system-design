@@ -194,5 +194,14 @@ describe('the spending lenses', () => {
       page: 1,
       after: null,
     });
+    // Cut short by the source, so not kept: the next read walks again instead of serving a snapshot.
+    const again = await partial.deps.read(horizonLens(partial.deps), {
+      ...SCOPE,
+      agency: null,
+      months: 12,
+      today: '2026-06-15',
+    });
+    expect(again).toMatchObject({ kind: 'error', outcome: 'rate-limited' });
+    expect(partial.sources.requests.ending).toHaveLength(3);
   });
 });

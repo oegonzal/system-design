@@ -18,9 +18,13 @@ export interface Missing {
 
 export type LensRefusal = Missing | BudgetExhausted | SourceFailure;
 
-/** What a lens's load answers: the body, what the source said about its freshness and what it cost — or why not. */
+/**
+ * What a lens's load answers: the body, what the source said about its
+ * freshness and what it cost — or why not. `keep: false` marks an answer the
+ * source cut short: served, never stored, so the next read tries again.
+ */
 export type LensLoad<B> =
-  { kind: 'ok'; body: B; asOf: string | null; requests: number } | LensRefusal;
+  { kind: 'ok'; body: B; asOf: string | null; requests: number; keep?: boolean } | LensRefusal;
 
 /**
  * One lens: its name in the snapshot table, what a stored body must still be
@@ -51,7 +55,9 @@ interface Stored<B> {
  * stored body of any age as `stale`, saying so, because an answer the owner
  * already had is better than none; something `missing` is never served
  * stale, since the snapshot cannot vouch for a thing the source does not
- * have. Freshness is decided here and nowhere else, from the injected clock.
+ * have. An answer a lens marks `keep: false` — one the source cut short — is
+ * served as `source` and not stored, so the next read asks again. Freshness
+ * is decided here and nowhere else, from the injected clock.
  *
  * The store is an optimisation, never a dependency: a read that fails falls
  * through to the load with a warning, a write that fails loses one snapshot
@@ -83,7 +89,7 @@ export class SnapshotCache {
         requests: fetched.requests,
         payload: fetched.body,
       };
-      await this.put(row);
+      if (fetched.keep !== false) await this.put(row);
       return answer(spec, { row, body: fetched.body }, 'source');
     }
     if (stored !== null && fetched.kind !== 'missing') {

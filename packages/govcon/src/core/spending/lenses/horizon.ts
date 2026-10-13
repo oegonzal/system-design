@@ -88,6 +88,8 @@ export const horizonLens = (deps: LensDeps): LensSpec<HorizonQuery, LensBody<Spe
       },
       asOf: await asOfFrom(deps),
       requests: tally.requests,
+      // A walk the source cut short is answered, not kept: the next read walks again.
+      keep: walk.stoppedBy !== 'source',
     };
   },
 });
