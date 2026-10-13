@@ -58,9 +58,9 @@ table" disclosure with the same numbers as text, and answers hover and focus
 on a column with one tooltip naming every series at that x, the value first.
 Tab into a chart, move with the arrow keys, Escape hides the tooltip. The
 tooltip sits beside its column and never leaves the plot: in a narrow window
-it slides back over the column instead. The charts scale with the page, so
-at phone width they are small and the data table under each is the readable
-form.
+it slides back over the column instead. The page is laid out for a desktop window: the charts
+scale with the page, so at phone width they are small and the data table
+under each is the readable form, and a wide table scrolls the page sideways.
 
 ### Pulse — when the money moves
 
@@ -300,33 +300,43 @@ the saved searches read exact codes over three days; widen the window or
 add family searches to see the open market, and read the Search page.
 
 **Recompetes (Horizon).** Across every agency the four codes hold about
-34,900 active contracts; the walk is complete for those ending before 2026-11-09 —
-1,291 contracts end between October 13 and 31, 285 more in early
-November — and for IDVs through mid-2027 (608 reach their last date
-to order in what is left of October). At the Department of Defense the four
-codes are complete before 2027-02-24: 254 contracts end in what is left of
-October, 415 in November, 537 in December, 473 in January. 541511 alone at
-Defense: 769 contracts end in the next twelve months — 31, 57, 91, 72, 58,
-119, 71, 73, 74, 48, 19, 56 a month from October 2026 — complete. Each is
-work a buyer may buy again. The open-notices column joins a row to the
-stored notices in its NAICS code at the same buying sub-agency: candidates
-for its recompete, not a confirmed match (at Defense a sub-agency is a whole
-military department, so one open Navy notice shows beside every expiring
-Navy contract in the code).
+34,900 active contracts; the walk is complete for those ending before
+2026-11-09 — 1,291 contracts end between October 13 and 31, 285 more in early
+November — and for IDVs through mid-2027 (608 reach their last date to order
+in what is left of October). At the Department of Defense the four codes are
+complete before 2027-02-24: 1,950 contracts end by then, with $11.1B
+obligated on them so far — 254 in what is left of October, 415 in November,
+537 in December, 473 in January — and 486 IDVs reach their last date to
+order inside the year. 541511 alone at Defense, read whole: 769 contracts
+end in the next twelve months ($5.8B obligated on them) — 31, 57, 91, 72,
+58, 119, 71, 73, 74, 48, 19, 56 a month from October 2026 — 428 of them
+inside six months ($3.7B). Narrowed to the work the capabilities statement
+names — 541511 with PSC DA01, application development support — 253
+Defense contracts end in the next twelve months ($1.8B obligated on them),
+146 inside six ($1.3B); that read is whole in five requests. Each is work a
+buyer may buy again. The open-notices column joins a row to the stored
+notices in its NAICS code at the same buying sub-agency: candidates for its
+recompete, not a confirmed match (at Defense a sub-agency is a whole
+military department, so one open Air Force notice shows beside every
+expiring Air Force contract in the code — 181 of the 200 rows listed for the
+four codes carry one).
 
 **The daily warm**, verified on 2026-10-13 from a fresh store seeded with the
 Enfav profile (all eight NAICS, the four manufacturing codes included): one
 line per lens, then the horizon and the outlook of Defense, Veterans Affairs
-and GSA — the top three buyers over a rolling year. With the earlier
-far-first walk it found 444 awards ending within 90 days at those three,
-published 444 alerts and one digest, "444 spending alerts for Enfav LLC"
-(bus event 619), and a second warm raised none of them again. The
-nearest-first walk reads the soonest-ending contracts those warms could not
-reach, so the next scheduled warm will find more. Most of the first 444 were
-IDVs at their last date to order with nothing obligated — the count is the
-signal — and many were in the manufacturing codes. For a digest a person
-reads: narrow the profile's NAICS to the software four, and set
-`alerts.endingWithinDays` to a month.
+and GSA — the top three buyers over a rolling year — in 179 requests, every
+one answered. It found 643 awards ending within 90 days. With the earlier
+far-first walk the same warm had found 444, published them and one digest,
+"444 spending alerts for Enfav LLC" (bus event 619), and a second warm
+raised none of them again; with the notifications service unreachable the
+warm logged one warning, published nothing and recorded nothing, so the same
+alerts are raised next time. A restart inside the day answered each lens
+that had a snapshot from it, without a request. Most of what it finds are IDVs at their
+last date to order with nothing obligated, and many are in the manufacturing
+codes: 643 lines is a count, not a reading list. For a digest a person
+reads, narrow the profile's NAICS to the software four and set
+`alerts.endingWithinDays` to a month; the digest lists the ten awards with
+the most obligated on them first.
 
 **What the data says for a new software and AI-services business.**
 
@@ -409,11 +419,19 @@ Probed live on 2026-10-12 and 2026-10-13; free, no key.
 Start the stack (`pnpm stack:db`, `pnpm db:migrate`, `pnpm govcon:start`)
 and watch the service log for the warm's lines. Open `/spending`: the chips
 are pressed, the pulse reads once and says it was served from the snapshot
-the warm took. Press a chip off and watch the address and the one re-read;
-type a family and see exactly one request after the pause. Visit Where and
-note the top agencies; on Agency, pick one — the scope narrows, every lens
-re-reads, the outlook opens — and pick it again to clear. On Horizon, change
-the months, open an "Open notices" disclosure and follow a link to the
-notice. Hover a column and Tab into a chart. Copy the address into a new tab
+the warm took. Press chips off and watch the address and the one re-read
+once the presses pause; type a family and see exactly one request after the
+pause. Visit Where, change what it ranks by and its window, and note the top
+agencies; on Agency, pick one — the scope narrows, every lens re-reads, the
+outlook opens — and pick it again to clear. On Horizon, change the months,
+open an "Open notices" disclosure and follow a link to the notice, then go
+Back. Hover a column and Tab into a chart. Copy the address into a new tab
 and reload: the same view. Then read the ledger by operation, and, with the
 notifications service up, the digest on Telegram.
+
+This build was walked that way on 2026-10-13 in a visible Chrome window
+driven by Playwright, on the software codes above: nineteen checks, all
+passing, the console clean. The walk is what found that a PSC in the scope
+answered 502, that two identical reads at once each walked the source, that
+every chip press started a walk of an in-between scope, and that the tooltip
+left the viewport in a narrow window — each fixed and walked again.
