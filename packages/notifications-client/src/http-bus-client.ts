@@ -5,6 +5,7 @@ import {
   type Recovery,
   type RecoveryClock,
   rideOut,
+  type Settled,
   type SubscribeRequest,
   type Subscription,
 } from '@sysdesign/contracts';
@@ -23,10 +24,11 @@ const CALL_TIMEOUT_MS = 15_000;
 
 export interface HttpBusOptions {
   /**
-   * How long a call that never reached the service is asked again at the
-   * pause. Every bus call may be: a subscribe, an acknowledgement and a delete
-   * are idempotent by the bus's own contract, and a prompt or a withdrawal
-   * published twice is one prompt, one withdrawal, to the service that reads it.
+   * How long a call that never reached the service — or a pull it did not
+   * answer in time — is asked again at the pause. Every bus call may be: a
+   * subscribe, an acknowledgement and a delete are idempotent by the bus's own
+   * contract, and a prompt or a withdrawal published twice is one prompt, one
+   * withdrawal, to the service that reads it.
    */
   recovery?: Recovery;
   /** The clock the recovery is kept by; a spec passes one that need not wait. */
@@ -37,6 +39,27 @@ export interface HttpBusOptions {
 }
 
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
+
+interface Answer {
+  status: number;
+  body: unknown;
+}
+
+/**
+ * Whether an attempt may be asked again within the declared recovery: one
+ * that never reached the service, or a pull — the one GET this client makes,
+ * a long poll the bus answers from a cursor only an acknowledgement moves —
+ * that the service did not answer in time. Measured 2026-10-12: one timed-out
+ * pull dropped the notifications channel for the rest of a question, and the
+ * operator's answer on it was never read. With the shipped recovery of 60 s at
+ * a 2 s pause, a 40 s pull that times out is asked once more at about 42 s
+ * and given up at about 82 s if it times out again; a longer outage is a
+ * wider window in the settings, never code here.
+ */
+const repeatable = (method: Method, outcome: Settled<Answer>): boolean =>
+  'error' in outcome &&
+  (outcome.error instanceof BusUnreachable ||
+    (method === 'GET' && outcome.error instanceof BusTimeout));
 
 const segment = (value: string): string => encodeURIComponent(value);
 
@@ -110,18 +133,18 @@ export class HttpBusClient extends BusClient {
     }
   }
 
-  /** The service's answer, asked again within the declared recovery while it never reached the service. */
+  /** The service's answer, asked again within the declared recovery while `repeatable` says the attempt may be. */
   private call(
     method: Method,
     path: string,
     body: unknown,
     timeoutMs = this.callTimeoutMs,
     signal?: AbortSignal,
-  ): Promise<{ status: number; body: unknown }> {
+  ): Promise<Answer> {
     return rideOut(
       this.recovery,
       () => this.attempt(method, path, body, timeoutMs, signal),
-      (outcome) => 'error' in outcome && outcome.error instanceof BusUnreachable,
+      (outcome) => repeatable(method, outcome),
       this.clock,
     );
   }
@@ -132,7 +155,7 @@ export class HttpBusClient extends BusClient {
     body: unknown,
     timeoutMs: number,
     signal?: AbortSignal,
-  ): Promise<{ status: number; body: unknown }> {
+  ): Promise<Answer> {
     const timeout = AbortSignal.timeout(timeoutMs);
     let response: Response;
     try {
@@ -157,7 +180,7 @@ export class HttpBusClient extends BusClient {
     return { status: response.status, body: parsed };
   }
 
-  private refused(route: string, answer: { status: number; body: unknown }): BusRefused {
+  private refused(route: string, answer: Answer): BusRefused {
     return new BusRefused(answer.status, messageOf(answer.body), route);
   }
 }

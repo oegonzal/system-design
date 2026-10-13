@@ -154,4 +154,39 @@ describe('the bus over HTTP', () => {
     ).rejects.toBeInstanceOf(BusUnreachable);
     expect(gone.calls).toHaveLength(4);
   });
+
+  it('[NTC-1] asks a pull again when the service did not answer it in time, within the recovery window, and a call that is not a pull once only', async () => {
+    let clock = 0;
+    const recovery = { windowMs: 1_000, pauseMs: 100 };
+    const ticking = {
+      now: () => clock,
+      sleep: async (ms: number) => {
+        clock += ms;
+      },
+    };
+    const event = { seq: '6', topic: 'interaction.answered', payload: {} };
+    // The first pull hangs past its own wait; the second answers.
+    const slow = scripted(['hang', { status: 200, body: { data: [event] } }]);
+    const bus = new HttpBusClient('http://bus.test', {
+      recovery,
+      clock: ticking,
+      callTimeoutMs: 50,
+      fetchImpl: slow.fetchImpl,
+    });
+    expect(await bus.pull('ask.x', { waitMs: 100, max: 5 })).toEqual([event]);
+    expect(slow.calls.map((call) => call.method)).toEqual(['GET', 'GET']);
+
+    // A prompt published twice is one prompt to the service — but a publish that timed out may have landed, so it is not asked again.
+    clock = 0;
+    const mute = scripted(['hang', { status: 201, body: { data: event } }]);
+    await expect(
+      new HttpBusClient('http://bus.test', {
+        recovery,
+        clock: ticking,
+        callTimeoutMs: 50,
+        fetchImpl: mute.fetchImpl,
+      }).publish({ topic: 'interaction.prompted', source: 'spec', payload: {} }),
+    ).rejects.toBeInstanceOf(BusTimeout);
+    expect(mute.calls).toHaveLength(1);
+  });
 });

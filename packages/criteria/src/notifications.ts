@@ -60,7 +60,7 @@ export const NOTIFICATIONS_CRITERIA: readonly Criterion[] = [
   {
     id: 'NTC-1',
     statement:
-      'The bus client makes each call on its route and unwraps the envelope; it names a missing subscription as such, a refusal with the service’s own words, a call that never reached the service, one that timed out past a pull’s own wait, and one its caller abandoned — and asks again, within the declared recovery window, a call that never reached a restarting service.',
+      'The bus client makes each call on its route and unwraps the envelope; it names a missing subscription as such, a refusal with the service’s own words, a call that never reached the service, one that timed out past a pull’s own wait, and one its caller abandoned — and asks again, within the declared recovery window, a call that never reached a restarting service and a pull the service did not answer in time — the one call it makes that a repeat cannot double.',
   },
   {
     id: 'NTC-2',

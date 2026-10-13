@@ -4,8 +4,8 @@
  * made again at the pause; past it, the outcome stands as it would have at
  * once. One loop for every HTTP client in the repository — the loop client
  * calls a dead socket and a read the loop failed transient, the bus client a
- * dead socket alone — so the difference between them is each one's predicate,
- * never a second loop. The declared shape is the wire shape: a settings file
+ * dead socket and a pull the bus did not answer in time — so the difference
+ * between them is each one's predicate, never a second loop. The declared shape is the wire shape: a settings file
  * carries the two numbers, and the clock a spec keeps time by is an option on
  * the client, never a field beside them.
  */
