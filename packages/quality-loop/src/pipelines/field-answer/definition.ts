@@ -92,14 +92,14 @@ export const FIELD_ANSWER: PipelineDefinition<FieldAnswers> = {
       persona: criticGrounding,
       samples: 1,
       maxItems: 10,
-      maxTokens: 12000,
+      maxTokens: 18500,
     },
     {
       id: 'critic.form',
       persona: criticForm,
       samples: 1,
       maxItems: 10,
-      maxTokens: 11000,
+      maxTokens: 13500,
     },
   ],
 

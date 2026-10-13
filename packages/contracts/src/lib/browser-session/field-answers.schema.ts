@@ -12,9 +12,11 @@ import { ANSWER_BASES, ANSWER_BASIS_MEANINGS, FIELD_DECISIONS } from './vocab';
 
 export const FIELDS_BOUND = bound(40, 'list');
 export const BASIS_BOUND = bound(6, 'list');
-export const ANSWERS_SUMMARY_BOUND = bound(600);
+/** Measured 2026-10-13 over 121 runs: p99 707, max 713 — a summary of two or three sentences over a long page. */
+export const ANSWERS_SUMMARY_BOUND = bound(750);
 export const ANSWER_VALUE_BOUND = bound(4000);
-export const ANSWER_REASON_BOUND = bound(300);
+/** Measured 2026-10-13 over 121 runs: p99 306, max 399, since a reason also says how the value rests on the evidence. */
+export const ANSWER_REASON_BOUND = bound(450);
 
 /** An evidence alias as the goal lists it: `m3`. */
 export const EVIDENCE_ALIAS = /^m\d+$/;

@@ -1,3 +1,4 @@
+import { boundsAgainstMeasured, fieldAnswersSchema } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline } from '../../core/describe-pipeline';
@@ -99,13 +100,15 @@ describe('the field-answer pipeline', () => {
     expect(FIELD_ANSWER.critics[0].persona).toContain('requires_user');
   });
 
-  it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage has measurably written', () => {
-    // `measured.json` (`pnpm measure:bounds`, 85 runs as of 2026-10-11) is
+  it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage has measurably written, and every bound the producer is shown sits above what it has written', () => {
+    // `measured.json` (`pnpm measure:bounds`, 121 runs as of 2026-10-13) is
     // what each stage measurably wrote. A cap is also the call's time limit,
     // so one a stage outwrites is a call cut short. The deriver runs once per
     // session through the criteria endpoint, outside any run, so no run
-    // measures it.
+    // measures it. A bound the producer overshoots discards the whole artifact:
+    // the summary's 600 sat under its own p99 (707) for a month of runs.
     expect(measured.runs).toBeGreaterThan(0);
+    expect(boundsAgainstMeasured(fieldAnswersSchema, measured.fields)).toEqual([]);
     expect(
       capsAgainstMeasured(FIELD_ANSWER, measured.caps, {
         exempt: {
