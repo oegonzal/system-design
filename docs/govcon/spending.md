@@ -76,7 +76,7 @@ the same view. Only what differs from the profile's default is written:
 | `newOnly`       | `true`                                                                                  | every action        |
 | `tab`           | `pulse`, `where`, `reach`, `horizon`, `agency`                                          | `pulse`             |
 | `category`      | `awarding_agency`, `awarding_subagency`, `recipient`, `naics`, `psc`, `state_territory` | `awarding_agency`   |
-| `window`        | `fytd`, `prior-fy`, `last-12-months`                                                    | `last-12-months`    |
+| `window`        | `fytd`, `prior-fy`, `fy-before-last`, `last-12-months`                                  | `last-12-months`    |
 | `months`        | `6`, `12`, `24`                                                                         | `12`                |
 
 A value the vocabulary does not know falls back to the default. A tab mounts
@@ -136,11 +136,14 @@ sub-agency, recipient, NAICS, PSC or state, each a share of the scope's
 whole over that window (the whole is read separately, so the rows need not
 add up to it). The window opens on the last twelve months — a whole year on
 any day, where the fiscal year to date is thirteen days long on October 13 —
-with the fiscal year to date and the prior fiscal year as presets.
+with the fiscal year to date, the prior fiscal year and the one before it as
+presets.
 "Truncated" means more rows exist beyond the declared bound
 (`MAX_BREAKDOWN_ROWS`). When the window reaches past the last day a late
 agency has published, a note says the total and that agency's rows are
-short; the prior fiscal year is the window to read for whole shares.
+short. For a quarter after October 1 that includes the prior fiscal year,
+which the late agency has not finished; "Fiscal year before last" is then
+the latest year that reads whole, and the note's absence says so.
 
 ### Reach — how much of it was open to you
 

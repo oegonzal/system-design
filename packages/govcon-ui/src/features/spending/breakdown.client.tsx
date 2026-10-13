@@ -6,7 +6,7 @@ import {
   type ScopeQuery,
   type WindowPreset,
 } from '@sysdesign/contracts';
-import { Alert, Spinner, Stack, Text } from '@sysdesign/design-system';
+import { Alert, BusyRegion, Spinner, Stack, Text } from '@sysdesign/design-system';
 import { useResource } from '@sysdesign/web-kit';
 
 import { api } from '../../api/client';
@@ -22,7 +22,7 @@ export interface BreakdownLensProps {
   onPresetChange(preset: WindowPreset): void;
 }
 
-/** Where the money goes: the scope ranked by one category over one window, both chosen by the page. */
+/** Where the money goes: the scope ranked by one category over one window, both chosen by the page; the last answer stays in view, dimmed, while the next loads. */
 export function BreakdownLens({
   scope,
   category,
@@ -44,10 +44,12 @@ export function BreakdownLens({
       />
       {breakdown.error ? <Alert tone="danger">{breakdown.error}</Alert> : null}
       {breakdown.data ? (
-        <>
-          <BreakdownList breakdown={breakdown.data} />
-          <ProvenanceLine provenance={breakdown.data.provenance} />
-        </>
+        <BusyRegion busy={breakdown.loading}>
+          <Stack gap={4}>
+            <BreakdownList breakdown={breakdown.data} />
+            <ProvenanceLine provenance={breakdown.data.provenance} />
+          </Stack>
+        </BusyRegion>
       ) : breakdown.error ? null : (
         <Stack gap={2}>
           <Spinner label={LENS_LOADING.where} />

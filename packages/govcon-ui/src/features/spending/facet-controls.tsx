@@ -157,11 +157,20 @@ function FacetControl({ id, facets, onCommit, onSettle, presets, disabled }: Fac
   }
 }
 
-/** Every declared facet, in the table's order. */
+/** The kinds whose control is one small field: they share a row, where a row of chips takes a line of its own. */
+const COMPACT_KINDS: readonly string[] = ['choice', 'flag'];
+const isCompact = (id: FacetId): boolean => COMPACT_KINDS.includes(SPENDING_FACETS[id].kind);
+
+/** Every declared facet, in the table's order: the small controls on one row, then each row of chips. */
 export function FacetControls(props: FacetControlsProps) {
   return (
     <Stack gap={3}>
-      {FACET_IDS.map((id) => (
+      <Stack direction="row" gap={4} wrap align="end">
+        {FACET_IDS.filter(isCompact).map((id) => (
+          <FacetControl key={id} id={id} {...props} />
+        ))}
+      </Stack>
+      {FACET_IDS.filter((id) => !isCompact(id)).map((id) => (
         <FacetControl key={id} id={id} {...props} />
       ))}
     </Stack>

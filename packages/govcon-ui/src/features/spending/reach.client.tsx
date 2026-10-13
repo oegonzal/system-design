@@ -1,7 +1,7 @@
 'use client';
 
 import { windowOf, type ReachCut, type ScopeQuery, type WindowPreset } from '@sysdesign/contracts';
-import { Alert, Spinner, Stack, Text } from '@sysdesign/design-system';
+import { Alert, BusyRegion, Spinner, Stack, Text } from '@sysdesign/design-system';
 import { useResource } from '@sysdesign/web-kit';
 
 import { api } from '../../api/client';
@@ -19,7 +19,7 @@ export interface ReachLensProps {
   hrefOf(cut: ReachCut): string | null;
 }
 
-/** What was within reach: the scope's new contracts over one window, cut down to what a firm with these lanes could have won. */
+/** What was within reach: the scope's new contracts over one window, cut down to what a firm with these lanes could have won; the last answer stays in view, dimmed, while the next loads. */
 export function ReachLens({ scope, lanes, preset, onPresetChange, hrefOf }: ReachLensProps) {
   const window = windowOf(preset, Date.now());
   // Reach names no family: it counts contracts.
@@ -32,10 +32,12 @@ export function ReachLens({ scope, lanes, preset, onPresetChange, hrefOf }: Reac
       <WindowPresets preset={preset} onPresetChange={onPresetChange} />
       {reach.error ? <Alert tone="danger">{reach.error}</Alert> : null}
       {reach.data ? (
-        <>
-          <ReachFunnel reach={reach.data} hrefOf={hrefOf} />
-          <ProvenanceLine provenance={reach.data.provenance} />
-        </>
+        <BusyRegion busy={reach.loading}>
+          <Stack gap={4}>
+            <ReachFunnel reach={reach.data} hrefOf={hrefOf} />
+            <ProvenanceLine provenance={reach.data.provenance} />
+          </Stack>
+        </BusyRegion>
       ) : reach.error ? null : (
         <Stack gap={2}>
           <Spinner label={LENS_LOADING.reach} />

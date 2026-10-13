@@ -64,7 +64,8 @@ export function ScopeBar({
   const sorted =
     agencies === null ? [] : [...agencies].sort((a, b) => a.name.localeCompare(b.name));
   const narrowed = Object.keys(facetParams(shown.facets)).length;
-  // A placement is a kind of contract: the family follows it and is not the reader's to change.
+  // A placement is a kind of contract: while one is set the family follows it and is not the reader's to change.
+  const placed = shown.facets.placement !== null;
   const family = familyUnder(shown.awardFamily, shown.facets);
   return (
     <Stack gap={3}>
@@ -109,10 +110,8 @@ export function ScopeBar({
         <SelectField
           label="Award family"
           value={family}
-          disabled={disabled || family !== shown.awardFamily}
-          hint={
-            family === shown.awardFamily ? undefined : 'Set by "Placed as": a kind of contract.'
-          }
+          disabled={disabled || placed}
+          hint={placed ? 'Set by "Placed as": a kind of contract.' : undefined}
           onChange={(event) => commit({ awardFamily: event.target.value as AwardFamilyChoice })}
         >
           {AWARD_FAMILY_CHOICES.map((family) => (
