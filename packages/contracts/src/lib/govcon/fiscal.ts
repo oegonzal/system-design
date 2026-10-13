@@ -52,6 +52,21 @@ export const fiscalYearStart = (fiscalYear: number): string => `${fiscalYear - 1
 /** The last day of a fiscal year, `YYYY-09-30`. */
 export const fiscalYearEnd = (fiscalYear: number): string => `${fiscalYear}-09-30`;
 
+/** The last day of a fiscal period — of the calendar month it is. */
+export const fiscalPeriodEnd = ({ fiscalYear, period }: FiscalPeriod): string => {
+  const month = PERIOD_MONTHS[period - 1];
+  if (month === undefined) throw new RangeError(`fiscalPeriodEnd: no period ${period}`);
+  // Periods 1–3 are October–December of the calendar year before.
+  const year = month >= 10 ? fiscalYear - 1 : fiscalYear;
+  return isoDateOf(Date.UTC(year, month, 0));
+};
+
+/** An ISO date moved back by whole days. */
+export const daysBefore = (isoDate: string, days: number): string => {
+  const at = new Date(`${isoDate}T00:00:00Z`);
+  return isoDateOf(Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate() - days));
+};
+
 /** A calendar month 1..12 as its three-letter label. */
 export const monthLabel = (month: number): string => MONTH_LABELS[month - 1] ?? String(month);
 

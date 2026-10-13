@@ -7,6 +7,8 @@ import {
   type AgencyOutlook,
   type HorizonRow,
   type PeriodObligations,
+  type ProjectedPeriod,
+  type PublicationDelay,
   type Provenance,
   type SpendingBreakdown,
   type SpendingHorizon,
@@ -57,8 +59,32 @@ export const periodsOf = (
       idvs,
       total: contracts + idvs,
       partial: partialLast && period === upTo,
+      unpublished: false,
     };
   });
+
+/** One agency publishing 90 days late, read on 2026-06-15: everything through mid-March is in. */
+export const publicationDelayOf = (
+  overrides: Partial<PublicationDelay> = {},
+): PublicationDelay => ({
+  agencies: ['Department of Defense'],
+  days: 90,
+  completeThrough: '2026-03-16',
+  ...overrides,
+});
+
+/** One projected period of the story: the three prior years' mean, scaled 1.1× with its band. */
+export const projectedPeriodOf = (fiscalYear: number, period: number): ProjectedPeriod => {
+  const expected = Math.round(400_000 * (1 + period / 6) * 0.9 + 60_000 * 0.9);
+  return {
+    fiscalYear,
+    period,
+    expected,
+    scaled: Math.round(expected * 1.1),
+    low: Math.round(expected * 0.8),
+    high: Math.round(expected * 1.15),
+  };
+};
 
 export const spendingPulseOf = (overrides: Partial<SpendingPulse> = {}): SpendingPulse => ({
   scope: spendingScopeOf(),
@@ -74,18 +100,9 @@ export const spendingPulseOf = (overrides: Partial<SpendingPulse> = {}): Spendin
     lookbackFiscalYears: [2023, 2024, 2025],
     basePeriods: 8,
     ratio: 1.1,
-    periods: [9, 10, 11, 12].map((period) => {
-      const expected = Math.round(400_000 * (1 + period / 6) * 0.9 + 60_000 * 0.9);
-      return {
-        fiscalYear: 2026,
-        period,
-        expected,
-        scaled: Math.round(expected * 1.1),
-        low: Math.round(expected * 0.8),
-        high: Math.round(expected * 1.15),
-      };
-    }),
+    periods: [9, 10, 11, 12].map((period) => projectedPeriodOf(2026, period)),
   },
+  delay: null,
   provenance: provenanceOf(),
   ...overrides,
 });
@@ -112,6 +129,7 @@ export const spendingBreakdownOf = (
     { id: '209', code: 'DOI', name: 'Department of the Interior', amount: 140_000, share: 0.0175 },
   ],
   truncated: false,
+  delay: null,
   provenance: provenanceOf(),
   ...overrides,
 });

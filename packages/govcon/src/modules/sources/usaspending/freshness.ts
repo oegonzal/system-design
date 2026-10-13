@@ -3,6 +3,7 @@ import { z } from 'zod';
 import type { Attempted, Fetched } from '../../../core/budget';
 import type { DataFreshness } from '../../../core/ports';
 import { issuesOf, type AttemptedHttp } from '../http';
+import { USASPENDING_PUBLICATION_LAGS } from './disclosures';
 import { USASPENDING_BASE_URL, USASPENDING_SOURCE_ID } from './source';
 import { usDay } from './values';
 
@@ -13,6 +14,7 @@ const freshnessSchema = z.looseObject({ last_updated: z.string() });
 export class UsaSpendingFreshness implements DataFreshness {
   readonly id = USASPENDING_SOURCE_ID;
   readonly disclosures: readonly string[] = [];
+  readonly publicationLags = USASPENDING_PUBLICATION_LAGS;
 
   constructor(
     private readonly http: AttemptedHttp,

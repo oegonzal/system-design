@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
-import { PULSE } from '../../testing/spending-fixtures';
+import { PULSE, PULSE_DELAYED } from '../../testing/spending-fixtures';
 import { pulseFigures } from './pulse-figures';
 import { PulseChart, PulseTiles } from './pulse-panels';
 
@@ -28,6 +28,14 @@ export const Unprojected: Story = {
       projection: null,
     },
   },
+};
+
+/** One agency publishes 90 days late: the periods after the last whole day are provisional, and the note says why. */
+export const Delayed: Story = { args: { pulse: PULSE_DELAYED } };
+
+/** The same delay in the tiles: the change is taken over the settled periods only. */
+export const DelayedTiles: Story = {
+  render: () => <PulseTiles figures={pulseFigures(PULSE_DELAYED)} />,
 };
 
 export const Pending: Story = { args: { pending: true } };

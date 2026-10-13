@@ -16,6 +16,7 @@ import type {
   CategoryPage,
   EndingAwardsPage,
   OfficesPage,
+  PublicationLag,
   RaisedAlert,
   SeriesPoint,
   SnapshotRow,
@@ -116,9 +117,13 @@ const withDefaults = (script: SpendingScript): Required<SpendingScript> => ({
 /**
  * The seven ports over a script, answered in order and repeating the last
  * reply; `script()` starts them over. Disclosures are one declared line per
- * port, so a spec can see them carried through.
+ * port, so a spec can see them carried through; no agency publishes late
+ * unless the spec declares the lags.
  */
-export function scriptedSpendingSources(script: SpendingScript = {}): ScriptedSpendingSources {
+export function scriptedSpendingSources(
+  script: SpendingScript = {},
+  publicationLags: readonly PublicationLag[] = [],
+): ScriptedSpendingSources {
   const id = 'usaspending';
   const requests: Record<Port, unknown[]> = {
     series: [],
@@ -161,7 +166,7 @@ export function scriptedSpendingSources(script: SpendingScript = {}): ScriptedSp
     budgets: { id, disclosures: ['budget disclosure'], budgets: replier('budgets') },
     offices: { id, disclosures: ['offices disclosure'], offices: replier('offices') },
     catalog: { id, disclosures: ['catalog disclosure'], agencies: replier('catalog') },
-    freshness: { id, disclosures: [], lastUpdated: replier('freshness') },
+    freshness: { id, disclosures: [], publicationLags, lastUpdated: replier('freshness') },
   };
 }
 

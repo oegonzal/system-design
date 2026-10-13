@@ -4,9 +4,15 @@ import {
   NotFoundException,
   ServiceUnavailableException,
 } from '@nestjs/common';
-import { horizonRowOf, noticeRefOf, opportunityOf } from '@sysdesign/contracts';
+import {
+  agencyDirectoryEntryOf,
+  horizonRowOf,
+  noticeRefOf,
+  opportunityOf,
+} from '@sysdesign/contracts';
 
 import { RequestGate, type BudgetPolicy } from '../../core/budget';
+import type { PublicationLag } from '../../core/ports';
 import {
   fetchedOf,
   InMemorySnapshotStore,
@@ -19,13 +25,23 @@ import { SpendingService } from './spending.service';
 
 const T0 = new Date('2026-06-15T12:00:00Z');
 
-/** `tickMs` advances the clock on every read, so a wall-clock deadline can pass inside one call. */
-function harness(
-  script: SpendingScript = {},
-  policy: Partial<BudgetPolicy> = {},
+interface HarnessOptions {
+  script?: SpendingScript;
+  policy?: Partial<BudgetPolicy>;
+  /** Advances the clock on every read, so a wall-clock deadline can pass inside one call. */
+  tickMs?: number;
+  notices?: InMemoryOpportunityRepository;
+  /** The agencies the source publishes late; none unless a test declares them. */
+  lags?: readonly PublicationLag[];
+}
+
+function harness({
+  script = {},
+  policy = {},
   tickMs = 0,
   notices = new InMemoryOpportunityRepository(),
-) {
+  lags = [],
+}: HarnessOptions = {}) {
   let now = T0;
   const clock = () => {
     now = new Date(now.getTime() + tickMs);
@@ -38,7 +54,7 @@ function harness(
     buckets: {},
     ...policy,
   };
-  const sources = scriptedSpendingSources(script);
+  const sources = scriptedSpendingSources(script, lags);
   const store = new InMemorySnapshotStore();
   const service = new SpendingService(
     store,
@@ -65,7 +81,7 @@ const scope = { naics: ['332710'], psc: [], awardFamily: 'both' as const };
 describe('the spending service', () => {
   it('[GOV-20] answers the pulse from the source once, then from the snapshot inside the TTL with no new ledger row, keyed on the fiscal period the clock names', async () => {
     const { service, operations, advance } = harness({
-      series: [fetchedOf([seriesPointOf({ fiscalYear: 2026, period: 1, total: 5 })])],
+      script: { series: [fetchedOf([seriesPointOf({ fiscalYear: 2026, period: 1, total: 5 })])] },
     });
     const first = await service.pulse({ ...scope, lookback: 3 });
     expect(first).toMatchObject({
@@ -91,7 +107,11 @@ describe('the spending service', () => {
       rejected: 0,
       hasMore: true,
     });
-    const { service, sources } = harness({ ending: [paged] }, { pullDeadlineMs: 1_500 }, 1_000);
+    const { service, sources } = harness({
+      script: { ending: [paged] },
+      policy: { pullDeadlineMs: 1_500 },
+      tickMs: 1_000,
+    });
     const horizon = await service.horizon({ ...scope, awardFamily: 'contracts', months: 6 });
     expect(horizon).toMatchObject({
       today: '2026-06-15',
@@ -110,7 +130,7 @@ describe('the spending service', () => {
   it('[GOV-20] a forced refresh asks the source inside the TTL and replaces the snapshot', async () => {
     const point = seriesPointOf({ fiscalYear: 2026, period: 1, total: 5 });
     const { service, operations } = harness({
-      series: [fetchedOf([point]), fetchedOf([{ ...point, total: 7 }])],
+      script: { series: [fetchedOf([point]), fetchedOf([{ ...point, total: 7 }])] },
     });
     await service.pulse({ ...scope, lookback: 3 });
     const refreshed = await service.pulse({ ...scope, lookback: 3 }, { refresh: true });
@@ -120,6 +140,36 @@ describe('the spending service', () => {
     ).toBe(7);
     expect(operations()).toEqual(['series', 'freshness', 'series']);
     expect((await service.pulse({ ...scope, lookback: 3 })).provenance.servedFrom).toBe('snapshot');
+  });
+
+  it('[GOV-25] marks what a late agency has yet to publish from the source’s own data-as-of: the pulse of a scope that counts it, the breakdown whose window reaches past that day, and neither for an agency that publishes on time', async () => {
+    const lags = [{ toptierCode: '097', name: 'Department of Defense', days: 90 }];
+    const catalog = [
+      fetchedOf([
+        agencyDirectoryEntryOf(),
+        agencyDirectoryEntryOf({ toptierCode: '036', name: 'Department of Veterans Affairs' }),
+      ]),
+    ];
+    const { service } = harness({ script: { catalog }, lags });
+    const delay = { agencies: ['Department of Defense'], days: 90, completeThrough: '2026-03-16' };
+
+    // Read on 2026-06-15 with data as of 2026-06-14: March ends after March 16, February does not.
+    const pulse = await service.pulse({ ...scope, lookback: 1 });
+    expect(pulse.delay).toEqual(delay);
+    expect(
+      pulse.series
+        .filter((point) => point.unpublished)
+        .map((point) => `${point.fiscalYear}:${point.period}`),
+    ).toEqual(['2026:6', '2026:7', '2026:8', '2026:9']);
+    expect((await service.pulse({ ...scope, agency: '097', lookback: 1 })).delay).toEqual(delay);
+
+    const onTime = await service.pulse({ ...scope, agency: '036', lookback: 1 });
+    expect(onTime.delay).toBeNull();
+    expect(onTime.series.some((point) => point.unpublished)).toBe(false);
+
+    const window = { ...scope, category: 'awarding_agency' as const, from: '2025-10-01' };
+    expect((await service.breakdown({ ...window, to: '2026-06-15' })).delay).toEqual(delay);
+    expect((await service.breakdown({ ...window, to: '2026-03-16' })).delay).toBeNull();
   });
 
   it('[GOV-23] joins the horizon’s rows to the open stored notices at read time — a snapshot read recomputes the join, nothing of it is stored, and a row without a NAICS never matches', async () => {
@@ -133,7 +183,7 @@ describe('the spending service', () => {
       rejected: 0,
       hasMore: false,
     });
-    const { service, store } = harness({ ending: [page] }, {}, 0, notices);
+    const { service, store } = harness({ script: { ending: [page] }, notices });
     const first = await service.horizon({ ...scope, awardFamily: 'contracts', months: 6 });
     expect(first.openNotices).toEqual([
       { externalId: horizonRowOf().externalId, notices: [noticeRefOf(opportunityOf())] },
@@ -159,19 +209,19 @@ describe('the spending service', () => {
       service.agency('097', { fiscalYear: 2031, awardFamily: 'both' }),
     ).rejects.toBeInstanceOf(BadRequestException);
     await expect(
-      harness({ series: [failure('rate-limited', 429, 'slow down')] }).service.pulse({
+      harness({ script: { series: [failure('rate-limited', 429, 'slow down')] } }).service.pulse({
         ...scope,
         lookback: 1,
       }),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
     await expect(
-      harness({ series: [failure('error', 500, 'status 500')] }).service.pulse({
+      harness({ script: { series: [failure('error', 500, 'status 500')] } }).service.pulse({
         ...scope,
         lookback: 1,
       }),
     ).rejects.toBeInstanceOf(BadGatewayException);
     await expect(
-      harness({}, { buckets: { usaspending: { dailyBudget: 0 } } }).service.agencies(),
+      harness({ policy: { buckets: { usaspending: { dailyBudget: 0 } } } }).service.agencies(),
     ).rejects.toBeInstanceOf(ServiceUnavailableException);
 
     // The 404 above already resolved the directory, so the directory lens shares that snapshot.

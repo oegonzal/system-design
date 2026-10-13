@@ -1,4 +1,9 @@
-import { FISCAL_PERIODS, type FiscalPeriod, type PeriodObligations } from '@sysdesign/contracts';
+import {
+  FISCAL_PERIODS,
+  fiscalPeriodEnd,
+  type FiscalPeriod,
+  type PeriodObligations,
+} from '@sysdesign/contracts';
 
 import type { SeriesPoint } from '../ports';
 
@@ -29,13 +34,16 @@ const lastPeriodOf = (fiscalYear: number, current: FiscalPeriod): number =>
  * the window gets its twelve periods, zero where the source reported none and
  * summed where it reported several, except the current year, which ends at
  * the period in progress — marked `partial`, since its amount is still
- * growing. Points outside the window, or without a period, are dropped;
- * negative amounts (de-obligations) are carried as they are.
+ * growing. A period that ends after `completeThrough` — the last day the
+ * source has wholly published for the scope, null when nothing is delayed —
+ * is marked `unpublished`. Points outside the window, or without a period,
+ * are dropped; negative amounts (de-obligations) are carried as they are.
  */
 export function alignSeries(
   points: readonly SeriesPoint[],
   window: FiscalWindow,
   current: FiscalPeriod,
+  completeThrough: string | null,
 ): PeriodObligations[] {
   const sums = new Map<string, Sums>();
   for (const point of points) {
@@ -57,6 +65,8 @@ export function alignSeries(
         period,
         ...(sums.get(keyOf(fiscalYear, period)) ?? nothing()),
         partial: fiscalYear === current.fiscalYear && period === current.period,
+        unpublished:
+          completeThrough !== null && fiscalPeriodEnd({ fiscalYear, period }) > completeThrough,
       });
     }
   }

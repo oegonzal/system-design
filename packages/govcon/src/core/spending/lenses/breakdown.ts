@@ -10,7 +10,7 @@ import {
 import type { LensBody, LensSpec } from '../lens';
 import { breakdownBodySchema } from '../schemas';
 import { scopeOf, spend, type LensDeps } from './deps';
-import { asOfFrom, resolveAgency } from './shared';
+import { publicationOf, resolveAgency } from './shared';
 
 export interface BreakdownQuery extends SpendingScope {
   category: BreakdownCategory;
@@ -23,7 +23,8 @@ export interface BreakdownQuery extends SpendingScope {
  * Where the money goes: the scope's obligations over a window, ranked by one
  * category. Two calls — the ranked rows, and the scope's own total over the
  * same window — so every share divides by the whole and the rows need not
- * add up to it.
+ * add up to it. A window that reaches past what an agency in the scope has
+ * published says so.
  */
 export const breakdownLens = (
   deps: LensDeps,
@@ -75,6 +76,7 @@ export const breakdownLens = (
     if (totals.kind !== 'ok') return totals;
 
     const total = totals.value.reduce((sum, point) => sum + point.total, 0);
+    const { asOf, delay } = await publicationOf(deps, scope.agency);
     return {
       kind: 'ok',
       body: {
@@ -88,8 +90,9 @@ export const breakdownLens = (
           share: total > 0 ? row.amount / total : 0,
         })),
         truncated: rows.value.hasMore,
+        delay: delay !== null && query.to > delay.completeThrough ? delay : null,
       },
-      asOf: await asOfFrom(deps),
+      asOf,
       requests: tally.requests,
     };
   },

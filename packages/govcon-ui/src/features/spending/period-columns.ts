@@ -1,5 +1,6 @@
 import {
   FISCAL_PERIODS,
+  isSettled,
   periodMonthLabel,
   type AgencyYear,
   type SpendingPulse,
@@ -45,14 +46,14 @@ export function periodColumns(
   return { series, data };
 }
 
-/** The pulse as period years: reported periods as measured (the one in progress provisional), the rest of this year projected with its band. */
+/** The pulse as period years: settled periods as measured, a period in progress or not wholly published provisional, the rest of this year projected with its band. */
 export function pulseYears(pulse: SpendingPulse): PeriodYear[] {
   const byYear = new Map<number, Map<number, ColumnValue>>();
   for (const point of pulse.series) {
     const cells = byYear.get(point.fiscalYear) ?? new Map<number, ColumnValue>();
     cells.set(
       point.period,
-      point.partial ? { value: point.total, provisional: true } : point.total,
+      isSettled(point) ? point.total : { value: point.total, provisional: true },
     );
     byYear.set(point.fiscalYear, cells);
   }

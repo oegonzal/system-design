@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { BreakdownControls } from './breakdown-panels';
 import * as stories from './breakdown-panels.stories';
 
-const { List, Truncated, Empty } = composeStories(stories);
+const { Delayed, List, Truncated, Empty } = composeStories(stories);
 
 describe('the breakdown panels', () => {
   it('[GOVU-11] ranks the rows as shares of the scope’s whole, with the window and the total above', () => {
@@ -23,6 +23,17 @@ describe('the breakdown panels', () => {
     expect(screen.getByText(/More rows exist/)).toBeTruthy();
     renderWithTheme(<Empty />);
     expect(screen.getByText('Nothing obligated by awarding agency in the window.')).toBeTruthy();
+  });
+
+  it('[GOVU-13] says the total and its rows are short when the window reaches past what a late agency has published, and nothing otherwise', () => {
+    renderWithTheme(<List />);
+    expect(screen.queryByText(/still filling in/)).toBeNull();
+    renderWithTheme(<Delayed />);
+    expect(
+      screen.getByText(
+        /Department of Defense awards are published 90 days after they are signed.*the total and every row those awards belong to are short/,
+      ),
+    ).toBeTruthy();
   });
 
   it('[GOVU-11] offers every category and window preset', () => {

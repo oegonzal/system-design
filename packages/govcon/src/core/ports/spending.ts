@@ -82,7 +82,16 @@ export interface AgencyCatalog extends SpendingPort {
   agencies(): Promise<Attempted<Fetched<AgencyDirectoryEntry[]>>>;
 }
 
+/** An agency whose awards the source publishes late, by its toptier code, and by how many days after they are signed. */
+export interface PublicationLag {
+  toptierCode: string;
+  name: string;
+  days: number;
+}
+
 export interface DataFreshness extends SpendingPort {
+  /** The agencies whose awards arrive late — a provider fact the adapter declares, never asked for. */
+  readonly publicationLags: readonly PublicationLag[];
   /** The source's "award data as of" date, ISO. */
   lastUpdated(): Promise<Attempted<Fetched<string>>>;
 }

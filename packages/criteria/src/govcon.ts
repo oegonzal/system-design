@@ -66,6 +66,11 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
     statement:
       'A spending view is its address: a link without a scope opens on the active profile’s NAICS, and the scope, the tab and each lens’s settings travel in the URL, so a reload, a shared link and a return by Back all open the same view; codes, typed or pressed, settle before they are written as one change; a directory pick narrows the scope to that agency; every column chart answers hover and focus with one tooltip naming every series at that x; and an expiring award says which open notices already exist for its NAICS and buyer, each a link to the notice.',
   },
+  {
+    id: 'GOVU-13',
+    statement:
+      'The pulse draws a period the source has not wholly published as provisional and says which agencies publish late, by how many days and through which day the amounts are whole; the change against the prior year is taken over the periods both years have settled; and a breakdown whose window reaches past that day says its total and rows are short.',
+  },
   // Government contracting: SAM.gov opportunities (packages/govcon)
   {
     id: 'GOV-1',
@@ -181,6 +186,11 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
     id: 'GOV-23',
     statement:
       'An expiring award is joined at read time to the open stored notices sharing its exact NAICS code and its agency sub-tier segment — never a name, never a prefix — bounded by MAX_RECOMPETE_NOTICES with the answer saying when that cut; the join is computed on every read, a snapshot read included, and never stored.',
+  },
+  {
+    id: 'GOV-25',
+    statement:
+      'A fiscal period that ends after the last day the source has wholly published for a scope — its data-as-of date less the longest lag the adapter declares for an agency the scope counts — is marked unpublished: it is projected and never counted in the run rate’s base, a prior year holding one is no year a mean rests on, and a breakdown whose window reaches past that day carries the delay, as the pulse of such a scope always does.',
   },
   {
     id: 'GOV-21',

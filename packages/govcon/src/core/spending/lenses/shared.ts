@@ -1,7 +1,8 @@
-import type { AgencyRef } from '@sysdesign/contracts';
+import { isoDateOf, type AgencyRef, type PublicationDelay } from '@sysdesign/contracts';
 
 import { agencyNamed } from '../agency';
 import type { LensRefusal } from '../lens';
+import { publicationDelay } from '../publication';
 import { missing, type LensDeps } from './deps';
 import { directoryLens } from './directory';
 import { freshnessLens } from './freshness';
@@ -30,4 +31,24 @@ export async function resolveAgency(
 export async function asOfFrom(deps: LensDeps): Promise<string | null> {
   const answer = await deps.read(freshnessLens(deps), {});
   return answer.kind === 'ok' ? answer.body.lastUpdated : null;
+}
+
+export interface Publication {
+  asOf: string | null;
+  delay: PublicationDelay | null;
+}
+
+/**
+ * How far the source has published a scope's awards: its "data as of", and
+ * the delay the declared lags put on the scope's agency — counted back from
+ * that date, or from today when the source cannot say.
+ */
+export async function publicationOf(deps: LensDeps, agency: string | null): Promise<Publication> {
+  const asOf = await asOfFrom(deps);
+  const delay = publicationDelay(
+    deps.sources.freshness.publicationLags,
+    agency,
+    asOf ?? isoDateOf(deps.now().getTime()),
+  );
+  return { asOf, delay };
 }

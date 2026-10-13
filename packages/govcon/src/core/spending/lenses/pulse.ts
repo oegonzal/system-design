@@ -11,7 +11,7 @@ import { PROJECTION_POLICY, projectFiscalYear } from '../projection';
 import { pulseBodySchema } from '../schemas';
 import { alignSeries } from '../series';
 import { scopeOf, spend, type LensDeps } from './deps';
-import { asOfFrom, resolveAgency } from './shared';
+import { publicationOf, resolveAgency } from './shared';
 
 /** The scope, how many prior years, and the fiscal period the answer is computed in — so a snapshot is never served for another period. */
 export interface PulseQuery extends SpendingScope {
@@ -52,7 +52,8 @@ export const pulseLens = (deps: LensDeps): LensSpec<PulseQuery, LensBody<Spendin
       () => deps.sources.series.series(request),
     );
     if (spent.kind !== 'ok') return spent;
-    const series = alignSeries(spent.value, window, current);
+    const { asOf, delay } = await publicationOf(deps, scope.agency);
+    const series = alignSeries(spent.value, window, current, delay?.completeThrough ?? null);
     return {
       kind: 'ok',
       body: {
@@ -60,8 +61,9 @@ export const pulseLens = (deps: LensDeps): LensSpec<PulseQuery, LensBody<Spendin
         fiscalYear: query.fiscalYear,
         series,
         projection: projectFiscalYear(series, current, PROJECTION_POLICY),
+        delay,
       },
-      asOf: await asOfFrom(deps),
+      asOf,
       requests: tally.requests,
     };
   },

@@ -32,6 +32,10 @@ const scopeSchema = z.strictObject({
 
 const fiscalPeriod = { fiscalYear: z.number().int(), period: z.number().int().min(1).max(12) };
 
+const publicationDelay = z
+  .strictObject({ agencies: z.array(label), days: count, completeThrough: isoDate })
+  .nullable();
+
 export const pulseBodySchema = z.strictObject({
   scope: scopeSchema,
   fiscalYear: z.number().int(),
@@ -42,6 +46,7 @@ export const pulseBodySchema = z.strictObject({
       idvs: amount,
       total: amount,
       partial: z.boolean(),
+      unpublished: z.boolean(),
     }),
   ),
   projection: z
@@ -61,6 +66,7 @@ export const pulseBodySchema = z.strictObject({
       ),
     })
     .nullable(),
+  delay: publicationDelay,
 }) satisfies z.ZodType<LensBody<SpendingPulse>>;
 
 export const breakdownBodySchema = z.strictObject({
@@ -79,6 +85,7 @@ export const breakdownBodySchema = z.strictObject({
     }),
   ),
   truncated: z.boolean(),
+  delay: publicationDelay,
 }) satisfies z.ZodType<LensBody<SpendingBreakdown>>;
 
 const familyTotals = z.strictObject({ count, amount });

@@ -17,6 +17,7 @@ describe('aligning a series', () => {
       points,
       { fromFiscalYear: 2025, toFiscalYear: 2026 },
       { fiscalYear: 2026, period: 3 },
+      null,
     );
     expect(aligned).toHaveLength(15);
     expect(aligned[0]).toEqual({
@@ -26,6 +27,7 @@ describe('aligning a series', () => {
       idvs: 1,
       total: 16,
       partial: false,
+      unpublished: false,
     });
     expect(aligned[1]).toMatchObject({ fiscalYear: 2025, period: 2, total: 0 });
     expect(aligned.at(-1)).toEqual({
@@ -35,6 +37,7 @@ describe('aligning a series', () => {
       idvs: 2,
       total: 9,
       partial: true,
+      unpublished: false,
     });
     expect(aligned.filter((point) => point.partial)).toHaveLength(1);
     expect(aligned.some((point) => point.total === 99)).toBe(false);
@@ -45,10 +48,25 @@ describe('aligning a series', () => {
       [seriesPointOf({ fiscalYear: 2026, period: 1, contracts: -5, idvs: 0, total: -5 })],
       { fromFiscalYear: 2026, toFiscalYear: 2027 },
       { fiscalYear: 2026, period: 2 },
+      null,
     );
     expect(aligned.map((point) => [point.fiscalYear, point.period, point.total])).toEqual([
       [2026, 1, -5],
       [2026, 2, 0],
     ]);
+  });
+
+  it('[GOV-25] marks unpublished every period that ends after the last day wholly published, in a past year and the current one alike, and none when nothing is delayed', () => {
+    const window = { fromFiscalYear: 2026, toFiscalYear: 2027 };
+    const current = { fiscalYear: 2027, period: 1 };
+    const unpublished = (completeThrough: string | null) =>
+      alignSeries([], window, current, completeThrough)
+        .filter((point) => point.unpublished)
+        .map((point) => `${point.fiscalYear}:${point.period}`);
+    // Read on 2026-10-12 with a 90-day lag: July ends after July 14, June does not.
+    expect(unpublished('2026-07-14')).toEqual(['2026:10', '2026:11', '2026:12', '2027:1']);
+    // A period is published on the very day it ends.
+    expect(unpublished('2026-07-31')).toEqual(['2026:11', '2026:12', '2027:1']);
+    expect(unpublished(null)).toEqual([]);
   });
 });

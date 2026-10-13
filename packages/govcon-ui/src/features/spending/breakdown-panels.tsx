@@ -10,6 +10,7 @@ import {
 import { BarList, Button, SelectField, Stack, StatTile, Text } from '@sysdesign/design-system';
 
 import { BREAKDOWN_CATEGORY_LABEL } from './costs';
+import { PublicationNote } from './publication-note';
 
 export interface BreakdownControlsProps {
   category: BreakdownCategory;
@@ -65,7 +66,7 @@ export interface BreakdownListProps {
   breakdown: SpendingBreakdown;
 }
 
-/** The scope's whole over the window, then the ranked rows as shares of it. */
+/** The scope's whole over the window, then the ranked rows as shares of it, and what the window is still missing. */
 export function BreakdownList({ breakdown }: BreakdownListProps) {
   const label = BREAKDOWN_CATEGORY_LABEL[breakdown.category];
   return (
@@ -75,6 +76,10 @@ export function BreakdownList({ breakdown }: BreakdownListProps) {
         value={compactMoney(breakdown.total)}
         detail={`${breakdown.from} → ${breakdown.to}`}
         style={{ maxWidth: 280 }}
+      />
+      <PublicationNote
+        delay={breakdown.delay}
+        consequence="This window reaches past that day, so the total and every row those awards belong to are short."
       />
       <BarList
         title={`Obligations by ${label}`}

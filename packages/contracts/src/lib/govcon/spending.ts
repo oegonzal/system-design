@@ -48,6 +48,25 @@ export interface PeriodObligations extends FiscalPeriod {
   total: number;
   /** The period in progress: its amount is what has been reported so far. */
   partial: boolean;
+  /** The period reaches past what the source has published for the scope: awards an agency publishes late are still to come. */
+  unpublished: boolean;
+}
+
+/** A period whose amount is final as far as the source can say: ended, and wholly published. */
+export const isSettled = (point: PeriodObligations): boolean =>
+  !point.partial && !point.unpublished;
+
+/**
+ * Awards a scope counts that the source publishes late: which agencies, by
+ * how many days after signing, and the last day whose awards are all in.
+ * Amounts after that day are still filling in.
+ */
+export interface PublicationDelay {
+  /** The agencies that publish late, by name. */
+  agencies: string[];
+  days: number;
+  /** ISO: awards signed on or before this day are published. */
+  completeThrough: string;
 }
 
 export interface ProjectedPeriod extends FiscalPeriod {
@@ -64,7 +83,7 @@ export interface Projection {
   method: 'seasonal-mean';
   /** The complete prior fiscal years the mean was taken over. */
   lookbackFiscalYears: number[];
-  /** Complete periods of the current year the run rate rests on. */
+  /** Settled periods of the current year the run rate rests on. */
   basePeriods: number;
   /** This year's base over the lookback mean's base; null while the base is too short. */
   ratio: number | null;
@@ -78,6 +97,8 @@ export interface SpendingPulse {
   series: PeriodObligations[];
   /** Null without a complete prior fiscal year to project from. */
   projection: Projection | null;
+  /** Null when no agency the scope counts publishes late. */
+  delay: PublicationDelay | null;
   provenance: Provenance;
 }
 
@@ -106,6 +127,8 @@ export interface SpendingBreakdown {
   rows: BreakdownRow[];
   /** More rows exist beyond the declared bound. */
   truncated: boolean;
+  /** Null unless the window reaches past what an agency the scope counts has published. */
+  delay: PublicationDelay | null;
   provenance: Provenance;
 }
 

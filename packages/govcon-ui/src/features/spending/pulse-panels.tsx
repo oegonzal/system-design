@@ -2,12 +2,17 @@ import { compactMoney, money, periodMonthLabel, type SpendingPulse } from '@sysd
 import { ColumnChart, StatGrid, StatTile, Text } from '@sysdesign/design-system';
 
 import { periodColumns, pulseYears } from './period-columns';
-import type { PulseFigures, Range } from './pulse-figures';
+import { PublicationNote } from './publication-note';
+import type { Comparison, PulseFigures, Range } from './pulse-figures';
 
-const percentChange = (now: number, then: number | null): string | null =>
-  then === null || then === 0
+/** The change over the periods both years have settled, saying how far that reaches. */
+const changeLabel = (comparison: Comparison | null): string | null =>
+  comparison === null || comparison.then === 0
     ? null
-    : `${now >= then ? '+' : ''}${(((now - then) / then) * 100).toFixed(0)}% vs the prior year to date`;
+    : `${comparison.now >= comparison.then ? '+' : ''}${(
+        ((comparison.now - comparison.then) / comparison.then) *
+        100
+      ).toFixed(0)}% vs the prior year through ${periodMonthLabel(comparison.throughPeriod)}`;
 
 const rangeLabel = (range: Range): string =>
   `${compactMoney(range.low)}–${compactMoney(range.high)}`;
@@ -16,7 +21,7 @@ export interface PulseTilesProps {
   figures: PulseFigures;
 }
 
-/** The year so far against last year, and what the projection adds. */
+/** The year so far against last year — compared over the periods both have settled — and what the projection adds. */
 export function PulseTiles({ figures }: PulseTilesProps) {
   const through = `FY${figures.fiscalYear} through ${periodMonthLabel(figures.throughPeriod)}`;
   return (
@@ -26,7 +31,7 @@ export function PulseTiles({ figures }: PulseTilesProps) {
         label="Prior year to date"
         value={compactMoney(figures.priorToDate)}
         detail={
-          percentChange(figures.toDate, figures.priorToDate) ??
+          changeLabel(figures.comparison) ??
           `FY${figures.fiscalYear - 1} through ${periodMonthLabel(figures.throughPeriod)}`
         }
       />
@@ -59,7 +64,7 @@ export interface PulseChartProps {
   pending?: boolean;
 }
 
-/** Obligations by fiscal period, one series per year; this year's open months hatched with their band. */
+/** Obligations by fiscal period, one series per year; this year's open months hatched with their band, and what the source has yet to publish said beneath. */
 export function PulseChart({ pulse, pending = false }: PulseChartProps) {
   const { series, data } = periodColumns(pulseYears(pulse));
   const method = pulse.projection;
@@ -86,6 +91,10 @@ export function PulseChart({ pulse, pending = false }: PulseChartProps) {
                 : `, scaled ${method.ratio.toFixed(2)}× by ${method.basePeriods} complete period(s) of this year`
             }.`}
       </Text>
+      <PublicationNote
+        delay={pulse.delay}
+        consequence="Periods after that day are drawn lighter as provisional, are projected like the month in progress, and stay out of the comparison with the prior year."
+      />
     </>
   );
 }

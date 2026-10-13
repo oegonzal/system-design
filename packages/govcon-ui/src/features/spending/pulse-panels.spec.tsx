@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import * as stories from './pulse-panels.stories';
 
-const { Chart, Tiles, Unprojected } = composeStories(stories);
+const { Chart, Delayed, DelayedTiles, Tiles, Unprojected } = composeStories(stories);
 
 describe('the pulse panels', () => {
   it('[GOVU-11] charts the fiscal years over twelve periods with a data table, and names the projection method', () => {
@@ -40,9 +40,29 @@ describe('the pulse panels', () => {
     const grid = screen.getByLabelText('Fiscal year to date');
     expect(within(grid).getByText('Year to date')).toBeTruthy();
     expect(within(grid).getByText('FY2026 through Jun')).toBeTruthy();
-    expect(within(grid).getByText(/% vs the prior year to date/)).toBeTruthy();
+    expect(within(grid).getByText(/% vs the prior year through May/)).toBeTruthy();
     expect(within(grid).getByText('Projected remainder')).toBeTruthy();
     expect(within(grid).getAllByText(/\$[\d.]+[KM]–\$[\d.]+[KM]/).length).toBe(2);
+  });
+
+  it('[GOVU-13] says which agency publishes late and through which day the amounts are whole, marks the periods after it provisional, and compares the years only as far as both are settled', () => {
+    renderWithTheme(<Chart />);
+    expect(screen.queryByText(/still filling in/)).toBeNull();
+
+    renderWithTheme(<Delayed />);
+    expect(
+      screen.getByText(
+        /Department of Defense awards are published 90 days after they are signed: everything through 2026-03-16 is in/,
+      ),
+    ).toBeTruthy();
+    fireEvent.click(screen.getAllByRole('button', { name: 'Data table' }).at(-1) as HTMLElement);
+    const table = screen
+      .getAllByRole('table', { name: 'Obligations by fiscal period table' })
+      .at(-1);
+    expect(within(table as HTMLElement).getAllByText(/\(provisional\)/)).toHaveLength(4);
+
+    renderWithTheme(<DelayedTiles />);
+    expect(screen.getByText(/% vs the prior year through Feb/)).toBeTruthy();
   });
 
   it('says when there is nothing to project from', () => {
