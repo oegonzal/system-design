@@ -25,3 +25,4 @@ export * from './theme/theme';
 export * from './theme/styled';
 export * from './theme-root';
 export * from './primitives';
+export * from './charts';

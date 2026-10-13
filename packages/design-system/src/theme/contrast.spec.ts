@@ -210,6 +210,21 @@ describe.each(COLOR_MODES)('%s mode', (colorMode) => {
       ).toBeGreaterThanOrEqual(WCAG_AA_NON_TEXT);
     });
 
+    it.each([0, 1, 2, 3])(
+      `chart series %s clears ${WCAG_AA_NON_TEXT}:1 against the surface`,
+      (slot) => {
+        const ratio = contrastRatio(color.chart.series[slot] ?? '', color.bg.surface);
+        expect(
+          ratio,
+          `chart.series[${slot}] on bg.surface is ${formatRatio(ratio)}`,
+        ).toBeGreaterThanOrEqual(WCAG_AA_NON_TEXT);
+      },
+    );
+
+    it('chart series slots are four distinct hues', () => {
+      expect(new Set(color.chart.series).size).toBe(4);
+    });
+
     it.each(SEVERITIES)(`the %s severity pair clears ${WCAG_AA_TEXT}:1`, (severity) => {
       const pair = color.severity[severity];
       const ratio = contrastRatio(pair.fg, pair.bg);

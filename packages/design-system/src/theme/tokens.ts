@@ -154,6 +154,21 @@ export const SEVERITY_PAIRS = {
 } as const satisfies Record<ColorMode, Record<Severity, IntentPair>>;
 
 /**
+ * Four data-series hues per mode, in a fixed order — a chart assigns them by
+ * position and never cycles past them; a fifth series folds into "Other".
+ * Stepped per mode rather than flipped: each slot clears 3:1 against that
+ * mode's surface (asserted in `contrast.spec.ts`) and the set passes the
+ * lightness band, chroma floor, colour-vision separation and normal-vision
+ * floor checks of the data-visualization validator, both modes.
+ */
+export type ChartSeriesScale = readonly [string, string, string, string];
+
+export const CHART_SERIES = {
+  light: ['#2a78d6', '#eb6834', '#4a3aa7', '#008300'],
+  dark: ['#3987e5', '#d95926', '#9085e9', '#008300'],
+} as const satisfies Record<ColorMode, ChartSeriesScale>;
+
+/**
  * Nine steps, fixed length.
  *
  * `as const` arity is the one thing the tuple type must preserve:

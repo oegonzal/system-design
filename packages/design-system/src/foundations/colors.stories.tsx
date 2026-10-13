@@ -154,6 +154,22 @@ export const SemanticRoles: Story = {
   },
 };
 
+/** The four data-series slots a chart assigns in order, against the surface they sit on. */
+export const ChartSeries: Story = {
+  render: function ChartSeriesStory() {
+    const theme = useTheme();
+    return (
+      <Group
+        name="chart.series"
+        entries={Object.fromEntries(
+          theme.color.chart.series.map((hex, slot) => [`slot ${slot + 1}`, hex]),
+        )}
+        against={theme.color.bg.surface}
+      />
+    );
+  },
+};
+
 /** Raw ramps. Named for what they are, never referenced from a component. */
 export const Primitives: Story = {
   render: () => (

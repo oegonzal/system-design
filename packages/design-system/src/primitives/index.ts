@@ -18,6 +18,7 @@ export * from './skeleton/skeleton';
 export * from './skip-link/skip-link';
 export * from './spinner/spinner';
 export * from './stack/stack';
+export * from './stat-tile/stat-tile';
 export * from './surface/surface';
 export * from './table/table';
 export * from './tabs/tabs';

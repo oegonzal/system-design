@@ -1,19 +1,5 @@
-import styled from '@emotion/styled';
 import { money, type AwardsSummary } from '@sysdesign/contracts';
-import { Button, Heading, Stack, Surface, Text } from '@sysdesign/design-system';
-
-const Tiles = styled.div`
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: ${({ theme }) => theme.space[3]}px;
-`;
-
-const Figure = styled.span`
-  display: block;
-  font-size: ${({ theme }) => theme.font.size.xl};
-  font-weight: ${({ theme }) => theme.font.weight.semibold};
-  color: ${({ theme }) => theme.color.text.primary};
-`;
+import { Button, Heading, Stack, StatGrid, StatTile, Text } from '@sysdesign/design-system';
 
 export interface AwardsSummaryTilesProps {
   summary: AwardsSummary;
@@ -21,17 +7,6 @@ export interface AwardsSummaryTilesProps {
   onLookup?: (uei: string) => void;
   /** The UEI whose lookup is in flight. */
   lookingUp?: string | null;
-}
-
-function Tile({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <Surface padding={4}>
-      <Text as="span" tone="secondary" size="sm">
-        {label}
-      </Text>
-      <Figure>{children}</Figure>
-    </Surface>
-  );
 }
 
 /** What the stored awards say, deterministically: how many, for how much, how contested, who keeps winning. */
@@ -43,30 +18,39 @@ export function AwardsSummaryTiles({
   const offers = summary.offers;
   return (
     <Stack gap={4}>
-      <Tiles aria-label="Award summary">
-        <Tile label="Awards">{summary.count}</Tile>
-        <Tile label="Total obligated">{money(summary.total)}</Tile>
-        <Tile label="Median award">{money(summary.median)}</Tile>
-        <Tile label="Offers received">
-          <Text as="span" size="sm">
-            one {offers.one} · few {offers.few} · many {offers.many} · unknown {offers.unknown}
-          </Text>
-        </Tile>
-        <Tile label="Set-asides">
-          <Text as="span" size="sm">
-            {Object.entries(summary.setAsideMix).length === 0
-              ? '—'
-              : Object.entries(summary.setAsideMix)
-                  .map(([code, count]) => `${code} ${count}`)
-                  .join(' · ')}
-          </Text>
-        </Tile>
-        <Tile label="By source">
-          <Text as="span" size="sm">
-            sam.gov {summary.bySource['sam.gov']} · USAspending {summary.bySource.usaspending}
-          </Text>
-        </Tile>
-      </Tiles>
+      <StatGrid aria-label="Award summary">
+        <StatTile label="Awards" value={summary.count} />
+        <StatTile label="Total obligated" value={money(summary.total)} />
+        <StatTile label="Median award" value={money(summary.median)} />
+        <StatTile
+          label="Offers received"
+          value={
+            <Text as="span" size="sm">
+              one {offers.one} · few {offers.few} · many {offers.many} · unknown {offers.unknown}
+            </Text>
+          }
+        />
+        <StatTile
+          label="Set-asides"
+          value={
+            <Text as="span" size="sm">
+              {Object.entries(summary.setAsideMix).length === 0
+                ? '—'
+                : Object.entries(summary.setAsideMix)
+                    .map(([code, count]) => `${code} ${count}`)
+                    .join(' · ')}
+            </Text>
+          }
+        />
+        <StatTile
+          label="By source"
+          value={
+            <Text as="span" size="sm">
+              sam.gov {summary.bySource['sam.gov']} · USAspending {summary.bySource.usaspending}
+            </Text>
+          }
+        />
+      </StatGrid>
       <Stack gap={2}>
         <Heading level={3}>Top awardees</Heading>
         {summary.topAwardees.length === 0 ? (

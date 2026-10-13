@@ -9,7 +9,15 @@ import {
 } from '@sysdesign/contracts';
 
 import { ACCENT_RAMPS } from './accents';
-import { INTENT_PAIRS, MODE_NEUTRALS, SEVERITY_PAIRS, palette, type IntentPair } from './tokens';
+import {
+  CHART_SERIES,
+  INTENT_PAIRS,
+  MODE_NEUTRALS,
+  SEVERITY_PAIRS,
+  palette,
+  type ChartSeriesScale,
+  type IntentPair,
+} from './tokens';
 
 /**
  * Semantic tokens — primitives named for their *role*.
@@ -62,6 +70,8 @@ export interface SemanticColors {
   nodeKindFg: Record<NodeKind, string>;
   /** Category anchor hue — heading dots, legends, anywhere a shelf needs a swatch. */
   nodeKindCategory: Record<NodeKindCategoryId, string>;
+  /** Data-series hues for charts, by slot in a fixed order; a chart never cycles past them. */
+  chart: { series: ChartSeriesScale };
 }
 
 /**
@@ -192,5 +202,6 @@ export function createSemanticColors({ mode, accent }: SemanticColorInput): Sema
     nodeKind: { ...nodeKind },
     nodeKindFg: { ...nodeKindFg },
     nodeKindCategory: { ...nodeKindCategory },
+    chart: { series: [...CHART_SERIES[mode]] },
   };
 }
