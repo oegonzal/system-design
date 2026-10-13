@@ -187,7 +187,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       persona: evaluatorRequirements,
       samples: 2,
       consumes: ['findings'],
-      maxTokens: 9000,
+      maxTokens: 12200,
       criterionKinds: ['functional', 'constraint'],
     },
     {

@@ -177,6 +177,16 @@ describe('the document-digest pipeline', () => {
       boundsAgainstMeasured(
         [documentDigestOutput.schema, deriverSchema(DOCUMENT_DIGEST.task)],
         measured.fields,
+        {
+          exempt: {
+            // A condition is the question a form asks, and 500 is right for that shape: p99 sits
+            // under the target over 240 runs; one digest of 2026-10-13 wrote a 1,230-character
+            // condition, kept whole under the 1,500 cut, which is not a reason to tell every digest
+            // it may write conditions that long.
+            'memories[].appliesWhen':
+              'one outlier condition of 1,230 characters; p99 within the target',
+          },
+        },
       ),
     ).toEqual([]);
   });

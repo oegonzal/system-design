@@ -40,7 +40,8 @@ import { z } from 'zod';
 
 import { section, type OutputShape } from '../../core/contracts';
 
-const SUMMARY_BOUND = bound(950);
+/** Measured 2026-10-13 over 240 runs: p99 970. */
+const SUMMARY_BOUND = bound(1000);
 const MEMORIES_BOUND = bound(DOCUMENT_MAX_MEMORIES, 'list');
 const MEMORY_EVIDENCE_BOUND = bound(4, 'list');
 const UNUSED_BOUND = bound(DOCUMENT_MAX_PARTS, 'list');

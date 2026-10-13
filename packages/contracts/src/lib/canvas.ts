@@ -231,7 +231,8 @@ export const NODE_LABEL_BOUND = bound(80);
 export const EDGE_LABEL_BOUND = bound(80);
 
 export const NODE_RESPONSIBILITIES_BOUND = bound(6, 'list');
-export const RESPONSIBILITY_BOUND = bound(90);
+/** Measured 2026-10-13 over the coach's canvases: p99 124, max 137 — a clause, not a sentence. */
+export const RESPONSIBILITY_BOUND = bound(150);
 export const NODE_OPERATIONS_BOUND = bound(12, 'list');
 export const OPERATION_NAME_MAX_LENGTH = 60;
 export const OPERATION_NOTES_BOUND = bound(200);

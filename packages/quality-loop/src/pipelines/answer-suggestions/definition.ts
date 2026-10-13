@@ -91,12 +91,12 @@ export const ANSWER_SUGGESTIONS: PipelineDefinition<AnswerSuggestions> = {
   },
 
   // Caps a fifth above what this pipeline's own runs wrote (`measured.json`,
-  // `pnpm measure:bounds`; 46 runs on the subscription, 2026-10-13): the
-  // grounding critic ran to 18,190 output tokens, the producer to 14,047 —
-  // past its 8,000 — the fit critic to 11,533, the evaluator to 10,502. The
-  // producer's cap is sized past that for the drafts the suggesting policy
-  // now asks for, two to four paragraphs each. A cap is also the call's time
-  // limit, so one a stage outwrites is a call cut short.
+  // `pnpm measure:bounds`; 51 runs on the subscription, 2026-10-13): the
+  // grounding critic ran to 18,190 output tokens, the evaluator to 17,431
+  // judging the two-to-four-paragraph drafts the suggesting policy asks for,
+  // the producer to 14,047 — past its 8,000 — the fit critic to 11,533. The
+  // producer's cap is sized past that for those drafts. A cap is also the
+  // call's time limit, so one a stage outwrites is a call cut short.
   deriveCriteria: { persona: deriveCriteria, maxTokens: 10000 },
   producer: { persona: producer, maxTokens: 20000, consumes: ['criteria'] },
   validators: [referencesValidator, citationsValidator, limitsValidator],
@@ -121,7 +121,7 @@ export const ANSWER_SUGGESTIONS: PipelineDefinition<AnswerSuggestions> = {
       // Beside the critics rather than after them: the operator waits on this
       // run, and measured on field-answer's stages that is a third off its time.
       consumes: [],
-      maxTokens: 13000,
+      maxTokens: 21000,
       criterionKinds: ['grounding', 'compliance', 'fit'],
     },
   ],

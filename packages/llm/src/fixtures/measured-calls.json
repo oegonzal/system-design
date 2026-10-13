@@ -595,13 +595,6 @@
     "durationMs": 156415
   },
   {
-    "run": "2026-10-11T11-10-25-175-b16683-quality",
-    "call": "03.evaluator.suggestions.s1.1",
-    "maxTokens": 12500,
-    "outputTokens": 10502,
-    "durationMs": 112579
-  },
-  {
     "run": "2026-10-12T00-02-56-736-de7d7b-quality",
     "call": "04.critic.fit.s1.1",
     "maxTokens": 8000,
@@ -670,5 +663,19 @@
     "maxTokens": 17500,
     "outputTokens": 9,
     "durationMs": 4276
+  },
+  {
+    "run": "2026-10-13T07-39-29-450-3572e0-quality",
+    "call": "05.evaluator.suggestions.s1.1",
+    "maxTokens": 13000,
+    "outputTokens": 17431,
+    "durationMs": 199377
+  },
+  {
+    "run": "2026-10-13T07-51-23-820-e23e10-quality",
+    "call": "01.criteria.1",
+    "maxTokens": 10000,
+    "outputTokens": 2287,
+    "durationMs": 23547
   }
 ]

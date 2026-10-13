@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { describePipeline } from '../../core/describe-pipeline';
 import { validatePipeline } from '../../core/validate-pipeline';
-import { capsAgainstMeasured, jsonSchemaTypes } from '../../core/testing';
+import { capsAgainstMeasured, deriverSchema, jsonSchemaTypes } from '../../core/testing';
 import { ANSWER_SUGGESTIONS } from './definition';
 import measured from './measured.json';
 import { answerSuggestionsOutput } from './output';
@@ -86,8 +86,14 @@ describe('the answer-suggestions pipeline', () => {
     ).toEqual([]);
   });
 
-  it('[QL-4] [QL-49] every bound its producer is shown sits above what it has measurably written', () => {
-    expect(boundsAgainstMeasured(answerSuggestionsOutput.schema, measured.fields)).toEqual([]);
+  it('[QL-4] [QL-49] every bound its producer and deriver are shown sits above what they have measurably written', () => {
+    // The deriver is measured too where a run derived its own criteria — a replay through POST /runs, outside a session.
+    expect(
+      boundsAgainstMeasured(
+        [answerSuggestionsOutput.schema, deriverSchema(ANSWER_SUGGESTIONS.task)],
+        measured.fields,
+      ),
+    ).toEqual([]);
   });
 
   it('[QL-4] every location the suggestions expose is printed verbatim where a judge reads it, beside the field’s ref', () => {

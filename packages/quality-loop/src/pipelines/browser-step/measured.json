@@ -1,20 +1,20 @@
 {
   "since": "2026-10-03T18:16:26.268Z",
-  "until": "2026-10-11T04:17:38.321Z",
-  "runs": 1120,
+  "until": "2026-10-13T08:51:15.962Z",
+  "runs": 1321,
   "fields": {
-    "actions": { "n": 1307, "max": 8, "p99": 8, "overTarget": 0 },
-    "actions[].expect": { "n": 2721, "max": 218, "p99": 158, "overTarget": 1 },
-    "actions[].reason": { "n": 4200, "max": 397, "p99": 223, "overTarget": 17 },
-    "actions[].serves": { "n": 3314, "max": 4, "p99": 2, "overTarget": 0 },
-    "actions[].serves[]": { "n": 1869, "max": 4, "p99": 3, "overTarget": 0 },
-    "actions[].url": { "n": 869, "max": 763, "p99": 763, "overTarget": 0 },
-    "assessment": { "n": 1305, "max": 996, "p99": 744, "overTarget": 21 }
+    "actions": { "n": 1508, "max": 8, "p99": 8, "overTarget": 0 },
+    "actions[].expect": { "n": 3004, "max": 218, "p99": 158, "overTarget": 1 },
+    "actions[].reason": { "n": 4508, "max": 461, "p99": 233, "overTarget": 35 },
+    "actions[].serves": { "n": 3622, "max": 4, "p99": 2, "overTarget": 0 },
+    "actions[].serves[]": { "n": 2225, "max": 4, "p99": 3, "overTarget": 0 },
+    "actions[].url": { "n": 895, "max": 763, "p99": 763, "overTarget": 0 },
+    "assessment": { "n": 1506, "max": 996, "p99": 764, "overTarget": 32 }
   },
   "caps": {
-    "critic.mission": { "n": 1303, "max": 16752, "p99": 9832, "maxApiCalls": 1 },
-    "critic.safety": { "n": 1303, "max": 14473, "p99": 6095, "maxApiCalls": 1 },
-    "evaluator.plan": { "n": 1310, "max": 30396, "p99": 16384, "maxApiCalls": 1 },
-    "producer": { "n": 1323, "max": 8517, "p99": 4043, "maxApiCalls": 1 }
+    "critic.mission": { "n": 1505, "max": 16752, "p99": 10923, "maxApiCalls": 1 },
+    "critic.safety": { "n": 1504, "max": 14473, "p99": 7235, "maxApiCalls": 1 },
+    "evaluator.plan": { "n": 1513, "max": 30396, "p99": 16384, "maxApiCalls": 1 },
+    "producer": { "n": 1525, "max": 11875, "p99": 4280, "maxApiCalls": 1 }
   }
 }

@@ -51,7 +51,7 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
     output: memoryPackOutput,
   },
 
-  deriveCriteria: { persona: deriveCriteria, maxTokens: 4000 },
+  deriveCriteria: { persona: deriveCriteria, maxTokens: 4700 },
   producer: { persona: producer, maxTokens: 16000, consumes: ['criteria'] },
   validators: [referencesValidator, limitsValidator],
   // The floor, not the standard order: a pack accepted at 80.6 with coverage
@@ -90,7 +90,7 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
       persona: evaluatorAdmissibility,
       samples: 2,
       consumes: [],
-      maxTokens: 8000,
+      maxTokens: 8800,
       criterionKinds: ['admissibility'],
     },
   ],

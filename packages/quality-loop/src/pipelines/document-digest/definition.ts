@@ -89,7 +89,7 @@ export const DOCUMENT_DIGEST: PipelineDefinition<DocumentDigest> = {
       persona: criticUsability,
       samples: 2,
       maxItems: 10,
-      maxTokens: 24000,
+      maxTokens: 28500,
     },
   ],
 

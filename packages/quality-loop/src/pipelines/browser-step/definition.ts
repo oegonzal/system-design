@@ -129,8 +129,8 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
   },
 
   // Each cap a fifth above the most its stage has written — `measured.json`
-  // (`pnpm measure:bounds`), 1,120 step runs, 2026-10-03 → 2026-10-11, on
-  // Claude, which counts its thinking: producer 8,517 tokens, critic.mission
+  // (`pnpm measure:bounds`), 1,321 step runs, 2026-10-03 → 2026-10-13, on
+  // Claude, which counts its thinking: producer 11,875 tokens, critic.mission
   // 16,752, critic.safety 14,473, evaluator 30,396 — and 19 derivations
   // through the criteria endpoint (9,974; `static/runs/2026-10-10T0*-criteria`).
   // A cap is also the call's time limit, so one a stage outwrites is a call cut short.
@@ -139,7 +139,7 @@ export const BROWSER_STEP: PipelineDefinition<StepPlan> = {
   // The planner sees the checklist: a session derives it once and supplies it on every run.
   producer: {
     persona: producer,
-    maxTokens: 10500,
+    maxTokens: 14500,
     consumes: ['criteria'],
     // The checklist covers the mission; a plan covers one page.
     instruction:

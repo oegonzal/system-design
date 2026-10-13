@@ -1,19 +1,22 @@
 {
   "since": "2026-10-11T07:19:57.183Z",
-  "until": "2026-10-13T06:49:54.047Z",
-  "runs": 46,
+  "until": "2026-10-13T07:58:11.108Z",
+  "runs": 51,
   "fields": {
-    "fields": { "n": 46, "max": 8, "p99": 8, "overTarget": 0 },
-    "fields[].suggestions": { "n": 64, "max": 4, "p99": 4, "overTarget": 0 },
-    "fields[].suggestions[].cites": { "n": 113, "max": 3, "p99": 3, "overTarget": 0 },
-    "fields[].suggestions[].text": { "n": 113, "max": 613, "p99": 607, "overTarget": 0 },
-    "fields[].suggestions[].why": { "n": 113, "max": 302, "p99": 290, "overTarget": 9 },
-    "summary": { "n": 46, "max": 810, "p99": 810, "overTarget": 3 }
+    "criteria": { "n": 5, "max": 10, "p99": 10, "overTarget": 0 },
+    "criteria[].statement": { "n": 37, "max": 350, "p99": 350, "overTarget": 0 },
+    "fields": { "n": 51, "max": 8, "p99": 8, "overTarget": 0 },
+    "fields[].suggestions": { "n": 69, "max": 4, "p99": 4, "overTarget": 0 },
+    "fields[].suggestions[].cites": { "n": 119, "max": 3, "p99": 3, "overTarget": 0 },
+    "fields[].suggestions[].text": { "n": 119, "max": 871, "p99": 613, "overTarget": 0 },
+    "fields[].suggestions[].why": { "n": 119, "max": 302, "p99": 290, "overTarget": 9 },
+    "summary": { "n": 51, "max": 810, "p99": 810, "overTarget": 3 }
   },
   "caps": {
-    "critic.fit": { "n": 46, "max": 11533, "p99": 11533, "maxApiCalls": 1 },
-    "critic.grounding": { "n": 46, "max": 18190, "p99": 18190, "maxApiCalls": 1 },
-    "evaluator.suggestions": { "n": 46, "max": 10502, "p99": 10502, "maxApiCalls": 1 },
-    "producer": { "n": 46, "max": 14047, "p99": 14047, "maxApiCalls": 1 }
+    "criteria": { "n": 5, "max": 2287, "p99": 2287, "maxApiCalls": 1 },
+    "critic.fit": { "n": 51, "max": 11533, "p99": 11533, "maxApiCalls": 1 },
+    "critic.grounding": { "n": 51, "max": 18190, "p99": 18190, "maxApiCalls": 1 },
+    "evaluator.suggestions": { "n": 51, "max": 17431, "p99": 17431, "maxApiCalls": 1 },
+    "producer": { "n": 51, "max": 14047, "p99": 14047, "maxApiCalls": 1 }
   }
 }

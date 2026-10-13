@@ -1,15 +1,15 @@
 {
   "since": "2026-09-06T04:32:56.052Z",
-  "until": "2026-10-13T06:59:36.492Z",
-  "runs": 2007,
+  "until": "2026-10-13T08:51:15.962Z",
+  "runs": 2033,
   "fields": {
-    "findings": { "n": 7739, "max": 9, "p99": 7, "overTarget": 0 },
-    "findings[].criterionIds": { "n": 17529, "max": 7, "p99": 4, "overTarget": 9 },
-    "findings[].locationRefs": { "n": 17561, "max": 11, "p99": 7, "overTarget": 2 },
-    "findings[].rationale": { "n": 17561, "max": 997, "p99": 618, "overTarget": 66 },
-    "results": { "n": 4387, "max": 40, "p99": 27, "overTarget": 1 },
-    "results[].locationRefs": { "n": 49660, "max": 12, "p99": 6, "overTarget": 120 },
-    "results[].rationale": { "n": 49605, "max": 619, "p99": 404, "overTarget": 5 }
+    "findings": { "n": 7813, "max": 9, "p99": 7, "overTarget": 0 },
+    "findings[].criterionIds": { "n": 17558, "max": 7, "p99": 4, "overTarget": 9 },
+    "findings[].locationRefs": { "n": 17590, "max": 11, "p99": 7, "overTarget": 2 },
+    "findings[].rationale": { "n": 17590, "max": 997, "p99": 618, "overTarget": 66 },
+    "results": { "n": 4430, "max": 40, "p99": 27, "overTarget": 2 },
+    "results[].locationRefs": { "n": 50282, "max": 12, "p99": 6, "overTarget": 124 },
+    "results[].rationale": { "n": 50227, "max": 619, "p99": 403, "overTarget": 5 }
   },
   "caps": {}
 }

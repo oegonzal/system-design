@@ -1,24 +1,24 @@
 {
   "since": "2026-10-03T02:01:50.804Z",
-  "until": "2026-10-03T04:13:42.457Z",
-  "runs": 15,
+  "until": "2026-10-13T08:22:05.795Z",
+  "runs": 240,
   "fields": {
-    "criteria": { "n": 15, "max": 24, "p99": 24, "overTarget": 0 },
-    "criteria[].statement": { "n": 189, "max": 351, "p99": 339, "overTarget": 0 },
-    "memories": { "n": 21, "max": 16, "p99": 16, "overTarget": 0 },
-    "memories[].appliesWhen": { "n": 206, "max": 189, "p99": 143, "overTarget": 0 },
-    "memories[].evidence": { "n": 206, "max": 4, "p99": 2, "overTarget": 0 },
-    "memories[].insight": { "n": 206, "max": 341, "p99": 327, "overTarget": 0 },
-    "summary": { "n": 21, "max": 752, "p99": 752, "overTarget": 0 },
-    "unused": { "n": 21, "max": 4, "p99": 4, "overTarget": 0 }
+    "criteria": { "n": 240, "max": 24, "p99": 24, "overTarget": 0 },
+    "criteria[].statement": { "n": 2668, "max": 644, "p99": 372, "overTarget": 1 },
+    "memories": { "n": 310, "max": 16, "p99": 16, "overTarget": 0 },
+    "memories[].appliesWhen": { "n": 2038, "max": 1230, "p99": 218, "overTarget": 1 },
+    "memories[].evidence": { "n": 2039, "max": 4, "p99": 3, "overTarget": 0 },
+    "memories[].insight": { "n": 2039, "max": 1054, "p99": 436, "overTarget": 2 },
+    "summary": { "n": 310, "max": 1179, "p99": 970, "overTarget": 4 },
+    "unused": { "n": 310, "max": 4, "p99": 4, "overTarget": 0 }
   },
   "caps": {
-    "criteria": { "n": 15, "max": 3901, "p99": 3901, "maxApiCalls": null },
-    "critic.coverage": { "n": 40, "max": 8065, "p99": 8065, "maxApiCalls": null },
-    "critic.grounding": { "n": 41, "max": 17454, "p99": 17454, "maxApiCalls": null },
-    "critic.usability": { "n": 42, "max": 19373, "p99": 19373, "maxApiCalls": null },
-    "evaluator.capture": { "n": 46, "max": 12382, "p99": 12382, "maxApiCalls": null },
-    "evaluator.rules": { "n": 48, "max": 9940, "p99": 9940, "maxApiCalls": null },
-    "producer": { "n": 21, "max": 21858, "p99": 21858, "maxApiCalls": null }
+    "criteria": { "n": 241, "max": 5385, "p99": 4804, "maxApiCalls": 1 },
+    "critic.coverage": { "n": 602, "max": 16706, "p99": 10791, "maxApiCalls": 1 },
+    "critic.grounding": { "n": 601, "max": 25166, "p99": 19450, "maxApiCalls": 1 },
+    "critic.usability": { "n": 608, "max": 23671, "p99": 17598, "maxApiCalls": 1 },
+    "evaluator.capture": { "n": 612, "max": 12382, "p99": 3473, "maxApiCalls": 1 },
+    "evaluator.rules": { "n": 679, "max": 10818, "p99": 9080, "maxApiCalls": 1 },
+    "producer": { "n": 310, "max": 21858, "p99": 14546, "maxApiCalls": 1 }
   }
 }
