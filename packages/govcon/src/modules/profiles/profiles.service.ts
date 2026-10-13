@@ -15,8 +15,9 @@ import { ENFAV, ENFAV_SEARCHES } from '../../profiles';
 import { CLOCK } from '../sources/tokens';
 import { PROFILE_REPOSITORY, SAVED_SEARCH_REPOSITORY } from './tokens';
 
+/** A record as the API answers it: the document through the boot schema — a row from before a field reads with its default — and what the store knows. */
 const toStored = (record: ProfileRecord): StoredProfile => ({
-  ...record.profile,
+  ...validateProfile(record.profile),
   isDefault: record.isDefault,
   createdAt: record.createdAt.toISOString(),
   updatedAt: record.updatedAt.toISOString(),

@@ -1,4 +1,5 @@
 import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import { DEFAULT_ALERT_POLICY, type SearchProfile } from '@sysdesign/contracts';
 
 import { ENFAV_SEARCHES } from '../../profiles';
 import {
@@ -36,6 +37,19 @@ describe('the profiles service', () => {
     );
     expect(await service.seed()).toBe(false);
     expect(await profiles.count()).toBe(1);
+  });
+
+  it('[GOV-13] [GOV-24] lists and resolves a stored document from before the alert policy with the declared default', async () => {
+    const { profiles, service } = harness();
+    const { alerts: _alerts, ...bare } = tinyProfile();
+    profiles.rows.set(bare.id, {
+      profile: bare as SearchProfile,
+      isDefault: true,
+      createdAt: NOW,
+      updatedAt: NOW,
+    });
+    expect((await service.list())[0]?.alerts).toEqual(DEFAULT_ALERT_POLICY);
+    expect((await service.resolve(undefined)).alerts).toEqual(DEFAULT_ALERT_POLICY);
   });
 
   it('[GOV-13] refuses a document the boot schema refuses, with its issues, and writes nothing', async () => {

@@ -5,6 +5,7 @@ import type {
   SourceCallQueries,
   SourceOperation,
   SpendingLens,
+  SpendingScope,
 } from '@sysdesign/contracts';
 
 /**
@@ -38,6 +39,9 @@ export function callKey<K extends SourceOperation>(
 /** sha256 hex over the lens and the canonical query — the snapshot table's key. */
 export const snapshotKey = (lens: SpendingLens, query: object): string =>
   digest('snapshot', lens, query);
+
+/** sha256 hex over a spending scope — what an alert's key names, so the same finding in another scope is another alert. */
+export const scopeKey = (scope: SpendingScope): string => digest('scope', 'spending', scope);
 
 const digest = (...parts: [string, string, object]): string =>
   createHash('sha256')

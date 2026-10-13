@@ -1,5 +1,7 @@
 import {
+  DEFAULT_ALERT_POLICY,
   FACTOR_IDS,
+  MAX_ALERT_ENDING_DAYS,
   MAX_PAGE_SIZE,
   MAX_PULL_DAYS,
   NOTICE_STATUSES,
@@ -69,6 +71,12 @@ const weightsSchema = z.strictObject(
   Object.fromEntries(FACTOR_IDS.map((id) => [id, unit])) as Record<FactorId, typeof unit>,
 );
 
+/** What the daily warm alerts on; a document from before the policy reads as the declared default. */
+const alertPolicySchema = z.strictObject({
+  endingWithinDays: z.number().int().min(0).max(MAX_ALERT_ENDING_DAYS),
+  pulseAboveBand: z.boolean(),
+});
+
 export const searchProfileSchema = z
   .strictObject({
     id: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/),
@@ -115,6 +123,7 @@ export const searchProfileSchema = z
         medium: z.number().min(0).max(100),
       }),
     }),
+    alerts: alertPolicySchema.default(DEFAULT_ALERT_POLICY),
   })
   .superRefine((profile, ctx) => {
     const sum = Object.values(profile.scoring.weights).reduce((total, weight) => total + weight, 0);

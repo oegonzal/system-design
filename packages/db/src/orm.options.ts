@@ -11,6 +11,7 @@ import { CoachingRun } from './entities/coaching-run.entity';
 import { DesignRevision } from './entities/design-revision.entity';
 import { DesignSession } from './entities/design-session.entity';
 import { ExperienceProfile } from './entities/experience-profile.entity';
+import { GovconAlert } from './entities/govcon-alert.entity';
 import { GovconAward } from './entities/govcon-award.entity';
 import { GovconBid } from './entities/govcon-bid.entity';
 import { GovconEntity } from './entities/govcon-entity.entity';
@@ -77,6 +78,7 @@ export const ormOptions = {
     GovconAward,
     GovconEntity,
     GovconSpendingSnapshot,
+    GovconAlert,
     BusEvent,
     BusSubscription,
     Interaction,

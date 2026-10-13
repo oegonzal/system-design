@@ -54,7 +54,7 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
   {
     id: 'GOVU-10',
     statement:
-      'The settings page edits a profile as data — codes, interests, weights with their live sum, prices, bands and tiers — creates, copies, defaults and removes profiles, shows the service issues per field, and shows the sources and the full ledger.',
+      'The settings page edits a profile as data — codes, interests, weights with their live sum, prices, bands, tiers and the alert thresholds (the days an expiring award is flagged within, and whether a pulse above its band alerts) — creates, copies, defaults and removes profiles, shows the service issues per field, and shows the sources and the full ledger.',
   },
   {
     id: 'GOVU-11',
@@ -161,6 +161,16 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
     id: 'GOV-20',
     statement:
       'Every spending lens spends through the one request gate as its own ledger operation, answers from the snapshot table inside the cache window without a request, validates a stored payload before trusting it, serves a stale snapshot only when a refresh failed and says so, and carries its provenance — fetched when, as of, served from where, how many attempts, which provider facts.',
+  },
+  {
+    id: 'GOV-22',
+    statement:
+      'The spending warm runs on a cadence declared in the environment (GOVCON_SPENDING_WARM_HOURS; 0 never), is started only by serve once it listens — never by a lifecycle hook, so the CLI and the HTTP suite never warm — forces a refresh of every lens for the default profile’s NAICS through the controller’s own query schemas, reads the outlook of the top agencies the breakdown names through the directory’s own id, and logs every lens’s outcome, a refusal included, with every page ledgered like any read.',
+  },
+  {
+    id: 'GOV-24',
+    statement:
+      'Alert rules are declared on the profile and run after a warm as pure arithmetic over what it read: each alert is raised once per kind, scope and subject through the ledger, published on its declared topic, listed in one digest prompt per warm put to a person, recorded only once published, and an unreachable bus or ledger is one warning, never a throw.',
   },
   {
     id: 'GOV-23',

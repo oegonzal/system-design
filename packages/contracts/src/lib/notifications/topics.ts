@@ -1,3 +1,4 @@
+import { awardEndingSchema, GOVCON_TOPICS, pulseAboveBandSchema } from '../govcon/alerts';
 import {
   SESSION_TOPICS,
   sessionEndedSchema,
@@ -29,4 +30,7 @@ export const NOTIFICATION_TOPICS: Readonly<Record<string, TopicDeclaration>> = {
   [SESSION_TOPICS.unitOpened]: { schema: sessionUnitOpenedSchema, publishedBy: 'anyone' },
   [SESSION_TOPICS.unitClosed]: { schema: sessionUnitClosedSchema, publishedBy: 'anyone' },
   [SESSION_TOPICS.ended]: { schema: sessionEndedSchema, publishedBy: 'anyone' },
+  // What govcon's spending warm found, for whoever keeps a record; the digest it also prompts is what reaches a person.
+  [GOVCON_TOPICS.awardEnding]: { schema: awardEndingSchema, publishedBy: 'anyone' },
+  [GOVCON_TOPICS.pulseAboveBand]: { schema: pulseAboveBandSchema, publishedBy: 'anyone' },
 };

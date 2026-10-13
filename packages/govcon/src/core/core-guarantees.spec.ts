@@ -35,6 +35,8 @@ describe('the core', () => {
         'budget/gate.ts',
         'budget/policy.ts',
         'spending/lens.ts',
+        'spending/recompetes.ts',
+        'spending/alerts.ts',
         'scoring.ts',
         'profile.ts',
         'plan.ts',

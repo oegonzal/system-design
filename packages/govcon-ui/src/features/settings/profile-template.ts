@@ -1,4 +1,4 @@
-import type { SearchProfile } from '@sysdesign/contracts';
+import { DEFAULT_ALERT_POLICY, type SearchProfile } from '@sysdesign/contracts';
 
 /**
  * What a new profile starts from: every price and band a scorer can read,
@@ -57,6 +57,7 @@ export const PROFILE_TEMPLATE: SearchProfile = {
     },
     tiers: { high: 70, medium: 45 },
   },
+  alerts: { ...DEFAULT_ALERT_POLICY },
 };
 
 /** A profile duplicated under a new slug, its company marked as the copy. */

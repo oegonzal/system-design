@@ -1,4 +1,8 @@
-import type { SearchProfile } from '@sysdesign/contracts';
+import {
+  DEFAULT_ALERT_POLICY,
+  MAX_ALERT_ENDING_DAYS,
+  type SearchProfile,
+} from '@sysdesign/contracts';
 import type { z } from 'zod';
 
 import { ENFAV } from '../profiles/enfav';
@@ -8,6 +12,11 @@ import { tinyProfile } from './testing';
 describe('the search profile', () => {
   it('[GOV-5] validates exactly the wire contract — the schema output and SearchProfile are one type', () => {
     expectTypeOf<z.output<typeof searchProfileSchema>>().toEqualTypeOf<SearchProfile>();
+  });
+
+  it('[GOV-5] [GOV-24] reads a document without an alert policy as the declared default', () => {
+    const { alerts: _alerts, ...bare } = tinyProfile();
+    expect(validateProfile(bare).alerts).toEqual(DEFAULT_ALERT_POLICY);
   });
 
   it('[GOV-5] accepts the tiny profile and the shipped Enfav profile', () => {
@@ -112,6 +121,14 @@ describe('the search profile', () => {
       'an unknown field',
       (p: ReturnType<typeof tinyProfile>) => ({ ...p, extra: true }),
       /Unrecognized key/,
+    ],
+    [
+      'an alert window past the bound',
+      (p: ReturnType<typeof tinyProfile>) => ({
+        ...p,
+        alerts: { ...p.alerts, endingWithinDays: MAX_ALERT_ENDING_DAYS + 1 },
+      }),
+      /alerts\.endingWithinDays/,
     ],
   ])('[GOV-5] [GOV-13] rejects %s at load, naming the path', (_label, mutate, pattern) => {
     expect(() => validateProfile(mutate(tinyProfile()))).toThrow(pattern);

@@ -11,7 +11,7 @@ import * as stories from './profile-editor.stories';
 const { Default, Creating, WithIssues, Saving } = composeStories(stories);
 
 describe('ProfileEditor', () => {
-  it('[GOVU-1] [GOVU-10] shows the codes, interests, weights, prices, bands and tiers as fields, with the weights summed live', () => {
+  it('[GOVU-1] [GOVU-10] shows the codes, interests, weights, prices, bands, tiers and alert thresholds as fields, with the weights summed live', () => {
     const onChange = vi.fn();
     renderWithTheme(<Default onChange={onChange} />);
     expect(screen.getByRole('form', { name: 'Profile enfav' })).toBeTruthy();
@@ -35,6 +35,11 @@ describe('ProfileEditor', () => {
       '14',
     );
     expect((screen.getByLabelText('High tier from') as HTMLInputElement).value).toBe('70');
+    expect((screen.getByLabelText('Ending within days') as HTMLInputElement).value).toBe('90');
+    expect(
+      (screen.getByLabelText('Alert when the pulse runs above its band') as HTMLInputElement)
+        .checked,
+    ).toBe(true);
 
     fireEvent.change(screen.getByLabelText('Weight naics'), { target: { value: '0.5' } });
     expect(onChange).toHaveBeenLastCalledWith(
@@ -51,16 +56,27 @@ describe('ProfileEditor', () => {
     expect(onChange).toHaveBeenLastCalledWith(
       expect.objectContaining({ naics: [...PROFILE.naics, '326199'] }),
     );
+    fireEvent.change(screen.getByLabelText('Ending within days'), { target: { value: '120' } });
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ alerts: { endingWithinDays: 120, pulseAboveBand: true } }),
+    );
+    fireEvent.click(screen.getByLabelText('Alert when the pulse runs above its band'));
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ alerts: { endingWithinDays: 90, pulseAboveBand: false } }),
+    );
     expect(weightSum({ ...PROFILE.scoring.weights, naics: 0.5 })).toBe(1.2);
   });
 
   it('[GOVU-10] puts every issue the service named beside its field, and all of them at the top', () => {
     renderWithTheme(<WithIssues />);
     const alerts = screen.getAllByRole('alert');
-    expect(alerts[0]?.textContent).toContain('2 issue(s) — nothing was saved');
+    expect(alerts[0]?.textContent).toContain('3 issue(s) — nothing was saved');
     expect(screen.getByText('weights sum to 1.2, not 1')).toBeTruthy();
     const naicsIssue = document.querySelector('[data-path="naics.0"]');
     expect(naicsIssue?.textContent).toContain('Invalid string');
+    expect(document.querySelector('[data-path="alerts.endingWithinDays"]')?.textContent).toContain(
+      'Too big',
+    );
     expect(screen.getByText('Weights sum to 1.20 — they must sum to 1').getAttribute('role')).toBe(
       'alert',
     );

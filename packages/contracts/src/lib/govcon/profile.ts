@@ -70,6 +70,17 @@ export interface ScoringPolicy {
   };
 }
 
+/** What the daily spending warm alerts on, declared per profile. */
+export interface AlertPolicy {
+  /** An award in the profile's codes ending within this many days raises one alert; 0 raises none. */
+  endingWithinDays: number;
+  /** The fiscal period in progress obligating above every prior year's amount for that period. */
+  pulseAboveBand: boolean;
+}
+
+/** What a profile alerts on until it says otherwise; a stored document from before the policy reads as this. */
+export const DEFAULT_ALERT_POLICY: AlertPolicy = { endingWithinDays: 90, pulseAboveBand: true };
+
 export interface SearchProfile {
   /** A slug: the path segment and the key everything else joins on. */
   id: string;
@@ -87,6 +98,7 @@ export interface SearchProfile {
     horizonDays: number;
   };
   scoring: ScoringPolicy;
+  alerts: AlertPolicy;
 }
 
 /** A profile as stored: the document plus what the store knows about it. */

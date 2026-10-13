@@ -77,6 +77,8 @@ export const ENFAV = {
   ],
   pull: { pageSize: 1000, maxPagesPerSlice: 1 },
   leads: { horizonDays: 120 },
+  // The daily digest: awards in these codes ending within a quarter, and a month running above every prior year's.
+  alerts: { endingWithinDays: 90, pulseAboveBand: true },
   scoring: {
     weights: {
       naics: 0.3,

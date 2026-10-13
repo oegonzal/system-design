@@ -7,6 +7,7 @@ export * from './entities/coaching-run.entity';
 export * from './entities/design-revision.entity';
 export * from './entities/design-session.entity';
 export * from './entities/experience-profile.entity';
+export * from './entities/govcon-alert.entity';
 export * from './entities/govcon-award.entity';
 export * from './entities/govcon-bid.entity';
 export * from './entities/govcon-entity.entity';

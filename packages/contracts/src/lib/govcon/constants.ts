@@ -57,5 +57,13 @@ export const MAX_HORIZON_ROWS = 200;
 export const MAX_AGENCY_OFFICES = 50;
 /** Open stored notices one horizon read joins to its rows; the answer says when this bound cut. */
 export const MAX_RECOMPETE_NOTICES = 500;
+/** The farthest ahead an ending-award alert may look, in days. */
+export const MAX_ALERT_ENDING_DAYS = 366;
+/** Alerts one digest prompt lists in full; the rest are counted. */
+export const ALERT_PROMPT_MAX_ITEMS = 10;
+/** A digest nobody answers is withdrawn after this many days. */
+export const ALERT_PROMPT_TTL_DAYS = 7;
+/** Agencies the warm reads an outlook for, from the top of the breakdown. */
+export const WARM_TOP_AGENCIES = 3;
 /** USAspending's award search begins on 2007-10-01, the first day of FY2008. */
 export const FIRST_FISCAL_YEAR = 2008;

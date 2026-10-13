@@ -26,12 +26,7 @@ import type {
   SpendingSnapshotStore,
   SpendingSources,
 } from '../../core/ports';
-import {
-  SnapshotCache,
-  type LensAnswer,
-  type LensSpec,
-  type ReadOptions,
-} from '../../core/spending/lens';
+import { SnapshotCache, type LensAnswer, type ReadOptions } from '../../core/spending/lens';
 import { agencyLens } from '../../core/spending/lenses/agency';
 import { breakdownLens } from '../../core/spending/lenses/breakdown';
 import type { LensDeps } from '../../core/spending/lenses/deps';
@@ -98,7 +93,7 @@ export class SpendingService {
   pulse(query: PulseQueryInput, options: ReadOptions = {}): Promise<SpendingPulse> {
     const current = currentFiscalPeriod(this.now().getTime());
     return this.answer(
-      this.read(
+      this.cache.read(
         pulseLens(this.deps),
         {
           ...scopeOf(query),
@@ -113,7 +108,7 @@ export class SpendingService {
 
   breakdown(query: BreakdownQueryInput, options: ReadOptions = {}): Promise<SpendingBreakdown> {
     return this.answer(
-      this.read(
+      this.cache.read(
         breakdownLens(this.deps),
         { ...scopeOf(query), category: query.category, from: query.from, to: query.to },
         options,
@@ -123,7 +118,7 @@ export class SpendingService {
 
   async horizon(query: HorizonQueryInput, options: ReadOptions = {}): Promise<SpendingHorizon> {
     const body = await this.answer(
-      this.read(
+      this.cache.read(
         horizonLens(this.deps),
         { ...scopeOf(query), months: query.months, today: isoDateOf(this.now().getTime()) },
         options,
@@ -133,7 +128,7 @@ export class SpendingService {
   }
 
   agencies(options: ReadOptions = {}): Promise<AgencyDirectory> {
-    return this.answer(this.read(directoryLens(this.deps), {}, options));
+    return this.answer(this.cache.read(directoryLens(this.deps), {}, options));
   }
 
   async agency(
@@ -147,21 +142,12 @@ export class SpendingService {
       throw new BadRequestException(`fiscal year ${fiscalYear} has not begun`);
     }
     return this.answer(
-      this.read(
+      this.cache.read(
         agencyLens(this.deps),
         { toptierCode, fiscalYear, awardFamily: query.awardFamily },
         options,
       ),
     );
-  }
-
-  /** One lens through the cache, with how this read may depart from the default. */
-  private read<Q extends object, B>(
-    spec: LensSpec<Q, B>,
-    query: Q,
-    options: ReadOptions,
-  ): Promise<LensAnswer<B>> {
-    return this.cache.read(spec, query, options);
   }
 
   /** The open stored notices the rows share a NAICS and a buyer with — joined on every read, never stored. */

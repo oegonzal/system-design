@@ -27,10 +27,12 @@ export const WithIssues: Story = {
       ...PROFILE,
       scoring: { ...PROFILE.scoring, weights: { ...PROFILE.scoring.weights, naics: 0.5 } },
       naics: ['33271A', '5415'],
+      alerts: { endingWithinDays: 400, pulseAboveBand: true },
     },
     issues: [
       { path: 'scoring.weights', message: 'weights sum to 1.2, not 1' },
       { path: 'naics.0', message: 'Invalid string: must match pattern /^\\d{2,6}$/' },
+      { path: 'alerts.endingWithinDays', message: 'Too big: expected number to be <=366' },
     ],
   },
 };

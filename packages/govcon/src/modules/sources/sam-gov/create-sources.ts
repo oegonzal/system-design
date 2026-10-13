@@ -5,6 +5,7 @@ import type {
   NoticeDescriptions,
   OpportunitySearch,
 } from '../../../core/ports';
+import { numberOr } from '../env';
 import { SAM_GOV_AWARDS_URL, SamGovAwards } from './awards';
 import { SAM_GOV_DESCRIPTION_URL, SamGovDescriptions } from './descriptions';
 import { DisabledAwards, DisabledDescriptions, DisabledRegistry, DisabledSearch } from './disabled';
@@ -37,12 +38,6 @@ export interface SamGovCredentials {
   awardsUrl: string;
   entitiesUrl: string;
 }
-
-const numberOr = (value: string | undefined, fallback: number): number => {
-  if (value === undefined || value.trim() === '') return fallback;
-  const parsed = Number(value);
-  return Number.isFinite(parsed) && parsed >= 0 ? parsed : fallback;
-};
 
 /** The credentials, or null without a key. */
 export function samGovCredentialsFromEnv(

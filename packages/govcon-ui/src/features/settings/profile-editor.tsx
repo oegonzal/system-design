@@ -1,11 +1,20 @@
 import {
   FACTOR_IDS,
+  MAX_ALERT_ENDING_DAYS,
   MAX_PAGE_SIZE,
   type FactorId,
   type ScoringPolicy,
   type SearchProfile,
 } from '@sysdesign/contracts';
-import { Alert, Button, Heading, Stack, Text, TextField } from '@sysdesign/design-system';
+import {
+  Alert,
+  Button,
+  CheckboxField,
+  Heading,
+  Stack,
+  Text,
+  TextField,
+} from '@sysdesign/design-system';
 
 import {
   BandRows,
@@ -372,6 +381,34 @@ export function ProfileEditor({
         <FieldIssues issues={issues} path="scoring.tiers" />
         <FieldIssues issues={issues} path="leads" />
         <FieldIssues issues={issues} path="pull" />
+      </Section>
+
+      <Section
+        title="Alerts"
+        hint="What the daily spending digest flags for this profile: an award in its codes ending inside this many days, and the fiscal period in progress obligating above every prior year's."
+      >
+        <Stack direction="row" gap={4} align="center" wrap>
+          <NumberField
+            label="Ending within days"
+            value={value.alerts.endingWithinDays}
+            min={0}
+            max={MAX_ALERT_ENDING_DAYS}
+            step={1}
+            disabled={saving}
+            onChange={(endingWithinDays) =>
+              patch({ alerts: { ...value.alerts, endingWithinDays } })
+            }
+          />
+          <CheckboxField
+            label="Alert when the pulse runs above its band"
+            checked={value.alerts.pulseAboveBand}
+            disabled={saving}
+            onChange={(event) =>
+              patch({ alerts: { ...value.alerts, pulseAboveBand: event.target.checked } })
+            }
+          />
+        </Stack>
+        <FieldIssues issues={issues} path="alerts" />
       </Section>
       <Text tone="muted" size="sm">
         Saved as one document; the service validates it whole and writes nothing on an issue.

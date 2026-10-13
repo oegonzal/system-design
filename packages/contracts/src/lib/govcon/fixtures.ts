@@ -4,7 +4,7 @@ import type { Entity } from './entity';
 import type { Lead, LeadsReport } from './lead';
 import type { NoticeDto } from './notice';
 import type { Opportunity } from './opportunity';
-import type { SearchProfile, StoredProfile } from './profile';
+import { DEFAULT_ALERT_POLICY, type SearchProfile, type StoredProfile } from './profile';
 import type { PullReport, SliceReport } from './pull';
 import type { SavedSearch } from './search';
 import type { Description, SourceCall, SourceStatus } from './source';
@@ -98,6 +98,7 @@ export const profileOf = (overrides: Partial<SearchProfile> = {}): SearchProfile
     },
     tiers: { high: 70, medium: 45 },
   },
+  alerts: { ...DEFAULT_ALERT_POLICY },
   ...overrides,
 });
 

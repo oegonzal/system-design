@@ -1,4 +1,9 @@
-import { FISCAL_PERIODS, type AgencyDirectoryEntry, type AgencyYear } from '@sysdesign/contracts';
+import {
+  FISCAL_PERIODS,
+  type AgencyDirectoryEntry,
+  type AgencyYear,
+  type BreakdownRow,
+} from '@sysdesign/contracts';
 
 /**
  * An agency's years as the source reported them, made regular: newest year
@@ -23,6 +28,25 @@ export function alignAgencyYears(years: readonly AgencyYear[]): AgencyYear[] {
           .map(([period, obligated]) => ({ period, obligated })),
       };
     });
+}
+
+/**
+ * The toptier codes of the first `limit` breakdown rows the directory knows,
+ * through the source's own id — a row's `id` is the directory's `agencyId`;
+ * a row without an id, or one the directory lacks, is skipped. Never a name.
+ */
+export function topAgencyCodes(
+  rows: readonly BreakdownRow[],
+  entries: readonly AgencyDirectoryEntry[],
+  limit: number,
+): string[] {
+  const byId = new Map(entries.map((entry) => [String(entry.agencyId), entry.toptierCode]));
+  return rows
+    .flatMap((row) => {
+      const code = row.id === null ? undefined : byId.get(row.id);
+      return code === undefined ? [] : [code];
+    })
+    .slice(0, limit);
 }
 
 /** The directory entry with this toptier code, or null. */

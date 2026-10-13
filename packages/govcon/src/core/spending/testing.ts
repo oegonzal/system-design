@@ -1,15 +1,22 @@
 import {
   agencyDirectoryEntryOf,
+  alertKeyOf,
   type AgencyDirectoryEntry,
   type AgencyYear,
+  type AlertKey,
+  type GovconAlert,
+  type InteractionPrompt,
   type SpendingLens,
 } from '@sysdesign/contracts';
 
 import type { Attempted, Fetched } from '../budget';
 import type {
+  AlertLedger,
+  AlertSink,
   CategoryPage,
   EndingAwardsPage,
   OfficesPage,
+  RaisedAlert,
   SeriesPoint,
   SnapshotRow,
   SpendingSnapshotStore,
@@ -146,4 +153,40 @@ export function scriptedSpendingSources(script: SpendingScript = {}): ScriptedSp
     catalog: { id, disclosures: ['catalog disclosure'], agencies: () => catalog() },
     freshness: { id, disclosures: [], lastUpdated: () => freshness() },
   };
+}
+
+/** The alert ledger in memory: what was recorded is raised. */
+export class InMemoryAlertLedger implements AlertLedger {
+  readonly rows: RaisedAlert[] = [];
+  /** When set, every method throws — the "store unavailable" branch. */
+  failing: Error | null = null;
+
+  async raised(keys: readonly AlertKey[]): Promise<Set<string>> {
+    if (this.failing) throw this.failing;
+    const known = new Set(this.rows.map((row) => alertKeyOf(row.key)));
+    return new Set(keys.map(alertKeyOf).filter((key) => known.has(key)));
+  }
+
+  async record(rows: readonly RaisedAlert[]): Promise<void> {
+    if (this.failing) throw this.failing;
+    this.rows.push(...rows);
+  }
+}
+
+/** An alert sink that remembers what it was given; `failing` makes every call throw, as a bus that is down does. */
+export class RecordingAlertSink implements AlertSink {
+  readonly published: GovconAlert[] = [];
+  readonly prompts: InteractionPrompt[] = [];
+  failing: Error | null = null;
+
+  async publish(alert: GovconAlert): Promise<{ seq: string }> {
+    if (this.failing) throw this.failing;
+    this.published.push(alert);
+    return { seq: String(this.published.length) };
+  }
+
+  async prompt(prompt: InteractionPrompt): Promise<void> {
+    if (this.failing) throw this.failing;
+    this.prompts.push(prompt);
+  }
 }
