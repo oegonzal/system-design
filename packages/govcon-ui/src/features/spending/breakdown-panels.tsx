@@ -2,15 +2,15 @@ import {
   BREAKDOWN_CATEGORIES,
   compactMoney,
   money,
-  WINDOW_PRESETS,
   type BreakdownCategory,
   type SpendingBreakdown,
   type WindowPreset,
 } from '@sysdesign/contracts';
-import { BarList, Button, SelectField, Stack, StatTile, Text } from '@sysdesign/design-system';
+import { BarList, SelectField, Stack, StatTile, Text } from '@sysdesign/design-system';
 
 import { BREAKDOWN_CATEGORY_LABEL } from './costs';
 import { PublicationNote } from './publication-note';
+import { WindowPresets } from './window-presets';
 
 export interface BreakdownControlsProps {
   category: BreakdownCategory;
@@ -42,22 +42,7 @@ export function BreakdownControls({
           </option>
         ))}
       </SelectField>
-      <Stack direction="row" gap={2} wrap align="center" role="group" aria-label="Window">
-        {WINDOW_PRESETS.map((option) => (
-          <Button
-            key={option.id}
-            type="button"
-            variant="subtle"
-            size="sm"
-            selected={preset === option.id}
-            aria-pressed={preset === option.id}
-            disabled={disabled}
-            onClick={() => onPresetChange(option.id)}
-          >
-            {option.label}
-          </Button>
-        ))}
-      </Stack>
+      <WindowPresets preset={preset} onPresetChange={onPresetChange} disabled={disabled} />
     </Stack>
   );
 }

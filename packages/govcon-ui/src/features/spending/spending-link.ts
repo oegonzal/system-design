@@ -2,7 +2,10 @@ import {
   AWARD_FAMILY_CHOICES,
   BREAKDOWN_CATEGORIES,
   DEFAULT_HORIZON_MONTHS,
+  facetParams,
+  facetsFromParams,
   HORIZON_MONTH_CHOICES,
+  NO_FACETS,
   WINDOW_PRESETS,
   type BreakdownCategory,
   type HorizonMonthChoice,
@@ -18,8 +21,9 @@ import { SPENDING_TABS, type SpendingTab } from './tabs';
  * open tab and each lens's own setting are read off it and written back to
  * it, so a reload, a shared link and a return by Back all open the same view.
  * A link that names no scope opens on the profile's NAICS; `naics=` (one
- * empty value) means none; a code list travels as one value per code. Every
- * choice is checked against its declared vocabulary — a URL may say anything.
+ * empty value) means none; a code list travels as one value per code, and a
+ * facet under its own name, spelled as the wire spells it. Every choice is
+ * checked against its declared vocabulary — a URL may say anything.
  */
 export const SPENDING_ROUTE = '/spending';
 
@@ -33,7 +37,13 @@ export interface SpendingView {
 
 /** What a link without parameters opens on: the profile's NAICS, nothing else narrowed, the first tab. */
 export const defaultView = (profileNaics: readonly string[]): SpendingView => ({
-  scope: { naics: profileNaics.join(', '), psc: '', agency: '', awardFamily: 'both' },
+  scope: {
+    naics: profileNaics.join(', '),
+    psc: '',
+    agency: '',
+    awardFamily: 'both',
+    facets: NO_FACETS,
+  },
   tab: 'pulse',
   category: 'awarding_agency',
   // A rolling year is a whole picture on any day; the fiscal year to date is thirteen days long on October 13.
@@ -62,6 +72,7 @@ export function parseSpendingView(params: Params, profileNaics: readonly string[
       psc: codesParam(params.getAll('psc'), base.scope.psc),
       agency: params.get('agency') ?? base.scope.agency,
       awardFamily: choose(AWARD_FAMILY_CHOICES, params.get('awardFamily'), base.scope.awardFamily),
+      facets: facetsFromParams((id) => params.get(id)),
     },
     tab: choose(
       SPENDING_TABS.map((tab) => tab.id),
@@ -87,17 +98,27 @@ const appendCodes = (search: URLSearchParams, key: string, typed: string): void 
 
 const sameCodes = (a: string, b: string): boolean => codesOf(a).join(',') === codesOf(b).join(',');
 
-/** The view as its address: only what differs from the profile's default view is written, in one order. */
-export function spendingHref(view: SpendingView, profileNaics: readonly string[]): string {
+/**
+ * The view as its address: only what differs from the profile's default
+ * view is written, in one order. `pinned` spells the NAICS out even when
+ * they are the profile's own — the address a saved view keeps, so it opens
+ * on the same codes whatever the profile comes to name.
+ */
+export function spendingHref(
+  view: SpendingView,
+  profileNaics: readonly string[],
+  pinned = false,
+): string {
   const base = defaultView(profileNaics);
   const search = new URLSearchParams();
-  if (!sameCodes(view.scope.naics, base.scope.naics))
+  if (pinned || !sameCodes(view.scope.naics, base.scope.naics))
     appendCodes(search, 'naics', view.scope.naics);
   if (!sameCodes(view.scope.psc, base.scope.psc)) appendCodes(search, 'psc', view.scope.psc);
   if (view.scope.agency !== base.scope.agency) search.set('agency', view.scope.agency);
   if (view.scope.awardFamily !== base.scope.awardFamily) {
     search.set('awardFamily', view.scope.awardFamily);
   }
+  for (const [id, value] of Object.entries(facetParams(view.scope.facets))) search.set(id, value);
   if (view.tab !== base.tab) search.set('tab', view.tab);
   if (view.category !== base.category) search.set('category', view.category);
   if (view.preset !== base.preset) search.set('window', view.preset);

@@ -1,5 +1,6 @@
 'use client';
 
+import { biddableSetAsides, type ReachCut, type StoredProfile } from '@sysdesign/contracts';
 import {
   Heading,
   Spinner,
@@ -12,25 +13,29 @@ import {
   Text,
 } from '@sysdesign/design-system';
 import { useResource } from '@sysdesign/web-kit';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { api } from '../../api/client';
 import { useProfile } from '../../providers/profile-context';
+import { SavedViews } from '../views/saved-views.client';
 import { AgencyLens } from './agency.client';
 import { BreakdownLens } from './breakdown.client';
+import { CodeSuggestions } from './code-suggestions';
 import { HorizonLens } from './horizon.client';
 import { PulseLens } from './pulse.client';
-import { scopeQueryOf } from './scope';
+import { ReachLens } from './reach.client';
+import { scopeQueryOf, toggleCode } from './scope';
 import { ScopeBar } from './scope-bar';
+import { SPENDING_ROUTE, spendingHref } from './spending-link';
 import { SPENDING_TABS, type SpendingTab } from './tabs';
 import { useSpendingView } from './use-spending-view';
 
 const NO_CODES: readonly string[] = [];
 
 /**
- * Spending: where and when the government obligates money, through four
- * free USAspending lenses over one scope. The view is its address — the
- * scope, the open tab and each lens's setting travel in the URL — and a link
+ * Spending: where and when the government obligates money, through free
+ * USAspending lenses over one scope. The view is its address — the scope,
+ * the open tab and each lens's setting travel in the URL — and a link
  * without a scope opens on the active profile's NAICS, so the lenses mount
  * once the profile is known and read each scope once.
  */
@@ -39,28 +44,32 @@ export function SpendingClient() {
   return (
     <Stack gap={5}>
       <Heading level={1}>Spending</Heading>
-      {loading ? (
-        <Spinner label="Loading the profile" />
-      ) : (
-        <SpendingWorkspace profileNaics={active?.naics ?? NO_CODES} />
-      )}
+      {loading ? <Spinner label="Loading the profile" /> : <SpendingWorkspace profile={active} />}
     </Stack>
   );
 }
 
 /**
- * The scope bar and the four tabs over one view. Each lens mounts the first
- * time its tab is opened — by a click or by the address — and stays mounted,
- * so a lens nobody opened never reads and a tab switched back to costs
+ * The scope bar and the tabs over one view. Each lens mounts the first time
+ * its tab is opened — by a click or by the address — and stays mounted, so
+ * a lens nobody opened never reads and a tab switched back to costs
  * nothing; the directory is read once and shared by the scope bar and the
- * agency lens, whose pick narrows the scope to that agency.
+ * agency lens, whose pick narrows the scope to that agency. What the
+ * profile declares reaches the page as data: its NAICS as chips, the lanes
+ * it may bid as one press on the set-aside facet and as what Reach counts
+ * for.
  */
-function SpendingWorkspace({ profileNaics }: { profileNaics: readonly string[] }) {
+function SpendingWorkspace({ profile }: { profile: StoredProfile | null }) {
+  const profileNaics = profile?.naics ?? NO_CODES;
   const { view, replace } = useSpendingView(profileNaics);
   const [opened, setOpened] = useState<ReadonlySet<SpendingTab>>(() => new Set([view.tab]));
   const directory = useResource((signal) => api.listAgencies({ signal }), []);
   const query = scopeQueryOf(view.scope);
   const visited = opened.has(view.tab) ? opened : new Set([...opened, view.tab]);
+  const lanes = useMemo(
+    () => (profile === null ? NO_CODES : biddableSetAsides(profile.scoring.setAside)),
+    [profile],
+  );
 
   const open = (value: string) => {
     const tab = value as SpendingTab;
@@ -72,6 +81,19 @@ function SpendingWorkspace({ profileNaics }: { profileNaics: readonly string[] }
       ...view,
       scope: { ...view.scope, agency: view.scope.agency === toptierCode ? '' : toptierCode },
     });
+  /** A cut's own awards ranked by who won them: the Where lens under the cut's facets. */
+  const winnersOf = (cut: ReachCut): string | null =>
+    cut.facets === null
+      ? null
+      : spendingHref(
+          {
+            ...view,
+            scope: { ...view.scope, awardFamily: 'contracts', facets: cut.facets },
+            tab: 'where',
+            category: 'recipient',
+          },
+          profileNaics,
+        );
 
   return (
     <>
@@ -80,14 +102,35 @@ function SpendingWorkspace({ profileNaics }: { profileNaics: readonly string[] }
           <Heading level={2}>Scope</Heading>
           <Text tone="secondary" size="sm">
             Every lens below reads this scope. Codes match families; an agency narrows to its
-            awards. The view is its address: copy the link to share it.
+            awards. The view is its address: copy the link to share it, or save it under a name.
           </Text>
+          {profile === null ? null : (
+            <SavedViews
+              profileId={profile.id}
+              route={SPENDING_ROUTE}
+              currentHref={spendingHref(view, profileNaics, true)}
+            />
+          )}
           <ScopeBar
             value={view.scope}
             onChange={(scope) => replace({ ...view, scope })}
             naicsOptions={profileNaics}
             agencies={directory.data?.entries ?? null}
             agenciesError={directory.error}
+            facetPresets={
+              lanes.length === 0
+                ? undefined
+                : { setAside: { label: 'My lanes', raw: lanes.join(',') } }
+            }
+          />
+          <CodeSuggestions
+            scope={query}
+            onToggle={(kind, code) =>
+              replace({
+                ...view,
+                scope: { ...view.scope, [kind]: toggleCode(view.scope[kind], code) },
+              })
+            }
           />
         </Stack>
       </Surface>
@@ -113,6 +156,19 @@ function SpendingWorkspace({ profileNaics }: { profileNaics: readonly string[] }
                 onCategoryChange={(category) => replace({ ...view, category })}
                 preset={view.preset}
                 onPresetChange={(preset) => replace({ ...view, preset })}
+              />
+            ) : null}
+          </Surface>
+        </TabPanel>
+        <TabPanel value="reach">
+          <Surface as="section" aria-label="Reach">
+            {visited.has('reach') ? (
+              <ReachLens
+                scope={query}
+                lanes={lanes}
+                preset={view.preset}
+                onPresetChange={(preset) => replace({ ...view, preset })}
+                hrefOf={winnersOf}
               />
             ) : null}
           </Surface>

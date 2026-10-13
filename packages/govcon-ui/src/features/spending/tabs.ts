@@ -1,7 +1,8 @@
-/** The four lenses, in the order the page shows them. */
+/** The lenses, in the order the page shows them. */
 export const SPENDING_TABS = [
   { id: 'pulse', label: 'Pulse' },
   { id: 'where', label: 'Where' },
+  { id: 'reach', label: 'Reach' },
   { id: 'horizon', label: 'Horizon' },
   { id: 'agency', label: 'Agency' },
 ] as const;

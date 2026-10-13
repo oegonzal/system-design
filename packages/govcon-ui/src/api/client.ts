@@ -1,3 +1,14 @@
+import {
+  withFacetParams,
+  type FacetQuery,
+  type GetSpendingReachResponse,
+  type ListSavedViewsResponse,
+  type SavedView,
+  type SaveSavedViewRequest,
+  type SaveSavedViewResponse,
+  type SpendingReach,
+  type SpendingReachQuery,
+} from '@sysdesign/contracts';
 import type {
   AgencyDirectory,
   AgencyOutlook,
@@ -46,7 +57,6 @@ import type {
   SaveSavedSearchRequest,
   SaveSavedSearchResponse,
   SavedSearch,
-  ScopeQuery,
   SearchProfile,
   SourceStatus,
   SpendingBreakdown,
@@ -71,12 +81,15 @@ const BASE_URL = process.env['NEXT_PUBLIC_GOVCON_URL'] ?? 'http://localhost:3004
 const request = createRequest(BASE_URL);
 const encode = encodeURIComponent;
 
-/** A scope on the wire: the code lists comma-joined, since a query string carries scalars; the server reads them back as lists. */
-const scopeParams = <Q extends ScopeQuery>({ naics, psc, ...rest }: Q) => ({
-  naics: naics && naics.length > 0 ? naics.join(',') : undefined,
-  psc: psc && psc.length > 0 ? psc.join(',') : undefined,
-  ...rest,
-});
+/** A list on the wire: comma-joined, since a query string carries scalars; the server reads it back as a list. */
+const joined = (codes: readonly string[] | undefined): string | undefined =>
+  codes && codes.length > 0 ? codes.join(',') : undefined;
+
+/** A scope on the wire: the code lists comma-joined and every facet in its one spelling. */
+const scopeParams = <Q extends FacetQuery & { naics?: string[]; psc?: string[] }>(query: Q) => {
+  const { naics, psc, ...rest } = withFacetParams(query);
+  return { naics: joined(naics), psc: joined(psc), ...rest };
+};
 
 export const api = {
   // Profiles and their saved searches.
@@ -138,6 +151,24 @@ export const api = {
   },
   async runFilter(body: RunSearchRequest): Promise<PullReport> {
     return unwrap(await request<RunSearchResponse>('/searches/run', { method: 'POST', body }));
+  },
+
+  // The views a profile keeps: named addresses inside this client.
+  async listViews(profileId: string, opts: GetOptions = {}): Promise<SavedView[]> {
+    return unwrap(
+      await request<ListSavedViewsResponse>(`/profiles/${encode(profileId)}/views`, opts),
+    );
+  },
+  async saveView(profileId: string, body: SaveSavedViewRequest): Promise<SavedView> {
+    return unwrap(
+      await request<SaveSavedViewResponse>(`/profiles/${encode(profileId)}/views`, {
+        method: 'PUT',
+        body,
+      }),
+    );
+  },
+  async removeView(id: string): Promise<void> {
+    await request<undefined>(`/views/${encode(id)}`, { method: 'DELETE' });
   },
 
   // The upstreams and the ledger.
@@ -245,6 +276,17 @@ export const api = {
     return unwrap(
       await request<GetSpendingHorizonResponse>(
         `/spending/horizon${toQueryString({ ...scopeParams(query) })}`,
+        opts,
+      ),
+    );
+  },
+  async getSpendingReach(
+    { lanes, ...query }: SpendingReachQuery,
+    opts: GetOptions = {},
+  ): Promise<SpendingReach> {
+    return unwrap(
+      await request<GetSpendingReachResponse>(
+        `/spending/reach${toQueryString({ ...scopeParams(query), lanes: joined(lanes) })}`,
         opts,
       ),
     );

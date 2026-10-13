@@ -12,6 +12,8 @@ import { act, fireEvent, screen, waitFor, within } from '@testing-library/react'
 import type { ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { savedViewOf, type SavedView } from '@sysdesign/contracts';
+
 import { ProfileProvider } from '../../providers/profile-context';
 import { PROFILE } from '../../testing/fixtures';
 import {
@@ -20,6 +22,7 @@ import {
   BREAKDOWN,
   HORIZON,
   PULSE,
+  REACH,
   SPENDING_NOW_MS,
 } from '../../testing/spending-fixtures';
 import { SpendingClient } from './spending.client';
@@ -31,6 +34,8 @@ vi.mock('next/navigation', async () => {
 
 const routes = (): StubRoute[] => [
   { path: '/profiles', body: { data: [PROFILE] } },
+  { path: '/profiles/enfav/views', body: { data: [] } },
+  { path: '/spending/reach', body: { data: REACH } },
   { path: '/spending/agencies', body: { data: AGENCIES } },
   { path: '/spending/pulse', body: { data: PULSE } },
   { path: '/spending/breakdown', body: { data: BREAKDOWN } },
@@ -180,6 +185,106 @@ describe('SpendingClient', () => {
       );
     });
     expect(routerMock.replace).not.toHaveBeenCalled();
+  });
+
+  it('[GOVU-14] [GOVU-15] counts the reach of the scope for the profile’s lanes over the page’s window, links each cut to who won it under the cut’s own facets, and offers the scope’s largest codes with their dollars only once asked', async () => {
+    const { calls } = stubApi(routes());
+    setMockSearchParams('naics=541511&tab=reach');
+    const { rerender } = mount();
+    await screen.findByRole('table', { name: 'Reach' });
+    // No family travels: reach counts contracts, for the lanes the profile prices above nothing.
+    expect(urls(calls)).toContain(
+      `/spending/reach?naics=541511&from=2025-06-15&to=2026-06-15&lanes=${encodeURIComponent('NONE,SBA,SBP')}`,
+    );
+    expect(urls(calls).some((url) => url.startsWith('/spending/pulse'))).toBe(false);
+    expect(
+      screen.getByRole('link', { name: 'Who won: No vehicle needed' }).getAttribute('href'),
+    ).toBe(
+      '/spending?naics=541511&awardFamily=contracts&placement=standalone&setAside=NONE%2CSBA%2CSBP&newOnly=true&tab=where&category=recipient',
+    );
+
+    // The profile's lanes, one press: the scope is narrowed to them and the address says so.
+    fireEvent.click(screen.getByRole('button', { name: 'More filters' }));
+    fireEvent.click(screen.getByRole('button', { name: 'My lanes' }));
+    expect(lastReplace()).toBe('/spending?naics=541511&setAside=NONE%2CSBA%2CSBP&tab=reach');
+    await applyLastReplace(rerender);
+    const lanes = `setAside=${encodeURIComponent('NONE,SBA,SBP')}`;
+    await waitFor(() => {
+      expect(urls(calls)).toContain(
+        `/spending/reach?naics=541511&from=2025-06-15&to=2026-06-15&${lanes}&lanes=${encodeURIComponent('NONE,SBA,SBP')}`,
+      );
+    });
+
+    // Nothing is ranked until the fold is opened; then one breakdown a kind, each over the scope without its own codes of that kind.
+    expect(urls(calls).some((url) => url.startsWith('/spending/breakdown'))).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: 'Largest codes in this scope' }));
+    const ranked = await screen.findByRole('group', { name: 'Largest PSC codes' });
+    const window = 'from=2025-06-15&to=2026-06-15';
+    expect(urls(calls)).toEqual(
+      expect.arrayContaining([
+        `/spending/breakdown?naics=541511&awardFamily=both&category=psc&${window}&${lanes}`,
+        `/spending/breakdown?awardFamily=both&category=naics&${window}&${lanes}`,
+      ]),
+    );
+    fireEvent.click(within(ranked).getByRole('button', { name: /^DOD · / }));
+    expect(lastReplace()).toBe(
+      '/spending?naics=541511&psc=DOD&setAside=NONE%2CSBA%2CSBP&tab=reach',
+    );
+  });
+
+  it('[GOVU-16] lists the profile’s views of this page, keeps the page as it stands under a name with its codes spelled out, reads the list again, and removes one', async () => {
+    let views: SavedView[] = [
+      savedViewOf({ href: '/spending?naics=332710&tab=where' }),
+      savedViewOf({ id: 'v-9', name: 'Another page', href: '/intel?naics=541511' }),
+    ];
+    const { calls, fetchMock } = stubApi([
+      ...routes().filter((route) => route.path !== '/profiles/enfav/views'),
+      { path: '/profiles/enfav/views', handler: () => ({ body: { data: views } }) },
+      {
+        method: 'PUT',
+        path: '/profiles/enfav/views',
+        handler: ({ init }) => {
+          const saved = savedViewOf({
+            id: 'v-2',
+            ...(JSON.parse(String(init?.body)) as Pick<SavedView, 'name' | 'href'>),
+          });
+          views = [...views, saved];
+          return { body: { data: saved } };
+        },
+      },
+      {
+        method: 'DELETE',
+        path: /^\/views\/[^/]+$/,
+        handler: ({ url }) => {
+          views = views.filter((view) => !url.pathname.endsWith(view.id));
+          return { status: 204, body: undefined };
+        },
+      },
+    ]);
+    mount();
+    const kept = await screen.findByRole('link', { name: 'Who buys' });
+    expect(kept.getAttribute('href')).toBe('/spending?naics=332710&tab=where');
+    // A view of another page is not this page's.
+    expect(screen.queryByRole('link', { name: 'Another page' })).toBeNull();
+
+    fireEvent.change(screen.getByLabelText('Save this view as'), {
+      target: { value: 'All codes, pulse' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save view' }));
+    const saved = await screen.findByRole('link', { name: 'All codes, pulse' });
+    const pinned = `/spending?${PROFILE.naics.map((code) => `naics=${code}`).join('&')}`;
+    expect(saved.getAttribute('href')).toBe(pinned);
+    expect(saved.getAttribute('aria-current')).toBe('page');
+    const put = fetchMock.mock.calls.find((call) => (call[1] as RequestInit).method === 'PUT');
+    expect(JSON.parse(String((put?.[1] as RequestInit).body))).toEqual({
+      name: 'All codes, pulse',
+      href: pinned,
+    });
+    expect(urls(calls).filter((url) => url === '/profiles/enfav/views')).toHaveLength(3);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove the saved view Who buys' }));
+    await waitFor(() => expect(screen.queryByRole('link', { name: 'Who buys' })).toBeNull());
+    expect(calls.some((call) => call.method === 'DELETE' && call.url === '/views/v-1')).toBe(true);
   });
 
   it('[GOVU-12] writes codes to the address once they pause', async () => {

@@ -7,6 +7,7 @@ import {
   spendingBreakdownOf,
   spendingHorizonOf,
   spendingPulseOf,
+  spendingReachOf,
 } from '@sysdesign/contracts';
 
 /**
@@ -34,6 +35,7 @@ export const PULSE_DELAYED = spendingPulseOf({
   delay: DELAY,
 });
 export const BREAKDOWN = spendingBreakdownOf();
+export const REACH = spendingReachOf();
 export const HORIZON = spendingHorizonOf();
 export const AGENCIES = agencyDirectoryOf();
 export const AGENCY_OUTLOOK = agencyOutlookOf();

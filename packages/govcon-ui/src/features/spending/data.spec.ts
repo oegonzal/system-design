@@ -1,4 +1,4 @@
-import { periodMonthLabel } from '@sysdesign/contracts';
+import { NO_FACETS, periodMonthLabel } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { AGENCY_OUTLOOK, PULSE, PULSE_DELAYED } from '../../testing/spending-fixtures';
@@ -13,8 +13,26 @@ describe('the spending page’s data', () => {
     expect(toggleCode('332710, 541511', '332710')).toBe('541511');
     expect(scopeQueryOf(EMPTY_SCOPE)).toEqual({ awardFamily: 'both' });
     expect(
-      scopeQueryOf({ naics: '332710, 541511', psc: '5340', agency: '097', awardFamily: 'idvs' }),
+      scopeQueryOf({
+        naics: '332710, 541511',
+        psc: '5340',
+        agency: '097',
+        awardFamily: 'idvs',
+        facets: NO_FACETS,
+      }),
     ).toEqual({ naics: ['332710', '541511'], psc: ['5340'], agency: '097', awardFamily: 'idvs' });
+    // A facet travels only when set, in the query's own types.
+    expect(
+      scopeQueryOf({
+        ...EMPTY_SCOPE,
+        facets: { ...NO_FACETS, recipientSize: 'small', setAside: ['NONE', 'SBA'], newOnly: true },
+      }),
+    ).toEqual({
+      awardFamily: 'both',
+      recipientSize: 'small',
+      setAside: ['NONE', 'SBA'],
+      newOnly: true,
+    });
   });
 
   it('[GOVU-11] lays fiscal years over twelve periods newest first, marking the period in progress provisional and the rest projected with its band', () => {

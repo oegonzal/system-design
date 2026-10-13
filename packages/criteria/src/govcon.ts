@@ -59,7 +59,7 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
   {
     id: 'GOVU-11',
     statement:
-      'The spending page scopes four free lenses over one scope bar — fiscal periods with a seasonal projection, a ranked breakdown over a fiscal window, awards expiring by month, and an agency’s budget by fiscal year with its sub-agencies — every chart carries a data-table alternative, and every panel states its provenance and the source’s disclosures verbatim.',
+      'The spending page scopes its free lenses over one scope bar — among them fiscal periods with a seasonal projection, a ranked breakdown over a fiscal window, awards expiring by month, and an agency’s budget by fiscal year with its sub-agencies — every chart carries a data-table alternative, and every panel states its provenance and the source’s disclosures verbatim.',
   },
   {
     id: 'GOVU-12',
@@ -70,6 +70,21 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
     id: 'GOVU-13',
     statement:
       'The pulse draws a period the source has not wholly published as provisional and says which agencies publish late, by how many days and through which day the amounts are whole; the change against the prior year is taken over the periods both years have settled; and a breakdown whose window reaches past that day says its total and rows are short.',
+  },
+  {
+    id: 'GOVU-14',
+    statement:
+      'The scope bar narrows a scope by the declared facets behind one fold that says how many are set and is open when a link arrives with some: each facet’s control follows its declared kind, a code or a range the table does not offer is shown pressed beside the ones it does, one press applies the lanes the profile may bid, a placement fixes the family as contracts, the facets travel in the address in their one spelling, and the scope’s largest PSC and NAICS codes are offered with their dollars only once asked for.',
+  },
+  {
+    id: 'GOVU-15',
+    statement:
+      'The Reach tab counts a scope’s new contracts over the page’s window for the profile’s lanes, cut by cut — each cut its count, its share of the first, its dollars and a link that ranks who won it under the cut’s own facets — then the last cut by award size against the acquisition thresholds, naming the lanes counted and saying when the window reaches past what is published.',
+  },
+  {
+    id: 'GOVU-16',
+    statement:
+      'A page’s views are kept by name per profile: each is a link to its address with the one that is this page marked current, a save keeps the page as it stands with its codes spelled out so it opens the same whatever the profile comes to name, saving under a kept name updates it, and a removal is one click.',
   },
   // Government contracting: SAM.gov opportunities (packages/govcon)
   {

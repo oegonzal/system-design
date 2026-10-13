@@ -1,3 +1,4 @@
+import { NO_FACETS } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -19,6 +20,7 @@ describe('the spending view in its address', () => {
       psc: '',
       agency: '',
       awardFamily: 'both',
+      facets: NO_FACETS,
     });
     expect(
       parseSpendingView(
@@ -28,7 +30,13 @@ describe('the spending view in its address', () => {
         PROFILE_NAICS,
       ),
     ).toEqual({
-      scope: { naics: '332710, 5415', psc: 'DA, 7030', agency: '097', awardFamily: 'idvs' },
+      scope: {
+        naics: '332710, 5415',
+        psc: 'DA, 7030',
+        agency: '097',
+        awardFamily: 'idvs',
+        facets: NO_FACETS,
+      },
       tab: 'horizon',
       category: 'recipient',
       preset: 'prior-fy',
@@ -41,10 +49,43 @@ describe('the spending view in its address', () => {
   it('[GOVU-12] falls back to the default from a value it does not know', () => {
     expect(
       parseSpendingView(
-        params('tab=nope&window=yesterday&months=7&awardFamily=all&category=x'),
+        params(
+          'tab=nope&window=yesterday&months=7&awardFamily=all&category=x&recipientSize=huge&amount=lots&newOnly=yes',
+        ),
         PROFILE_NAICS,
       ),
     ).toEqual(defaultView(PROFILE_NAICS));
+  });
+
+  it('[GOVU-14] carries every facet in the address in its one spelling and reads it back, and a saved view’s address spells its codes out even when they are the profile’s own', () => {
+    const base = defaultView(PROFILE_NAICS);
+    const facets = {
+      recipientSize: 'small' as const,
+      placement: 'standalone' as const,
+      setAside: ['NONE', 'SBA'],
+      amount: { min: 15_000.01, max: 350_000 },
+      newOnly: true,
+    };
+    const view = { ...base, scope: { ...base.scope, facets }, tab: 'reach' as const };
+    const href = spendingHref(view, PROFILE_NAICS);
+    expect(href).toBe(
+      '/spending?recipientSize=small&placement=standalone&setAside=NONE%2CSBA&amount=15000.01-350000&newOnly=true&tab=reach',
+    );
+    expect(
+      parseSpendingView(new URL(href, 'http://localhost').searchParams, PROFILE_NAICS),
+    ).toEqual(view);
+    expect(
+      sameView(view, { ...view, scope: { ...view.scope, facets: { ...facets } } }, PROFILE_NAICS),
+    ).toBe(true);
+    expect(sameView(view, base, PROFILE_NAICS)).toBe(false);
+
+    // Pinned: the same view whatever the profile comes to name.
+    const pinned = spendingHref(base, PROFILE_NAICS, true);
+    expect(pinned).toBe('/spending?naics=332710&naics=541511');
+    expect(parseSpendingView(new URL(pinned, 'http://localhost').searchParams, ['111110'])).toEqual(
+      base,
+    );
+    expect(spendingHref(defaultView([]), [], true)).toBe('/spending?naics=');
   });
 
   it('[GOVU-12] writes only what differs from the default, in one order, round-trips through the address, and tells two spellings of one view from a changed one', () => {

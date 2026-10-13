@@ -22,6 +22,18 @@ type Story = StoryObj<typeof ScopeBar>;
 /** One profile code chosen, the directory loaded. */
 export const Default: Story = {};
 
+/** A link that arrived with facets: the fold says how many and is open, and the placement fixes the family. */
+export const Narrowed: Story = {
+  args: {
+    value: {
+      ...EMPTY_SCOPE,
+      naics: '332710',
+      facets: { ...EMPTY_SCOPE.facets, placement: 'standalone', setAside: ['SBA'], newOnly: true },
+    },
+    facetPresets: { setAside: { label: 'My lanes', raw: 'NONE,SBA,SBP' } },
+  },
+};
+
 /** The directory still loading: the agency select waits. */
 export const DirectoryLoading: Story = { args: { agencies: null } };
 

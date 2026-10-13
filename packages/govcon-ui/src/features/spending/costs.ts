@@ -1,4 +1,9 @@
-import type { AwardFamilyChoice, BreakdownCategory, ServedFrom } from '@sysdesign/contracts';
+import type {
+  AwardFamilyChoice,
+  BreakdownCategory,
+  ReachCutId,
+  ServedFrom,
+} from '@sysdesign/contracts';
 
 import type { SpendingTab } from './tabs';
 
@@ -30,9 +35,30 @@ export const SERVED_FROM_LABEL: Record<ServedFrom, string> = {
   stale: 'from an older snapshot — the source refused a refresh',
 };
 
+/** What each reach cut keeps, and why it matters to a firm deciding where to compete. */
+export const REACH_CUT_LABEL: Record<ReachCutId, { label: string; note: string }> = {
+  new: {
+    label: 'New contracts',
+    note: 'Begun inside the window: work that was won, not a change to something older.',
+  },
+  lanes: {
+    label: 'In your lanes',
+    note: 'Made with no set-aside or under one you may bid.',
+  },
+  standalone: {
+    label: 'No vehicle needed',
+    note: 'Placed as contracts of their own, not as orders under a vehicle you must already hold.',
+  },
+  small: {
+    label: 'Won by a small business',
+    note: 'What firms your size took of it.',
+  },
+};
+
 export const LENS_LOADING: Record<SpendingTab, string> = {
   pulse: 'Reading obligations by period',
   where: 'Ranking the scope',
+  reach: 'Counting what was within reach',
   horizon: 'Walking the expiring awards',
   agency: 'Reading the agency',
 };

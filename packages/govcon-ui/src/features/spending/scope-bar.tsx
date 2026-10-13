@@ -1,12 +1,25 @@
 import {
   AWARD_FAMILY_CHOICES,
+  facetParams,
+  familyUnder,
   type AgencyDirectoryEntry,
   type AwardFamilyChoice,
+  type FacetId,
 } from '@sysdesign/contracts';
-import { Button, SelectField, Stack, Text, TextField } from '@sysdesign/design-system';
+import {
+  ChipGroup,
+  Disclosure,
+  DisclosureButton,
+  DisclosurePanel,
+  SelectField,
+  Stack,
+  Text,
+  TextField,
+} from '@sysdesign/design-system';
 
 import { codesOf } from '../codes';
 import { AWARD_FAMILY_LABEL, SPENDING_COST } from './costs';
+import { FacetControls, type FacetPreset } from './facet-controls';
 import { toggleCode, type ScopeDraft } from './scope';
 import { useSettledDraft } from './use-settled-draft';
 
@@ -21,14 +34,18 @@ export interface ScopeBarProps {
   /** The agency directory; null while it loads. */
   agencies: readonly AgencyDirectoryEntry[] | null;
   agenciesError?: string | null;
+  /** One-press facet settings the profile supplies — its own lanes, say. */
+  facetPresets?: Partial<Record<FacetId, FacetPreset>>;
   disabled?: boolean;
 }
 
 /**
  * What every lens is scoped by: code families, one awarding agency, one or
- * both award families. Codes — typed or pressed — are handed on once they
- * pause, so composing a scope is one change; the agency and the family are
- * handed on at once.
+ * both award families, and the facets that narrow those. Codes and chips —
+ * typed or pressed — are handed on once they pause, so composing a scope is
+ * one change; a select or a checkbox is handed on at once. The facets sit
+ * behind one fold that says how many are set, and opens by itself when a
+ * link arrives with some.
  */
 export function ScopeBar({
   value,
@@ -36,6 +53,7 @@ export function ScopeBar({
   naicsOptions,
   agencies,
   agenciesError = null,
+  facetPresets,
   disabled = false,
 }: ScopeBarProps) {
   const { shown, settleLater, commit, settleNow } = useSettledDraft(
@@ -43,30 +61,21 @@ export function ScopeBar({
     onChange,
     CODES_SETTLE_MS,
   );
-  const chosen = codesOf(shown.naics);
   const sorted =
     agencies === null ? [] : [...agencies].sort((a, b) => a.name.localeCompare(b.name));
+  const narrowed = Object.keys(facetParams(shown.facets)).length;
+  // A placement is a kind of contract: the family follows it and is not the reader's to change.
+  const family = familyUnder(shown.awardFamily, shown.facets);
   return (
     <Stack gap={3}>
-      <Stack direction="row" gap={2} wrap align="center">
-        <Text as="span" tone="secondary" size="sm">
-          Profile NAICS
-        </Text>
-        {naicsOptions.map((code) => (
-          <Button
-            key={code}
-            type="button"
-            variant="subtle"
-            size="sm"
-            selected={chosen.includes(code)}
-            aria-pressed={chosen.includes(code)}
-            disabled={disabled}
-            onClick={() => settleLater({ naics: toggleCode(shown.naics, code) })}
-          >
-            {code}
-          </Button>
-        ))}
-      </Stack>
+      <ChipGroup
+        label="Profile NAICS"
+        showLabel
+        options={naicsOptions.map((code) => ({ id: code, label: code }))}
+        value={codesOf(shown.naics)}
+        disabled={disabled}
+        onToggle={(code) => settleLater({ naics: toggleCode(shown.naics, code) })}
+      />
       <Stack direction="row" gap={4} align="end" wrap>
         <TextField
           label="NAICS codes"
@@ -99,8 +108,11 @@ export function ScopeBar({
         </SelectField>
         <SelectField
           label="Award family"
-          value={shown.awardFamily}
-          disabled={disabled}
+          value={family}
+          disabled={disabled || family !== shown.awardFamily}
+          hint={
+            family === shown.awardFamily ? undefined : 'Set by "Placed as": a kind of contract.'
+          }
           onChange={(event) => commit({ awardFamily: event.target.value as AwardFamilyChoice })}
         >
           {AWARD_FAMILY_CHOICES.map((family) => (
@@ -110,6 +122,20 @@ export function ScopeBar({
           ))}
         </SelectField>
       </Stack>
+      <Disclosure defaultOpen={narrowed > 0}>
+        <DisclosureButton variant="subtle" size="sm">
+          {narrowed === 0 ? 'More filters' : `More filters (${narrowed} set)`}
+        </DisclosureButton>
+        <DisclosurePanel>
+          <FacetControls
+            facets={shown.facets}
+            onCommit={(facets) => commit({ facets })}
+            onSettle={(facets) => settleLater({ facets })}
+            presets={facetPresets}
+            disabled={disabled}
+          />
+        </DisclosurePanel>
+      </Disclosure>
       <Text tone="muted" size="sm">
         {SPENDING_COST}
       </Text>
