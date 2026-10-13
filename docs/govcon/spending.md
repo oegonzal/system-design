@@ -1,12 +1,13 @@
 # Spending — where and when the government obligates money
 
 The Spending page of `packages/govcon-ui` and the `/spending/*` routes of
-`packages/govcon` answer four questions about one scope — a set of NAICS or
+`packages/govcon` answer five questions about one scope — a set of NAICS or
 PSC code families, one awarding agency or every agency, contracts or
-indefinite-delivery vehicles (IDVs) or both — from USAspending, which needs
-no key: **when** the money moves (Pulse), **where** it goes (Where), **what is
-ending** and so may be bought again (Horizon), and **how much an agency has
-left** (Agency). Every answer is a snapshot the service took through the one
+indefinite-delivery vehicles (IDVs) or both, narrowed by any of five facets —
+from USAspending, which needs no key: **when** the money moves (Pulse),
+**where** it goes (Where), **how much of it was open to you** (Reach), **what
+is ending** and so may be bought again (Horizon), and **how much an agency
+has left** (Agency). Every answer is a snapshot the service took through the one
 request gate, kept for the cache window, and carries its provenance. A daily
 warm refreshes the default profile's lenses and puts what changed to a person
 as a Telegram digest. This guide says how each piece works and how to use it;
@@ -27,20 +28,56 @@ agency and the award family are handed on at once. USAspending ANDs the code fil
 narrows a NAICS scope rather than widening it; leave PSC empty to see the
 whole industry. The agency select is the directory USAspending publishes.
 
+**More filters.** Five facets narrow the scope further, behind one fold that
+says how many are set and is open when a link arrives with some. They are
+one declared table (`SPENDING_FACETS` in contracts), so the control, the
+address, the wire and the snapshot key all spell a value the same way:
+
+| Facet           | What it keeps                                                                                                                              |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Won by          | Awards to small businesses, or to everyone else, by the size the government recorded on that award.                                        |
+| Placed as       | Stand-alone contracts, or orders under a vehicle the winner already held. Choosing one makes the scope one of contracts.                   |
+| Set-aside       | Any of the set-aside codes, with `NONE` for an award made under no set-aside. **My lanes** presses the ones the profile's scoring may bid. |
+| Award size      | One of four bands cut at the acquisition thresholds: up to $15K, to $350K, to $900K, and over.                                             |
+| New awards only | Awards that began inside the window, never a change to an older one.                                                                       |
+
+A code or a range the table does not offer, named by an address or a saved
+view, is shown pressed beside the ones it does.
+
+**Largest codes in this scope.** One more fold under the bar ranks the
+scope's PSC and NAICS codes by what was obligated under them over the last
+twelve months, each a chip with its dollars that puts the code in the scope
+or takes it out. Each kind is ranked over the scope without its own codes of
+that kind, so the list shows what there is to choose from. It reads two
+breakdowns a scope and only once opened. Product service codes are the
+filter to reach for: a keyword finds almost nothing in this data, and a
+code finds the work.
+
+**Saved views.** Name the page as it stands and it is kept for the profile
+as a link; saving under a name already kept updates it. A saved view spells
+its NAICS out even when they are the profile's own, so it opens the same
+whatever the profile comes to name. The service keeps the address and
+nothing of what it shows.
+
 **The view is its address.** The scope, the open tab and each lens's setting
 travel in the URL, so a reload, a shared link and a return by Back all open
 the same view. Only what differs from the profile's default is written:
 
-| Parameter     | Values                                                                                  | Default             |
-| ------------- | --------------------------------------------------------------------------------------- | ------------------- |
-| `naics`       | one per code (`naics=541511&naics=541512`); `naics=` alone means none                   | the profile's NAICS |
-| `psc`         | one per code                                                                            | none                |
-| `agency`      | a toptier code (`097`)                                                                  | every agency        |
-| `awardFamily` | `contracts`, `idvs`, `both`                                                             | `both`              |
-| `tab`         | `pulse`, `where`, `horizon`, `agency`                                                   | `pulse`             |
-| `category`    | `awarding_agency`, `awarding_subagency`, `recipient`, `naics`, `psc`, `state_territory` | `awarding_agency`   |
-| `window`      | `fytd`, `prior-fy`, `last-12-months`                                                    | `last-12-months`    |
-| `months`      | `6`, `12`, `24`                                                                         | `12`                |
+| Parameter       | Values                                                                                  | Default             |
+| --------------- | --------------------------------------------------------------------------------------- | ------------------- |
+| `naics`         | one per code (`naics=541511&naics=541512`); `naics=` alone means none                   | the profile's NAICS |
+| `psc`           | one per code                                                                            | none                |
+| `agency`        | a toptier code (`097`)                                                                  | every agency        |
+| `awardFamily`   | `contracts`, `idvs`, `both`                                                             | `both`              |
+| `recipientSize` | `small`, `other`                                                                        | anyone              |
+| `placement`     | `standalone`, `order`                                                                   | either              |
+| `setAside`      | codes, comma-joined (`NONE,SBA,SBP`)                                                    | any                 |
+| `amount`        | `min-max` in dollars, either end open (`15000.01-350000`, `-15000`)                     | any                 |
+| `newOnly`       | `true`                                                                                  | every action        |
+| `tab`           | `pulse`, `where`, `reach`, `horizon`, `agency`                                          | `pulse`             |
+| `category`      | `awarding_agency`, `awarding_subagency`, `recipient`, `naics`, `psc`, `state_territory` | `awarding_agency`   |
+| `window`        | `fytd`, `prior-fy`, `last-12-months`                                                    | `last-12-months`    |
+| `months`        | `6`, `12`, `24`                                                                         | `12`                |
 
 A value the vocabulary does not know falls back to the default. A tab mounts
 the first time it is opened — by a click or by the address — and stays
@@ -104,6 +141,31 @@ with the fiscal year to date and the prior fiscal year as presets.
 (`MAX_BREAKDOWN_ROWS`). When the window reaches past the last day a late
 agency has published, a note says the total and that agency's rows are
 short; the prior fiscal year is the window to read for whole shares.
+
+### Reach — how much of it was open to you
+
+The scope's new contracts over the page's window, cut down step by step.
+Each cut narrows the one before it and never widens:
+
+1. **New contracts**: begun inside the window.
+2. **In your lanes**: made with no set-aside or under one the profile may
+   bid. The lanes are read from the profile's scoring.
+3. **No vehicle needed**: placed as contracts of their own, not as orders
+   under a vehicle a firm must already hold.
+4. **Won by a small business**: what firms that size took of it.
+
+Each cut shows its count, its share of the first, the dollars obligated on
+it, and a link that opens Where ranked by recipient under exactly that
+cut's facets, so "who won those 1,812" is one click. The last cut is then
+shown by award size against the acquisition thresholds, each band with the
+rule that applies to a purchase of that size. Reach counts contracts only:
+a vehicle is not work until an order is placed under it. A cut the scope's
+own facets rule out — stand-alone contracts in a scope of orders — is
+answered as zero without asking the source. The read is twelve requests:
+a count and a total for each cut, and a count for each band.
+
+Checked 2026-10-13 against the source directly for NAICS 541511, 541512 and
+541519 over fiscal 2025: 33,911 new contracts, and 1,812 at the last cut.
 
 ### Horizon — what is ending
 
@@ -170,7 +232,8 @@ request, which matters under `node --watch`, where every save restarts the
 service — and each scheduled run renews: the snapshot is replaced inside the
 window, so the page's first look that day is a snapshot. A warm reads the
 default profile's NAICS (no PSC, every agency, both families) through every
-lens, then, for each of the top three agencies
+lens, the reach count taken for the lanes the profile may bid, then, for
+each of the top three agencies
 the rolling-year breakdown names, the horizon narrowed to that agency (the
 scope a directory pick opens, and the one whose walk reaches today) and its
 outlook, and logs one line per lens:
@@ -179,6 +242,7 @@ outlook, and logs one line per lens:
 spending warm every 24 h
 warm pulse source 1 req 812 ms
 warm breakdown source 2 req 1240 ms
+warm reach source 12 req 4310 ms
 warm horizon source 7 req 9870 ms
 warm agencies source 1 req 310 ms
 warm horizon 097 source 9 req 6210 ms
@@ -239,11 +303,13 @@ the way SAM.gov writes a notice's; a name's own dots are dropped when the
 path is built, so `U.S. Coast Guard` is stored and shown as `US Coast Guard`.
 Pure arithmetic lives in
 `packages/govcon/src/core/spending/` (the series aligner, the projection,
-the horizon walk, the agency alignment, the recompete join, the alert rules);
+the horizon walk, the agency alignment, the recompete join, the alert rules,
+how a publication delay marks a period, and how facets narrow cut by cut);
 one adapter per USAspending endpoint lives in
 `packages/govcon/src/modules/sources/usaspending/`; the warm, the alert
-ledger and the bus sink in `packages/govcon/src/modules/spending/`. The
-criteria are `GOV-20..24` and `GOVU-11..12` in `packages/criteria`.
+ledger and the bus sink in `packages/govcon/src/modules/spending/`; saved
+views in `packages/govcon/src/modules/views/`. The criteria are `GOV-20..28`
+and `GOVU-11..16` in `packages/criteria`.
 
 ## How to use the tools
 
@@ -256,17 +322,21 @@ switch the window and the months — then copy the address.
 ```
 curl -s 'localhost:3004/spending/pulse?naics=541511,541512&lookback=3' | jq '.data | {fiscalYear, projection: .projection.method, servedFrom: .provenance.servedFrom}'
 curl -s 'localhost:3004/spending/breakdown?category=awarding_agency&naics=541511&from=2025-10-01&to=2026-09-30' | jq '.data | {total, truncated, top: .rows[:5]}'
+curl -s 'localhost:3004/spending/reach?naics=541511,541512,541519&from=2024-10-01&to=2025-09-30&lanes=NONE,SBA,SBP' | jq '.data | {cuts: [.cuts[]|{id, awards, amount}], bands}'
+curl -s 'localhost:3004/spending/breakdown?category=recipient&naics=541511&from=2024-10-01&to=2025-09-30&placement=standalone&setAside=NONE,SBA,SBP&recipientSize=small&newOnly=true' | jq '.data.rows[:10]'
 curl -s 'localhost:3004/spending/horizon?naics=541511&months=12' | jq '.data | {capped, stoppedBy, completeBefore, rows: (.rows|length), open: (.openNotices|length)}'
 curl -s 'localhost:3004/spending/agencies' | jq '.data.entries | length'
 curl -s 'localhost:3004/spending/agencies/097?fiscalYear=2026' | jq '.data | {name, years: [.years[]|{fiscalYear, periods: (.byPeriod|length)}]}'
 ```
 
 Lists are comma-joined on the wire; the server sorts and de-duplicates them,
-so the same scope in any spelling is one snapshot.
+so the same scope in any spelling is one snapshot. Every scoped route takes
+the five facets under the names in the table above, and refuses a value
+outside the vocabulary with a 400 naming the field.
 
 **The ledger:** every page read is one row under its operation —
-`series`, `breakdown`, `horizon`, `agency-budget`, `agency-offices`,
-`agency-directory`, `freshness` — in Settings → Ledger and at
+`series`, `breakdown`, `horizon`, `award-count`, `agency-budget`,
+`agency-offices`, `agency-directory`, `freshness` — in Settings → Ledger and at
 `GET /source/calls?operation=horizon`.
 
 **Settings → Alerts:** the two thresholds above, saved with the profile.
@@ -473,23 +543,25 @@ families and interests that name parts and repair.
 
 ## Limits
 
-| Constant                                                    | Value     | Where it binds                                                              |
-| ----------------------------------------------------------- | --------- | --------------------------------------------------------------------------- |
-| `MAX_SCOPE_CODES`                                           | 20        | codes of each kind in one scope                                             |
-| `DEFAULT_PULSE_LOOKBACK_YEARS` / `MAX_PULSE_LOOKBACK_YEARS` | 3 / 5     | prior years the pulse shows and projects from                               |
-| `MAX_BREAKDOWN_ROWS`                                        | 25        | rows one breakdown answers (`truncated` says when more exist)               |
-| `HORIZON_MONTH_CHOICES`                                     | 6, 12, 24 | the months the page offers (`MAX_HORIZON_MONTHS` 36 on the wire)            |
-| `HORIZON_LOOKBACK_YEARS`                                    | 5         | the action-date window a horizon walk covers                                |
-| `MAX_HORIZON_PAGES` × `HORIZON_PAGE_SIZE`                   | 30 × 100  | pages per family (finding today's place and reading forward), rows per page |
-| `HORIZON_MAX_DEPTH_AWARDS`                                  | 50,000    | the depth USAspending pages its award search to                             |
-| `MAX_HORIZON_ROWS`                                          | 200       | soonest-ending rows one answer lists                                        |
-| `MAX_RECOMPETE_NOTICES`                                     | 500       | open notices one horizon read joins                                         |
-| `MAX_AGENCY_OFFICES`                                        | 50        | sub-agencies one outlook answers                                            |
-| `ALERT_PROMPT_MAX_ITEMS` / `ALERT_PROMPT_TTL_DAYS`          | 10 / 7    | lines one digest lists; days until it expires                               |
-| `MAX_ALERT_ENDING_DAYS`                                     | 366       | the farthest `alerts.endingWithinDays` may look                             |
-| `WARM_TOP_AGENCIES`                                         | 3         | agency outlooks one warm reads                                              |
-| `SAM_GOV_CACHE_TTL_HOURS`                                   | 24        | the snapshot window                                                         |
-| `GOVCON_PULL_DEADLINE_SECONDS`                              | 120       | the wall clock on one horizon walk                                          |
+| Constant                                                    | Value              | Where it binds                                                              |
+| ----------------------------------------------------------- | ------------------ | --------------------------------------------------------------------------- |
+| `MAX_SCOPE_CODES`                                           | 20                 | codes of each kind in one scope                                             |
+| `DEFAULT_PULSE_LOOKBACK_YEARS` / `MAX_PULSE_LOOKBACK_YEARS` | 3 / 5              | prior years the pulse shows and projects from                               |
+| `MAX_BREAKDOWN_ROWS`                                        | 25                 | rows one breakdown answers (`truncated` says when more exist)               |
+| `ACQUISITION_THRESHOLDS`                                    | $15K, $350K, $900K | the lines the award-size bands are cut at, as raised 2025-10-01             |
+| `MAX_VIEW_NAME_LENGTH` / `MAX_VIEW_HREF_LENGTH`             | 120 / 2000         | a saved view's name and address                                             |
+| `HORIZON_MONTH_CHOICES`                                     | 6, 12, 24          | the months the page offers (`MAX_HORIZON_MONTHS` 36 on the wire)            |
+| `HORIZON_LOOKBACK_YEARS`                                    | 5                  | the action-date window a horizon walk covers                                |
+| `MAX_HORIZON_PAGES` × `HORIZON_PAGE_SIZE`                   | 30 × 100           | pages per family (finding today's place and reading forward), rows per page |
+| `HORIZON_MAX_DEPTH_AWARDS`                                  | 50,000             | the depth USAspending pages its award search to                             |
+| `MAX_HORIZON_ROWS`                                          | 200                | soonest-ending rows one answer lists                                        |
+| `MAX_RECOMPETE_NOTICES`                                     | 500                | open notices one horizon read joins                                         |
+| `MAX_AGENCY_OFFICES`                                        | 50                 | sub-agencies one outlook answers                                            |
+| `ALERT_PROMPT_MAX_ITEMS` / `ALERT_PROMPT_TTL_DAYS`          | 10 / 7             | lines one digest lists; days until it expires                               |
+| `MAX_ALERT_ENDING_DAYS`                                     | 366                | the farthest `alerts.endingWithinDays` may look                             |
+| `WARM_TOP_AGENCIES`                                         | 3                  | agency outlooks one warm reads                                              |
+| `SAM_GOV_CACHE_TTL_HOURS`                                   | 24                 | the snapshot window                                                         |
+| `GOVCON_PULL_DEADLINE_SECONDS`                              | 120                | the wall clock on one horizon walk                                          |
 
 ## USAspending facts the design rests on
 
@@ -505,6 +577,8 @@ Probed live on 2026-10-12 and 2026-10-13; free, no key.
 - `awards/last_updated` is `MM/DD/YYYY`; agency financials are revealed about five to six weeks after the period.
 - Department of Defense awards appear 90 days after signing. Measured 2026-10-13 against data as of 2026-10-12: Defense reported $43.3B for June 2026, $12.2B for July and $0.02B for August. The Army Corps of Engineers awards under Defense's code; as an awarding agency of its own (`096`) it reports no contract obligations. The adapter declares the lag as data (`USASPENDING_PUBLICATION_LAGS`), and the lenses derive everything else from it.
 - `spending_by_award` answers null for an award's end date with options, under every name tried; `awards/{id}` returns it as `period_of_performance.potential_end_date`.
+- `spending_by_award_count` answers one count per award kind (`results.contracts`, `results.idvs`) for the same filters every search takes.
+- The facet filters, measured on the count, the series and the category endpoints: `recipient_type_names: ["small_business"]` or `["other_than_small_business"]`; `set_aside_type_codes` with `NONE` for no set-aside; `award_amounts: [{ lower_bound, upper_bound }]`, inclusive at both ends, so two bands that share an edge count an award on it twice; `time_period[].date_type: "new_awards_only"`; and among `award_type_codes`, `B` (purchase order) and `D` (definitive contract) stand alone while `A` (BPA call) and `C` (delivery or task order) are placed under a vehicle.
 
 ## Reviewing a build live
 
