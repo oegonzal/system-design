@@ -150,7 +150,7 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
   {
     id: 'GOV-17',
     statement:
-      "Awards from SAM.gov's Contract Awards API and from USAspending are normalized to one shape, fetched one gated page at a time up to a bound, upserted by source and id, listed and summarized deterministically from the store, and read by the scorer's history factor and by a notice's own solicitation.",
+      "Awards from SAM.gov's Contract Awards API and from USAspending are normalized to one shape — a count of offers the provider writes as its not-counted placeholder read as unknown — fetched one gated page at a time up to a bound, upserted by source and id, listed and summarized deterministically from the store, and read by the scorer's history factor and by a notice's own solicitation.",
   },
   {
     id: 'GOV-18',

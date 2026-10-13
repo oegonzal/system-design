@@ -1,5 +1,6 @@
 import { SAM_GOV_AWARDS_URL, SamGovAwards, toSamAwardParams } from './awards';
 import fixture from './fixtures/awards-response.json';
+import { normalizeSamAward } from './normalize-award';
 import { httpOf, KEY } from './testing';
 
 const request = {
@@ -55,6 +56,27 @@ describe('the SAM.gov contract awards', () => {
     });
     expect(warnings).toEqual(['sam.gov awards: 1 record(s) did not normalize']);
     expect(JSON.stringify(result)).not.toContain(KEY);
+  });
+
+  it("[GOV-17] reads the provider's 999 offers as not counted, and every real count as itself", () => {
+    const record = fixture.awardSummary[0];
+    const withOffers = (numberOfOffersReceived: number | string) =>
+      normalizeSamAward(
+        {
+          ...record,
+          awardDetails: {
+            ...record?.awardDetails,
+            competitionInformation: { numberOfOffersReceived },
+          },
+        },
+        'sam.gov',
+      );
+    const offersOf = (answer: ReturnType<typeof normalizeSamAward>) =>
+      answer.ok ? answer.award.offersReceived : 'rejected';
+    expect(offersOf(withOffers(999))).toBeNull();
+    expect(offersOf(withOffers('999'))).toBeNull();
+    expect(offersOf(withOffers(998))).toBe(998);
+    expect(offersOf(withOffers(3))).toBe(3);
   });
 
   it('joins codes and pages by index the way the provider counts, reports an unreadable envelope, and says when the last page was reached', async () => {

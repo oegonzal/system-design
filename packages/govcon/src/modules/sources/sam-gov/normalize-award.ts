@@ -26,6 +26,19 @@ const integer = (value: number | string | null | undefined): number | null => {
   return parsed === null ? null : Math.trunc(parsed);
 };
 
+/**
+ * How the provider writes "offers were not counted". Measured 2026-10-13: 466
+ * of 871 stored 5415 awards carried 999, and 464 of those were GSA Federal
+ * Acquisition Service schedule records. A placeholder is not a count of
+ * bidders, so it reads as unknown.
+ */
+const OFFERS_NOT_COUNTED = 999;
+
+const offersReceived = (value: number | string | null | undefined): number | null => {
+  const count = integer(value);
+  return count === OFFERS_NOT_COUNTED ? null : count;
+};
+
 const isoDay = (value: string | null | undefined): string | null =>
   parseSamDate(value)?.slice(0, 10) ?? null;
 
@@ -58,7 +71,9 @@ function shape(record: SamAward, signedAt: string, source: AwardDraft['source'])
       clean(record.awardDetails?.awardeeData?.awardeeHeader?.legalBusinessName),
     awardeeUei: clean(record.awardDetails?.awardeeData?.awardeeUEIInformation?.uniqueEntityId),
     amount: amount(record.awardDetails?.dollars?.actionObligation),
-    offersReceived: integer(record.awardDetails?.competitionInformation?.numberOfOffersReceived),
+    offersReceived: offersReceived(
+      record.awardDetails?.competitionInformation?.numberOfOffersReceived,
+    ),
     extentCompeted: clean(record.coreData?.competitionInformation?.extentCompeted?.code),
     setAsideCode: setAside === 'NONE' ? null : setAside,
     signedAt,
