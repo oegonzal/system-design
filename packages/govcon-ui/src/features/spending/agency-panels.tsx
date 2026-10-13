@@ -30,7 +30,7 @@ export interface AgencyDirectoryTableProps {
   onSelect(toptierCode: string): void;
 }
 
-/** Every toptier agency with its budget authority; one opens its outlook. */
+/** Every toptier agency with its budget authority; picking one makes it the page's scope and opens its outlook. */
 export function AgencyDirectoryTable({ agencies, selected, onSelect }: AgencyDirectoryTableProps) {
   return (
     <Table aria-label="Agencies">
@@ -68,7 +68,7 @@ export function AgencyDirectoryTable({ agencies, selected, onSelect }: AgencyDir
                 aria-pressed={selected === agency.toptierCode}
                 onClick={() => onSelect(agency.toptierCode)}
               >
-                {selected === agency.toptierCode ? 'Viewing' : 'View'}
+                {selected === agency.toptierCode ? 'In scope' : 'View'}
               </Button>
             </td>
           </tr>

@@ -25,6 +25,16 @@ describe('the pulse panels', () => {
     ).toBeTruthy();
   });
 
+  it('[GOVU-12] answers hover on a period with one tooltip naming every fiscal year at that period', () => {
+    renderWithTheme(<Chart />);
+    fireEvent.mouseEnter(screen.getByRole('button', { name: /^Jun:/ }));
+    const tooltip = screen.getByRole('tooltip');
+    for (const label of ['FY2026', 'FY2025', 'FY2024', 'FY2023']) {
+      expect(tooltip.textContent).toContain(label);
+    }
+    expect(tooltip.textContent).toContain('(provisional)');
+  });
+
   it('[GOVU-11] tiles the year to date, the prior year to date with its change, and the projected remainder with its band', () => {
     renderWithTheme(<Tiles />);
     const grid = screen.getByLabelText('Fiscal year to date');

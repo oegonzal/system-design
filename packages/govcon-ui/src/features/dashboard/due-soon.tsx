@@ -9,6 +9,7 @@ import {
 import { Badge, Heading, Stack, Table, Text } from '@sysdesign/design-system';
 
 import { useLink } from '../../components/link-context';
+import { noticeHref } from '../notice-href';
 import { BID_STAGE_TONE } from '../tones';
 
 export interface DueSoonProps {
@@ -56,7 +57,7 @@ export function DueSoon({ rows, nowMs }: DueSoonProps) {
                     <Badge tone={BID_STAGE_TONE[bid.stage]}>{bid.stage}</Badge>
                   </td>
                   <td>
-                    <Link href={`/notices/${encodeURIComponent(bid.noticeId)}`} $variant="inline">
+                    <Link href={noticeHref(bid.noticeId)} $variant="inline">
                       {o.title}
                     </Link>
                   </td>

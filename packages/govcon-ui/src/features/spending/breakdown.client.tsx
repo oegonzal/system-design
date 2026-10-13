@@ -8,7 +8,6 @@ import {
 } from '@sysdesign/contracts';
 import { Alert, Spinner, Stack, Text } from '@sysdesign/design-system';
 import { useResource } from '@sysdesign/web-kit';
-import { useState } from 'react';
 
 import { api } from '../../api/client';
 import { BreakdownControls, BreakdownList } from './breakdown-panels';
@@ -17,12 +16,20 @@ import { ProvenanceLine } from './provenance-line';
 
 export interface BreakdownLensProps {
   scope: ScopeQuery;
+  category: BreakdownCategory;
+  onCategoryChange(category: BreakdownCategory): void;
+  preset: WindowPreset;
+  onPresetChange(preset: WindowPreset): void;
 }
 
-/** Where the money goes: the scope ranked by one category over one window. */
-export function BreakdownLens({ scope }: BreakdownLensProps) {
-  const [category, setCategory] = useState<BreakdownCategory>('awarding_agency');
-  const [preset, setPreset] = useState<WindowPreset>('fytd');
+/** Where the money goes: the scope ranked by one category over one window, both chosen by the page. */
+export function BreakdownLens({
+  scope,
+  category,
+  onCategoryChange,
+  preset,
+  onPresetChange,
+}: BreakdownLensProps) {
   const window = windowOf(preset, Date.now());
   const query = { ...scope, category, from: window.from, to: window.to };
   const key = JSON.stringify(query);
@@ -31,9 +38,9 @@ export function BreakdownLens({ scope }: BreakdownLensProps) {
     <Stack gap={4}>
       <BreakdownControls
         category={category}
-        onCategoryChange={setCategory}
+        onCategoryChange={onCategoryChange}
         preset={preset}
-        onPresetChange={setPreset}
+        onPresetChange={onPresetChange}
       />
       {breakdown.error ? <Alert tone="danger">{breakdown.error}</Alert> : null}
       {breakdown.data ? (

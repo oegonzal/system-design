@@ -8,6 +8,10 @@ import { Button, SelectField, Stack, Text, TextField } from '@sysdesign/design-s
 import { codesOf } from '../codes';
 import { AWARD_FAMILY_LABEL, SPENDING_COST } from './costs';
 import { toggleCode, type ScopeDraft } from './scope';
+import { useSettledDraft } from './use-settled-draft';
+
+/** How long typing may pause before the codes are handed on. */
+export const CODES_SETTLE_MS = 300;
 
 export interface ScopeBarProps {
   value: ScopeDraft;
@@ -20,7 +24,11 @@ export interface ScopeBarProps {
   disabled?: boolean;
 }
 
-/** What every lens is scoped by: code families, one awarding agency, one or both award families. */
+/**
+ * What every lens is scoped by: code families, one awarding agency, one or
+ * both award families. Chips and selects are handed on at once; typed codes
+ * settle first, since the owner writes the scope to the address.
+ */
 export function ScopeBar({
   value,
   onChange,
@@ -29,7 +37,8 @@ export function ScopeBar({
   agenciesError = null,
   disabled = false,
 }: ScopeBarProps) {
-  const chosen = codesOf(value.naics);
+  const { shown, type, commit, settle } = useSettledDraft(value, onChange, CODES_SETTLE_MS);
+  const chosen = codesOf(shown.naics);
   const sorted =
     agencies === null ? [] : [...agencies].sort((a, b) => a.name.localeCompare(b.name));
   return (
@@ -47,7 +56,7 @@ export function ScopeBar({
             selected={chosen.includes(code)}
             aria-pressed={chosen.includes(code)}
             disabled={disabled}
-            onClick={() => onChange({ ...value, naics: toggleCode(value.naics, code) })}
+            onClick={() => commit({ naics: toggleCode(shown.naics, code) })}
           >
             {code}
           </Button>
@@ -57,22 +66,24 @@ export function ScopeBar({
         <TextField
           label="NAICS codes"
           hint="Codes or families, comma-separated"
-          value={value.naics}
+          value={shown.naics}
           disabled={disabled}
-          onChange={(event) => onChange({ ...value, naics: event.target.value })}
+          onChange={(event) => type({ naics: event.target.value })}
+          onBlur={settle}
         />
         <TextField
           label="PSC codes"
-          value={value.psc}
+          value={shown.psc}
           disabled={disabled}
-          onChange={(event) => onChange({ ...value, psc: event.target.value.toUpperCase() })}
+          onChange={(event) => type({ psc: event.target.value.toUpperCase() })}
+          onBlur={settle}
         />
         <SelectField
           label="Agency"
-          value={value.agency}
+          value={shown.agency}
           disabled={disabled || agencies === null}
           hint={agenciesError ?? (agencies === null ? 'Loading the directory…' : undefined)}
-          onChange={(event) => onChange({ ...value, agency: event.target.value })}
+          onChange={(event) => commit({ agency: event.target.value })}
         >
           <option value="">any</option>
           {sorted.map((agency) => (
@@ -83,11 +94,9 @@ export function ScopeBar({
         </SelectField>
         <SelectField
           label="Award family"
-          value={value.awardFamily}
+          value={shown.awardFamily}
           disabled={disabled}
-          onChange={(event) =>
-            onChange({ ...value, awardFamily: event.target.value as AwardFamilyChoice })
-          }
+          onChange={(event) => commit({ awardFamily: event.target.value as AwardFamilyChoice })}
         >
           {AWARD_FAMILY_CHOICES.map((family) => (
             <option key={family} value={family}>

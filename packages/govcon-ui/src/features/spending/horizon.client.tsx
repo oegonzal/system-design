@@ -1,6 +1,6 @@
 'use client';
 
-import { DEFAULT_HORIZON_MONTHS, type ScopeQuery } from '@sysdesign/contracts';
+import type { HorizonMonthChoice, ScopeQuery } from '@sysdesign/contracts';
 import { Alert, Spinner, Stack, Text } from '@sysdesign/design-system';
 import { useResource } from '@sysdesign/web-kit';
 import { useState } from 'react';
@@ -14,11 +14,12 @@ const ROWS_PER_PAGE = 25;
 
 export interface HorizonLensProps {
   scope: ScopeQuery;
+  months: HorizonMonthChoice;
+  onMonthsChange(months: HorizonMonthChoice): void;
 }
 
-/** What is coming up: the scope's awards ending inside the months ahead. */
-export function HorizonLens({ scope }: HorizonLensProps) {
-  const [months, setMonths] = useState<number>(DEFAULT_HORIZON_MONTHS);
+/** What is coming up: the scope's awards ending inside the months ahead, with the open notices already stored for them. */
+export function HorizonLens({ scope, months, onMonthsChange }: HorizonLensProps) {
   const query = { ...scope, months };
   const key = JSON.stringify(query);
   const horizon = useResource((signal) => api.getSpendingHorizon(query, { signal }), [key]);
@@ -27,7 +28,7 @@ export function HorizonLens({ scope }: HorizonLensProps) {
   const offset = paging.key === key ? paging.offset : 0;
   return (
     <Stack gap={4}>
-      <HorizonMonths value={months} onChange={setMonths} />
+      <HorizonMonths value={months} onChange={onMonthsChange} />
       {horizon.error ? <Alert tone="danger">{horizon.error}</Alert> : null}
       {horizon.data ? (
         <>
@@ -35,6 +36,7 @@ export function HorizonLens({ scope }: HorizonLensProps) {
           <HorizonChart horizon={horizon.data} pending={horizon.loading} />
           <HorizonTable
             rows={horizon.data.rows}
+            openNotices={horizon.data.openNotices}
             offset={offset}
             limit={ROWS_PER_PAGE}
             onPage={(next) => setPaging({ key, offset: next })}

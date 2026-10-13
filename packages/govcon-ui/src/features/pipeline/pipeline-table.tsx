@@ -13,6 +13,7 @@ import {
 import { Badge, Button, SelectField, Stack, Table, Text } from '@sysdesign/design-system';
 
 import { useLink } from '../../components/link-context';
+import { noticeHref } from '../notice-href';
 import { TIER_TONE } from '../tones';
 
 export interface PipelineTableProps {
@@ -71,7 +72,7 @@ export function PipelineTable({
               return (
                 <tr key={bid.noticeId}>
                   <td>
-                    <Link href={`/notices/${encodeURIComponent(bid.noticeId)}`} $variant="inline">
+                    <Link href={noticeHref(bid.noticeId)} $variant="inline">
                       {clip(o.title, 60)}
                     </Link>
                   </td>

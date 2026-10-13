@@ -61,6 +61,11 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
     statement:
       'The spending page scopes four free lenses over one scope bar — fiscal periods with a seasonal projection, a ranked breakdown over a fiscal window, awards expiring by month, and an agency’s budget by fiscal year with its sub-agencies — every chart carries a data-table alternative, and every panel states its provenance and the source’s disclosures verbatim.',
   },
+  {
+    id: 'GOVU-12',
+    statement:
+      'A spending view is its address: a link without a scope opens on the active profile’s NAICS, and the scope, the tab and each lens’s settings travel in the URL, so a reload, a shared link and a return by Back all open the same view; typed codes settle before they are written; a directory pick narrows the scope to that agency; every column chart answers hover and focus with one tooltip naming every series at that x; and an expiring award says which open notices already exist for its NAICS and buyer, each a link to the notice.',
+  },
   // Government contracting: SAM.gov opportunities (packages/govcon)
   {
     id: 'GOV-1',

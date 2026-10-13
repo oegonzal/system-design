@@ -51,4 +51,23 @@ describe('the horizon panels', () => {
     fireEvent.change(screen.getByLabelText('Months ahead'), { target: { value: '24' } });
     expect(onChange).toHaveBeenCalledWith(24);
   });
+
+  it('[GOVU-12] says which open notices already exist for an expiring award, each a link to the notice with its type and deadline, and counts the rows that have one', () => {
+    renderWithTheme(<Rows />);
+    const table = screen.getByRole('table', { name: 'Expiring awards' });
+    const rows = within(table).getAllByRole('row').slice(1);
+    expect(within(rows[1] as HTMLElement).getByText('0')).toBeTruthy();
+    fireEvent.click(within(rows[0] as HTMLElement).getByRole('button', { name: '1 open' }));
+    const list = screen.getByRole('list', { name: 'Open notices for N6660426P0205' });
+    const link = within(list).getByRole('link', {
+      name: 'Additive manufacturing of replacement brackets',
+    });
+    expect(link.getAttribute('href')).toBe('/notices/n-1');
+    expect(within(list).getByText('Solicitation · due 2026-10-10')).toBeTruthy();
+
+    renderWithTheme(<Tiles />);
+    const grid = screen.getByLabelText('Ending inside the window');
+    expect(within(grid).getByText('With an open notice')).toBeTruthy();
+    expect(within(grid).getByText('of 2 listed')).toBeTruthy();
+  });
 });

@@ -45,6 +45,7 @@ export const DEFAULT_HORIZON_MONTHS = 12;
 export const MAX_HORIZON_MONTHS = 36;
 /** The horizons the client offers; each is within `MAX_HORIZON_MONTHS`. */
 export const HORIZON_MONTH_CHOICES = [6, 12, 24] as const;
+export type HorizonMonthChoice = (typeof HORIZON_MONTH_CHOICES)[number];
 /** The action-date window that bounds a horizon walk's universe, in fiscal years. */
 export const HORIZON_LOOKBACK_YEARS = 5;
 /** Pages one horizon walk may spend per award family, before the wall-clock deadline. */

@@ -10,7 +10,7 @@ import * as stories from './agency-panels.stories';
 const { Outlook, SubAgencies, NoSubAgencies } = composeStories(stories);
 
 describe('the agency panels', () => {
-  it('[GOVU-11] lists the directory with a View per agency, marking the one open', () => {
+  it('[GOVU-11] [GOVU-12] lists the directory with a View per agency, marking the one in scope', () => {
     const onSelect = vi.fn();
     renderWithTheme(
       <AgencyDirectoryTable agencies={AGENCIES.entries} selected="097" onSelect={onSelect} />,
@@ -19,7 +19,7 @@ describe('the agency panels', () => {
     expect(within(table).getAllByRole('row')).toHaveLength(4);
     expect(within(table).getByText('DOD — Department of Defense')).toBeTruthy();
     expect(
-      within(table).getByRole('button', { name: 'Viewing' }).getAttribute('aria-pressed'),
+      within(table).getByRole('button', { name: 'In scope' }).getAttribute('aria-pressed'),
     ).toBe('true');
     fireEvent.click(within(table).getAllByRole('button', { name: 'View' })[0] as HTMLElement);
     expect(onSelect).toHaveBeenCalledWith('036');

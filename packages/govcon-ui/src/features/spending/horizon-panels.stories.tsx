@@ -27,12 +27,21 @@ export const Capped: Story = {
   ),
 };
 
+/** The soonest-ending rows; the first already has an open notice for its work and buyer. */
 export const Rows: Story = {
-  render: () => <HorizonTable rows={HORIZON.rows} offset={0} limit={25} onPage={fn()} />,
+  render: () => (
+    <HorizonTable
+      rows={HORIZON.rows}
+      openNotices={HORIZON.openNotices}
+      offset={0}
+      limit={25}
+      onPage={fn()}
+    />
+  ),
 };
 
 export const NoRows: Story = {
-  render: () => <HorizonTable rows={[]} offset={0} limit={25} onPage={fn()} />,
+  render: () => <HorizonTable rows={[]} openNotices={[]} offset={0} limit={25} onPage={fn()} />,
 };
 
 export const Months: Story = { render: () => <HorizonMonths value={12} onChange={fn()} /> };

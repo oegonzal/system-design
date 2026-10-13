@@ -4,9 +4,12 @@ import {
   clip,
   compactMoney,
   DASH,
+  day,
   HORIZON_MONTH_CHOICES,
   money,
   monthLabel,
+  type HorizonMonthChoice,
+  type HorizonNoticeMatch,
   type HorizonRow,
   type SpendingHorizon,
 } from '@sysdesign/contracts';
@@ -14,6 +17,9 @@ import {
   Alert,
   Badge,
   ColumnChart,
+  Disclosure,
+  DisclosureButton,
+  DisclosurePanel,
   SelectField,
   Stack,
   StatGrid,
@@ -22,13 +28,15 @@ import {
   Text,
 } from '@sysdesign/design-system';
 
+import { useLink } from '../../components/link-context';
+import { noticeHref } from '../notice-href';
 import { Pager } from '../search/pager';
 import { AWARD_FAMILY_TONE } from '../tones';
 import { AWARD_FAMILY_LABEL } from './costs';
 
 export interface HorizonMonthsProps {
-  value: number;
-  onChange(months: number): void;
+  value: HorizonMonthChoice;
+  onChange(months: HorizonMonthChoice): void;
   disabled?: boolean;
 }
 
@@ -39,7 +47,12 @@ export function HorizonMonths({ value, onChange, disabled = false }: HorizonMont
       label="Months ahead"
       value={String(value)}
       disabled={disabled}
-      onChange={(event) => onChange(Number(event.target.value))}
+      onChange={(event) => {
+        const months = HORIZON_MONTH_CHOICES.find(
+          (choice) => String(choice) === event.target.value,
+        );
+        if (months !== undefined) onChange(months);
+      }}
     >
       {HORIZON_MONTH_CHOICES.map((months) => (
         <option key={months} value={months}>
@@ -54,8 +67,9 @@ export interface HorizonTilesProps {
   horizon: SpendingHorizon;
 }
 
-/** How much ends inside the window, per family, and whether the walk saw all of it. */
+/** How much ends inside the window, per family, how many rows already have an open notice, and whether the walk saw all of it. */
 export function HorizonTiles({ horizon }: HorizonTilesProps) {
+  const withNotice = horizon.openNotices.filter((match) => match.notices.length > 0).length;
   return (
     <Stack gap={3}>
       <StatGrid aria-label="Ending inside the window">
@@ -75,6 +89,11 @@ export function HorizonTiles({ horizon }: HorizonTilesProps) {
           label="Window"
           value={`${horizon.months} months`}
           detail={`from ${horizon.today}`}
+        />
+        <StatTile
+          label="With an open notice"
+          value={withNotice}
+          detail={`of ${horizon.rows.length} listed`}
         />
       </StatGrid>
       {horizon.capped ? (
@@ -117,13 +136,49 @@ export function HorizonChart({ horizon, pending = false }: HorizonChartProps) {
 
 export interface HorizonTableProps {
   rows: readonly HorizonRow[];
+  /** The open stored notices joined to the rows by NAICS and buyer; a row with none is absent. */
+  openNotices: readonly HorizonNoticeMatch[];
   offset: number;
   limit: number;
   onPage(offset: number): void;
 }
 
-/** The soonest-ending awards, paged on the client — the lens already bounded them. */
-export function HorizonTable({ rows, offset, limit, onPage }: HorizonTableProps) {
+/** The open notices of one expiring award, each a link to the notice with its type and deadline. */
+function OpenNotices({
+  row,
+  notices,
+}: {
+  row: HorizonRow;
+  notices: HorizonNoticeMatch['notices'];
+}) {
+  const Link = useLink();
+  if (notices.length === 0) return <>0</>;
+  return (
+    <Disclosure>
+      <DisclosureButton variant="ghost" size="sm">
+        {`${notices.length} open`}
+      </DisclosureButton>
+      <DisclosurePanel>
+        <Stack as="ul" gap={1} aria-label={`Open notices for ${row.piid ?? row.externalId}`}>
+          {notices.map((notice) => (
+            <li key={notice.noticeId}>
+              <Link href={noticeHref(notice.noticeId)} $variant="inline">
+                {clip(notice.title, 60)}
+              </Link>{' '}
+              <Text as="span" tone="muted" size="sm">
+                {`${notice.noticeType ?? 'notice'} · due ${day(notice.responseDeadlineAt)}`}
+              </Text>
+            </li>
+          ))}
+        </Stack>
+      </DisclosurePanel>
+    </Disclosure>
+  );
+}
+
+/** The soonest-ending awards, paged on the client — the lens already bounded them — each with the open notices already stored for its work and buyer. */
+export function HorizonTable({ rows, openNotices, offset, limit, onPage }: HorizonTableProps) {
+  const noticesOf = new Map(openNotices.map((match) => [match.externalId, match.notices]));
   if (rows.length === 0) {
     return (
       <Text tone="muted" size="sm">
@@ -144,6 +199,7 @@ export function HorizonTable({ rows, offset, limit, onPage }: HorizonTableProps)
             <th scope="col">Agency</th>
             <th scope="col">NAICS / PSC</th>
             <th scope="col">Type</th>
+            <th scope="col">Open notices</th>
           </tr>
         </thead>
         <tbody>
@@ -161,6 +217,9 @@ export function HorizonTable({ rows, offset, limit, onPage }: HorizonTableProps)
                 {row.naicsCode ?? DASH} / {row.pscCode ?? DASH}
               </td>
               <td>{clip(row.typeDescription, 28)}</td>
+              <td>
+                <OpenNotices row={row} notices={noticesOf.get(row.externalId) ?? []} />
+              </td>
             </tr>
           ))}
         </tbody>

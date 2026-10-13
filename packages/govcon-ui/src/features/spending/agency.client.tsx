@@ -3,7 +3,6 @@
 import type { AgencyDirectory, AwardFamilyChoice } from '@sysdesign/contracts';
 import { Alert, Spinner, Stack, Text } from '@sysdesign/design-system';
 import { useResource } from '@sysdesign/web-kit';
-import { useState } from 'react';
 
 import { api } from '../../api/client';
 import { AgencyDirectoryTable, AgencyOutlookPanel, SubAgencyTable } from './agency-panels';
@@ -15,11 +14,20 @@ export interface AgencyLensProps {
   directory: AgencyDirectory | null;
   directoryError: string | null;
   awardFamily: AwardFamilyChoice;
+  /** The scope's agency, whose outlook is open; null when the scope names none. */
+  selected: string | null;
+  /** A pick narrows the page's scope to the agency; picking it again clears. */
+  onSelect(toptierCode: string): void;
 }
 
-/** An agency's headroom: pick one from the directory, read its budget by year and its offices for this year. */
-export function AgencyLens({ directory, directoryError, awardFamily }: AgencyLensProps) {
-  const [selected, setSelected] = useState<string | null>(null);
+/** An agency's headroom: pick one from the directory — it becomes the scope — and read its budget by year and its offices for this year. */
+export function AgencyLens({
+  directory,
+  directoryError,
+  awardFamily,
+  selected,
+  onSelect,
+}: AgencyLensProps) {
   const outlook = useResource(
     (signal) =>
       selected === null
@@ -35,7 +43,7 @@ export function AgencyLens({ directory, directoryError, awardFamily }: AgencyLen
           <AgencyDirectoryTable
             agencies={directory.entries}
             selected={selected}
-            onSelect={setSelected}
+            onSelect={onSelect}
           />
           <ProvenanceLine provenance={directory.provenance} />
         </>

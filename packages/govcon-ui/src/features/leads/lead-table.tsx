@@ -2,6 +2,7 @@ import { agencyOf, clip, day, rangeLabel, type LeadsReport } from '@sysdesign/co
 import { Badge, Heading, Stack, Table, Text } from '@sysdesign/design-system';
 
 import { useLink } from '../../components/link-context';
+import { noticeHref } from '../notice-href';
 import { TIER_TONE } from '../tones';
 
 /** The columns, as data: the header vocabulary and how each row renders it. */
@@ -9,21 +10,12 @@ export interface LeadTableProps {
   report: LeadsReport;
   /** The row that is open, when one is. */
   activeNoticeId?: string | null;
-  /** The route a title opens; `/notices/:id` in the app. */
-  noticeHref?: (noticeId: string) => string;
   /** A shorter heading for a panel that is one of several. */
   heading?: string;
 }
 
-const defaultHref = (noticeId: string): string => `/notices/${encodeURIComponent(noticeId)}`;
-
 /** The ranking as the service returned it; the title opens the notice, the link opens sam.gov. */
-export function LeadTable({
-  report,
-  activeNoticeId = null,
-  noticeHref = defaultHref,
-  heading = 'Leads',
-}: LeadTableProps) {
+export function LeadTable({ report, activeNoticeId = null, heading = 'Leads' }: LeadTableProps) {
   const Link = useLink();
   return (
     <Stack gap={3}>

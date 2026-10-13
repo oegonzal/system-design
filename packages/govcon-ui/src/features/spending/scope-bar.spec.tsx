@@ -1,14 +1,16 @@
 import { renderWithTheme } from '@sysdesign/web-testing';
 import { composeStories } from '@storybook/react';
-import { fireEvent, screen } from '@testing-library/react';
+import { act, fireEvent, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
+import { CODES_SETTLE_MS } from './scope-bar';
 import * as stories from './scope-bar.stories';
 
 const { Default, DirectoryLoading, DirectoryFailed } = composeStories(stories);
 
 describe('ScopeBar', () => {
-  it('[GOVU-11] toggles profile codes into the typed list, offers the directory as agencies, and chooses the family', () => {
+  it('[GOVU-11] [GOVU-12] toggles profile codes into the typed list at once, offers the directory as agencies, chooses the family, and settles typed codes before handing them on', () => {
+    vi.useFakeTimers();
     const onChange = vi.fn();
     renderWithTheme(<Default onChange={onChange} />);
     const chosen = screen.getByRole('button', { name: '332710' });
@@ -24,8 +26,12 @@ describe('ScopeBar', () => {
     fireEvent.change(screen.getByLabelText('Award family'), { target: { value: 'idvs' } });
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ awardFamily: 'idvs' }));
     fireEvent.change(screen.getByLabelText('PSC codes'), { target: { value: 'ac13' } });
+    expect((screen.getByLabelText('PSC codes') as HTMLInputElement).value).toBe('AC13');
+    expect(onChange).not.toHaveBeenLastCalledWith(expect.objectContaining({ psc: 'AC13' }));
+    act(() => vi.advanceTimersByTime(CODES_SETTLE_MS));
     expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ psc: 'AC13' }));
     expect(screen.getByText(/Free: USAspending needs no key/)).toBeTruthy();
+    vi.useRealTimers();
   });
 
   it('waits for the directory, and says when it failed', () => {
