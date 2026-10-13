@@ -28,6 +28,12 @@ export const NAV_ITEMS = [
     description: 'Awards and registrants: who won what, for how much, against how many.',
   },
   {
+    href: '/spending',
+    label: 'Spending',
+    description:
+      'What agencies obligate and when, where it goes, what is expiring, and an agency’s budget by fiscal year.',
+  },
+  {
     href: '/settings',
     label: 'Settings',
     description: 'Profiles, weights and prices; the sources and the ledger.',

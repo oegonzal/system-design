@@ -3,7 +3,7 @@ import { composeStories } from '@storybook/react';
 import { fireEvent, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { codesOf } from './fetch-awards-form';
+import { codesOf } from '../codes';
 import * as stories from './fetch-awards-form.stories';
 
 const { Default, WithReport, Pending } = composeStories(stories);

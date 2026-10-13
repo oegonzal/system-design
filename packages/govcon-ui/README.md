@@ -1,6 +1,6 @@
 # govcon-ui
 
-The Next.js client for the govcon service: six routes under one shell — the dashboard (buckets, a pull, what is due, the best leads, your registration), search (the store over every filter; SAM.gov searches run and saved), the bid pipeline, one notice in full, award and registrant intel, and settings (profiles as editable data, the sources, the ledger). Every button that spends a request says so. Pure components carry stories and specs; containers are specified against a stubbed API.
+The Next.js client for the govcon service: seven routes under one shell — the dashboard (buckets, a pull, what is due, the best leads, your registration), search (the store over every filter; SAM.gov searches run and saved), the bid pipeline, one notice in full, award and registrant intel, spending (four free USAspending lenses over one scope: obligations by fiscal period with the rest of the year projected, a ranked breakdown over a window, awards expiring by month, and an agency's budget by year with its offices — every chart with a data-table twin, every panel with its provenance), and settings (profiles as editable data, the sources, the ledger). Every button that spends a request says so. Pure components carry stories and specs; containers are specified against a stubbed API.
 
 ```bash
 pnpm govcon:start            # the service on :3004 + this client on :4202 (needs the db)

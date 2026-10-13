@@ -11,6 +11,7 @@ import {
 } from '@sysdesign/design-system';
 import { useState } from 'react';
 
+import { codesOf } from '../codes';
 import { SLICE_OUTCOME_TONE } from '../tones';
 import { AWARD_SOURCE_COST, AWARD_SOURCE_LABEL, AWARD_SOURCE_OPTIONS, FETCH_COST } from './costs';
 
@@ -21,13 +22,6 @@ export interface FetchAwardsFormProps {
   pending?: boolean;
   report?: FetchAwardsReport | null;
 }
-
-/** `a, b c` → `['a', 'b', 'c']`. */
-export const codesOf = (text: string): string[] =>
-  text
-    .split(/[\s,]+/)
-    .map((code) => code.trim())
-    .filter((code) => code.length > 0);
 
 const isoDay = (date: Date): string => date.toISOString().slice(0, 10);
 

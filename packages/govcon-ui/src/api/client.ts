@@ -1,4 +1,7 @@
 import type {
+  AgencyDirectory,
+  AgencyOutlook,
+  AgencyOutlookQuery,
   AwardsQuery,
   AwardsSummary,
   Bid,
@@ -10,12 +13,17 @@ import type {
   FetchAwardsRequest,
   FetchAwardsResponse,
   FetchDescriptionResponse,
+  GetAgenciesResponse,
+  GetAgencyOutlookResponse,
   GetAwardsSummaryResponse,
   GetBidPipelineSummaryResponse,
   GetEntityResponse,
   GetNoticeResponse,
   GetProfileResponse,
   GetSourceResponse,
+  GetSpendingBreakdownResponse,
+  GetSpendingHorizonResponse,
+  GetSpendingPulseResponse,
   LeadsReport,
   ListAwardsResponse,
   ListCallsQuery,
@@ -38,8 +46,15 @@ import type {
   SaveSavedSearchRequest,
   SaveSavedSearchResponse,
   SavedSearch,
+  ScopeQuery,
   SearchProfile,
   SourceStatus,
+  SpendingBreakdown,
+  SpendingBreakdownQuery,
+  SpendingHorizon,
+  SpendingHorizonQuery,
+  SpendingPulse,
+  SpendingPulseQuery,
   StartPullRequest,
   StartPullResponse,
   StoredProfile,
@@ -55,6 +70,13 @@ import { createRequest, query as toQueryString, unwrap, type GetOptions } from '
 const BASE_URL = process.env['NEXT_PUBLIC_GOVCON_URL'] ?? 'http://localhost:3004';
 const request = createRequest(BASE_URL);
 const encode = encodeURIComponent;
+
+/** A scope on the wire: the code lists comma-joined, since a query string carries scalars; the server reads them back as lists. */
+const scopeParams = <Q extends ScopeQuery>({ naics, psc, ...rest }: Q) => ({
+  naics: naics && naics.length > 0 ? naics.join(',') : undefined,
+  psc: psc && psc.length > 0 ? psc.join(',') : undefined,
+  ...rest,
+});
 
 export const api = {
   // Profiles and their saved searches.
@@ -191,6 +213,56 @@ export const api = {
   },
   async fetchAwards(body: FetchAwardsRequest): Promise<FetchAwardsReport> {
     return unwrap(await request<FetchAwardsResponse>('/awards/fetch', { method: 'POST', body }));
+  },
+
+  // Spending: four lenses and the agency directory, free, answered from the day's snapshot when there is one.
+  async getSpendingPulse(
+    query: SpendingPulseQuery = {},
+    opts: GetOptions = {},
+  ): Promise<SpendingPulse> {
+    return unwrap(
+      await request<GetSpendingPulseResponse>(
+        `/spending/pulse${toQueryString({ ...scopeParams(query) })}`,
+        opts,
+      ),
+    );
+  },
+  async getSpendingBreakdown(
+    query: SpendingBreakdownQuery,
+    opts: GetOptions = {},
+  ): Promise<SpendingBreakdown> {
+    return unwrap(
+      await request<GetSpendingBreakdownResponse>(
+        `/spending/breakdown${toQueryString({ ...scopeParams(query) })}`,
+        opts,
+      ),
+    );
+  },
+  async getSpendingHorizon(
+    query: SpendingHorizonQuery = {},
+    opts: GetOptions = {},
+  ): Promise<SpendingHorizon> {
+    return unwrap(
+      await request<GetSpendingHorizonResponse>(
+        `/spending/horizon${toQueryString({ ...scopeParams(query) })}`,
+        opts,
+      ),
+    );
+  },
+  async listAgencies(opts: GetOptions = {}): Promise<AgencyDirectory> {
+    return unwrap(await request<GetAgenciesResponse>('/spending/agencies', opts));
+  },
+  async getAgencyOutlook(
+    toptierCode: string,
+    query: AgencyOutlookQuery = {},
+    opts: GetOptions = {},
+  ): Promise<AgencyOutlook> {
+    return unwrap(
+      await request<GetAgencyOutlookResponse>(
+        `/spending/agencies/${encode(toptierCode)}${toQueryString({ ...query })}`,
+        opts,
+      ),
+    );
   },
 
   // Registrants.
