@@ -4,9 +4,14 @@ import { useEffect, useRef, useState, type ComponentProps } from 'react';
 /**
  * The frame a table sits in: as wide as its column and no wider, scrolling
  * sideways by itself — so a table with more columns than the screen has room
- * for moves inside its frame and the page never does.
+ * for moves inside its frame and the page never does. Positioned, so that
+ * what a cell positions absolutely — a visually hidden label, say — is laid
+ * out against the frame and clipped by it. Measured 2026-10-13 at a phone's
+ * width: without it one such label, a pixel wide and far along a wide row,
+ * widened the whole page by a hundred pixels.
  */
 const Scroller = styled.div`
+  position: relative;
   max-width: 100%;
   overflow-x: auto;
 `;

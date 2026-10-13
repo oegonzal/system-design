@@ -72,10 +72,11 @@ describe('Table', () => {
       return { frame, layOut };
     }
 
-    it('scrolls sideways inside its own frame, never wider than its column', () => {
+    it('scrolls sideways inside its own frame, never wider than its column, and is what a cell’s absolutely positioned content is laid out against', () => {
       const { frame } = renderMeasured();
       expect(getComputedStyle(frame).overflowX).toBe('auto');
       expect(getComputedStyle(frame).maxWidth).toBe('100%');
+      expect(getComputedStyle(frame).position).toBe('relative');
     });
 
     it('is a named region a keyboard can focus while it holds more than it shows, and nothing once it fits', () => {
