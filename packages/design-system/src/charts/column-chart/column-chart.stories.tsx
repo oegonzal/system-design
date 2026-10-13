@@ -107,3 +107,18 @@ export const Tooltip: Story = {
     await userEvent.hover(within(canvasElement).getByRole('button', { name: /^Jun:/ }));
   },
 };
+
+/** A plot narrower than the room a bubble wants beside its slot: the bubble slides back over the slot and stays inside the plot. */
+export const TooltipInANarrowPlot: Story = {
+  args: Grouped.args,
+  decorators: [
+    (Story) => (
+      <div style={{ maxWidth: 300 }}>
+        <Story />
+      </div>
+    ),
+  ],
+  play: async ({ canvasElement }) => {
+    await userEvent.hover(within(canvasElement).getByRole('button', { name: /^Mar:/ }));
+  },
+};

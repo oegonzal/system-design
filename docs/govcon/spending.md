@@ -56,7 +56,11 @@ signing, agency financials arrive weeks after the period, USAspending cannot
 filter by period of performance — are shown verbatim. Every chart has a "Data
 table" disclosure with the same numbers as text, and answers hover and focus
 on a column with one tooltip naming every series at that x, the value first.
-Tab into a chart, move with the arrow keys, Escape hides the tooltip.
+Tab into a chart, move with the arrow keys, Escape hides the tooltip. The
+tooltip sits beside its column and never leaves the plot: in a narrow window
+it slides back over the column instead. The charts scale with the page, so
+at phone width they are small and the data table under each is the readable
+form.
 
 ### Pulse — when the money moves
 

@@ -10,8 +10,10 @@ import { cellOf, type ColumnDatum, type ColumnSeries, type SlotBox } from './geo
  * The hover layer of a column chart, in HTML over the svg: one transparent
  * hit target per datum, the whole slot wide and the plot tall, and one
  * bubble that names every series at that x — the value first and strong, the
- * series name beside it under a short line in its colour. Hover, focus and
- * the arrow keys move it; leaving, blurring out or Escape hides it. The
+ * series name beside it under a short line in its colour. The bubble sits
+ * beside its slot and never leaves the plot, however narrow the plot is.
+ * Hover, focus and the arrow keys move it; leaving, blurring out or Escape
+ * hides it. The
  * targets rove one Tab stop, each named with the datum's words, so a reader
  * hears what a pointer sees; the numbers also live in the table twin, so the
  * bubble gates nothing.
@@ -57,20 +59,39 @@ const Hit = styled('button', transient)<{ $box: SlotBox }>`
   }
 `;
 
-const Bubble = styled('div', transient)<{ $box: SlotBox }>`
+/**
+ * Where the bubble sits: level with the top of the plot, beside the active
+ * slot — after it in the first half, before it in the second. The rail spans
+ * the plot and lays out from the slot's side; the offset holds the bubble off
+ * the rail's edge as far as the slot's far side and is the only part that
+ * gives way, so a bubble wider than the room beside its slot slides back
+ * over the slot instead of leaving the plot.
+ */
+const Rail = styled('div', transient)<{ $box: SlotBox }>`
   position: absolute;
   top: ${({ $box }) => `${$box.top * 100}%`};
-  ${({ $box }) =>
-    $box.after ? `left: ${($box.left + $box.width) * 100}%;` : `right: ${(1 - $box.left) * 100}%;`}
+  left: 0;
+  right: 0;
   z-index: ${({ theme }) => theme.zIndex.popover};
-  min-width: 180px;
-  max-width: 320px;
+  display: flex;
+  flex-direction: ${({ $box }) => ($box.after ? 'row' : 'row-reverse')};
+  pointer-events: none;
+`;
+
+const Offset = styled('span', transient)<{ $box: SlotBox }>`
+  flex: 0 1 ${({ $box }) => `${($box.after ? $box.left + $box.width : 1 - $box.left) * 100}%`};
+`;
+
+const Bubble = styled.div`
+  flex: none;
+  box-sizing: border-box;
+  min-width: min(180px, 100%);
+  max-width: min(320px, 100%);
   padding: ${({ theme }) => `${theme.space[3]}px ${theme.space[4]}px`};
   border: 1px solid ${({ theme }) => theme.color.border.subtle};
   border-radius: ${({ theme }) => theme.radius.md};
   background: ${({ theme }) => theme.color.bg.surface};
   box-shadow: ${({ theme }) => theme.shadow.md};
-  pointer-events: none;
 `;
 
 const Rows = styled.ul`
@@ -87,6 +108,15 @@ const Row = styled.li`
   gap: ${({ theme }) => theme.space[2]}px;
 `;
 
+/** A series' words — value, name, notes — on one line while they fit; what does not fit drops under the value. */
+const Words = styled.span`
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  column-gap: ${({ theme }) => theme.space[2]}px;
+  min-width: 0;
+`;
+
 /** The series' identity beside its value: a short line in its colour, never a filled box. */
 const Key = styled('span', transient)<{ $color: string }>`
   flex: none;
@@ -100,6 +130,7 @@ const Value = styled.span`
   font-size: ${({ theme }) => theme.font.size.md};
   font-weight: ${({ theme }) => theme.font.weight.semibold};
   font-variant-numeric: tabular-nums;
+  overflow-wrap: anywhere;
   color: ${({ theme }) => theme.color.text.primary};
 `;
 
@@ -167,31 +198,37 @@ export function ColumnTooltip({
         );
       })}
       {shown !== undefined && box !== undefined ? (
-        <Bubble role="tooltip" $box={box}>
-          <Text as="span" size="sm" tone="secondary">
-            {shown.label}
-          </Text>
-          <Rows>
-            {series.map((item, index) => {
-              const value = shown.values[item.id];
-              const cell = value === undefined ? null : cellOf(value);
-              return (
-                <Row key={item.id}>
-                  <Key $color={colors[index] ?? 'currentColor'} aria-hidden="true" />
-                  <Value>{cell === null ? DASH : formatValue(cell.value)}</Value>
-                  <Text as="span" size="sm" tone="secondary">
-                    {item.label}
-                  </Text>
-                  {cell === null ? null : (
-                    <Text as="span" size="sm" tone="muted">
-                      {cellNotes(cell, formatValue).join(' ')}
-                    </Text>
-                  )}
-                </Row>
-              );
-            })}
-          </Rows>
-        </Bubble>
+        <Rail $box={box}>
+          <Offset $box={box} aria-hidden="true" />
+          <Bubble role="tooltip">
+            <Text as="span" size="sm" tone="secondary">
+              {shown.label}
+            </Text>
+            <Rows>
+              {series.map((item, index) => {
+                const value = shown.values[item.id];
+                const cell = value === undefined ? null : cellOf(value);
+                const notes = cell === null ? [] : cellNotes(cell, formatValue);
+                return (
+                  <Row key={item.id}>
+                    <Key $color={colors[index] ?? 'currentColor'} aria-hidden="true" />
+                    <Words>
+                      <Value>{cell === null ? DASH : formatValue(cell.value)}</Value>
+                      <Text as="span" size="sm" tone="secondary">
+                        {item.label}
+                      </Text>
+                      {notes.length === 0 ? null : (
+                        <Text as="span" size="sm" tone="muted">
+                          {notes.join(' ')}
+                        </Text>
+                      )}
+                    </Words>
+                  </Row>
+                );
+              })}
+            </Rows>
+          </Bubble>
+        </Rail>
       ) : null}
     </Layer>
   );

@@ -95,6 +95,41 @@ describe('ColumnChart', () => {
     expect(screen.queryByRole('tooltip')).toBeNull();
   });
 
+  it('lays the tooltip out from its slot’s side — after the slot in the first half, before it in the second — behind an offset that gives way, so the bubble never leaves the plot', () => {
+    renderWithTheme(<Grouped />);
+    const group = screen.getByRole('group', { name: 'Obligations by fiscal period values' });
+    const placed = (name: RegExp) => {
+      fireEvent.mouseEnter(within(group).getByRole('button', { name }));
+      const bubble = screen.getByRole('tooltip');
+      const rail = bubble.parentElement as HTMLElement;
+      const [grow, shrink, basis] = getComputedStyle(
+        rail.firstElementChild as HTMLElement,
+      ).flex.split(' ');
+      return {
+        direction: getComputedStyle(rail).flexDirection,
+        offset: { grow, shrink, percent: Number.parseFloat(basis ?? '') },
+        bubble: getComputedStyle(bubble).flex,
+        maxWidth: getComputedStyle(bubble).maxWidth,
+      };
+    };
+    // First half: the rail runs from the left, the offset reaching the slot's far side.
+    const [oct, dec] = [placed(/^Oct:/), placed(/^Dec:/)];
+    expect([oct.direction, dec.direction]).toEqual(['row', 'row']);
+    expect(dec.offset.percent).toBeGreaterThan(oct.offset.percent);
+    // Second half: it runs from the right, the offset reaching back to the slot's near side.
+    const [jun, sep] = [placed(/^Jun:/), placed(/^Sep:/)];
+    expect([jun.direction, sep.direction]).toEqual(['row-reverse', 'row-reverse']);
+    expect(jun.offset.percent).toBeGreaterThan(sep.offset.percent);
+    // Only the offset may give way; the bubble keeps its width, up to the plot's.
+    for (const at of [oct, dec, jun, sep]) {
+      expect(at.offset).toMatchObject({ grow: '0', shrink: '1' });
+      expect(at.offset.percent).toBeGreaterThan(0);
+      expect(at.offset.percent).toBeLessThan(100);
+      expect(at.bubble).toBe('0 0 auto');
+      expect(at.maxWidth).toBe('min(320px, 100%)');
+    }
+  });
+
   it('refuses more series than the theme has slots', () => {
     expect(() =>
       renderWithTheme(
