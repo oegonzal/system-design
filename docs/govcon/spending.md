@@ -267,36 +267,46 @@ codes in Enfav's capabilities — NAICS 541511 (custom programming), 541512
 and hosting) — every agency, contracts and IDVs.
 
 **Volume (Pulse).** Obligations in the four codes: FY2024 $73.1B, FY2025
-$70.8B, FY2026 $71.1B, each twelve complete periods; FY2027 period 1 had
-$0.37B by October 12. A flat market of about $71B a year, neither growing nor
-shrinking. By code in FY2026: 541512 $31.4B (44%), 541519 $24.1B (34%),
-541511 $11.5B (16%), 518210 $4.0B (6%).
+$70.8B, and $71.1B so far for FY2026; FY2027 period 1 had $0.37B by
+October 12. FY2025 is the last year the data holds whole: the Department of
+Defense publishes awards 90 days after signing, so on this date its FY2026
+stops in mid-July, and the lens counts nothing for it in the months after.
+Measured directly from USAspending for the three 5415 codes, contracts only:
+Defense shows $0.6B for July through September 2026 against $8.6B a year
+earlier; through June it ran 21% ahead of FY2025 ($16.1B against $13.4B),
+and civilian agencies finished FY2026 11% up ($49.7B against $44.9B). The
+market is not flat: it dipped 3% in FY2025, and FY2026 will close near $74B
+to $76B for the three codes, against $66.8B, once Defense's last quarter is
+published in January. By code in FY2025: 541512 $32.1B (45%), 541519 $25.1B
+(35%), 541511 $10.4B (15%), 518210 $3.4B (5%).
 
-**Buyers (Where, FY2026).** By department: Defense 25.2% ($17.9B), Veterans
-Affairs 13.3% ($9.4B), General Services Administration 11.2% ($7.9B),
-Homeland Security 10.1% ($7.2B), Health and Human Services 10.1% ($7.2B),
-Justice 3.7%, Treasury 3.5%, Commerce 3.2%, State 3.1%, Transportation 2.6%,
-Interior 2.0%, Agriculture 2.0% — five departments are seven tenths of it.
-By sub-agency: VA 13.3%, GSA's Federal Acquisition Service 11.0% (which buys
-on other agencies' behalf through its schedules and government-wide
-contracts), Air Force 6.6%, Army 6.0%, Centers for Medicare and Medicaid
-4.7%, Navy 3.8%, Defense Information Systems Agency 3.6%, Customs and Border
-Protection 3.4%, State 3.1%, IRS 2.4%, FAA 2.1%, NIH 2.0%. By the work named
-(PSC): DA01 business application and application development support 28.3%
-($20.1B), DA10 9.6%, R499 other professional support 7.5%, DF01 IT management
-support 6.1%, 7A21 business application software 5.4%, R425 engineering and
-technical support 3.3%, DG01 network support 2.6%, DD01 service delivery
-support 2.1%, 7F20 IT management tools 1.9%, R408 program management 1.7%,
-DB10 compute as a service 1.6%, DF10 IT management as a service 1.5%. The
-PSC families in Enfav's profile — DA, DB, DF, DG, 7030 — are the top of
-this mix; application development support alone is $20B a year.
+**Buyers (Where, FY2025).** By department: Defense 32.8% ($23.2B), Veterans
+Affairs 10.6% ($7.5B), Health and Human Services 9.7% ($6.9B), General
+Services Administration 9.6% ($6.8B), Homeland Security 8.3% ($5.9B),
+Treasury 4.8%, Justice 3.6%, State 3.0%, Commerce 2.8%, Interior 1.9%,
+Agriculture 1.8%, Transportation 1.8% — five departments are seven tenths of
+it. The same lens over FY2026 puts Defense at 25.2%, because its last ten
+weeks are unpublished. By sub-agency: VA 10.6%, GSA's Federal Acquisition
+Service 9.3% (which buys on other agencies' behalf through its schedules and
+government-wide contracts), Air Force 8.4%, Army 5.8%, Navy 5.8%, Defense
+Information Systems Agency 4.9%, Centers for Medicare and Medicaid 4.5%, IRS
+3.5%, State 3.0%, Customs and Border Protection 2.8%, Defense Logistics
+Agency 2.3%, NIH 2.3%. By the work named (PSC): DA01 business application
+and application development support 28.5% ($20.2B), DA10 8.1%, R499 other
+professional support 6.0%, DF01 IT management support 5.8%, 7A21 business
+application software 5.5%, R425 engineering and technical support 3.6%, R408
+program management 2.5%, DG01 network support 2.4%, DD01 service delivery
+support 2.3%, D399 other IT and telecom 2.0%, DJ01 security and compliance
+support 1.8%, 7E20 end-user products 1.7%. The PSC families in Enfav's
+profile — DA, DB, DF, DG, 7030 — are the top of this mix; application
+development support alone is $20B a year.
 
-**Winners (concentration).** The largest recipients in FY2026: General
-Dynamics IT 4.7%, Accenture Federal Services 4.7%, Booz Allen Hamilton 3.4%,
-Oracle Health Government Services 2.9%, CACI 2.4%, Deloitte Consulting 2.2%,
-SAIC 2.1%, Peraton 2.0%, Salient CRGT 1.8%, Palantir USG 1.6%, ThunderCat
-Technology 1.6%, Four Points Technology 1.5%. The twelve largest hold 31%
-and the 25 the lens lists hold under half; the rest is a long tail — the
+**Winners (concentration).** The largest recipients in FY2025: General
+Dynamics IT 4.4%, Accenture Federal Services 4.1%, Booz Allen Hamilton 3.5%,
+SAIC 2.5%, CACI 2.5%, Leidos 2.3%, Deloitte Consulting 2.0%, Peraton 1.5%,
+FCN 1.4%, Oracle Health Government Services 1.4%, Peraton Enterprise
+Solutions 1.3%, ThunderCat Technology 1.3%. The twelve largest hold 28%
+and the 25 the lens lists hold four tenths; the rest is a long tail — the
 market is not closed by a handful of primes, but its top is the large
 integrators.
 
@@ -304,9 +314,17 @@ integrators.
 and USAspending fetched for June–October 2026). Of the 500 most recent 5415
 awards from SAM.gov, 453 (90.6%) were open competition, 34 total small
 business set-asides, 8 service-disabled veteran-owned, 3 women-owned, 2
-8(a) — about 9% set aside for small business. Offers received: 333 (67%)
-drew many, 60 (12%) few, 83 (17%) one, 24 unknown — two-thirds of recent
-awards were contested by many bidders, one in six went to a single offer.
+8(a). That sample is not the market: more than half of the stored SAM.gov
+awards are GSA schedule records, which carry no set-aside and 999 offers, a
+placeholder. The summary counts the placeholder as many offers (333 many, 60
+few, 83 one, 24 unknown), so its "many" is not a count of bidders: 466 of
+the 871 stored SAM.gov awards carry 999, and 464 of those are Federal
+Acquisition Service records. Among the 336 with a real count, 154 (46%) drew
+one offer, 118 (35%) two to four and 64 (19%) five or more; of the 62
+small-business set-asides among them, 11 drew one offer and 35 two to four.
+Measured directly from USAspending for FY2025, the three 5415 codes,
+contracts only: small businesses took 46% of the dollars, at least 22% of
+the dollars carry a set-aside on the award itself, and 87% were competed.
 Stored awards by code: 541511 490, 541512 326, 541519 408 (40 of them SBA
 set-asides), 518210 42.
 
@@ -379,9 +397,10 @@ families and interests that name parts and repair.
 
 **What the data says for a new software and AI-services business.**
 
-1. Opportunity is ample and steady: about $71B a year in the four codes, of
-   which $20B a year is the application-development support work the
-   capabilities statement describes.
+1. Opportunity is ample and growing: $70.8B in the four codes in FY2025,
+   the last whole year, with FY2026 running ahead of it; $20B a year is the
+   application-development support work the capabilities statement
+   describes.
 2. The buyers are concentrated: Defense (Air Force, Army, Navy, DISA),
    Veterans Affairs, GSA's Federal Acquisition Service, Homeland Security
    (Customs and Border Protection) and Health and Human Services (CMS, NIH)
@@ -389,12 +408,15 @@ families and interests that name parts and repair.
 3. Interest in services like Enfav's is not in doubt: the PSC mix is
    application development, IT management and network support services at
    scale.
-4. Winning as a prime is hard: two-thirds of recent awards drew many
-   offers, about 9% were small-business set-asides, and the top of the market
-   is the large integrators. The realistic entry is as a subcontractor to
-   those primes on the recompetes the Horizon lists, and on the small
-   set-aside and sources-sought notices the store shows (four of the nine
-   open software notices are sources sought — the moment to be known).
+4. Winning as a prime is hard for a firm with no contract vehicle: in FY2025
+   90% of the three codes' contract dollars were orders under one, and the
+   top of the market is the large integrators. It is not closed to small
+   firms, which took 46% of those dollars, and nearly half of the stored
+   awards with a real offer count drew a single offer. The realistic entry
+   is as a subcontractor to those primes on the recompetes the Horizon lists,
+   and on the small set-aside and sources-sought notices the store shows
+   (four of the nine open software notices are sources sought — the moment
+   to be known).
 5. What this data cannot show: subcontract awards (USAspending publishes
    subaward data these lenses do not read yet), and offers or set-asides on
    USAspending's own rows (those come from SAM.gov's awards, which cost
