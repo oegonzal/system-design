@@ -15,7 +15,9 @@ import {
 import { awaitOrchestration, type AwaitOptions, type LoopClient } from '@sysdesign/loop-client';
 
 import { TEACH_ITERATIONS } from '../../adapters/loop-http/loop-brain';
+import { SESSION_ENV, SESSION_FLAGS } from '../../config';
 import type { LedgerPort } from '../../core/ports';
+import { SessionRefused } from '../../core/unit-advice';
 
 /**
  * The operator answers a folder of session dumps recorded, taught again in
@@ -42,6 +44,22 @@ export interface TeachAgainReport {
   unanswered: number;
   /** Dumps taught without their rows linked, or whose document stored nothing, with why. */
   skipped: string[];
+}
+
+/**
+ * Whom a dump's answers are about when its own teachings do not say: the name
+ * given, else the configured one — and never the environment's placeholder,
+ * which is refused by name. Measured 2026-10-13: six answers from before
+ * teaching existed were stored about "the subject" because nothing named whom.
+ */
+export function subjectFor(given: string | undefined, configured: string): string {
+  if (given !== undefined) return given;
+  if (configured === SESSION_ENV.subject.fallback) {
+    throw new SessionRefused(
+      `teach-again needs the subject's name for a dump whose own teachings carry none: ${SESSION_FLAGS.subject.name} <name>, or ${SESSION_ENV.subject.name} in the environment`,
+    );
+  }
+  return configured;
 }
 
 export interface TeachAgainDeps {

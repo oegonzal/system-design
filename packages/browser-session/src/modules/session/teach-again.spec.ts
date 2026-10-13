@@ -7,7 +7,9 @@ import { FakeLoop, FakeLoopClient } from '@sysdesign/studio-testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { TEACH_ITERATIONS } from '../../adapters/loop-http/loop-brain';
-import { guidanceItemOf, teachAgain, type TeachAgainDeps } from './teach-again';
+import { SESSION_ENV, SESSION_FLAGS } from '../../config';
+import { SessionRefused } from '../../core/unit-advice';
+import { guidanceItemOf, subjectFor, teachAgain, type TeachAgainDeps } from './teach-again';
 
 const SESSION_A = '11111111-1111-4111-8111-111111111111';
 const SESSION_C = '33333333-3333-4333-8333-333333333333';
@@ -245,5 +247,14 @@ describe('teach-again over a folder of session dumps', () => {
     expect(loop.orchestrations.startRequests).toHaveLength(0);
     expect(loop.retracted).toEqual([]);
     expect(taught).toEqual([]);
+  });
+
+  it("[BRW-17] teaches under the subject given, else the configured one, and refuses the environment's placeholder by name", () => {
+    expect(subjectFor('Ada', SESSION_ENV.subject.fallback)).toBe('Ada');
+    expect(subjectFor(undefined, 'Alex Example')).toBe('Alex Example');
+    expect(() => subjectFor(undefined, SESSION_ENV.subject.fallback)).toThrow(SessionRefused);
+    expect(() => subjectFor(undefined, SESSION_ENV.subject.fallback)).toThrow(
+      `${SESSION_FLAGS.subject.name} <name>, or ${SESSION_ENV.subject.name} in the environment`,
+    );
   });
 });

@@ -104,12 +104,18 @@ describe('parseOptions', () => {
     });
     expect(parsed(['show', 'abc', '--json'])).toEqual({ command: 'show', id: 'abc', json: true });
     expect(parsed(['replay-events', 'abc'])).toEqual({ command: 'replay-events', id: 'abc' });
-    expect(parsed(['teach-again', '--sessions', 'static/sessions', '--dry-run'])).toEqual({
+    expect(
+      parsed(['teach-again', '--sessions', 'static/sessions', '--subject', 'Ada', '--dry-run']),
+    ).toEqual({
       command: 'teach-again',
       sessions: 'static/sessions',
+      subject: 'Ada',
       dryRun: true,
     });
-    expect(parsed(['teach-again', '--sessions', 'd'])).toMatchObject({ dryRun: false });
+    expect(parsed(['teach-again', '--sessions', 'd'])).toMatchObject({
+      subject: undefined,
+      dryRun: false,
+    });
   });
 
   it.each([
@@ -297,9 +303,9 @@ describe('execute', () => {
   });
   it('[BRW-17] teaches a folder of dumps again and says what it did, or what it would do', async () => {
     const { out, sink } = io();
-    const asked: [string, boolean][] = [];
-    const teachAgain: CliService['teachAgain'] = async (dir, dryRun) => {
-      asked.push([dir, dryRun]);
+    const asked: [string, boolean, string | undefined][] = [];
+    const teachAgain: CliService['teachAgain'] = async (dir, dryRun, subject) => {
+      asked.push([dir, dryRun, subject]);
       return {
         dryRun,
         sessions: 2,
@@ -315,7 +321,7 @@ describe('execute', () => {
     };
     expect(
       await execute(
-        parsed(['teach-again', '--sessions', 'static/sessions']),
+        parsed(['teach-again', '--sessions', 'static/sessions', '--subject', 'Ada']),
         service({ teachAgain }),
         sink,
       ),
@@ -328,8 +334,8 @@ describe('execute', () => {
       ),
     ).toBe(0);
     expect(asked).toEqual([
-      ['static/sessions', false],
-      ['static/sessions', true],
+      ['static/sessions', false, 'Ada'],
+      ['static/sessions', true, undefined],
     ]);
     expect(out).toEqual([
       '19 answer(s) in 2 session(s) taught again as 3 document(s): 18 fact(s) stored, 4 earlier digest(s) retracted; 40 dump(s) held no answer; x-session: 3 answer(s) but 0 teaching(s) — taught without linking rows or retracting',

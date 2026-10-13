@@ -35,7 +35,7 @@ import {
   STOP_SIGNAL,
   UNIT_ADVISORS,
 } from './tokens';
-import { teachAgain, type TeachAgainReport } from './teach-again';
+import { subjectFor, teachAgain, type TeachAgainReport } from './teach-again';
 
 /**
  * What the command line asks of a run: the engine's options, the subject
@@ -179,14 +179,15 @@ export class SessionService {
   /**
    * The operator answers a folder of session dumps recorded, taught again in
    * the canonical shape and their earlier digests retracted; `dryRun` plans and
-   * posts nothing. The subject is each dump's own, else the configured one.
+   * posts nothing. The subject is each dump's own, else the one given, else the
+   * configured one — and never the environment's placeholder.
    */
-  teachAgain(dumpsDir: string, dryRun: boolean): Promise<TeachAgainReport> {
+  teachAgain(dumpsDir: string, dryRun: boolean, subject?: string): Promise<TeachAgainReport> {
     return teachAgain(
       {
         client: this.client,
         ledger: this.ledger,
-        subject: this.config.subject,
+        subject: subjectFor(subject, this.config.subject),
         log: (text) => this.operator.notify(text),
       },
       dumpsDir,

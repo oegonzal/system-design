@@ -9,7 +9,7 @@ pnpm browser-session run --goal packages/browser-session/goals/linkedin-easy-app
 pnpm browser-session sessions [--limit 20] [--json]
 pnpm browser-session show <id> [--json]
 pnpm browser-session replay-events <id>    # a recorded session's events again, for a record that missed them
-pnpm browser-session teach-again --sessions static/sessions [--dry-run]   # the recorded operator answers taught again in today's shape; their earlier digests retracted
+pnpm browser-session teach-again --sessions static/sessions --subject "Your Name" [--dry-run]   # the recorded operator answers taught again in today's shape; their earlier digests retracted
 pnpm exec nx test browser-session          # pure, browser (headless bundled Chromium) and db projects
 ```
 

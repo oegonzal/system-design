@@ -4,7 +4,7 @@
  * `main.js sessions [--limit n] [--json]`
  * `main.js show <id> [--json]`
  * `main.js replay-events <id>`
- * `main.js teach-again --sessions <dir> [--dry-run]`
+ * `main.js teach-again --sessions <dir> [--subject <name>] [--dry-run]`
  *
  * `parseOptions` reads argv against the declared flags; `execute` runs the
  * options over the service and writes through `io`; `cli` loads the
@@ -51,9 +51,10 @@ export const USAGE = `usage: browser-session <command> [options]
   show      <id> [${flag('json')}]
   replay-events <id>
             publishes a recorded session's events again, for a record that missed them
-  teach-again ${flag('sessions')} <dir> [${flag('dryRun')}]
+  teach-again ${flag('sessions')} <dir> [${flag('subject')} <name>] [${flag('dryRun')}]
             teaches the operator answers recorded in a folder of session dumps again, in the canonical
-            shape, and retracts what their earlier digests stored`;
+            shape, and retracts what their earlier digests stored; the subject names whom a dump's own
+            teachings do not`;
 
 /** The commands, as data: what each takes as a positional, and whether it reads or writes the session's tables. */
 export const COMMANDS = {
@@ -82,7 +83,7 @@ export type Options =
   | { command: 'sessions'; limit: number; json: boolean }
   | { command: 'show'; id: string; json: boolean }
   | { command: 'replay-events'; id: string }
-  | { command: 'teach-again'; sessions: string; dryRun: boolean };
+  | { command: 'teach-again'; sessions: string; subject: string | undefined; dryRun: boolean };
 
 /** What `execute` writes to and how it is answered. */
 export interface Io {
@@ -173,6 +174,7 @@ export function parseOptions(argv: readonly string[], defaults: SessionDefaults)
         return {
           command,
           sessions: required(text('sessions'), 'sessions'),
+          subject: text('subject'),
           dryRun: on('dryRun') ?? false,
         };
     }
@@ -220,7 +222,7 @@ export async function execute(options: Options, service: CliService, io: Io): Pr
         return 0;
       }
       case 'teach-again': {
-        const report = await service.teachAgain(options.sessions, options.dryRun);
+        const report = await service.teachAgain(options.sessions, options.dryRun, options.subject);
         io.out(renderTeachAgain(report));
         return 0;
       }
