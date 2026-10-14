@@ -51,4 +51,21 @@ export const NoShare: Story = {
   },
 };
 
+/** A row with a page of its own is named by a link to it; one without is named in text. */
+export const LinkedLabels: Story = {
+  args: {
+    title: 'Obligations by recipient',
+    items: [
+      {
+        id: 'a',
+        label: <a href="/firms/a">Northwind Systems</a>,
+        detail: 'A1B2C3D4E5F6',
+        value: 5_000_000,
+        share: 0.625,
+      },
+      { id: 'b', label: 'Unnamed recipient', value: 1_000_000, share: 0.125 },
+    ],
+  },
+};
+
 export const Empty: Story = { args: { items: [], emptyMessage: 'No rows in the window.' } };

@@ -1,10 +1,12 @@
 import styled from '@emotion/styled';
+import type { ReactNode } from 'react';
 
 import { Text } from '../../primitives/text/text';
 
 export interface BarListItem {
   id: string;
-  label: string;
+  /** What the bar is of — text, or a link to it when it has a page of its own. */
+  label: ReactNode;
   /** A second word under the label — a code, an abbreviation. */
   detail?: string | null;
   value: number;

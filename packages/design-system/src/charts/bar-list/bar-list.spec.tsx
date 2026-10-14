@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 import { ThemeRoot } from '../../theme-root';
 import * as stories from './bar-list.stories';
 
-const { Default, NoShare, Empty } = composeStories(stories);
+const { Default, NoShare, LinkedLabels, Empty } = composeStories(stories);
 const renderWithTheme = (ui: ReactElement) => render(ui, { wrapper: ThemeRoot });
 
 describe('BarList', () => {
@@ -25,6 +25,21 @@ describe('BarList', () => {
     expect(within(rows[0] as HTMLElement).getByText('$6,200,000')).toBeTruthy();
     expect(within(rows[0] as HTMLElement).getByText('77.5%')).toBeTruthy();
     expect(within(rows[0] as HTMLElement).getByText('DOD')).toBeTruthy();
+  });
+
+  it('names a row by whatever it is given — a link to the row’s own page, or text — beside the same value and share', () => {
+    renderWithTheme(<LinkedLabels />);
+    const rows = within(
+      screen.getByRole('list', { name: 'Obligations by recipient' }),
+    ).getAllByRole('listitem');
+    expect(
+      within(rows[0] as HTMLElement)
+        .getByRole('link', { name: 'Northwind Systems' })
+        .getAttribute('href'),
+    ).toBe('/firms/a');
+    expect(within(rows[0] as HTMLElement).getByText('62.5%')).toBeTruthy();
+    expect(within(rows[1] as HTMLElement).queryByRole('link')).toBeNull();
+    expect(within(rows[1] as HTMLElement).getByText('Unnamed recipient')).toBeTruthy();
   });
 
   it('leaves the share column empty without a whole, and says when there is nothing', () => {
