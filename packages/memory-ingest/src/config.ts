@@ -26,7 +26,7 @@ export const DEFAULT_KIND: IngestKind = 'notes';
 /** How large a rendered chunk goal may grow; well under the engine's budget so a digest reads one screen of facts. */
 export const DEFAULT_CHUNK_BYTES = 6000;
 export const DEFAULT_LOOP_URL = 'http://localhost:3003';
-/** The studio API, whose experience profiles and STAR stories `export-studio` writes as documents. */
+/** The studio API, from which `export-studio` writes the subject's own experience profiles and STAR stories as documents. */
 export const DEFAULT_STUDIO_URL = 'http://localhost:3000/api';
 /** Where the manifest lives, under the working directory. */
 export const DEFAULT_HOME = 'static/memory-ingest';

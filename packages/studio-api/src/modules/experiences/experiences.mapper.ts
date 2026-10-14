@@ -9,10 +9,12 @@ import type { ExperienceProfile } from '@sysdesign/db';
 export const toExperienceProfileDto = (e: ExperienceProfile): ExperienceProfileDto => ({
   id: e.id,
   slug: e.slug,
+  origin: e.origin,
   companyLabel: e.companyLabel,
   title: e.title,
   summary: e.summary,
   techStack: e.techStack,
   highlights: e.highlights,
+  practiceHighlights: e.practiceHighlights,
   createdAt: e.createdAt.toISOString(),
 });

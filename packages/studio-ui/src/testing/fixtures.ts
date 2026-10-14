@@ -115,6 +115,7 @@ export function makeExperience(
   return {
     id: 'exp-1',
     slug: 'flash-sale',
+    origin: 'own',
     companyLabel: 'TicketWave',
     title: 'Flash-sale ticketing platform',
     summary: 'Survived on-sale spikes of 40x baseline traffic.',
@@ -124,6 +125,7 @@ export function makeExperience(
       'Read-replica fanout',
       '15,000 requests per second at peak',
     ],
+    practiceHighlights: [],
     createdAt: AT,
     ...overrides,
   };

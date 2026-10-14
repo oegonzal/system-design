@@ -300,10 +300,27 @@ Before any of this is useful, give the store facts about you:
 ```bash
 pnpm memory-ingest ingest docs/ingestion/Resume_2026_c.pdf --kind resume --subject "Your Name" --dry-run   # what would be posted
 pnpm memory-ingest ingest docs/ingestion/Resume_2026_c.pdf notes.md --kind notes --subject "Your Name"    # posts, one chunk at a time
-pnpm memory-ingest export-studio --out docs/ingestion/studio                             # the studio's experience profiles and STAR stories, as documents
-pnpm memory-ingest ingest docs/ingestion/studio/*.md --kind notes --date 2026-10-12      # … ingested like any notes
+pnpm memory-ingest export-studio --out docs/ingestion/studio                             # your own experience profiles and STAR stories, as documents; practice withheld
+pnpm memory-ingest ingest docs/ingestion/studio/studio-experiences.md --kind notes --scope subject --date <the day you exported>   # … ingested like any notes
 pnpm memory-ingest status                                                                # how each chunk's digest went
 ```
+
+The export writes only what the studio declares yours. An example written for
+practice and a story drawn from one are withheld, and the report counts them
+under that origin (a line such as `5 records · 1 withheld as practice`); the
+practice highlights an experience of yours carries only so its prompts have a
+scale to size from are never written either; and a document left with none of
+yours is removed rather than kept stale. A studio running a build older than
+origins serves none and is refused, exit 2; one whose database is migrated but
+not yet seeded reads every experience as practice, so run `pnpm db:seed` before
+exporting. Name the files you ingest: `studio-star-stories.md` states every
+story drawn from no experience or from one of yours as yours, so ingest it once
+each one is — not while a story saved trying the studio out is still there.
+`--scope subject` declares the record yours wherever a form asks. `--date` is
+the day you exported: the same command, date and all, after the record changes
+posts only the chunks the change touched and then retracts the digests they
+replaced, while a new date is in every chunk's goal and posts the document
+whole again.
 
 Each chunk is one `document-memory` orchestration: a `document-digest` run
 turns the chunk into facts a form field could take, with grounding critics

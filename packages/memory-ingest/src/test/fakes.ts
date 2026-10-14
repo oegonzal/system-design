@@ -177,7 +177,7 @@ export class ScriptedSink implements IngestSink {
   }
 }
 
-/** The studio's record as a spec gives it. */
+/** The studio's lists as a spec gives them. */
 export class ScriptedStudio implements StudioSource {
   constructor(
     private readonly profiles: readonly ExperienceProfileDto[] = [],
@@ -193,12 +193,18 @@ export class ScriptedStudio implements StudioSource {
   }
 }
 
-/** Documents written, by path. */
+/** Documents written, by path, and every path asked to be removed, in order. */
 export class InMemoryWriter implements DocumentWriter {
   readonly written = new Map<string, string>();
+  readonly removed: string[] = [];
 
   async write(path: string, text: string): Promise<void> {
     this.written.set(path, text);
+  }
+
+  async remove(path: string): Promise<boolean> {
+    this.removed.push(path);
+    return this.written.delete(path);
   }
 }
 
@@ -207,11 +213,13 @@ export const sampleExperience = (
 ): ExperienceProfileDto => ({
   id: '11111111-1111-4111-8111-111111111111',
   slug: 'ledger-platform',
+  origin: 'own',
   companyLabel: 'Acme',
   title: 'Senior Engineer',
   summary: 'Built the ledger platform.',
   techStack: ['TypeScript', 'Postgres'],
   highlights: ['Cut settlement latency by half.', 'Led a team of four.'],
+  practiceHighlights: [],
   createdAt: FIXED_NOW,
   ...overrides,
 });

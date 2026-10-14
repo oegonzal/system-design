@@ -8,10 +8,10 @@ import {
 import type { StudioSource } from '../../core/ports';
 
 /**
- * The studio's record over its own HTTP API, each list read whole page by
- * page at the largest page the API allows. A list the studio will not give —
- * a status other than 200 — is refused naming the route and the status; a
- * studio that cannot be reached is the fetch's own error, with the URL.
+ * The studio's lists over its own HTTP API, each read whole page by page at
+ * the largest page the API allows. A list the studio will not give — a status
+ * other than 200 — is refused naming the route and the status; a studio that
+ * cannot be reached is the fetch's own error, with the URL.
  */
 export class StudioRefused extends Error {
   override readonly name = 'StudioRefused';

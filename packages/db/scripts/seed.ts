@@ -1,9 +1,9 @@
 /**
- * Loads the committed experience fixture into the database.
+ * Loads the committed experience fixture into the database through
+ * `seedExperiences`, the one seeder the studio's test harness calls too.
  *
- * Idempotent: `upsertMany` keys on the primary key, and the fixture pins its
- * UUIDs, so re-running updates in place rather than failing on a duplicate.
- * Safe to run on every `tilt up`.
+ * Idempotent: it upserts every fixture row in place by its pinned UUID and
+ * deletes nothing. Safe to run on every `tilt up`.
  *
  *     node -r @swc-node/register packages/db/scripts/seed.ts
  *
@@ -11,66 +11,21 @@
  * decorators, and `ReflectMetadataProvider` needs `emitDecoratorMetadata`,
  * which esbuild (and therefore tsx) does not implement.
  */
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
 import { MikroORM } from '@mikro-orm/postgresql';
 import config from '../mikro-orm.config';
 import { ExperienceProfile } from '../src/entities/experience-profile.entity';
-
-const FIXTURE = join(__dirname, '../src/seed/experiences.fixture.json');
-
-interface FixtureRow {
-  id: string;
-  slug: string;
-  companyLabel: string;
-  title: string;
-  summary: string;
-  techStack: string[];
-  highlights: string[];
-}
-
-function loadFixture(): FixtureRow[] {
-  const rows = JSON.parse(readFileSync(FIXTURE, 'utf8')) as FixtureRow[];
-
-  // Fail loudly rather than half-seeding: the prompt pipeline writes from the
-  // prose, so a row with no highlights would surface later as a thin prompt.
-  const bad = rows.filter(
-    (row) =>
-      !row.id ||
-      !row.slug ||
-      !row.title ||
-      row.techStack.length === 0 ||
-      row.highlights.length === 0,
-  );
-  if (bad.length > 0) {
-    throw new Error(`fixture has ${bad.length} invalid row(s), first slug=${bad[0]?.slug}`);
-  }
-
-  return rows;
-}
+import { seedExperiences } from '../src/seed/seed-experiences';
 
 async function main(): Promise<void> {
-  const rows = loadFixture();
-
   // debug: false — the shared config turns SQL logging on, which would bury
   // the one-line summary under a page of statements.
   const orm = await MikroORM.init({ ...config, debug: false });
 
   try {
     const em = orm.em.fork();
-    // `upsertMany` takes plain data, so property initializers never run —
-    // `createdAt` must be supplied here. It is excluded from the conflict
-    // update so re-seeding refreshes content without rewriting history.
-    await em.upsertMany(
-      ExperienceProfile,
-      rows.map((row) => ({ ...row, createdAt: new Date() })),
-      { onConflictExcludeFields: ['createdAt'] },
-    );
-    await em.flush();
-
+    const seeded = await seedExperiences(em);
     const total = await em.count(ExperienceProfile);
-    console.log(`seeded ${rows.length} experiences · table now holds ${total} rows`);
+    console.log(`seeded ${seeded} experiences · table now holds ${total} rows`);
   } finally {
     await orm.close(true);
   }

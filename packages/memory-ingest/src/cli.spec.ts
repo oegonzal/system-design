@@ -8,7 +8,9 @@ import { cliDeps as deps, io, parsed } from './test/cli-harness';
 import {
   InMemoryLedger,
   manifestEntry,
+  sampleExperience,
   ScriptedSink,
+  ScriptedStudio,
   settledOrchestration,
   stepOf,
 } from './test/fakes';
@@ -335,8 +337,8 @@ describe('execute', () => {
     ).toBe(0);
     expect(JSON.parse(json.out[0] ?? '')).toEqual({
       files: [
-        { path: '/work/studio/studio-experiences.md', records: 1 },
-        { path: '/work/studio/studio-star-stories.md', records: 1 },
+        { path: '/work/studio/studio-experiences.md', records: 1, withheld: {}, removed: false },
+        { path: '/work/studio/studio-star-stories.md', records: 1, withheld: {}, removed: false },
       ],
     });
 
@@ -352,5 +354,40 @@ describe('execute', () => {
     ).toBe(2);
     expect(down.errors).toEqual(['fetch failed: ECONNREFUSED studio.test']);
     expect(unreachable.writer.written.size).toBe(0);
+  });
+
+  it('[ING-3] export-studio prints what it withheld under each origin and what it removed, and exits 2 leaving an earlier export as it was for an experience of an origin it does not know', async () => {
+    const practice = sampleExperience({ origin: 'practice' });
+    const { out, sink } = io();
+    const d = deps({ studio: new ScriptedStudio([sampleExperience(), practice], []) });
+    expect(await execute(parsed(['export-studio', '--out', 'studio']), d, sink)).toBe(0);
+    expect(out).toEqual([
+      '/work/studio/studio-experiences.md: 1 record · 1 withheld as practice\n/work/studio/studio-star-stories.md: no records — nothing written',
+    ]);
+
+    const practiceOnly = io();
+    const stale = deps({ studio: new ScriptedStudio([practice], []) });
+    stale.writer.written.set('/work/studio/studio-experiences.md', '# An earlier export\n');
+    expect(
+      await execute(parsed(['export-studio', '--out', 'studio']), stale, practiceOnly.sink),
+    ).toBe(0);
+    expect(practiceOnly.out[0]).toContain(
+      '/work/studio/studio-experiences.md: no records — nothing written · 1 withheld as practice · the earlier document removed',
+    );
+    expect(stale.writer.written.size).toBe(0);
+
+    const unknown = io();
+    const undeclared = { id: '44444444-4444-4444-8444-444444444444', origin: undefined };
+    const older = deps({
+      studio: new ScriptedStudio([sampleExperience(), sampleExperience(undeclared)], []),
+    });
+    older.writer.written.set('/work/studio/studio-experiences.md', '# An earlier export\n');
+    const earlier = new Map(older.writer.written);
+    expect(await execute(parsed(['export-studio', '--out', 'studio']), older, unknown.sink)).toBe(
+      2,
+    );
+    expect(unknown.errors[0]).toContain(`experience ${undeclared.id} (no origin)`);
+    expect(older.writer.written).toEqual(earlier);
+    expect(older.writer.removed).toEqual([]);
   });
 });

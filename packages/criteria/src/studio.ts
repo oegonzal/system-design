@@ -60,7 +60,7 @@ export const STUDIO_CRITERIA: readonly Criterion[] = [
   {
     id: 'GEN-1',
     statement:
-      "A design prompt can be generated from an experience — the named one, or the least practised in fixture order — by the grader's prompt pipeline: the run is started, polled, and its best draft claimed once into a prompt marked generated whose rubric is the draft's own rows, one criterion each, never a second derivation.",
+      "A design prompt can be generated from an experience — the named one, or the least practised in fixture order, an example written for practice as any other — by the grader's prompt pipeline, from a goal rendering the experience whole with its practice lines as the last of its highlights: the run is started, polled, and its best draft claimed once into a prompt marked generated whose rubric is the draft's own rows, one criterion each, never a second derivation.",
   },
   {
     id: 'GEN-2',

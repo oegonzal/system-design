@@ -70,8 +70,10 @@ export const USAGE = `usage: memory-ingest <command> [options]
   status  [--refresh] [--json]
           the manifest
   export-studio --out <dir> [--json]
-          writes the studio's experience profiles and STAR stories as markdown documents under <dir>,
-          one titled section per record, for ingest to read like any notes file
+          writes the subject's own experience profiles and STAR stories as markdown documents under <dir>,
+          one titled section per record, for ingest to read like any notes file; a practice example, a story
+          drawn from one and every practice line are withheld, and a source left with none of the subject's
+          records removes the document an earlier export wrote
 flags:
 ${flagLines()}
 exit: 0 ok · 1 a chunk failed, was refused or was settled with its facts unstored, or a retraction left a digest run standing · 2 usage, an input the program cannot use, a path the manifest has no entry for, or a manifest home another command is writing
@@ -221,7 +223,9 @@ async function dispatch(options: Options, deps: CliDeps, io: Io): Promise<number
       print(io, options.json, report, renderExport(report));
       return 0;
     } catch (error) {
-      // The studio could not be read — unreachable, or it refused a list: nothing was written.
+      // The studio could not be read — unreachable, or it refused a list — or it served a record whose
+      // origin is not known: nothing was written. A document that could not be written or removed is
+      // reported the same way, and a source exported before it may already be on disk.
       io.error(messageOf(error));
       return 2;
     }

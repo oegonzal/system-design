@@ -1,16 +1,12 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { afterAll, beforeAll, beforeEach } from 'vitest';
-import type { ExperienceProfileDto } from '@sysdesign/contracts';
 import {
   ensureDatabase,
-  ExperienceProfile,
   Prompt,
   PromptGeneration,
+  seedExperiences,
   StarStory,
   truncateTestTables,
 } from '@sysdesign/db';
@@ -54,7 +50,9 @@ async function createHarness(): Promise<Harness> {
   await app.listen(0);
 
   const em = app.get(EntityManager);
-  await ensureSeeded(em);
+  // Seeded on every boot, as `pnpm db:seed` seeds, so a test database seeded
+  // by an earlier fixture converges on this one.
+  await seedExperiences(em.fork());
 
   return {
     app,
@@ -112,28 +110,6 @@ export const MEDIA_ID = 'e1000000-0000-4000-8000-000000000002';
 
 /** An id no row has: what a spec asks for when it expects a 404. */
 export const UNKNOWN_UUID = '11111111-1111-4111-8111-111111111111';
-
-/**
- * Self-sufficient: seed the experience fixture if this database never was.
- *
- * The fixture is read with `readFileSync` rather than imported — a relative
- * import across package roots would drag `packages/db` inside this package's
- * `rootDir` and break the tsconfig.
- */
-async function ensureSeeded(em: EntityManager): Promise<void> {
-  const fork = em.fork();
-  if ((await fork.count(ExperienceProfile)) > 0) return;
-
-  const fixture = join(__dirname, '../../../db/src/seed/experiences.fixture.json');
-  const rows = JSON.parse(readFileSync(fixture, 'utf8')) as Array<
-    Omit<ExperienceProfileDto, 'createdAt'>
-  >;
-  await fork.upsertMany(
-    ExperienceProfile,
-    rows.map((row) => ({ ...row, createdAt: new Date() })),
-  );
-  await fork.flush();
-}
 
 /**
  * Wipes everything the tests create — in a test database only, which

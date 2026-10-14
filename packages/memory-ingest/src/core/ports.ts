@@ -19,12 +19,18 @@ export interface DocumentReader {
   read(path: string): Promise<string>;
 }
 
-/** A document written whole at a path, the folders above it made as needed. */
+/** Documents kept at paths: one written whole, the folders above it made as needed, or one removed. */
 export interface DocumentWriter {
   write(path: string, text: string): Promise<void>;
+  /** The document at a path gone — true when there was one to remove, false when the path held none. */
+  remove(path: string): Promise<boolean>;
 }
 
-/** The studio's record of the subject, read whole: every experience profile and every STAR story. */
+/**
+ * The studio's lists, each read whole: every experience profile — the
+ * subject's own and the examples written for practice alike — and every STAR
+ * story. Which of them is the subject's record is the export's to decide.
+ */
 export interface StudioSource {
   experiences(): Promise<readonly ExperienceProfileDto[]>;
   stories(): Promise<readonly StarStoryDto[]>;

@@ -59,9 +59,12 @@ and the criteria the loop derived from it. Three sources, one row:
   library documents (`GET /prompts/library`, `GET /prompts/library/*id` are
   proxies).
 - **Generated** — `POST /prompts/generate { experienceId? }` renders the
-  experience (title, company label, summary, stack, highlights — the label is
-  there so the fidelity critic can catch it leaking) as the goal of a
-  `design-prompt` run and remembers the run in `prompt_generation`. Reading
+  experience (title, company label, summary, stack, and its highlights with
+  its practice highlights as the last bullets — the label is there so the
+  fidelity critic can catch it leaking; whether the experience is the
+  subject's own or an example written for practice never reaches the goal)
+  as the goal of a `design-prompt` run and remembers the run in
+  `prompt_generation`. Reading
   the run once it is complete parses its best artifact with
   `designPromptDraftSchema`, renders it to the house markdown with
   `renderDesignPromptMarkdown`, and claims it into a prompt with a

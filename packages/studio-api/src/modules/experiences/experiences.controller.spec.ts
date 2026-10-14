@@ -4,6 +4,7 @@ import type {
   GetExperienceResponse,
   ListExperiencesResponse,
 } from '@sysdesign/contracts';
+import { experienceFixture } from '@sysdesign/db';
 
 import { call, TICKETING_ID, UNKNOWN_UUID, useHarness } from '../../test/harness';
 
@@ -30,6 +31,17 @@ describe('experiences', () => {
       expect(body.meta).toEqual({ total: 6, limit: 50, offset: 0 });
     });
 
+    it('serves every experience as the fixture declares it — whose it is, its highlights, and the practice lines it keeps apart', async () => {
+      const { body } = await call<ListExperiencesResponse>(`${h.url}/experiences`);
+
+      const byId = <T extends { id: string }>(rows: readonly T[]) =>
+        Object.fromEntries(rows.map((row) => [row.id, row]));
+      // createdAt is the moment of seeding, which the fixture cannot declare.
+      expect(byId(body.data.map((served) => ({ ...served, createdAt: undefined })))).toEqual(
+        byId(experienceFixture()),
+      );
+    });
+
     it('pages like every list: the meta reports the page it applied, and bounds are validated', async () => {
       const { body } = await call<ListExperiencesResponse>(`${h.url}/experiences?limit=2&offset=1`);
       expect(body.meta).toEqual({ total: 6, limit: 2, offset: 1 });
@@ -52,7 +64,8 @@ describe('experiences', () => {
 
       expect(status).toBe(200);
       expect(body.data.slug).toBe('ticketing-replatform');
-      // The numbers a prompt is sized from live in the prose, not in fields.
+      // An attested highlight states its own figures; the scale a prompt is sized from is in the
+      // practice highlights, which the list case above checks against the fixture.
       expect(body.data.highlights.join(' ')).toContain('10,000+ concurrent');
     });
 

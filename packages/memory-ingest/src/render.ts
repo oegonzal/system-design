@@ -1,3 +1,5 @@
+import { EXPERIENCE_ORIGINS } from '@sysdesign/contracts';
+
 import type { ExportReport } from './core/export-studio';
 import type { ChunkReport, FileReport, IngestReport } from './core/ingest-report';
 import type { ManifestEntry, ManifestStep } from './core/ports';
@@ -225,13 +227,24 @@ export function renderStatus(
   return [body, foot].filter((line): line is string => line !== null).join('\n');
 }
 
-/** One line per source: the document written and how many records it holds, or that there was nothing to write. */
+/**
+ * One line per source: the document written and how many of the subject's
+ * records it holds, or that there was nothing to write — then how many records
+ * were withheld under each origin, named by the origin, and whether a document
+ * an earlier export left there was removed.
+ */
 export function renderExport(report: ExportReport): string {
   return report.files
-    .map((file) =>
-      file.records === 0
-        ? `${file.path}: no records — nothing written`
-        : `${file.path}: ${count(file.records, 'record')}`,
-    )
+    .map((file) => {
+      const parts = [
+        file.records === 0 ? 'no records — nothing written' : count(file.records, 'record'),
+        ...EXPERIENCE_ORIGINS.flatMap((origin) => {
+          const withheld = file.withheld[origin];
+          return withheld === undefined ? [] : [`${withheld} withheld as ${origin}`];
+        }),
+        ...(file.removed ? ['the earlier document removed'] : []),
+      ];
+      return `${file.path}: ${parts.join(' · ')}`;
+    })
     .join('\n');
 }
