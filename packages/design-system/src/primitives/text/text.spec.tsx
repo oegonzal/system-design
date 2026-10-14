@@ -33,6 +33,14 @@ describe('Text', () => {
     expect(screen.getByText('muted')).toBeTruthy();
   });
 
+  it('wraps a run with no break in it inside its block, by the rule that leaves the block’s smallest width alone', () => {
+    renderWithTheme(<Text>CONT_AWD_HQ003424F0250_9700_47QTCB22D0289_4732</Text>);
+    expect(
+      getComputedStyle(screen.getByText('CONT_AWD_HQ003424F0250_9700_47QTCB22D0289_4732'))
+        .overflowWrap,
+    ).toBe('break-word');
+  });
+
   it('keeps style-only props off the DOM', () => {
     renderWithTheme(
       <Text tone="muted" size="sm">

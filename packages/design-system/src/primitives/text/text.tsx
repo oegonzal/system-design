@@ -17,6 +17,14 @@ export interface TextProps extends HTMLAttributes<HTMLElement> {
 const Root = styled('p', transient)<{ $tone: TextTone; $size: TextSize }>`
   margin: 0;
   font-size: ${({ theme, $size }) => theme.font.size[$size]};
+  /*
+   * A run with no break in it — an id, an address — wraps inside the block
+   * instead of pushing the page sideways. The rule that breaks a word only
+   * when it would overflow, never the one that breaks anywhere: the block's
+   * smallest width stays its longest word, so a row of text in a flex line
+   * wraps as a row before any word is broken.
+   */
+  overflow-wrap: break-word;
 
   color: ${({ theme, $tone }) =>
     ({
