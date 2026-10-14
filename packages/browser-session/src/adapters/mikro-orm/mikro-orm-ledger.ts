@@ -1,11 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
-import type {
-  BrowserDecisionDto,
-  BrowserSessionDetailDto,
-  BrowserSessionDto,
-  BrowserTaskDto,
-  SuccessCriterion,
+import {
+  INTERRUPTED,
+  INTERRUPTED_STATUS,
+  interruptedDetail,
+  type BrowserDecisionDto,
+  type BrowserSessionDetailDto,
+  type BrowserSessionDto,
+  type BrowserTaskDto,
+  type SuccessCriterion,
 } from '@sysdesign/contracts';
 import { BrowserDecision, BrowserSession, BrowserTask } from '@sysdesign/db';
 
@@ -180,6 +183,23 @@ export class MikroOrmLedger implements LedgerPort {
         { id: { $in: [...decisionIds] } },
         { teachOrchestrationId: orchestrationRunId },
       );
+  }
+
+  async failStale(before: Date): Promise<number> {
+    const em = this.em.fork();
+    const stale = await em.find(BrowserSession, {
+      status: 'running',
+      heartbeatAt: { $lt: before },
+    });
+    for (const row of stale) {
+      row.status = INTERRUPTED_STATUS;
+      row.terminationReason = INTERRUPTED;
+      row.terminationDetail = interruptedDetail(iso(row.heartbeatAt));
+      // Finished when it was last known alive: what ended it, and when, nobody saw.
+      row.finishedAt = row.heartbeatAt;
+    }
+    await em.flush();
+    return stale.length;
   }
 
   async closeSession(sessionId: string, close: SessionClose): Promise<void> {

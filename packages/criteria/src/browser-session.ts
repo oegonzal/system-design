@@ -72,6 +72,11 @@ export const BROWSER_SESSION_CRITERIA: readonly Criterion[] = [
       'The first suggestion in lettering order whose basis the answering settings’ drafts table types is filled without a question — ready before the question, none goes out; arriving while one waits, the question is withdrawn saying what was filled, an answer given in the same moment standing — recorded from memory naming the run that drafted it, cached as what the field holds, taught to nobody since the record already holds it; a typed suggestion the page refuses is asked as any refused answer and never typed again; and a suggestion whose basis the table offers reaches the operator as before.',
   },
   {
+    id: 'BRW-19',
+    statement:
+      'A session that starts closes every session still marked running whose beat is older than SESSION_STALE_AFTER_MS — its process killed, crashed or put to sleep — as failed and interrupted, finished at its last beat, and says how many; a session alive beside it beats well inside the window and is never touched, a close that later arrives from the stopped process overwrites the row with what ended it, and a ledger that cannot close them is one warning, never a stop.',
+  },
+  {
     id: 'BRW-13',
     statement:
       'A unit of work carries the identity its mission declares: the facts named under Unit identity, read by the one declared-section grammar every mission section uses, carried by every taskStart as facets with their values as the page names them, compared across sessions by one fixed-locale key, stored on the task row and rendered beside each open and closed unit; the units an advisor puts on record are rendered under Units of work by stance within a bound, and only the forbidden ones reach the goal’s index.',

@@ -17,6 +17,7 @@ const TERMINATIONS = [
   'page-stalled',
   'operator-stop',
   'error',
+  'interrupted',
 ] as const satisfies ContractTerminations;
 
 /**
@@ -33,7 +34,8 @@ const TERMINATIONS = [
  * open and supplied on every run, keyed by pipeline id — stored so a reader
  * can see what the runs were judged against without replaying the derivation.
  * `heartbeatAt` is the engine's sign of life: a `running` row whose beat has
- * stopped belongs to a dead process.
+ * stopped belongs to a dead process, and the next session to start closes it
+ * as `interrupted`, finished at its last beat.
  */
 @Entity()
 @Index({ properties: ['status'] })

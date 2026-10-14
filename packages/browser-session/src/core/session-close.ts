@@ -7,12 +7,32 @@ import { closingFiles, indexRowOf, manifestOf } from './session-dump';
 import type { SessionOutcome } from './session-engine';
 import { endedEvent } from './session-events';
 import { tasksClosed } from './session-state';
+import { SESSION_STALE_AFTER_MS } from './write-queue';
 
 /** A write that did not land, a beat that was missed: reported under the session, never thrown. */
 export const warnOf =
   (deps: SessionDeps, sessionId: string) =>
   (what: string, error: unknown): void =>
     deps.warn(`session ${sessionId}: ${what} — ${describeError(error).message}`);
+
+/**
+ * Every session another process left running and then stopped beating for —
+ * killed, crashed, the machine put to sleep — closed as interrupted by the
+ * session that starts now, as the quality loop's janitor closes a run whose
+ * beat stopped. Only a session silent past `SESSION_STALE_AFTER_MS` is
+ * closed, so one alive beside this one is never touched. Housekeeping, not
+ * the session's own record: a ledger that cannot do it is one warning.
+ */
+export async function closeInterrupted(deps: SessionDeps, now: Date): Promise<void> {
+  try {
+    const closed = await deps.ledger.failStale(new Date(now.getTime() - SESSION_STALE_AFTER_MS));
+    if (closed > 0) {
+      deps.log(`closed ${closed} session(s) that stopped beating without closing, as interrupted`);
+    }
+  } catch (error) {
+    deps.warn(`sessions that stopped beating were not closed — ${describeError(error).message}`);
+  }
+}
 
 /** How a session ended: the termination decided, the fault if one was thrown, and when. */
 export interface SessionEnd {

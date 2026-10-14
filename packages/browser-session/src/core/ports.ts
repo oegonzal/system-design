@@ -306,6 +306,13 @@ export interface LedgerPort {
   /** The teaching orchestration, written onto exactly the decision rows whose answers the document carried. */
   recordTeaching(decisionIds: readonly string[], orchestrationRunId: string): Promise<void>;
   closeSession(sessionId: string, close: SessionClose): Promise<void>;
+  /**
+   * Every session still `running` whose beat is older than `before` closed
+   * as interrupted, finished at its last beat; how many. A live session beats
+   * well inside the window and is never touched; a close that later arrives
+   * from a stopped process overwrites the row with what ended it.
+   */
+  failStale(before: Date): Promise<number>;
   listSessions(limit: number): Promise<BrowserSessionDto[]>;
   getSession(id: string): Promise<BrowserSessionDetailDto | null>;
 }

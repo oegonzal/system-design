@@ -261,4 +261,66 @@ describe('the ledger in Postgres', () => {
     await orm.em.fork().nativeUpdate(BrowserSession, { id: older }, { limits: stored as never });
     expect((await ledger.getSession(older))?.limits.targetDone).toBeNull();
   });
+
+  it('[BRW-19] closes as interrupted every running session whose beat is older than the line drawn, finished at its last beat, leaves one beating and one already closed as they were, and a close that later arrives from the stopped process is the record', async () => {
+    await truncateTestTables(orm.em, [BrowserSession, BrowserTask, BrowserDecision]);
+    const ledger = new MikroOrmLedger(orm.em);
+    const open = (id: string, startedAt: Date) =>
+      ledger.openSession({
+        id,
+        dumpRunId: `dump-${id.slice(0, 8)}`,
+        goalPath: 'goals/test.md',
+        goalHash: 'h',
+        goalMarkdown: '# mission',
+        profile: 'spec',
+        subject: 'Alex Example',
+        headed: false,
+        limits: RAILS,
+        startedAt,
+      });
+    const dead = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
+    const alive = '0b6c3b1a-8f2e-4c4b-9a8e-3f4b2c1d0e9f';
+    const done = '5d2f1e3c-6b7a-4c8d-9e0f-1a2b3c4d5e6f';
+    await open(dead, at(0));
+    await open(alive, at(0));
+    await ledger.heartbeat(alive, at(170), 4);
+    await open(done, at(0));
+    await ledger.closeSession(done, {
+      status: 'complete',
+      termination: { reason: 'target-reached', detail: 'two done' },
+      steps: 2,
+      finishedAt: at(30),
+      error: null,
+    });
+
+    expect(await ledger.failStale(at(120))).toBe(1);
+    expect(await ledger.getSession(dead)).toMatchObject({
+      status: 'failed',
+      terminationReason: 'interrupted',
+      terminationCause: null,
+      terminationDetail: 'stopped beating at 2026-10-03T10:00:00.000Z without closing',
+      finishedAt: '2026-10-03T10:00:00.000Z',
+    });
+    expect(await ledger.getSession(alive)).toMatchObject({ status: 'running', finishedAt: null });
+    expect(await ledger.getSession(done)).toMatchObject({
+      status: 'complete',
+      terminationReason: 'target-reached',
+    });
+    expect(await ledger.failStale(at(120))).toBe(0);
+
+    // The process was only slow: its own close arrives, and the row says what ended it.
+    await ledger.closeSession(dead, {
+      status: 'stopped',
+      termination: { reason: 'max-minutes', detail: 'out of time' },
+      steps: 9,
+      finishedAt: at(400),
+      error: null,
+    });
+    expect(await ledger.getSession(dead)).toMatchObject({
+      status: 'stopped',
+      terminationReason: 'max-minutes',
+      terminationDetail: 'out of time',
+      finishedAt: '2026-10-03T10:06:40.000Z',
+    });
+  });
 });

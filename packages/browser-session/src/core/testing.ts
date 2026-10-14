@@ -2,6 +2,9 @@ import { createHash } from 'node:crypto';
 
 import {
   actionRefs,
+  INTERRUPTED,
+  INTERRUPTED_STATUS,
+  interruptedDetail,
   readReply,
   type BrowserDecisionDto,
   type BrowserSessionDetailDto,
@@ -271,6 +274,24 @@ export class InMemoryLedger implements LedgerPort {
         heartbeatAt: close.finishedAt.toISOString(),
         error: close.error,
       });
+    });
+  }
+
+  failStale(before: Date): Promise<number> {
+    return this.write(() => {
+      const stale = [...this.sessions.values()].filter(
+        (session) =>
+          session.status === 'running' && Date.parse(session.heartbeatAt) < before.getTime(),
+      );
+      for (const session of stale) {
+        Object.assign(session, {
+          status: INTERRUPTED_STATUS,
+          terminationReason: INTERRUPTED,
+          terminationDetail: interruptedDetail(session.heartbeatAt),
+          finishedAt: session.heartbeatAt,
+        });
+      }
+      return stale.length;
     });
   }
 

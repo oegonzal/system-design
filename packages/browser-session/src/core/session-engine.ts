@@ -19,7 +19,7 @@ import {
   type Withdrawal,
 } from './ports';
 import { timeLimitOf } from './rails';
-import { closeSession, warnOf } from './session-close';
+import { closeInterrupted, closeSession, warnOf } from './session-close';
 import { rubricsFile } from './session-dump';
 import { createSessionEvents, startedEvent } from './session-events';
 import { createState, pushHistory, touchedBy } from './session-state';
@@ -86,6 +86,7 @@ export async function runSession(
   // mission or an advisor nobody runs refuses the session like a bad flag.
   const advisors = await resolveAdvisors(deps, goal.markdown, options, sessionId);
   const startedAt = deps.clock.now();
+  await closeInterrupted(deps, startedAt);
   const dump = deps.dumps.open(startedAt);
   const state = createState({ sessionId, dumpRunId: dump.runId, startedAt });
   // The one awaited write: a ledger that refuses the row stops the session before the browser opens.

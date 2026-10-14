@@ -1,0 +1,70 @@
+import type { NewSession } from './ports';
+import { decidedAnswers, decidedPlan, InMemoryLedger } from './testing';
+import { JOURNEY_ANSWERS as ANSWERS, JOURNEY_PLANS as PLANS } from './testing-journey';
+import { runScripted as run, SPEC_RAILS, SPEC_SUBJECT } from './testing-session';
+
+/** Where the spec clock starts: the instant the session under test opens. */
+const START = new Date('2026-10-03T10:00:00.000Z');
+
+/** The whole journey, ending on the mission's own stop. */
+const JOURNEY = {
+  script: {
+    plans: [PLANS.search, PLANS.results, PLANS.form, PLANS.done, PLANS.end].map((p) =>
+      decidedPlan(p),
+    ),
+    answers: [decidedAnswers(ANSWERS)],
+  },
+  lines: ['Yes'],
+};
+
+/** A session another process opened, which last beat at `lastBeat`. */
+const leftRunning = (id: string, lastBeat: Date): NewSession => ({
+  id,
+  dumpRunId: `dump-${id}`,
+  goalPath: 'goals/test.md',
+  goalHash: 'h',
+  goalMarkdown: '# another mission',
+  profile: 'spec',
+  subject: SPEC_SUBJECT,
+  headed: false,
+  limits: SPEC_RAILS,
+  startedAt: lastBeat,
+});
+
+describe('a session that starts', () => {
+  it('[BRW-19] closes every session another process left running and then stopped beating for, as interrupted and finished at its last beat, says so, and never touches one alive beside it', async () => {
+    const ledger = new InMemoryLedger();
+    await ledger.openSession(leftRunning('dead', new Date(START.getTime() - 3_600_000)));
+    await ledger.openSession(leftRunning('alive', new Date(START.getTime() - 10_000)));
+
+    const { outcome, logs } = await run({ ...JOURNEY, ledger });
+    expect(outcome.status).toBe('complete');
+    expect(await ledger.getSession('dead')).toMatchObject({
+      status: 'failed',
+      terminationReason: 'interrupted',
+      terminationCause: null,
+      terminationDetail: 'stopped beating at 2026-10-03T09:00:00.000Z without closing',
+      finishedAt: '2026-10-03T09:00:00.000Z',
+    });
+    expect(await ledger.getSession('alive')).toMatchObject({
+      status: 'running',
+      terminationReason: null,
+      finishedAt: null,
+    });
+    expect(logs).toContain(
+      'closed 1 session(s) that stopped beating without closing, as interrupted',
+    );
+
+    // Nothing left stranded: the next session to start has nothing to close, and says nothing.
+    const again = await run({ ...JOURNEY, ledger });
+    expect(again.logs.filter((line) => line.startsWith('closed '))).toEqual([]);
+  });
+
+  it('[BRW-19] a ledger that cannot close them is one warning, and the session runs as it would have', async () => {
+    const ledger = new InMemoryLedger();
+    vi.spyOn(ledger, 'failStale').mockRejectedValue(new Error('pool exhausted'));
+    const { outcome, warnings } = await run({ ...JOURNEY, ledger });
+    expect(outcome.status).toBe('complete');
+    expect(warnings).toContain('sessions that stopped beating were not closed — pool exhausted');
+  });
+});

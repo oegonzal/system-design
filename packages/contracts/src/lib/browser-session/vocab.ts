@@ -43,7 +43,27 @@ export const ENGINE_TERMINATIONS = [
 
 export type EngineTermination = (typeof ENGINE_TERMINATIONS)[number];
 
-export const BROWSER_SESSION_TERMINATIONS = [MISSION_STOP, ...ENGINE_TERMINATIONS] as const;
+/**
+ * A session whose process stopped beating without closing it — killed,
+ * crashed, the machine put to sleep — as the next session to start finds it.
+ * Nothing ended it, so nothing the mission or the engine declares can be said
+ * of it; a close that later arrives from that process overwrites it with what
+ * did.
+ */
+export const INTERRUPTED = 'interrupted';
+
+/** What is said of an interrupted session: the last sign of life it gave, as an ISO instant. */
+export const interruptedDetail = (lastBeat: string): string =>
+  `stopped beating at ${lastBeat} without closing`;
+
+/** The status an interrupted session is left in: it ended on no rule of its own. */
+export const INTERRUPTED_STATUS = 'failed' satisfies BrowserSessionStatus;
+
+export const BROWSER_SESSION_TERMINATIONS = [
+  MISSION_STOP,
+  ...ENGINE_TERMINATIONS,
+  INTERRUPTED,
+] as const;
 export type BrowserSessionTermination = (typeof BROWSER_SESSION_TERMINATIONS)[number];
 
 /** The statuses a mission's stop may leave the session in; which one, the mission declares beside the cause. */
