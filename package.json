@@ -34,6 +34,7 @@
     "review:code": "tsx --tsconfig tooling/tsconfig.json tooling/code-review/review.ts",
     "measure:bounds": "tsx --tsconfig tooling/tsconfig.json tooling/bounds/measure.ts",
     "typecheck:tooling": "tsc --noEmit -p tooling/tsconfig.json",
+    "lint:tooling": "eslint tooling --max-warnings=0",
     "test:tooling": "vitest run --config tooling/vite.config.ts",
     "test:stories": "tsx tooling/storybook-smoke/smoke.ts",
     "format": "prettier --write .",

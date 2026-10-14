@@ -197,7 +197,7 @@ describe('one source of truth for every knob', () => {
   it('the CI review job sets no variable the config does not declare, and no API key', () => {
     const workflow = readFileSync(join(REPO_ROOT, '.github', 'workflows', 'ci.yml'), 'utf8');
     const job = workflow.slice(workflow.indexOf('\n  review:'));
-    const end = job.slice(1).search(/\n  [a-z][a-z-]*:\n/);
+    const end = job.slice(1).search(/\n {2}[a-z][a-z-]*:\n/);
     const block = end === -1 ? job : job.slice(0, end + 1);
     const keys = new Set([...block.matchAll(/^\s+([A-Z][A-Z0-9_]+):/gm)].map((match) => match[1]));
     expect(keys.size).toBeGreaterThan(0);

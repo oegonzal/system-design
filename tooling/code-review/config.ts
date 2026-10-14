@@ -1,6 +1,6 @@
 import { SUBSCRIPTION_TOKEN_SOURCES } from '@sysdesign/llm';
 
-import type { Scope } from './context';
+import type { Scope } from './git-scope';
 import { PROFILES, type ProfileName, type ProfileSettings } from './critics';
 import { DEFAULT_RUNS_DIR, type CiProvenance } from './persist';
 

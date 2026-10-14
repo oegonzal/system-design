@@ -70,6 +70,9 @@ const WORKERS = Math.max(2, Math.min(4, cpus().length - 2));
 const READY_TIMEOUT_MS = 300_000;
 const RENDER_TIMEOUT_MS = 45_000;
 
+/** The first line of a message: what a one-line report keeps. */
+const firstLineOf = (text: string): string => text.split('\n', 1).join('');
+
 async function reachable(url: string): Promise<boolean> {
   try {
     const response = await fetch(`${url}/index.json`);
@@ -194,7 +197,7 @@ async function renderOne(
       });
     }
   } catch (error) {
-    result.fatal = String(error).split('\n')[0]!.slice(0, 300);
+    result.fatal = firstLineOf(String(error)).slice(0, 300);
   }
 
   result.noise = [...noise];

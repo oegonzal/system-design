@@ -21,7 +21,7 @@
           "line": { "type": "integer", "minimum": 1 },
           "category": {
             "type": "string",
-            "description": "Replaced with the calling critic's own enum at run time by review.ts"
+            "description": "Replaced with the calling critic's own enum at run time by criticSchemaFor"
           },
           "evidence": {
             "type": "string",

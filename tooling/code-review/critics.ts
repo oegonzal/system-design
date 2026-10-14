@@ -2,7 +2,7 @@
  * The critic registry.
  *
  * One place defines what a critic is called, which prompt it runs, and which
- * categories it may use. `review.ts` injects those categories into the schema as
+ * categories it may use. `criticSchemaFor` injects those categories into the schema as
  * an `enum` before each call, so the allowed set is enforced by the API rather
  * than requested in prose — a model left unconstrained will happily invent a
  * category, and prose alone does not hold.

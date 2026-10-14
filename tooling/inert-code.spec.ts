@@ -207,10 +207,9 @@ describe('inert code', () => {
   it('every exported name is reached from somewhere other than its own declaration', () => {
     const discovered = DISCOVERED.map(({ path }) => join(REPO, path));
     const inert: string[] = [];
-    for (const path of files) {
+    for (const [path, own] of counts) {
       if (STORY_FILE.test(path)) continue;
       if (discovered.some((root) => path.startsWith(root))) continue;
-      const own = counts.get(path)!;
       for (const { name, line } of exportedNames(readFileSync(path, 'utf8'), path)) {
         // One occurrence in the repository, and it is in this file: the
         // declaration itself, with nothing anywhere that reads it.

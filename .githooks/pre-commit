@@ -112,6 +112,12 @@ if printf '%s\n' "${code[@]}" | grep -q '^tooling/'; then
     echo "  ✗ commit refused: tooling/ failed to typecheck."
     exit 1
   fi
+  echo "  → lint review tooling"
+  if ! pnpm lint:tooling; then
+    echo ""
+    echo "  ✗ commit refused: tooling/ failed lint, or left a warning."
+    exit 1
+  fi
 fi
 
 file_list=$(IFS=,; printf '%s' "${code[*]}")

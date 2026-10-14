@@ -31,7 +31,7 @@ describe('themeGuard', () => {
   });
 
   it('fails on the second vocabulary too, in any casing', () => {
-    const mixed = BRAND_B[0]!.toUpperCase() + BRAND_B.slice(1);
+    const mixed = BRAND_B.charAt(0).toUpperCase() + BRAND_B.slice(1);
     const [found] = themeGuard([file('README.md', `A ${mixed} theme`)]);
     expect(found?.severity).toBe('high');
   });

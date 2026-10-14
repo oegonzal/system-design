@@ -1,19 +1,15 @@
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 import {
   bundleKey,
-  codeReviewExpectations,
-  deriveIntent,
   packDiff,
   splitDiffByFile,
   truncateAtHunkBoundary,
   type FileDiff,
-} from './context';
+} from './diff-pack';
 
 /**
- * Context assembly is where a review silently stops being a review: a file
+ * Packing the diff is where a review silently stops being a review: a file
  * dropped here is a file no critic can report on, and the pipeline reports
  * success either way. So the splitting, bundling and packing invariants are
  * pinned directly, not just exercised through a live run.
@@ -213,114 +209,5 @@ describe('truncateAtHunkBoundary', () => {
   it('keeps whole hunks and says what it left out', () => {
     const kept = truncateAtHunkBoundary(segment('a.ts', 5).body, 200);
     expect(kept).toContain('[remaining hunks not shown]');
-  });
-});
-
-describe('codeReviewExpectations', () => {
-  it('extracts the section and stops at the next heading of the same level', () => {
-    const { text } = codeReviewExpectations(
-      '# T\n\n## Code Review Expectations\n\nkeep me\n\n## Styling\n\ndrop me\n',
-    );
-    expect(text).toContain('keep me');
-    expect(text).not.toContain('drop me');
-  });
-
-  it('does not stop at a deeper heading', () => {
-    const { text } = codeReviewExpectations(
-      '## Code Review Expectations\n\nkeep me\n\n### Detail\n\nkeep me too\n',
-    );
-    expect(text).toContain('keep me too');
-  });
-
-  /** A fenced example containing `##` must not truncate the section. */
-  it('ignores headings inside a fenced block', () => {
-    const { text } = codeReviewExpectations(
-      '## Code Review Expectations\n\n```md\n## Not A Heading\n```\n\nkeep me\n',
-    );
-    expect(text).toContain('keep me');
-  });
-
-  it('concatenates duplicate headings and warns, rather than picking a winner', () => {
-    const { text, warnings } = codeReviewExpectations(
-      '## Code Review Expectations\n\nfirst\n\n## Other\n\nx\n\n## Code Review Expectations\n\nsecond\n',
-    );
-
-    expect(text).toContain('first');
-    expect(text).toContain('second');
-    expect(warnings[0]).toContain('2 times');
-  });
-
-  /** Following repo-map.ts: refuse to run rather than invent a rule set. */
-  it('throws when the section is missing', () => {
-    expect(() => codeReviewExpectations('# T\n\n## Styling\n\nx\n')).toThrow(/Code Review/);
-  });
-
-  /**
-   * A canary over the real file: if someone deletes the section the pipeline
-   * reads its policy from, this fails loudly rather than at review time — and
-   * the human commentary around the section must never leak into a prompt.
-   */
-  it('finds the section in review-policy.md, exactly once, without the commentary', () => {
-    const { text, warnings } = codeReviewExpectations(
-      readFileSync(join(__dirname, 'review-policy.md'), 'utf8'),
-    );
-
-    expect(text).toContain('boundaries');
-    expect(text).not.toContain('commentary for humans');
-    expect(warnings).toEqual([]);
-  });
-});
-
-describe('deriveIntent', () => {
-  const commits = [
-    'feat: add the thing\n\nA body explaining why the thing was added at some length.',
-    'fix: correct the thing\n\nAnother body.\n\nCo-Authored-By: Someone <a@b.c>',
-  ];
-
-  it('lists every subject, oldest first', () => {
-    const intent = deriveIntent(commits);
-    expect(intent.source).toBe('commits');
-    expect(intent.text.indexOf('add the thing')).toBeLessThan(
-      intent.text.indexOf('correct the thing'),
-    );
-  });
-
-  it('strips trailers and tool signatures', () => {
-    expect(deriveIntent(commits).text).not.toContain('Co-Authored-By');
-    expect(
-      deriveIntent(['feat: x\n\n🤖 Generated with tooling\n\nreal body here now']).text,
-    ).not.toContain('🤖');
-  });
-
-  /** Truncating a flat concatenation sheds the later subjects, which is the wrong half. */
-  it('keeps every subject when the budget forces bodies out', () => {
-    const long = Array.from(
-      { length: 8 },
-      (_, i) => `feat: subject number ${i}\n\n${'body '.repeat(200)}`,
-    );
-    const intent = deriveIntent(long, undefined, 600);
-
-    expect(intent.truncated).toBe(true);
-    for (let i = 0; i < 8; i += 1) expect(intent.text).toContain(`subject number ${i}`);
-  });
-
-  it('lets an explicit override win over commit archaeology', () => {
-    const intent = deriveIntent(commits, 'The pull request description, which is the real intent.');
-    expect(intent.source).toBe('env');
-    expect(intent.text).toContain('pull request description');
-  });
-
-  it('reports no purpose when there are no commits', () => {
-    expect(deriveIntent([]).source).toBe('none');
-  });
-
-  /**
-   * A branch of `wip:` commits is worse than nothing: it anchors the critic to a
-   * baseline that means nothing, where an absent purpose correctly disables the
-   * judgements that need one.
-   */
-  it('treats a substance-free purpose as absent', () => {
-    expect(deriveIntent(['wip', 'wip', 'wip']).source).toBe('none');
-    expect(deriveIntent([], 'wip').source).toBe('none');
   });
 });

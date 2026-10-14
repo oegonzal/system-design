@@ -67,8 +67,8 @@ describe('planRenders', () => {
     const planned = planRenders([story('a--docs', { type: 'docs' })]);
 
     expect(planned).toHaveLength(1);
-    expect(planned[0]!.kind).toBe('docs');
-    expect(planned[0]!.mode).toBe(RENDER_MODES[0]);
+    expect(planned[0]?.kind).toBe('docs');
+    expect(planned[0]?.mode).toBe(RENDER_MODES[0]);
   });
 
   it('treats an entry with no type as a story rather than skipping it', () => {

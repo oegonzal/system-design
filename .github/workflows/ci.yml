@@ -85,6 +85,9 @@ jobs:
       - name: Typecheck tooling
         run: pnpm typecheck:tooling
 
+      - name: Lint tooling
+        run: pnpm lint:tooling
+
       - name: Test tooling
         run: pnpm test:tooling
 

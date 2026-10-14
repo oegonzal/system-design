@@ -164,8 +164,9 @@ export const isFailure = (verdict: Verdict): boolean => FAILING.includes(verdict
 
 const label = (target: RenderTarget) => `${target.id} [${target.mode}]`;
 
-function group<T>(items: readonly T[], key: (item: T) => string): Map<string, T[]> {
-  const out = new Map<string, T[]>();
+/** Items by key; every group holds at least the item that opened it. */
+function group<T>(items: readonly T[], key: (item: T) => string): Map<string, [T, ...T[]]> {
+  const out = new Map<string, [T, ...T[]]>();
   for (const item of items) {
     const existing = out.get(key(item));
     if (existing) existing.push(item);
@@ -241,7 +242,7 @@ export function summarise(results: readonly RenderResult[]): Summary {
   if (byRule.size > 0) {
     lines.push('', `--- axe (${byRule.size} distinct rules, stories only) ---`);
     for (const [rule, hits] of byRule) {
-      const first = hits[0]!.violation;
+      const first = hits[0].violation;
       lines.push('', `[${hits.length}] ${rule} (${first.impact ?? 'unknown'}) — ${first.help}`);
       lines.push(`      target: ${first.target}`);
       lines.push(`      ${first.sample}`);
