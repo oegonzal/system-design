@@ -38,8 +38,8 @@ describe('recording is the seam’s, not the adapter’s', () => {
       error: null,
     });
     // The schema it was asked against is recorded as JSON, never the zod object.
-    expect(JSON.stringify(calls[0]!.schema)).toContain('answer');
-    expect(calls[0]!.durationMs).toBeGreaterThanOrEqual(0);
+    expect(JSON.stringify(calls[0]?.schema)).toContain('answer');
+    expect(calls[0]?.durationMs).toBeGreaterThanOrEqual(0);
   });
 
   it('[QL-62] records a call that produced nothing, and one that threw, rather than leaving the dump silent', async () => {
@@ -48,7 +48,7 @@ describe('recording is the seam’s, not the adapter’s', () => {
       .withRecorder((call) => misses.push(call))
       .completeStructured(ask);
     expect(misses[0]).toMatchObject({ outcome: 'schema-miss', response: null });
-    expect(misses[0]!.error?.name).toBe('NoValue');
+    expect(misses[0]?.error?.name).toBe('NoValue');
 
     const thrown: LlmCall[] = [];
     const broken: LlmClient = {
@@ -62,7 +62,7 @@ describe('recording is the seam’s, not the adapter’s', () => {
     ).rejects.toThrow('transport died');
     // The throw still reaches the caller; the record is made on the way past.
     expect(thrown[0]).toMatchObject({ outcome: 'error' });
-    expect(thrown[0]!.error?.message).toBe('transport died');
+    expect(thrown[0]?.error?.message).toBe('transport died');
   });
 
   it('[QL-62] an adapter that knows more about its own turn keeps saying so', async () => {

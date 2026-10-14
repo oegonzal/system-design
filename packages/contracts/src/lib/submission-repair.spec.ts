@@ -7,6 +7,18 @@ import { repairSubmission } from './submission-repair';
 
 const criteria: CriterionRef[] = ['c1', 'c2', 'c3'].map((id) => ({ id }));
 
+/** The brief and the narrative the valid submission carries, each its own fresh copy. */
+const briefOf = (): NonNullable<DesignSubmission['brief']> => ({
+  version: 1,
+  bindings: [{ criterionId: 'c1', nodeIds: ['n-2', 'n-3'], path: ['e-1', 'e-2'], claim: 'ok' }],
+});
+const narrativeOf = (): NonNullable<DesignSubmission['narrative']> => ({
+  version: 1,
+  overview: 'A thin API over one store.',
+  componentRationales: [{ nodeId: 'n-3', prose: 'The system of record.' }],
+  criterionNarrations: [{ criterionId: 'c1', prose: 'A read walks e-1 then e-2.' }],
+});
+
 const valid = (): DesignSubmission => ({
   graph: {
     nodes: [
@@ -19,17 +31,15 @@ const valid = (): DesignSubmission => ({
       { id: 'e-2', source: 'n-2', target: 'n-3', kind: 'sync' },
     ],
   },
-  brief: {
-    version: 1,
-    bindings: [{ criterionId: 'c1', nodeIds: ['n-2', 'n-3'], path: ['e-1', 'e-2'], claim: 'ok' }],
-  },
-  narrative: {
-    version: 1,
-    overview: 'A thin API over one store.',
-    componentRationales: [{ nodeId: 'n-3', prose: 'The system of record.' }],
-    criterionNarrations: [{ criterionId: 'c1', prose: 'A read walks e-1 then e-2.' }],
-  },
+  brief: briefOf(),
+  narrative: narrativeOf(),
 });
+
+/** What a repair is expected to have kept, or a failure that says it kept none. */
+const kept = <T>(value: T | null, what: string): T => {
+  if (value === null) throw new Error(`the repair kept no ${what}`);
+  return value;
+};
 
 /** What a coach might return: a rubric id it invented, a duplicate, a fan-out path, a ghost node. */
 const sloppy = (): DesignSubmission => {
@@ -39,7 +49,7 @@ const sloppy = (): DesignSubmission => {
     brief: {
       version: 1,
       bindings: [
-        ...base.brief!.bindings,
+        ...briefOf().bindings,
         { criterionId: 'c99', nodeIds: ['n-2'], claim: 'no such criterion' },
         { criterionId: 'c1', nodeIds: ['n-1'], claim: 'bound twice' },
         // e-2 does not start where e-1 starts: a fan-out, not a walk.
@@ -53,13 +63,13 @@ const sloppy = (): DesignSubmission => {
     },
     narrative: {
       version: 1,
-      overview: base.narrative!.overview,
+      overview: narrativeOf().overview,
       componentRationales: [
-        ...base.narrative!.componentRationales,
+        ...narrativeOf().componentRationales,
         { nodeId: 'n-ghost', prose: 'explains a node that is not drawn' },
       ],
       criterionNarrations: [
-        ...base.narrative!.criterionNarrations,
+        ...narrativeOf().criterionNarrations,
         { criterionId: 'c42', prose: 'narrates a criterion the rubric never listed' },
       ],
     },
@@ -76,12 +86,16 @@ describe('repairSubmission', () => {
     const repaired = repairSubmission(input, criteria);
     expect(repaired.graph).toBe(input.graph);
     expect(repaired.brief?.bindings).toEqual([
-      valid().brief!.bindings[0],
+      briefOf().bindings[0],
       { criterionId: 'c2', nodeIds: ['n-2'], path: ['e-1', 'e-2'], claim: 'fan' },
     ]);
     expect(repaired.narrative).toEqual(valid().narrative);
-    expect(validateBriefReferences(repaired.graph, repaired.brief!, criteria)).toEqual([]);
-    expect(validateNarration(repaired.graph, repaired.narrative!, criteria)).toEqual([]);
+    expect(
+      validateBriefReferences(repaired.graph, kept(repaired.brief, 'brief'), criteria),
+    ).toEqual([]);
+    expect(
+      validateNarration(repaired.graph, kept(repaired.narrative, 'narrative'), criteria),
+    ).toEqual([]);
   });
 
   it('[UX-11] is idempotent, and turns an emptied brief or narrative into null', () => {

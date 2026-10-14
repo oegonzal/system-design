@@ -53,6 +53,12 @@ export function submissionFixture(): DesignSubmission {
   };
 }
 
+/** The brief a fixture always carries — the part these cases break — or a failure that says it carried none. */
+const briefOf = (submission: DesignSubmission) => {
+  if (submission.brief === null) throw new Error('the fixture carries no brief');
+  return submission.brief;
+};
+
 describe('designSubmissionSchema', () => {
   it('[DEL-7] accepts a full submission and infers the same object back', () => {
     const fixture = submissionFixture();
@@ -104,10 +110,10 @@ describe('designSubmissionSchema', () => {
   it('requires a binding to name a component and make a claim', () => {
     const fixture = submissionFixture();
     const noNodes = structuredClone(fixture);
-    noNodes.brief!.bindings[0].nodeIds = [];
+    briefOf(noNodes).bindings[0].nodeIds = [];
     expect(designSubmissionSchema.safeParse(noNodes).success).toBe(false);
     const noClaim = structuredClone(fixture);
-    noClaim.brief!.bindings[0].claim = '';
+    briefOf(noClaim).bindings[0].claim = '';
     expect(designSubmissionSchema.safeParse(noClaim).success).toBe(false);
   });
 

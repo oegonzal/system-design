@@ -89,11 +89,15 @@ export function headingLevels(lines: readonly PdfLine[]): Map<number, number> {
   return new Map(sizes.map((size, index) => [size, Math.min(index + 1, MAX_HEADING_LEVEL)]));
 }
 
+/** The middle value of an odd count, the mean of the two middle values of an even one; nothing has a median of 0. */
 const median = (values: readonly number[]): number => {
-  if (values.length === 0) return 0;
   const sorted = [...values].sort((a, b) => a - b);
   const middle = Math.floor(sorted.length / 2);
-  return sorted.length % 2 === 1 ? sorted[middle]! : (sorted[middle - 1]! + sorted[middle]!) / 2;
+  const middles =
+    sorted.length % 2 === 1
+      ? sorted.slice(middle, middle + 1)
+      : sorted.slice(middle - 1, middle + 1);
+  return middles.length === 0 ? 0 : middles.reduce((sum, value) => sum + value, 0) / middles.length;
 };
 
 /** Items grouped into lines in reading order: an item on the current line's baseline joins it, any other starts the next. */
@@ -131,20 +135,34 @@ export function linesOf(items: readonly PositionedText[]): PdfLine[] {
  * the page's pitch allows, a jump back up the page, or a change of type size.
  */
 export function blocksOf(lines: readonly PdfLine[]): PdfLine[][] {
-  if (lines.length === 0) return [];
-  const pitches = lines.slice(1).map((line, index) => lines[index]!.y - line.y);
-  const pitch = median(pitches.filter((gap) => gap > 0));
-  const blocks: PdfLine[][] = [[lines[0]!]];
-  lines.slice(1).forEach((line, index) => {
-    const previous = lines[index]!;
+  const [first, ...rest] = lines;
+  if (first === undefined) return [];
+  /** Each line beside the one before it, in reading order. */
+  const steps: { previous: PdfLine; line: PdfLine }[] = [];
+  let previous = first;
+  for (const line of rest) {
+    steps.push({ previous, line });
+    previous = line;
+  }
+  const pitch = median(
+    steps.map(({ previous, line }) => previous.y - line.y).filter((gap) => gap > 0),
+  );
+  const blocks: PdfLine[][] = [];
+  let block: PdfLine[] = [first];
+  for (const { previous, line } of steps) {
     const gap = previous.y - line.y;
     const upward = gap < 0;
     const sizeStep =
       Math.abs(line.height - previous.height) / Math.max(previous.height, line.height, 1);
     const opens = upward || (pitch > 0 && gap > BLOCK_GAP * pitch) || sizeStep > FONT_STEP;
-    if (opens) blocks.push([line]);
-    else blocks[blocks.length - 1]!.push(line);
-  });
+    if (opens) {
+      blocks.push(block);
+      block = [line];
+    } else {
+      block.push(line);
+    }
+  }
+  blocks.push(block);
   return blocks;
 }
 

@@ -98,6 +98,9 @@ export function useDraftAutosave(
         return Promise.resolve();
       }
       const { id, signal } = latest.begin();
+      /* eslint-disable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect --
+         marking the save in flight at its start, and how it ended once it lands, is
+         this callback's contract; the autosave effect is one of its callers */
       setPhase('saving');
       const promise = api
         .saveSessionDraft(sessionId, storeApi.getState().serializeDraft(), { signal })
@@ -116,6 +119,7 @@ export function useDraftAutosave(
           goneRef.current = gone;
           setFailure({ version: target, gone });
           setPhase(gone === null ? 'failed' : 'idle');
+          /* eslint-enable @eslint-react/hooks-extra/no-direct-set-state-in-use-effect */
         })
         .finally(() => {
           if (inFlight.current?.target === target) inFlight.current = null;

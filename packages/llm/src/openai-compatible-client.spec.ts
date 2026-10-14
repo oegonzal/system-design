@@ -86,14 +86,14 @@ describe('an OpenAI-compatible provider', () => {
     });
     expect(value).toEqual({ answer: 'ok', score: 7 });
 
-    const body = sent[0]!.body as {
+    const body = sent[0]?.body as {
       response_format: {
         type: string;
         json_schema: { name: string; strict: boolean; schema: Record<string, unknown> };
       };
       messages: { role: string; content: string }[];
     };
-    expect(sent[0]!.url).toBe('https://api.openai.com/v1/chat/completions');
+    expect(sent[0]?.url).toBe('https://api.openai.com/v1/chat/completions');
     expect(body.response_format.type).toBe('json_schema');
     expect(body.response_format.json_schema.strict).toBe(true);
     expect(body.response_format.json_schema.name).toBe(SCHEMA_NAME);
@@ -122,8 +122,8 @@ describe('an OpenAI-compatible provider', () => {
     }).completeStructuredDetailed({ system: 's', user: 'u', schema });
     expect(reply.value).toEqual({ answer: 'ok', score: 7 });
     // The second ask named the first reply's fault.
-    const second = sent[1]!.body as { messages: { content: string }[] };
-    expect(second.messages[1]!.content).toContain('refused');
+    const second = sent[1]?.body as { messages: { content: string }[] };
+    expect(second.messages[1]?.content).toContain('refused');
 
     const { send: always } = scripted(replied('{"answer":"ok"}'));
     const lost = await client(always, {
@@ -158,8 +158,8 @@ describe('an OpenAI-compatible provider', () => {
     // Both shapes are asked for, so the table is the only thing that differs.
     const { send: chat, sent: chatSent } = scripted(replied('{"answer":"ok","score":1}'));
     await client(chat).completeStructured({ system: 's', user: 'u', schema, maxTokens: 500 });
-    expect(chatSent[0]!.url).toBe('https://api.openai.com/v1/chat/completions');
-    expect(Object.keys(chatSent[0]!.body)).toContain('messages');
+    expect(chatSent[0]?.url).toBe('https://api.openai.com/v1/chat/completions');
+    expect(Object.keys(chatSent[0]?.body ?? {})).toContain('messages');
 
     const { send, sent } = scripted(answered('{"answer":"ok","score":1}'));
     const value = await client(send, { api: 'responses', store: true }).completeStructured({
@@ -170,14 +170,14 @@ describe('an OpenAI-compatible provider', () => {
     });
     expect(value).toEqual({ answer: 'ok', score: 1 });
 
-    const body = sent[0]!.body as {
+    const body = sent[0]?.body as {
       instructions: string;
       input: { role: string; content: string }[];
       max_output_tokens: number;
       store: boolean;
       text: { format: { type: string; name: string; strict: boolean } };
     };
-    expect(sent[0]!.url).toBe('https://api.openai.com/v1/responses');
+    expect(sent[0]?.url).toBe('https://api.openai.com/v1/responses');
     // The system prompt is this shape's `instructions`, and the schema sits
     // flattened beside the format rather than nested under a `json_schema` key.
     expect(body.instructions).toBe('s');
