@@ -44,16 +44,20 @@ export class MemoryController {
   }
 
   /**
-   * Retract one memory a digest run stored, by the run's id and the memory's
-   * ref — a fact since corrected, when the rest of its run still holds. Answers
-   * the text, kind and scope that went. Nothing removed answers
-   * `removed: null`: a point the store never held, or one this build cannot
-   * read, which stays. `:ref` is required after the literal `points`, so an
-   * address whose ref is empty or missing — `/memory/<run>/points/` or
-   * `/memory/<run>/points` — matches neither route here and answers 404.
-   * Without the segment it would not: Express leaves `strict routing` off,
-   * which reads `/memory/<run>/` as `/memory/<run>`, the run's own retraction
-   * above.
+   * Retract one stored memory — a fact since corrected, when the rest of its
+   * run still holds — by the run it was digested from and its ref: the `runId`
+   * and `ref` a retrieval report lists, which name the digest run only for a
+   * document's digest, since a lesson or a knowledge item is filed under the
+   * run it was learned from. Answers the text, kind and scope that went.
+   * Nothing removed answers `removed: null`: a point the store never held, or
+   * one this build cannot read, which stays. No retraction is recorded, so a
+   * re-index of a memory run stores again a lesson retracted from it.
+   *
+   * `:ref` is required after the literal `points`, so an address whose ref is
+   * empty or missing — `/memory/<run>/points/` or `/memory/<run>/points` —
+   * matches neither route here and answers 404. Without the segment it would
+   * not: Express leaves `strict routing` off, which reads `/memory/<run>/` as
+   * `/memory/<run>`, the run's own retraction above.
    */
   @Delete(':id/points/:ref')
   @HttpCode(200)

@@ -60,13 +60,32 @@ const serviceOver = (ports: MemoryPorts): MemoryService => {
   return new MemoryService(runs, ports, records);
 };
 
+/** A finished memory run over the sample source, and the service that can re-index it. */
+const reindexable = () => {
+  const source = sampleRun();
+  const digest = digestRun(source);
+  const record = memoryRun(digest.runId, source.runId);
+  const ports = memoryPorts();
+  const runs = {
+    get: (runId: string) =>
+      Promise.resolve(runId === digest.runId ? digest : runId === source.runId ? source : null),
+    summary: () => ({ policy: { thresholds: { acceptAt: ACCEPT_AT } } }),
+  } as unknown as RunsService;
+  const records = {
+    find: (id: string) => Promise.resolve(id === record.orchestrationRunId ? record : null),
+  } as unknown as OrchestrationRunRepository;
+  return {
+    source,
+    digest,
+    record,
+    store: ports.store as InMemoryMemoryStore,
+    service: new MemoryService(runs, ports, records),
+  };
+};
+
 describe('the memory service’s re-index', () => {
   it('[QL-60] re-embeds the digest a memory run already produced, and the chunks it writes carry the source run’s lineage', async () => {
-    const source = sampleRun();
-    const digest = digestRun(source);
-    const record = memoryRun(digest.runId, source.runId);
-    const ports = memoryPorts();
-    const store = ports.store as InMemoryMemoryStore;
+    const { source, digest, record, store, service } = reindexable();
     // A point the run stored before lineage was recorded.
     await store.replaceRunChunks(source.runId, [
       {
@@ -89,18 +108,8 @@ describe('the memory service’s re-index', () => {
         vectors: { condition: [1, 0, 0, 0, 0, 0, 0, 0], lesson: [1, 0, 0, 0, 0, 0, 0, 0] },
       },
     ]);
-    const runs = {
-      get: (runId: string) =>
-        Promise.resolve(runId === digest.runId ? digest : runId === source.runId ? source : null),
-      summary: () => ({ policy: { thresholds: { acceptAt: ACCEPT_AT } } }),
-    } as unknown as RunsService;
-    const records = {
-      find: (id: string) => Promise.resolve(id === record.orchestrationRunId ? record : null),
-    } as unknown as OrchestrationRunRepository;
 
-    const outcome = await new MemoryService(runs, ports, records).reindex(
-      record.orchestrationRunId,
-    );
+    const outcome = await service.reindex(record.orchestrationRunId);
     expect(outcome).toMatchObject({ status: 'complete', counts: { chunks: 1 } });
     expect(outcome.runIds).toEqual([digest.runId]);
     const stored = [...store.points.values()].filter(
@@ -251,5 +260,21 @@ describe('the memory service’s retractions', () => {
       'memory memory.1 of run run-a held but unreadable by this build: nothing removed',
     ]);
     expect(lines).toEqual(['memory memory.1 of run run-c not held: nothing removed']);
+  });
+  it('[QL-70] a lesson is retracted by the run it was learned from, never its digest run, and a re-index of its memory run stores it again: no retraction is recorded', async () => {
+    const { source, digest, record, store, service } = reindexable();
+    const lessons = () =>
+      [...store.points.values()].filter((chunk) => chunk.source.runId === source.runId);
+    await service.reindex(record.orchestrationRunId);
+    const [lesson] = lessons();
+    expect(lesson.source.kind).toBe('lesson');
+    const { ref } = lesson.source;
+
+    expect((await service.retractPoint(digest.runId, ref)).removed).toBeNull();
+    expect((await service.retractPoint(source.runId, ref)).removed?.text).toBe(lesson.text);
+    expect(lessons().map((chunk) => chunk.text)).not.toContain(lesson.text);
+
+    await service.reindex(record.orchestrationRunId);
+    expect(lessons().map((chunk) => chunk.text)).toContain(lesson.text);
   });
 });

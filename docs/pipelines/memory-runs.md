@@ -373,8 +373,8 @@ is the source of it.
 **The routes.** `src/modules/orchestration/` serves the generic surface;
 `src/modules/memory/` keeps the adapters — embeddings, the vector store, the
 query probes — binds them into the memory orchestrator's ports for the
-orchestration module (which never imports Qdrant), and serves the two tools
-that need them without a run.
+orchestration module (which never imports Qdrant), and serves the `/memory`
+routes, the tools that need no run.
 
 | Verb     | Path                                     | Code | Body / query                                          | Answers                                        |
 | -------- | ---------------------------------------- | ---- | ----------------------------------------------------- | ---------------------------------------------- |
@@ -387,32 +387,42 @@ that need them without a run.
 | `DELETE` | `/memory/:id/points/:ref`                | 200  | —                                                     | `{ data: { runId, ref, removed } }`            |
 | `POST`   | `/memory/retrieval-report`               | 200  | `{ goal }`, up to 64,000 B                            | `{ data: RetrievalReportDto }`                 |
 | `POST`   | `/memory/form-retrieval-report`          | 200  | `{ fields: [{ name, context?, role?, inputType? }] }` | `{ data: FormRetrievalReportDto }`             |
+| `GET`    | `/memory/effectiveness`                  | 200  | `pipeline`, `limit`                                   | `{ data: RecallEffectivenessDto }`             |
+| `GET`    | `/memory/gaps`                           | 200  | `runId` or `goalHash`, `limit`                        | `{ data: StandingGapsDto }`                    |
 
 `/memory-runs` is retired, not aliased. The body of a memory orchestration is
 **exactly** the body of a quality run; `output` and `maxIterations` reach the
-target only. The five `/memory` routes run **no pipeline at all**: `reindex`
+target only. The seven `/memory` routes run **no pipeline at all**: `reindex`
 re-embeds a memory run's lessons from the digest artifact it already produced,
 which is what makes a generation bump survivable (§6); `retrieval-report`
 answers what a recall _would_ retrieve for a goal without running one, and
 `form-retrieval-report` the same for a form page's fields — each field's own
 probe, both named vectors' rankings, the hits its field type takes and the
 dealt evidence, as the `form-memory` orchestrator's recall step would compose
-them; `DELETE
+them; `effectiveness` and `gaps` read the runs already recorded — whether a
+recalled lesson's run saw its defects resolve, and what no recall could serve,
+by brief — and write nothing; `DELETE
 /memory/:id` retracts every point a digest run stored, by the run's id — one
 writer per digest run — which is how a document taught or ingested again closes
 behind itself (`memory-ingest ingest` once the store holds every fact of a
 document's current text, `memory-ingest retract` retiring one,
 `browser-session teach-again`); a run the store never held removes nothing and
-is no error. `DELETE
-/memory/:id/points/:ref` retracts one point of such a run — the memory it stored
-under that ref — for a fact since corrected while the rest of its digest still
-holds, and answers the text, kind and scope it held, the only record of it once
-the point is gone; a point the store never held answers `removed: null`, and so
-does one whose payload this build cannot read, which is left standing and
-logged as held. The literal `points` is what keeps an empty ref from retracting
-the whole run: Express leaves `strict routing` off, so `/memory/<run>/` is the
-run's own address, while `/memory/<run>/points/` matches no route and is a 404.
-It is the operator's: no client calls it.
+is no error.
+
+`DELETE /memory/:id/points/:ref` retracts one stored memory, for a fact since
+corrected while the rest of its run still holds. Its address is the run the
+memory was digested from — its `source.runId`, the `runId` a retrieval report
+lists beside its `ref` — which is the digest run itself only for a document's
+digest: a lesson or a knowledge item is filed under the run it was learned
+from. It answers the text, kind and scope the point held, the only record of
+it once the point is gone; a point the store never held answers
+`removed: null`, and so does one whose payload this build cannot read, which
+is left standing and logged as held. No retraction is recorded, so a re-index
+of a memory run (§6) stores again a lesson retracted from it. The literal
+`points` is what keeps an empty ref from retracting the whole run: Express
+leaves `strict routing` off, so `/memory/<run>/` is the run's own address,
+while `/memory/<run>/points/` matches no route and is a 404. It is the
+operator's: no client calls it.
 
 Guards, before any row exists: an unknown orchestrator is a 404; a pipeline
 not in `RunsService.list()` is a 404, the same as `POST /runs`; whatever the

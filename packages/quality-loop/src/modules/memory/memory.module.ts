@@ -76,10 +76,11 @@ const memoryPorts = (
 
 /**
  * The memory orchestrator's adapters — embeddings, the vector store, the
- * query probes — the two tools that need them without a run, the re-index
- * and the retrieval report, and the recall a run asks for its own producer,
- * which binds itself into the runs module's slot. The memory run itself is
- * an orchestration.
+ * query probes — the `/memory` routes, tools that run no pipeline (the
+ * re-index, the two retractions, the two retrieval reports and the two
+ * reports on what recalls did), and the recall a run asks for its own
+ * producer, which binds itself into the runs module's slot. The memory run
+ * itself is an orchestration.
  */
 @Module({
   imports: [

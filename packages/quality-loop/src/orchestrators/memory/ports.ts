@@ -192,11 +192,11 @@ export interface MemoryStore {
    */
   retractRun(sourceRunId: string): Promise<number>;
   /**
-   * One point gone, by the run that stored it and its ref within that run — a
-   * fact since corrected, when the rest of its run still holds. Answers the
-   * memory as it was held, because the store keeps nothing of a point once it
-   * is gone. A point the store never held removes nothing, and so does one
-   * this build cannot read, which stays where it is.
+   * One point gone, by the run it was digested from and its ref within that
+   * run — a fact since corrected, when the rest of its run still holds.
+   * Answers the memory as it was held, because the store keeps nothing of a
+   * point once it is gone. A point the store never held removes nothing, and
+   * so does one this build cannot read, which stays where it is.
    */
   retractPoint(point: PointRef): Promise<PointRetraction>;
 }

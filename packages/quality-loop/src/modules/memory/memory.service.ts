@@ -1,8 +1,8 @@
 /**
  * The memory tools that need the ports without running the orchestrator: a
- * re-index of a finished memory run's lessons, the retractions — of a digest
- * run's every point, or of one — and the reports of what a recall would find
- * and of what recalls did. Memory runs themselves are
+ * re-index of a finished memory run's lessons, the retractions — of every
+ * point a digest run stored, or of one stored memory — and the reports of what
+ * a recall would find and of what recalls did. Memory runs themselves are
  * `POST /orchestrations/memory`.
  */
 import {
@@ -164,8 +164,8 @@ export class MemoryService implements OnModuleInit {
   }
 
   /**
-   * Retract one memory a digest run stored, by the run's id and the memory's
-   * ref within it — a fact since corrected, when the rest of its run still
+   * Retract one stored memory, by the run it was digested from and its ref
+   * within that run — a fact since corrected, when the rest of its run still
    * holds. The store keeps nothing of a point once it is gone, so the answer
    * and the log carry what went: its text, its kind and the scope it was
    * stored with. Nothing removed is no error, and answers `removed: null`

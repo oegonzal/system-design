@@ -85,14 +85,16 @@ export interface RetractedMemoryRunDto {
 export type RetractMemoryRunResponse = ApiResponse<RetractedMemoryRunDto>;
 
 /**
- * What a point retraction did: the one memory a digest run stored under `ref`,
- * gone from the store — a fact since corrected, when the rest of its run still
- * holds. The store keeps nothing of a point once it is gone, so the answer
- * carries what it held: its text, its kind, and the scope it was stored with
- * (null on a point stored without one). `removed` is null when nothing went,
- * which is no error, and covers two cases the service's log tells apart: the
- * store held no point at that address, or held one whose payload this build
- * cannot read, which is left standing.
+ * What a point retraction did: one stored memory gone — a fact since
+ * corrected, when the rest of its run still holds. `runId` is the run the
+ * memory was digested from (its `source.runId`, the `runId` a retrieval report
+ * lists beside its `ref`), which is the digest run itself only for a
+ * document's digest. The store keeps nothing of a point once it is gone, so
+ * the answer carries what it held: its text, its kind, and the scope it was
+ * stored with (null on a point stored without one). `removed` is null when
+ * nothing went, which is no error, and covers two cases the service's log
+ * tells apart: the store held no point at that address, or held one whose
+ * payload this build cannot read, which is left standing.
  */
 export interface RetractedMemoryPointDto {
   runId: string;
