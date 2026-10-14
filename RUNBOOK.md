@@ -378,7 +378,8 @@ rather than an answer given about another application. Then:
 
 ```bash
 pnpm memory-ingest ingest docs/ingestion/standing-answers.md --kind notes --subject "Your Name" --date 2026-10-12
-pnpm memory-ingest ingest docs/ingestion/standing-answers.md --kind notes --subject "Your Name" --date 2026-10-19   # after an edit: posts what changed, then retracts the digests it replaced
+pnpm memory-ingest ingest docs/ingestion/standing-answers.md --kind notes --subject "Your Name" --date 2026-10-12   # after an edit, same date: posts the chunks whose goals changed, then retracts the digests they replaced
+pnpm memory-ingest ingest docs/ingestion/standing-answers.md --kind notes --subject "Your Name" --date 2026-10-19   # a new date is in every chunk's goal: posts the whole document again, then retracts its earlier digests
 ```
 
 A measured note: a plan costs four model calls and an answer page four more,
