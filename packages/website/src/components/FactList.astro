@@ -15,7 +15,7 @@ const { details } = Astro.props;
 
 <dl class="divide-y divide-line border-y border-line">
   {details.map(({ term, fact }) => <div
-    class="grid gap-1 py-3 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] sm:gap-6 print:grid-cols-[minmax(0,12rem)_minmax(0,1fr)] print:py-1.5"
+    class="grid gap-1 py-3 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] sm:gap-6 print:grid-cols-[minmax(0,12rem)_minmax(0,1fr)] print:py-0.5"
   >
     <dt class="font-semibold">{term}</dt>
     <dd class="text-ink-soft">

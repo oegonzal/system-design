@@ -6,6 +6,7 @@ import PageHeader from '../components/PageHeader.astro';
 import Section from '../components/Section.astro';
 import { COMPANY, COMPANY_DETAILS } from '../data/company';
 import { SERVICES } from '../data/services';
+import { SITE } from '../data/site';
 import BaseLayout from '../layouts/BaseLayout.astro';
 
 const differentiators = [
@@ -28,6 +29,12 @@ const differentiators = [
 ];
 
 const contact = COMPANY.pointOfContact.status === 'verified' ? COMPANY.pointOfContact.value : null;
+
+// Paper has no links: the printed statement spells out the addresses it refers to.
+const printed = (path: string): string => {
+  const url = new URL(path, SITE.origin);
+  return url.pathname === '/' ? url.host : `${url.host}${url.pathname}`;
+};
 ---
 
 <BaseLayout
@@ -75,10 +82,11 @@ const contact = COMPANY.pointOfContact.status === 'verified' ? COMPANY.pointOfCo
   </Section>
 
   <Section id="past-performance" title="Past performance" tone="muted">
-    <p class="max-w-3xl leading-7 text-ink-soft print:text-xs">
+    <p class="max-w-3xl leading-7 text-ink-soft print:max-w-none print:text-xs print:leading-snug">
       Enfav LLC was formed in 2026. The founder's prior professional experience appears on the
-      <a href="/about/" class="text-link underline underline-offset-4">About page</a>; it is not
-      Enfav LLC contract past performance.
+      <a href="/about/" class="text-link underline underline-offset-4">About page</a
+      ><span class="hidden print:inline"> ({printed('/about/')})</span>; it is not Enfav LLC
+      contract past performance.
     </p>
   </Section>
 
@@ -100,6 +108,7 @@ const contact = COMPANY.pointOfContact.status === 'verified' ? COMPANY.pointOfCo
             class="text-link underline underline-offset-4"
           />
         </p>
+        <p class="hidden print:block">Website: {printed('/')}</p>
       </div>
       <div>
         <h3 class="font-semibold">Teaming and subcontracting</h3>

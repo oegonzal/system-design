@@ -62,6 +62,7 @@ describe('the dependency matrix', () => {
   it('leaves the tooling-tagged hosts unconstrained, as the eslint rule does', () => {
     expect(ALLOWED['storybook']).toBeNull();
     expect(ALLOWED['studio-e2e']).toBeNull();
+    expect(ALLOWED['website-e2e']).toBeNull();
   });
 });
 

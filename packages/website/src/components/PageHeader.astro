@@ -14,7 +14,7 @@ const { title, lede, eyebrow } = Astro.props;
 <div
   class="surface-brand bg-brand text-on-brand print:bg-transparent print:text-ink print:[--focus-ring:var(--color-ink)]"
 >
-  <Container class="py-14 sm:py-20 print:py-2">
+  <Container class="py-14 sm:py-20 print:pt-0 print:pb-1">
     {eyebrow && <p
       class="text-sm font-semibold tracking-wide text-accent uppercase print:text-ink-soft"
     >
@@ -26,7 +26,7 @@ const { title, lede, eyebrow } = Astro.props;
       {title}
     </h1>
     <p
-      class="mt-5 max-w-2xl text-lg leading-8 text-on-brand-soft print:mt-1 print:text-sm print:text-ink-soft"
+      class="mt-5 max-w-2xl text-lg leading-8 text-on-brand-soft print:mt-1 print:max-w-none print:text-sm print:leading-snug print:text-ink-soft"
     >
       {lede}
     </p>

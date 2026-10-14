@@ -1,0 +1,23 @@
+{
+  "name": "website-e2e",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "packages/website-e2e/src",
+  "implicitDependencies": ["website"],
+  "tags": ["type:tooling"],
+  "// e2e": "Never cached: the suite tests a running server (wrangler dev over packages/website/dist, or the site at WEBSITE_E2E_BASE_URL), and neither what that server serves nor production's state is an input Nx can hash.",
+  "targets": {
+    "e2e": {
+      "dependsOn": ["^build"],
+      "cache": false
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "cwd": "packages/website-e2e",
+        "command": "tsc --noEmit -p tsconfig.json"
+      }
+    }
+  }
+}

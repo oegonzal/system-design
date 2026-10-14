@@ -37,6 +37,7 @@ import type { ChangedFile } from './index';
  *   website        -> (nothing)         the Enfav marketing site, statically built with Astro; it imports no workspace package
  *   storybook      -> (anything)        the catalog host legitimately sees both sides
  *   studio-e2e     -> (anything)        drives the whole stack by definition
+ *   website-e2e    -> (anything)        drives the built site through a browser, as studio-e2e drives the stack
  *
  * `null` means unconstrained — the `type:tooling` tag in eslint.config.mjs.
  */
@@ -76,6 +77,7 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
   website: [],
   storybook: null,
   'studio-e2e': null,
+  'website-e2e': null,
 };
 
 /** The workspace alias prefix every package is published under internally. */

@@ -108,6 +108,10 @@ jobs:
       - name: End-to-end
         run: pnpm exec nx run studio-e2e:e2e --args="--project=chromium --project=narrow --project=grader-down"
 
+      - name: End-to-end, website
+        # The built site under wrangler dev: Cloudflare's routing, 404 page and headers.
+        run: pnpm exec nx run website-e2e:e2e
+
       - name: Upload test artifacts
         if: failure()
         uses: actions/upload-artifact@v4
@@ -116,6 +120,8 @@ jobs:
           path: |
             dist/.playwright/packages/studio-e2e/playwright-report
             dist/.playwright/packages/studio-e2e/test-output
+            dist/.playwright/packages/website-e2e/playwright-report
+            dist/.playwright/packages/website-e2e/test-output
           retention-days: 7
           if-no-files-found: ignore
 
