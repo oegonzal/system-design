@@ -14,6 +14,7 @@ import {
   sectionAlias,
   DOCUMENT_RULES,
   DOCUMENT_MAX_MEMORIES,
+  SCOPE_RULE,
   type DocumentChunk,
 } from './document-digest';
 import {
@@ -68,6 +69,12 @@ const UNDECLARED: DocumentChunk = {
 const UNDECLARED_GOAL_SHA256 = '355fc5455c8dafa9d37d38c2237b5216dc314cd9d1e7bd4fde4e40d8407f9855';
 
 const sha256 = (text: string): string => createHash('sha256').update(text, 'utf8').digest('hex');
+
+// The two lines that close the Limits: an undeclared goal's, and a declared one's, which names
+// the store as what holds every memory to the declared scope.
+const VALIDATED = '- Validators check these limits; they are not criteria.';
+const HELD_BY_THE_STORE =
+  '- The store keeps every memory under the declared scope, and validators check the other limits; they are not criteria.';
 
 describe('renderDocumentGoal', () => {
   it('[QL-40] writes one aliased section per part and an index naming each as section evidence', () => {
@@ -130,7 +137,8 @@ describe('renderDocumentGoal', () => {
     const fixed = textBytes(renderDocumentGoal(minimal)) - 1;
     expect(fixed).toBe(FIXED_GOAL_BYTES);
     // And it stays a minority of the smallest budget worth packing to, or a chunk
-    // is mostly instructions — a document declaring its scope, one limit longer, too.
+    // is mostly instructions — a document declaring its scope, its limit stated
+    // in the scope test's place, too.
     expect(fixed).toBeLessThan(MIN_SENSIBLE_CHUNK_BYTES / 2);
     for (const scope of MEMORY_SCOPES) {
       expect(textBytes(renderDocumentGoal({ ...minimal, scope })) - 1).toBeLessThan(
@@ -145,8 +153,11 @@ describe('renderDocumentGoal', () => {
     expect(readDocumentIndex(goal)?.document).not.toHaveProperty('scope');
   });
 
-  it('[QL-69] a declared scope is one limit every lens reads and one fact of the index, and changes nothing else', () => {
+  it('[QL-69] a declared scope takes the scope test’s place: one limit every lens reads, one fact of the index, the store named where the limits close, and nothing else changed', () => {
     const undeclared = renderDocumentGoal(UNDECLARED);
+    // Undeclared, the scope test is a rule like any other, and validators close the limits.
+    expect(undeclared).toContain(`\n- ${SCOPE_RULE}\n`);
+    expect(undeclared).toContain(`\n${VALIDATED}\n`);
     for (const scope of MEMORY_SCOPES) {
       const limit = declaredScopeLimit(scope);
       // The producer is told the scope to write; the judges, that it is not theirs to fault.
@@ -157,11 +168,18 @@ describe('renderDocumentGoal', () => {
       expect(goal).toContain(`\n${limit}\n`);
       // A limit, not a rule: the deriver writes no criterion from the Limits.
       expect(goal.indexOf(limit)).toBeGreaterThan(goal.indexOf('## Limits'));
+      // The document decided what the scope test decides, so no rule states the test.
+      expect(goal).not.toContain(SCOPE_RULE);
+      // No validator checks the declaration: the store holds every memory to it, and the goal says so.
+      expect(goal).toContain(`\n${HELD_BY_THE_STORE}\n`);
+      expect(goal).not.toContain(VALIDATED);
       expect(readDocumentIndex(goal)?.document).toEqual({
         ...readDocumentIndex(undeclared)?.document,
         scope,
       });
-      expect(stripIndexSection(goal).replace(`${limit}\n`, '')).toBe(stripIndexSection(undeclared));
+      expect(
+        stripIndexSection(goal).replace(`${limit}\n`, '').replace(HELD_BY_THE_STORE, VALIDATED),
+      ).toBe(stripIndexSection(undeclared).replace(`- ${SCOPE_RULE}\n`, ''));
     }
     expect(documentChunkSchema.safeParse({ ...UNDECLARED, scope: 'subject' }).success).toBe(true);
     expect(documentChunkSchema.safeParse({ ...UNDECLARED, scope: 'everywhere' }).success).toBe(
@@ -171,14 +189,29 @@ describe('renderDocumentGoal', () => {
     expect(documentChunkSchema.safeParse({ ...UNDECLARED, scope: null }).success).toBe(false);
   });
 
+  it('[QL-69] the scope test is left out by its constant, never by its wording: a rule that shares its words is stated', () => {
+    const sharing = SCOPE_RULE.slice(0, SCOPE_RULE.indexOf('?') + 1);
+    for (const scope of MEMORY_SCOPES) {
+      expect(renderDocumentGoal({ ...UNDECLARED, scope, rules: [SCOPE_RULE, sharing] })).toContain(
+        `## Rules\n\n- ${sharing}\n\n## Limits`,
+      );
+      // A declared chunk whose one rule is the scope test states none.
+      expect(renderDocumentGoal({ ...UNDECLARED, scope, rules: [SCOPE_RULE] })).toContain(
+        '## Rules\n\n(none)\n\n## Limits',
+      );
+    }
+  });
+
   it('[QL-40] renders a maximal chunk under the engine budget, and the schema refuses one past the part cap', () => {
-    const maximal = {
+    const maximal: DocumentChunk = {
       ...resumeChunk(),
-      scope: 'subject' as const,
       parts: Array.from({ length: DOCUMENT_MAX_PARTS }, () => 'p'.repeat(DOCUMENT_PART_MAX_LENGTH)),
       maxMemories: 16,
     };
-    expect(textBytes(renderDocumentGoal(maximal))).toBeLessThan(GOAL_BUDGET_BYTES);
+    // Declared or not: a declared scope states its limit and leaves the scope test out.
+    for (const chunk of [maximal, ...MEMORY_SCOPES.map((scope) => ({ ...maximal, scope }))]) {
+      expect(textBytes(renderDocumentGoal(chunk))).toBeLessThan(GOAL_BUDGET_BYTES);
+    }
     expect(
       documentChunkSchema.safeParse({
         ...maximal,

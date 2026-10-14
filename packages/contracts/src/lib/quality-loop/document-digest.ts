@@ -90,12 +90,12 @@ const documentHeadShape = {
   date: z.string().regex(DAY).nullable(),
   /**
    * Where every memory of the document holds, when the document declares it:
-   * the goal tells every lens so, and the store keeps each memory under it
-   * whatever its digest wrote. Absent when the document declares none, and
-   * each memory is then scoped by the scope test. Absent rather than null,
-   * because the goal of a document that declares nothing must render as it
-   * did before a document could declare one: the ingester names a chunk by
-   * its goal's hash.
+   * the goal tells every lens so in place of the scope test, and the store
+   * keeps each memory under it whatever its digest wrote. Absent when the
+   * document declares none, and each memory is then scoped by the scope test
+   * (`SCOPE_RULE`). Absent rather than null, because the goal of a document
+   * that declares nothing must render as it did before a document could
+   * declare one: the ingester names a chunk by its goal's hash.
    */
   scope: z.enum(MEMORY_SCOPES).optional(),
   chunk: z.strictObject({ index: z.number().int().min(1), of: z.number().int().min(1) }),
@@ -111,13 +111,26 @@ export const documentChunkSchema = z.strictObject({
 });
 export type DocumentChunk = z.infer<typeof documentChunkSchema>;
 
-/** Rules a composer can state as they are; they guide the producer and the critics. */
+/**
+ * The scope test, as the rule that decides each memory's scope when the
+ * document declares none. A document that declares its scope has decided it
+ * for every memory, so its goal leaves this rule out of the rules it states —
+ * chosen by this constant, never by the rule's wording.
+ */
+export const SCOPE_RULE =
+  'A memory is scoped by one test — would the answer differ for another employer, role or application? Unit where it would: working or knowing someone there, consents, how it was heard of, whether this posting suits. Subject where it is the same whoever asks, however the form asked it for one role.';
+
+/**
+ * Rules a composer can state as they are; they guide the producer and the
+ * critics. The scope test among them (`SCOPE_RULE`) is stated only where the
+ * document declares no scope.
+ */
 export const DOCUMENT_RULES: readonly string[] = [
   'A memory states one fact the cited sections state about the subject, and nothing they do not.',
   'An insight is a complete statement a form field could take or compute from: absolute dates and figures, names as the document spells them, the subject named.',
   'An appliesWhen names the situation a form puts the subject in — the field or question that calls for the fact.',
   "Where a cited section qualifies a claim — reported rather than audited, a design, a learning exercise or a planned project, an interpretation — the insight carries that qualifier in the section's own words; a section that states a fact plainly needs none.",
-  'A memory is scoped by one test — would the answer differ for another employer, role or application? Unit where it would: working or knowing someone there, consents, how it was heard of, whether this posting suits. Subject where it is the same whoever asks, however the form asked it for one role.',
+  SCOPE_RULE,
   "Where cited sections date a role, or the roles a technology was used in, the insight states both ends as given and the span between them in whole years and months, computed from those dates alone; an open end is computed to the document's date, and the insight says so.",
 ];
 
@@ -163,16 +176,34 @@ const headLine = (chunk: DocumentChunk): string =>
   ].join(' · ');
 
 /**
- * The limit a document that declares its scope adds, where every lens reads
- * it: the producer writes the scope given, the rules evaluator does not hold
- * the scope test against it, and no critic faults a memory for it — it is
- * the document's declaration, not a judgement. Rendered only when declared.
+ * The limit a document that declares its scope renders in place of the scope
+ * test, where every lens reads it: the producer is told the scope to write,
+ * and every judge that the scope is the document's declaration, not theirs to
+ * fault. Its goal leaves the scope test out of the rules it states
+ * (`rulesOf`), so the deriver is given no scope rule to write a criterion
+ * from; and whatever a judge still says of a memory's scope, the store keeps
+ * every memory under the declaration. Rendered only when declared.
  */
 export const declaredScopeLimit = (scope: MemoryScope): string =>
   `- Give every memory the scope ${scope}: the document declares it for everything it states, so the scope test does not apply and no memory is faulted for its scope.`;
 
+/** The rules a goal states: the chunk's own, less the scope test where the document declares its scope. */
+const rulesOf = (chunk: DocumentChunk): readonly string[] =>
+  chunk.scope === undefined ? chunk.rules : chunk.rules.filter((rule) => rule !== SCOPE_RULE);
+
+/**
+ * The line closing the Limits: what holds the digest to them, and that none of
+ * them is a criterion. No validator checks a declared scope — the store keeps
+ * every memory under it — so a declared goal names the store.
+ */
+const limitsClosing = (chunk: DocumentChunk): string =>
+  chunk.scope === undefined
+    ? '- Validators check these limits; they are not criteria.'
+    : '- The store keeps every memory under the declared scope, and validators check the other limits; they are not criteria.';
+
 /** The goal, or a refusal when it would not fit the engine's budget. */
 export function renderDocumentGoal(chunk: DocumentChunk): string {
+  const rules = rulesOf(chunk);
   const goal = [
     `# Document — ${chunk.title.trim()}`,
     '',
@@ -188,7 +219,7 @@ export function renderDocumentGoal(chunk: DocumentChunk): string {
     ]),
     '## Rules',
     '',
-    ...(chunk.rules.length > 0 ? chunk.rules.map((rule) => `- ${rule}`) : ['(none)']),
+    ...(rules.length > 0 ? rules.map((rule) => `- ${rule}`) : ['(none)']),
     '',
     '## Limits',
     '',
@@ -196,7 +227,7 @@ export function renderDocumentGoal(chunk: DocumentChunk): string {
     `- Give each memory a kind: ${DOCUMENT_MEMORY_KINDS.map((kind) => `${kind} — ${DOCUMENT_MEMORY_KIND_USES[kind]}`).join('; ')}.`,
     ...(chunk.scope === undefined ? [] : [declaredScopeLimit(chunk.scope)]),
     '- A section may support several memories; list every section no memory rests on under unused.',
-    '- Validators check these limits; they are not criteria.',
+    limitsClosing(chunk),
     '',
     renderIndexSection(indexOf(chunk)),
   ].join('\n');
