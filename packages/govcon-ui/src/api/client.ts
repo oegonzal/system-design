@@ -1,10 +1,4 @@
 import {
-  formatAmountRange,
-  withFacetParams,
-  type AwardDetail,
-  type FacetQuery,
-  type GetAwardDetailResponse,
-  type GetSpendingPrimesResponse,
   type GetTargetResponse,
   type GetTargetSummaryResponse,
   type ListAlertsQuery,
@@ -16,20 +10,12 @@ import {
   type Target,
   type TargetKind,
   type TargetSummary,
-  type GetSpendingReachResponse,
   type ListSavedViewsResponse,
   type SavedView,
   type SaveSavedViewRequest,
   type SaveSavedViewResponse,
-  type SpendingPrimes,
-  type SpendingPrimesQuery,
-  type SpendingReach,
-  type SpendingReachQuery,
 } from '@sysdesign/contracts';
 import type {
-  AgencyDirectory,
-  AgencyOutlook,
-  AgencyOutlookQuery,
   AwardsQuery,
   AwardsSummary,
   Bid,
@@ -41,17 +27,12 @@ import type {
   FetchAwardsRequest,
   FetchAwardsResponse,
   FetchDescriptionResponse,
-  GetAgenciesResponse,
-  GetAgencyOutlookResponse,
   GetAwardsSummaryResponse,
   GetBidPipelineSummaryResponse,
   GetEntityResponse,
   GetNoticeResponse,
   GetProfileResponse,
   GetSourceResponse,
-  GetSpendingBreakdownResponse,
-  GetSpendingHorizonResponse,
-  GetSpendingPulseResponse,
   LeadsReport,
   ListAwardsResponse,
   ListCallsQuery,
@@ -76,39 +57,24 @@ import type {
   SavedSearch,
   SearchProfile,
   SourceStatus,
-  SpendingBreakdown,
-  SpendingBreakdownQuery,
-  SpendingHorizon,
-  SpendingHorizonQuery,
-  SpendingPulse,
-  SpendingPulseQuery,
   StartPullRequest,
   StartPullResponse,
   StoredProfile,
 } from '@sysdesign/contracts';
-import { createRequest, query as toQueryString, unwrap, type GetOptions } from '@sysdesign/web-kit';
+import { query as toQueryString, unwrap, type GetOptions } from '@sysdesign/web-kit';
+
+import { encode, joined, request } from './request';
+import { spendingApi } from './spending';
 
 /**
  * The one HTTP boundary to the govcon service, one method per route. Single
  * resources come back unwrapped; lists keep their envelope, since `meta` is
  * part of the answer. Every POST that spends the budget finishes before it
- * answers — the report or the outcome is the response.
+ * answers — the report or the outcome is the response. The spending side
+ * is its own module and is one object with the rest here.
  */
-const BASE_URL = process.env['NEXT_PUBLIC_GOVCON_URL'] ?? 'http://localhost:3004';
-const request = createRequest(BASE_URL);
-const encode = encodeURIComponent;
 const targetPath = (kind: TargetKind, subject: string): string =>
   `/targets/${kind}/${encode(subject)}`;
-
-/** A list on the wire: comma-joined, since a query string carries scalars; the server reads it back as a list. */
-const joined = (codes: readonly string[] | undefined): string | undefined =>
-  codes && codes.length > 0 ? codes.join(',') : undefined;
-
-/** A scope on the wire: the code lists comma-joined and every facet in its one spelling. */
-const scopeParams = <Q extends FacetQuery & { naics?: string[]; psc?: string[] }>(query: Q) => {
-  const { naics, psc, ...rest } = withFacetParams(query);
-  return { naics: joined(naics), psc: joined(psc), ...rest };
-};
 
 export const api = {
   // Profiles and their saved searches.
@@ -308,85 +274,7 @@ export const api = {
     return unwrap(await request<FetchAwardsResponse>('/awards/fetch', { method: 'POST', body }));
   },
 
-  // Spending: four lenses and the agency directory, free, answered from the day's snapshot when there is one.
-  async getSpendingPulse(
-    query: SpendingPulseQuery = {},
-    opts: GetOptions = {},
-  ): Promise<SpendingPulse> {
-    return unwrap(
-      await request<GetSpendingPulseResponse>(
-        `/spending/pulse${toQueryString({ ...scopeParams(query) })}`,
-        opts,
-      ),
-    );
-  },
-  async getSpendingBreakdown(
-    query: SpendingBreakdownQuery,
-    opts: GetOptions = {},
-  ): Promise<SpendingBreakdown> {
-    return unwrap(
-      await request<GetSpendingBreakdownResponse>(
-        `/spending/breakdown${toQueryString({ ...scopeParams(query) })}`,
-        opts,
-      ),
-    );
-  },
-  async getSpendingHorizon(
-    query: SpendingHorizonQuery = {},
-    opts: GetOptions = {},
-  ): Promise<SpendingHorizon> {
-    return unwrap(
-      await request<GetSpendingHorizonResponse>(
-        `/spending/horizon${toQueryString({ ...scopeParams(query) })}`,
-        opts,
-      ),
-    );
-  },
-  async getSpendingReach(
-    { lanes, ...query }: SpendingReachQuery,
-    opts: GetOptions = {},
-  ): Promise<SpendingReach> {
-    return unwrap(
-      await request<GetSpendingReachResponse>(
-        `/spending/reach${toQueryString({ ...scopeParams(query), lanes: joined(lanes) })}`,
-        opts,
-      ),
-    );
-  },
-  async getSpendingPrimes(
-    { band, ...query }: SpendingPrimesQuery,
-    opts: GetOptions = {},
-  ): Promise<SpendingPrimes> {
-    return unwrap(
-      await request<GetSpendingPrimesResponse>(
-        `/spending/primes${toQueryString({
-          ...scopeParams(query),
-          band: band === undefined ? undefined : formatAmountRange(band),
-        })}`,
-        opts,
-      ),
-    );
-  },
-  async getAward(externalId: string, opts: GetOptions = {}): Promise<AwardDetail> {
-    return unwrap(
-      await request<GetAwardDetailResponse>(`/spending/awards/${encode(externalId)}`, opts),
-    );
-  },
-  async listAgencies(opts: GetOptions = {}): Promise<AgencyDirectory> {
-    return unwrap(await request<GetAgenciesResponse>('/spending/agencies', opts));
-  },
-  async getAgencyOutlook(
-    toptierCode: string,
-    query: AgencyOutlookQuery = {},
-    opts: GetOptions = {},
-  ): Promise<AgencyOutlook> {
-    return unwrap(
-      await request<GetAgencyOutlookResponse>(
-        `/spending/agencies/${encode(toptierCode)}${toQueryString({ ...query })}`,
-        opts,
-      ),
-    );
-  },
+  ...spendingApi,
 
   // Registrants.
   /** The registrant as stored — null until it has been looked up. Never a request to SAM.gov. */
