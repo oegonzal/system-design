@@ -113,6 +113,12 @@ export const shimmer = keyframes`
   to   { background-position: -200% 0; }
 `;
 
+/** A busy region's bar. Infinite, and stilled rather than sped up under reduced motion. */
+export const sweep = keyframes`
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(250%); }
+`;
+
 /** Spinner. Infinite, and stopped rather than sped up under reduced motion. */
 export const spin = keyframes`
   to { transform: rotate(360deg); }

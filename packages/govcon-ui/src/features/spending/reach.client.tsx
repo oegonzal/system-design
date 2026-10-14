@@ -19,7 +19,7 @@ export interface ReachLensProps {
   hrefOf(cut: ReachCut): string | null;
 }
 
-/** What was within reach: the scope's new contracts over one window, cut down to what a firm with these lanes could have won; the last answer stays in view, dimmed, while the next loads. */
+/** What was within reach: the scope's new contracts over one window, cut down to what a firm with these lanes could have won; the last answer stays in view, marked busy, while the next loads. */
 export function ReachLens({ scope, lanes, preset, onPresetChange, hrefOf }: ReachLensProps) {
   const window = windowOf(preset, Date.now());
   // Reach names no family: it counts contracts.

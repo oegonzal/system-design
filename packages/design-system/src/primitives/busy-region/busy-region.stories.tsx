@@ -18,5 +18,5 @@ type Story = StoryObj<typeof BusyRegion>;
 /** The answer to what was asked. */
 export const Settled: Story = {};
 
-/** The last answer, while the next one loads: dimmed and marked busy. */
+/** The last answer, while the next one loads: as readable as before, under a bar, and marked busy. */
 export const Busy: Story = { args: { busy: true } };

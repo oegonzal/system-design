@@ -22,7 +22,7 @@ export interface BreakdownLensProps {
   onPresetChange(preset: WindowPreset): void;
 }
 
-/** Where the money goes: the scope ranked by one category over one window, both chosen by the page; the last answer stays in view, dimmed, while the next loads. */
+/** Where the money goes: the scope ranked by one category over one window, both chosen by the page; the last answer stays in view, marked busy, while the next loads. */
 export function BreakdownLens({
   scope,
   category,

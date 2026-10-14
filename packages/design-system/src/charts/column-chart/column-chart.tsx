@@ -2,7 +2,6 @@ import { useTheme } from '@emotion/react';
 import styled from '@emotion/styled';
 import { useId, useState } from 'react';
 
-import { PENDING_OPACITY } from '../../primitives/busy-region/busy-region';
 import { Text } from '../../primitives/text/text';
 import { CHART_SERIES_LIMIT, compactNumber, ticks } from '../scale';
 import { ColumnTooltip } from './column-tooltip';
@@ -49,6 +48,8 @@ const AXIS_FONT = 11;
 const PROJECTED_STROKE = 1.5;
 const BAND_OPACITY = 0.15;
 const PROVISIONAL_OPACITY = 0.5;
+/** The marks while the next answer loads; text and gridlines stay as they are. */
+const PENDING_OPACITY = 0.45;
 /** At most this many x labels, so they never collide. */
 const MAX_X_LABELS = 12;
 /** The outline that lifts the hovered datum's columns. */
