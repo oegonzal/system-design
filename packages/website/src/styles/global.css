@@ -1,0 +1,91 @@
+/*
+ * The site's design tokens and base layer — the one place colours, type and
+ * focus treatment are declared. Components use the utilities these tokens
+ * generate (bg-surface, text-ink, …) and never a raw colour.
+ *
+ * source('../') limits class scanning to src/, whatever directory the build runs
+ * from.
+ */
+@import 'tailwindcss' source('../');
+
+@theme {
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+
+  /* Text — every pairing below holds WCAG AA (4.5:1) on surface and surface-muted. */
+  --color-ink: #0c1a2a;
+  --color-ink-soft: #3d4b5c;
+  --color-link: #0a4f9c;
+
+  /* Surfaces */
+  --color-surface: #ffffff;
+  --color-surface-muted: #f3f6fa;
+  --color-line: #d5dde7;
+
+  /* Brand: the dark band behind the hero, CTAs and footer; text on it is white. */
+  --color-brand: #0b3558;
+  --color-brand-strong: #082742;
+  --color-accent: #3fb6c4;
+  --color-on-brand: #ffffff;
+  --color-on-brand-soft: #c9d8e6;
+
+  /* Placeholders: unmistakable, and still AA. */
+  --color-placeholder-ink: #7a3e00;
+  --color-placeholder-surface: #fff6e6;
+  --color-placeholder-line: #c27a1a;
+
+  --container-content: 72rem;
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+    /* Focus is an outline (forced-colors keeps it; a box-shadow ring vanishes),
+       ≥3:1 against whichever surface it sits on: dark ink on light surfaces,
+       white on the brand band (.surface-brand). */
+    --focus-ring: var(--color-ink);
+  }
+
+  html {
+    font-family: var(--font-sans);
+    color: var(--color-ink);
+    background: var(--color-surface);
+    -webkit-text-size-adjust: 100%;
+  }
+
+  @media (prefers-reduced-motion: no-preference) {
+    html {
+      scroll-behavior: smooth;
+    }
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  .surface-brand {
+    --focus-ring: var(--color-on-brand);
+  }
+
+  a {
+    color: inherit;
+  }
+
+  button:not(:disabled),
+  [role='button']:not(:disabled) {
+    cursor: pointer;
+  }
+
+  /* Long addresses and identifiers wrap instead of pushing a narrow page sideways. */
+  dd,
+  address,
+  .wrap-anywhere {
+    overflow-wrap: anywhere;
+  }
+
+  @page {
+    size: letter;
+    margin: 0.5in;
+  }
+}

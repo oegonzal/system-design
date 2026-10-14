@@ -14,6 +14,7 @@ import { JOB_APPLICATION_CRITERIA } from './job-application';
 import { NOTIFICATIONS_CRITERIA } from './notifications';
 import { QUALITY_LOOP_CRITERIA } from './quality-loop';
 import { QUALITY_LOOP_CLIENTS_CRITERIA } from './quality-loop-clients';
+import { SITE_CRITERIA } from './site';
 import { STUDIO_CRITERIA } from './studio';
 import { WEB_CRITERIA } from './web';
 
@@ -28,4 +29,5 @@ export const CRITERIA: readonly Criterion[] = [
   ...BROWSER_SESSION_CRITERIA,
   ...NOTIFICATIONS_CRITERIA,
   ...JOB_APPLICATION_CRITERIA,
+  ...SITE_CRITERIA,
 ];

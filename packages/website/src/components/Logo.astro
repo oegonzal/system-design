@@ -1,0 +1,21 @@
+---
+/**
+ * The Enfav mark: an "E" of three bars and a node on the brand square — the
+ * same drawing as src/assets/icon.svg and public/favicon.svg. Decorative here:
+ * the link around it carries the name.
+ */
+interface Props {
+  size?: number;
+}
+
+const { size = 32 } = Astro.props;
+---
+
+<svg width={size} height={size} viewBox="0 0 64 64" aria-hidden="true" focusable="false">
+  <rect width="64" height="64" rx="14" class="fill-brand"></rect>
+  <rect x="17" y="16" width="8" height="32" class="fill-on-brand"></rect>
+  <rect x="17" y="16" width="28" height="8" class="fill-on-brand"></rect>
+  <rect x="17" y="28" width="21" height="8" class="fill-on-brand"></rect>
+  <rect x="17" y="40" width="28" height="8" class="fill-on-brand"></rect>
+  <circle cx="47" cy="32" r="4.5" class="fill-accent"></circle>
+</svg>

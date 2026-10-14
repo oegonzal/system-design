@@ -10,6 +10,18 @@ const compat = new FlatCompat({
   recommendedConfig: js.configs.recommended,
 });
 
+/**
+ * The unused-binding policy, shared with the packages that own a config of
+ * their own (packages/website applies it to `.astro` files, which the ts/js
+ * block below never matches). A rest destructure that drops fields
+ * (`const { stored, ...document } = row`) is the idiom for a projection; the
+ * dropped names are not unused work.
+ */
+export const unusedBindings = [
+  'warn',
+  { ignoreRestSiblings: true, argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+];
+
 export default [
   {
     ignores: [
@@ -34,12 +46,7 @@ export default [
   {
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
     rules: {
-      // A rest destructure that drops fields (`const { stored, ...document } = row`)
-      // is the idiom for a projection; the dropped names are not unused work.
-      '@typescript-eslint/no-unused-vars': [
-        'warn',
-        { ignoreRestSiblings: true, argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
-      ],
+      '@typescript-eslint/no-unused-vars': unusedBindings,
       '@nx/enforce-module-boundaries': [
         'error',
         {

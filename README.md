@@ -24,6 +24,7 @@ sits alongside for the behavioral half of the interview.
 - **NestJS** API and the **quality loop** service — a generic critic/evaluator/controller loop whose pipelines are data
 - **PostgreSQL** + **MikroORM** (hand-written migrations, `migration:check` drift gate) · **Qdrant** for the loop's memory
 - **Tilt** + Docker Desktop **Kubernetes** dev environment
+- **Astro** + **Tailwind CSS** for the Enfav LLC marketing site — every page prerendered, no client JavaScript
 - **Vitest** + **Playwright** · GitHub Actions CI with an LLM + rules code-review pipeline
 
 ## Getting started
@@ -100,6 +101,7 @@ dependency is hoisted to the root and Nx is the single entry point.
 | `packages/quality-loop-ui` | Next.js client for the quality loop: pick a prompt, run, watch, read the verdict                                                               |
 | `packages/govcon`          | SAM.gov contract opportunities: budgeted pull, Postgres store, deterministic leads (CLI + HTTP)                                                |
 | `packages/govcon-ui`       | Next.js client for govcon: pull, rank, read a lead's trace and description, watch the ledger                                                   |
+| `packages/website`         | The Enfav LLC marketing site: Astro + Tailwind, every page prerendered; unconfirmed company facts render as marked placeholders                |
 | `packages/notifications`   | The event bus over HTTP — declared topics, pulled subscriptions — and the channels (Telegram) that put prompts to you and bring answers back   |
 | `packages/job-application` | The record of units a browser session applied to, fed by the session's events, and the advisor it asks what is on record before each plan      |
 | `packages/web-kit`         | Shared web plumbing: Emotion SSR registry, HTTP request core, hooks, route table and announcer                                                 |
@@ -155,6 +157,7 @@ pnpm quality:start                         # quality-loop on :3003 + its web cli
 pnpm govcon:start                          # govcon on :3004 + its web client on :4202 (needs the db)
 pnpm notifications:serve                   # the event bus on :3005, Telegram polling with TELEGRAM_API_KEY (needs the db)
 pnpm job-application:serve                 # the record of applications on :3006, fed by the bus; the advisor a browser session asks (needs the db)
+pnpm website:serve                         # the Enfav LLC marketing site on :4203
 ```
 
 The dev servers need no Nx daemon: `nx run studio-api:serve` and

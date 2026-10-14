@@ -1,0 +1,23 @@
+---
+import type { Fact } from '../lib/fact';
+import Placeholder from './Placeholder.astro';
+
+/** A mailto link for a confirmed address; the placeholder marker until it is confirmed. */
+interface Props {
+  address: Fact<string>;
+  class?: string;
+}
+
+const { address, class: className } = Astro.props;
+---
+
+{address.status === 'verified' ? (
+  <a
+    href={`mailto:${address.value}`}
+    data-fact="verified"
+    class:list={['wrap-anywhere', className]}
+    set:text={address.value}
+  />
+) : (
+  <Placeholder label={address.label} />
+)}

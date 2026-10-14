@@ -1,0 +1,33 @@
+---
+import { NAV, SITE } from '../data/site';
+import Container from './Container.astro';
+import Logo from './Logo.astro';
+
+const current = Astro.url.pathname;
+---
+
+<header class="border-b border-line bg-surface print:hidden">
+  <Container class="flex flex-wrap items-center justify-between gap-x-6 gap-y-1 py-3">
+    <a
+      href="/"
+      class="flex min-h-11 items-center gap-2.5 rounded-md text-lg font-bold tracking-tight no-underline"
+      aria-label={`${SITE.name} — home`}
+    >
+      <Logo size={32} />
+      <span>Enfav <span class="font-medium text-ink-soft">LLC</span></span>
+    </a>
+    <nav aria-label="Primary">
+      <ul class="-mx-1.5 flex flex-wrap items-center sm:-mx-3">
+        {NAV.map(({ href, label }) => <li>
+          <a
+            href={href}
+            aria-current={current === href ? 'page' : undefined}
+            class="inline-flex min-h-11 items-center rounded-md px-1.5 text-sm sm:px-3 font-semibold text-ink-soft decoration-brand decoration-2 underline-offset-8 hover:text-ink hover:underline aria-[current=page]:text-ink aria-[current=page]:underline"
+          >
+            {label}
+          </a>
+        </li>)}
+      </ul>
+    </nav>
+  </Container>
+</header>

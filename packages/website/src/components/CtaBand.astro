@@ -1,0 +1,26 @@
+---
+import Button from './Button.astro';
+import Container from './Container.astro';
+
+/** The closing call to action: a heading, one line, one link. Never printed. */
+interface Props {
+  title: string;
+  text: string;
+  href: string;
+  action: string;
+}
+
+const { title, text, href, action } = Astro.props;
+---
+
+<section aria-labelledby="cta-title" class="surface-brand bg-brand text-on-brand print:hidden">
+  <Container
+    class="flex flex-col items-start gap-6 py-14 sm:flex-row sm:items-center sm:justify-between"
+  >
+    <div>
+      <h2 id="cta-title" class="text-2xl font-bold tracking-tight">{title}</h2>
+      <p class="mt-2 text-lg text-on-brand-soft">{text}</p>
+    </div>
+    <Button href={href} variant="solid">{action}</Button>
+  </Container>
+</section>

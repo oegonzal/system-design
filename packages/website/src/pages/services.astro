@@ -1,0 +1,47 @@
+---
+import CtaBand from '../components/CtaBand.astro';
+import Container from '../components/Container.astro';
+import PageHeader from '../components/PageHeader.astro';
+import { SERVICES } from '../data/services';
+import BaseLayout from '../layouts/BaseLayout.astro';
+---
+
+<BaseLayout
+  title="Services — Enfav LLC"
+  description="AI workflow automation, retrieval and data processing, custom software, cloud architecture and modernization, and systems integration and quality engineering."
+>
+  <PageHeader
+    title="Services"
+    lede="Five ways we help teams put AI and modern software into production."
+  />
+
+  <Container class="py-14 sm:py-20">
+    <div class="divide-y divide-line">
+      {SERVICES.map((service) => <section
+        id={service.id}
+        aria-labelledby={`${service.id}-title`}
+        class="grid gap-6 py-10 first:pt-0 last:pb-0 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:gap-12"
+      >
+        <div>
+          <h2 id={`${service.id}-title`} class="text-2xl font-bold tracking-tight">
+            {service.title}
+          </h2>
+          <p class="mt-4 text-lg leading-8 text-ink-soft">{service.summary}</p>
+        </div>
+        <div>
+          <h3 class="text-sm font-semibold tracking-wide text-ink-soft uppercase">Deliverables</h3>
+          <ul class="mt-3 list-disc space-y-2 pl-5 leading-7">
+            {service.deliverables.map((deliverable) => <li>{deliverable}</li>)}
+          </ul>
+        </div>
+      </section>)}
+    </div>
+  </Container>
+
+  <CtaBand
+    title="Have a process worth automating?"
+    text="Tell us what you are working on."
+    href="/contact/"
+    action="Start a conversation"
+  />
+</BaseLayout>

@@ -1,0 +1,97 @@
+---
+import iconArt from '../assets/icon.svg';
+import Button from '../components/Button.astro';
+import CtaBand from '../components/CtaBand.astro';
+import PageHeader from '../components/PageHeader.astro';
+import Section from '../components/Section.astro';
+import ServiceCard from '../components/ServiceCard.astro';
+import { COMPANY } from '../data/company';
+import { SERVICES } from '../data/services';
+import { SITE } from '../data/site';
+import BaseLayout from '../layouts/BaseLayout.astro';
+import { organizationGraph } from '../lib/structured-data';
+import { getImage } from 'astro:assets';
+
+const site = Astro.site ?? new URL(SITE.origin);
+const logo = await getImage({ src: iconArt, format: 'png', width: 512, height: 512 });
+
+const structuredData = organizationGraph(
+  {
+    legalName: COMPANY.legalName,
+    email: COMPANY.email.general,
+    founder: COMPANY.pointOfContact,
+  },
+  SITE,
+  new URL(logo.src, site).href,
+);
+
+const steps = [
+  {
+    title: 'Define the outcome',
+    text: 'We start from the decision or process you want to change and the criteria a good result must meet.',
+  },
+  {
+    title: 'Design for production',
+    text: 'Architecture, data flow and failure modes are settled before code — what runs where, what it costs, how it is observed.',
+  },
+  {
+    title: 'Build with evaluation',
+    text: 'Automated tests, and for AI work critics and evaluators, run on every change so quality is measured rather than assumed.',
+  },
+  {
+    title: 'Hand over cleanly',
+    text: 'You receive typed, tested, documented code and the runbooks to operate it.',
+  },
+];
+---
+
+<BaseLayout
+  title="Enfav LLC — AI automation and software engineering"
+  description="Enfav LLC designs and builds AI workflow automation, custom software, systems integrations and data processing for commercial and public-sector teams."
+  structuredData={structuredData}
+>
+  <PageHeader
+    title="AI automation and software engineering, built to production standards."
+    lede="Enfav LLC is an AI-focused software engineering company. We design and build AI workflow automation, custom software, systems integrations and data-processing solutions for commercial and public-sector organizations."
+  >
+    <div class="mt-8 flex flex-wrap gap-3">
+      <Button href="/contact/" variant="solid">Start a conversation</Button>
+      <Button href="/government/" variant="outline">Government contracting</Button>
+    </div>
+  </PageHeader>
+
+  <Section id="services" title="What we build">
+    <ul class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+      {SERVICES.map((service) => <li>
+        <ServiceCard service={service} />
+      </li>)}
+    </ul>
+  </Section>
+
+  <Section id="approach" title="How we work" tone="muted">
+    <ol class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      {steps.map((step, index) => <li class="rounded-xl border border-line bg-surface p-6">
+        <p class="text-sm font-semibold text-ink-soft">Step {index + 1}</p>
+        <h3 class="mt-1 text-lg font-semibold">{step.title}</h3>
+        <p class="mt-3 leading-7 text-ink-soft">{step.text}</p>
+      </li>)}
+    </ol>
+  </Section>
+
+  <Section id="government" title="For government buyers and prime contractors">
+    <div class="flex flex-col items-start gap-6 lg:flex-row lg:items-center lg:justify-between">
+      <p class="max-w-2xl text-lg leading-8 text-ink-soft">
+        Enfav LLC offers AI automation and software engineering to government agencies — directly,
+        or as a subcontractor and teaming partner to prime contractors.
+      </p>
+      <Button href="/government/">Read the capability statement</Button>
+    </div>
+  </Section>
+
+  <CtaBand
+    title="Have a process worth automating?"
+    text="Tell us what you are working on."
+    href="/contact/"
+    action="Start a conversation"
+  />
+</BaseLayout>

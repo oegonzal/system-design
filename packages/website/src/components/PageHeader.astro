@@ -1,0 +1,35 @@
+---
+import Container from './Container.astro';
+
+/** The brand band that opens every page: the page's one <h1> and its lede. */
+interface Props {
+  title: string;
+  lede: string;
+  eyebrow?: string;
+}
+
+const { title, lede, eyebrow } = Astro.props;
+---
+
+<div
+  class="surface-brand bg-brand text-on-brand print:bg-transparent print:text-ink print:[--focus-ring:var(--color-ink)]"
+>
+  <Container class="py-14 sm:py-20 print:py-2">
+    {eyebrow && <p
+      class="text-sm font-semibold tracking-wide text-accent uppercase print:text-ink-soft"
+    >
+      {eyebrow}
+    </p>}
+    <h1
+      class="mt-2 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl print:mt-0 print:text-2xl"
+    >
+      {title}
+    </h1>
+    <p
+      class="mt-5 max-w-2xl text-lg leading-8 text-on-brand-soft print:mt-1 print:text-sm print:text-ink-soft"
+    >
+      {lede}
+    </p>
+    <slot />
+  </Container>
+</div>

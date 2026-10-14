@@ -1,0 +1,21 @@
+---
+/**
+ * The visible mark of a detail the owner has not confirmed yet. It says so in
+ * words (never only by colour), is kept out of search snippets, and carries
+ * `data-fact` so checks can tell a stated fact from the copy around it.
+ */
+interface Props {
+  label: string;
+}
+
+const { label } = Astro.props;
+---
+
+<span
+  data-fact="placeholder"
+  data-nosnippet
+  class="inline-flex flex-wrap items-baseline gap-x-1.5 rounded-md border border-dashed border-placeholder-line bg-placeholder-surface px-2 py-0.5 text-sm text-placeholder-ink"
+>
+  <strong class="font-semibold">Placeholder</strong>
+  <span>— {label}</span>
+</span>

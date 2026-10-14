@@ -1,0 +1,29 @@
+---
+/**
+ * A call to action — always a link, since every action on this site goes
+ * somewhere. `solid` on the brand band is white; on light surfaces it is the
+ * brand colour. `outline` is the quieter companion on the band.
+ */
+interface Props {
+  href: string;
+  variant?: 'solid' | 'outline' | 'brand';
+}
+
+const { href, variant = 'brand' } = Astro.props;
+
+const variants = {
+  brand: 'bg-brand text-on-brand hover:bg-brand-strong',
+  solid: 'bg-on-brand text-brand hover:bg-surface-muted',
+  outline: 'border border-on-brand/60 text-on-brand hover:bg-on-brand/10',
+} as const;
+---
+
+<a
+  href={href}
+  class:list={[
+    'inline-flex min-h-11 items-center justify-center rounded-md px-5 text-sm font-semibold no-underline transition-colors motion-reduce:transition-none',
+    variants[variant],
+  ]}
+>
+  <slot />
+</a>

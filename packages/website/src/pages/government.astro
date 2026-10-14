@@ -1,0 +1,117 @@
+---
+import Container from '../components/Container.astro';
+import EmailLink from '../components/EmailLink.astro';
+import FactList from '../components/FactList.astro';
+import PageHeader from '../components/PageHeader.astro';
+import Section from '../components/Section.astro';
+import { COMPANY, COMPANY_DETAILS } from '../data/company';
+import { SERVICES } from '../data/services';
+import BaseLayout from '../layouts/BaseLayout.astro';
+
+const differentiators = [
+  {
+    title: 'Senior-led delivery',
+    text: 'Engineering is led by the founder, a full-stack engineer with more than ten years of production experience.',
+  },
+  {
+    title: 'Evaluation-driven AI',
+    text: 'Automated critics, evaluators and audit trails are part of every AI workflow we build.',
+  },
+  {
+    title: 'Maintainable by design',
+    text: 'Typed, tested and documented code, delivered with the runbooks to operate it.',
+  },
+  {
+    title: 'A modern, well-supported stack',
+    text: 'TypeScript, Node.js, React, PostgreSQL, AWS and GCP.',
+  },
+];
+
+const contact = COMPANY.pointOfContact.status === 'verified' ? COMPANY.pointOfContact.value : null;
+---
+
+<BaseLayout
+  title="Government contracting & capability statement — Enfav LLC"
+  description="Enfav LLC's capability statement: core competencies, differentiators, company data and points of contact for agencies and prime contractors."
+>
+  <PageHeader
+    eyebrow="Capability statement"
+    title="Government contracting"
+    lede="Enfav LLC provides AI workflow automation and software engineering to government agencies, directly or as a subcontractor and teaming partner to prime contractors."
+  />
+
+  <Container class="pt-8 print:hidden">
+    <p class="rounded-md border border-line bg-surface-muted px-4 py-3 text-sm text-ink-soft">
+      This page prints as a one-page capability statement — use your browser's Print or Save as PDF.
+    </p>
+  </Container>
+
+  <Section id="competencies" title="Core competencies">
+    <ul class="grid gap-x-10 gap-y-4 sm:grid-cols-2 print:grid-cols-2 print:gap-x-6 print:gap-y-1">
+      {SERVICES.map((service) => <li>
+        <p class="font-semibold print:text-sm">{service.title}</p>
+        <p class="mt-1 leading-7 text-ink-soft print:mt-0 print:text-xs print:leading-snug">
+          {service.line}
+        </p>
+      </li>)}
+    </ul>
+  </Section>
+
+  <Section id="differentiators" title="Differentiators" tone="muted">
+    <ul class="grid gap-x-10 gap-y-4 sm:grid-cols-2 print:grid-cols-2 print:gap-x-6 print:gap-y-1">
+      {differentiators.map((item) => <li>
+        <p class="font-semibold print:text-sm">{item.title}</p>
+        <p class="mt-1 leading-7 text-ink-soft print:mt-0 print:text-xs print:leading-snug">
+          {item.text}
+        </p>
+      </li>)}
+    </ul>
+  </Section>
+
+  <Section id="company-data" title="Company data">
+    <div class="max-w-3xl print:max-w-none print:text-xs">
+      <FactList details={COMPANY_DETAILS} />
+    </div>
+  </Section>
+
+  <Section id="past-performance" title="Past performance" tone="muted">
+    <p class="max-w-3xl leading-7 text-ink-soft print:text-xs">
+      Enfav LLC was formed in 2026. The founder's prior professional experience appears on the
+      <a href="/about/" class="text-link underline underline-offset-4">About page</a>; it is not
+      Enfav LLC contract past performance.
+    </p>
+  </Section>
+
+  <Section id="contact" title="Point of contact">
+    <div class="grid gap-8 sm:grid-cols-2 print:grid-cols-2 print:gap-4 print:text-xs">
+      <div>
+        {contact && <p><span class="font-semibold">{contact.name}</span>, {contact.title}</p>}
+        <p class="mt-2 print:mt-0">
+          Contracting and teaming:
+          <EmailLink
+            address={COMPANY.email.contracts}
+            class="text-link underline underline-offset-4"
+          />
+        </p>
+        <p class="mt-1 print:mt-0">
+          General inquiries:
+          <EmailLink
+            address={COMPANY.email.general}
+            class="text-link underline underline-offset-4"
+          />
+        </p>
+      </div>
+      <div>
+        <h3 class="font-semibold">Teaming and subcontracting</h3>
+        <p class="mt-2 leading-7 text-ink-soft print:mt-0 print:leading-snug">
+          We welcome teaming and subcontracting conversations with prime contractors. Email
+          <EmailLink
+            address={COMPANY.email.contracts}
+            class="text-link underline underline-offset-4"
+          />
+          with the solicitation or program and the scope you need covered.
+        </p>
+      </div>
+    </div>
+  </Section>
+</BaseLayout>

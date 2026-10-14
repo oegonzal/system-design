@@ -15,3 +15,5 @@ node_modules
 static/runs
 CLAUDE.md
 Resume_a2.pdf
+**/.astro
+**/.env*

@@ -1,8 +1,20 @@
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from 'node:fs';
+import { tmpdir } from 'node:os';
+import { dirname, join, relative, resolve, sep } from 'node:path';
 
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
+
+import { readAstro } from './astro-sources';
 
 /**
  * Nothing inert may remain in the codebase — CLAUDE.md's first rule, as a gate.
@@ -18,23 +30,40 @@ import { describe, expect, it } from 'vitest';
  * whose identifier occurs exactly ONCE in the whole repository occurs at its
  * own declaration and nowhere else. Nothing imports it, no signature names it,
  * no spec exercises it. Counting is done over identifier TOKENS, through the
- * compiler's own parser, so a name that survives only inside a comment or a
- * string literal is correctly read as dead.
+ * compiler's own parser — Astro's for an Astro component (astro-sources.ts),
+ * TypeScript's for everything else — so a name that survives only inside a
+ * comment or a string literal is correctly read as dead.
  *
- * What it deliberately does not catch: a symbol used only inside the file that
- * declares it (exported for no reason, but reached), and a name that collides
- * with an unrelated property or JSX attribute somewhere. Both make the count
- * too HIGH, so this gate under-reports and never blocks something live — the
- * only direction a build gate may be wrong in. The complement is lint's
- * unused-binding rule, which catches the local half; between them the two
- * leave very little room.
+ * An Astro component is nothing but a default export, which no name addresses,
+ * so it is held to the rule its module path can be held to instead: some other
+ * file imports it.
+ *
+ * What the name count deliberately does not catch: a symbol used only inside
+ * the file that declares it (exported for no reason, but reached), and a name
+ * that collides with an unrelated property or JSX attribute somewhere. Both
+ * make the count too HIGH, so it under-reports rather than block something
+ * live — the only direction a build gate may be wrong in. The complement is
+ * lint's unused-binding rule, which catches the local half; between them the
+ * two leave very little room.
+ *
+ * The gate is wrong the other way, blocking something live, only where a module
+ * is reached without its name or its path being written in a file it reads.
+ * The component rule, matching resolved paths where the name count accepts any
+ * token of the name, is the exposed one: a framework that routes or globs a
+ * folder, a specifier `unimported` does not resolve (a path alias, a query), an
+ * importer of a kind SOURCE leaves out. Each such reach is declared, never
+ * worked around: a DISCOVERED entry naming who reaches the folder, resolution
+ * added to `unimported`, or the kind added to SOURCE with a reader for it.
  *
  * Nor does it catch inert *logic* — an unreachable branch, a policy field no
  * controller reads. That is a review obligation, not a parse.
  */
 const REPO = join(__dirname, '..');
 
-/** Directories that hold no authored source: dependencies, build output, caches. */
+/**
+ * Directories that hold no authored source: dependencies, build output,
+ * caches, and generated types (Astro's `.astro`).
+ */
 const SKIP = new Set([
   'node_modules',
   'dist',
@@ -43,35 +72,55 @@ const SKIP = new Set([
   '.next-e2e',
   '.nx',
   '.git',
+  '.astro',
   'static',
   'storybook-static',
 ]);
 
 /**
- * Where a module's exports are reached by something other than an `import`, so
- * a name nothing imports is still live. Each entry names who does the reaching,
- * because that is the fact that makes the exemption true — a path added here
- * without one is an exemption nobody can check.
+ * Where a module is reached by something other than an `import`, so a name —
+ * or a component — nothing imports is still live. Each entry names who does
+ * the reaching, because that is the fact that makes the exemption true — a
+ * path added here without one is an exemption nobody can check.
  *
- * Framework entry points that export a DEFAULT are not listed: a default export
- * is addressed by module path and never by name, so it is skipped everywhere.
+ * A TypeScript entry point that exports only a DEFAULT needs no entry: a
+ * default export is addressed by module path and never by name, so the
+ * exported-name rule skips it everywhere. An Astro component is the exception
+ * — it is held to being imported — so a folder a framework routes components
+ * from is listed here.
  */
 const DISCOVERED: readonly { readonly path: string; readonly by: string }[] = [
   {
     path: 'packages/db/src/migrations',
     by: 'MikroORM, which discovers migration classes by globbing the folder',
   },
+  {
+    path: 'packages/website/src/pages',
+    by: "Astro, which routes each module in the folder and calls an endpoint's GET export by name",
+  },
 ];
 
 /** Storybook loads its stories by glob, naming each export as a story. */
 const STORY_FILE = /\.stories\.tsx?$/;
 
+/** The sources the gate reads: TypeScript modules, and Astro components. */
+const SOURCE = /\.(ts|tsx|mts|astro)$/;
+const COMPONENT = /\.astro$/;
+
+/**
+ * Every source file under `dir`, this checkout's alone: the walk does not enter
+ * a folder holding its own `.git`, the mark of another checkout's root — a
+ * worktree, a submodule, a clone — which that checkout's own run of the gate
+ * reads. Git never commits a `.git` entry, so in a fresh clone this skips
+ * nothing but a submodule; in a local checkout, a nested copy read here would
+ * show routes nothing imports and double every count, keeping dead exports alive.
+ */
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir).flatMap((entry) => {
     if (SKIP.has(entry)) return [];
     const path = join(dir, entry);
-    if (statSync(path).isDirectory()) return sourceFiles(path);
-    return /\.(ts|tsx|mts)$/.test(entry) ? [path] : [];
+    if (!statSync(path).isDirectory()) return SOURCE.test(entry) ? [path] : [];
+    return existsSync(join(path, '.git')) ? [] : sourceFiles(path);
   });
 }
 
@@ -154,18 +203,73 @@ export function identifierCounts(source: string, path = 'sample.ts'): Map<string
   return counts;
 }
 
+/**
+ * Every module specifier a TypeScript file writes — import and export
+ * declarations, `import()`, `require` — as the compiler's own pre-processor
+ * lists them.
+ */
+const moduleSpecifiers = (source: string): string[] =>
+  ts.preProcessFile(source, true, true).importedFiles.map(({ fileName }) => fileName);
+
+/**
+ * The components no OTHER file imports, given the specifiers each file writes.
+ *
+ * A relative specifier is resolved against the folder of the file that wrote
+ * it, as the bundler resolves it, and Astro adds no `.astro` resolve extension,
+ * so an import of a component spells its file. Only a relative specifier is
+ * resolved, and only as a path: a path alias or a query (`?raw`) would read a
+ * live component as unimported, so a package that writes one must add its
+ * resolution here first.
+ */
+function unimported(
+  components: readonly string[],
+  imports: ReadonlyMap<string, readonly string[]>,
+): string[] {
+  const reached = new Set(
+    [...imports].flatMap(([importer, specifiers]) =>
+      specifiers
+        .filter((specifier) => specifier.startsWith('.'))
+        .map((specifier) => resolve(dirname(importer), specifier))
+        .filter((target) => target !== importer),
+    ),
+  );
+  return components.filter((component) => !reached.has(component));
+}
+
 describe('inert code', () => {
   const files = sourceFiles(REPO);
+  const modules = files.filter((path) => !COMPONENT.test(path));
+  const components = new Map(
+    files
+      .filter((path) => COMPONENT.test(path))
+      .map((path) => [path, readAstro(readFileSync(path, 'utf8'))] as const),
+  );
   const counts = new Map<string, Map<string, number>>();
+  const imports = new Map<string, readonly string[]>();
+  for (const path of modules) {
+    const source = readFileSync(path, 'utf8');
+    counts.set(path, identifierCounts(source, path));
+    imports.set(path, moduleSpecifiers(source));
+  }
+  for (const [path, component] of components) {
+    counts.set(path, component.identifiers);
+    imports.set(path, component.imports);
+  }
   const total = new Map<string, number>();
-  for (const path of files) {
-    const own = identifierCounts(readFileSync(path, 'utf8'), path);
-    counts.set(path, own);
+  for (const own of counts.values()) {
     for (const [name, n] of own) total.set(name, (total.get(name) ?? 0) + n);
   }
+  const discovered = (path: string): boolean =>
+    DISCOVERED.some((entry) => path.startsWith(join(REPO, entry.path) + sep));
 
   it('reads the repository it is meant to guard, and every exemption still names a reacher', () => {
     expect(files.length).toBeGreaterThan(500);
+    expect(components.size, 'no Astro component found to read').toBeGreaterThan(0);
+    // A component the compiler cannot read would count as using nothing.
+    const unreadable = [...components].flatMap(([path, { errors }]) =>
+      errors.map((error) => `${relative(REPO, path)}:${error}`),
+    );
+    expect(unreadable, 'every Astro component must parse').toEqual([]);
     for (const { path, by } of DISCOVERED) {
       // An exemption for a folder that is gone exempts nothing, and one that
       // cannot say who reaches it is an exemption nobody can check.
@@ -202,18 +306,59 @@ describe('inert code', () => {
     // Forwarding a name is not using it; importing it is.
     expect(identifierCounts("export { A } from './a';").get('A')).toBeUndefined();
     expect(identifierCounts("import { A } from './a';\n").get('A')).toBe(1);
+
+    // A component is read in its frontmatter, its client scripts and its tags.
+    expect(readAstro('---\nconst label = SITE.name;\n---\n').identifiers.get('SITE')).toBe(1);
+    const script = readAstro("<script>\n  import { NAV } from './site';\n</script>");
+    expect([script.identifiers.get('NAV'), script.imports]).toEqual([1, ['./site']]);
+    expect(readAstro('<Card />').identifiers.get('Card')).toBe(1);
+    // A comment, text and an attribute string are not uses there either.
+    expect(readAstro('<!-- A --><p title="A">A</p>').identifiers.get('A')).toBeUndefined();
+    // One source span is one occurrence, however many nodes ESTree hangs on it.
+    const shorthand = readAstro("---\nimport { A } from './a';\nconst { b } = A;\n---\n<p {b} />");
+    expect([shorthand.identifiers.get('A'), shorthand.identifiers.get('b')]).toEqual([2, 2]);
+    // Forwarding a name is not using it, in a component as in a module.
+    expect(readAstro('---\nconst a = 1;\nexport { a };\n---\n').identifiers.get('a')).toBe(1);
+    // A component the compiler cannot read is an error, never a count of nothing.
+    expect(readAstro('---\nconst = ;\n---\n').errors).toEqual([expect.stringMatching(/^2:/)]);
+    // A component is reached by a relative import from another file, never by its own.
+    const importers = new Map([
+      [
+        '/r/pages/index.astro',
+        readAstro("---\nimport Card from '../ui/Card.astro';\n---\n").imports,
+      ],
+      ['/r/lib/card.ts', moduleSpecifiers("export { default } from '../ui/Hero.astro';")],
+      ['/r/ui/Dead.astro', readAstro("---\nimport Dead from './Dead.astro';\n---\n").imports],
+    ]);
+    expect(
+      unimported(['/r/ui/Card.astro', '/r/ui/Hero.astro', '/r/ui/Dead.astro'], importers),
+    ).toEqual(['/r/ui/Dead.astro']);
+
+    // The walk reads its own checkout, and no checkout nested in it: a worktree
+    // holds a `.git` file, a clone a `.git` folder.
+    const tree = mkdtempSync(join(tmpdir(), 'inert-code-'));
+    try {
+      const nested = ['wt/.git', 'wt/a.ts', 'clone/.git/HEAD', 'clone/b.ts'];
+      for (const file of ['.git/HEAD', 'own.ts', 'ui/Own.astro', ...nested]) {
+        mkdirSync(dirname(join(tree, file)), { recursive: true });
+        writeFileSync(join(tree, file), '');
+      }
+      const read = sourceFiles(tree).map((path) => relative(tree, path));
+      expect(read.sort()).toEqual(['own.ts', join('ui', 'Own.astro')]);
+    } finally {
+      rmSync(tree, { recursive: true, force: true });
+    }
   });
 
   it('every exported name is reached from somewhere other than its own declaration', () => {
-    const discovered = DISCOVERED.map(({ path }) => join(REPO, path));
     const inert: string[] = [];
-    for (const [path, own] of counts) {
-      if (STORY_FILE.test(path)) continue;
-      if (discovered.some((root) => path.startsWith(root))) continue;
+    for (const path of modules) {
+      if (STORY_FILE.test(path) || discovered(path)) continue;
+      const own = counts.get(path);
       for (const { name, line } of exportedNames(readFileSync(path, 'utf8'), path)) {
         // One occurrence in the repository, and it is in this file: the
         // declaration itself, with nothing anywhere that reads it.
-        if (total.get(name) === 1 && (own.get(name) ?? 0) === 1) {
+        if (total.get(name) === 1 && (own?.get(name) ?? 0) === 1) {
           inert.push(`${relative(REPO, path)}:${line} ${name}`);
         }
       }
@@ -221,6 +366,17 @@ describe('inert code', () => {
     expect(
       inert,
       `nothing may be exported that nothing reaches — delete it, or give it the caller it was written for:\n  ${inert.join('\n  ')}`,
+    ).toEqual([]);
+  });
+
+  it('every Astro component is imported by another file, unless a framework reaches it', () => {
+    const unused = unimported(
+      [...components.keys()].filter((path) => !discovered(path)),
+      imports,
+    ).map((path) => relative(REPO, path));
+    expect(
+      unused,
+      `a component nothing imports renders nowhere — delete it, import it where it was meant to appear, or, if something other than an import reaches its folder, add the folder to DISCOVERED naming what does:\n  ${unused.join('\n  ')}`,
     ).toEqual([]);
   });
 });

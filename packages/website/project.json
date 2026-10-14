@@ -1,0 +1,37 @@
+{
+  "name": "website",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/website/src",
+  "projectType": "application",
+  "tags": ["type:app", "scope:web"],
+  "// targets": "lint is inferred from eslint.config.mjs and test from vitest.config.ts. typecheck is astro check, because tsc cannot read .astro files; it replaces the tsc target @nx/vite would infer. ASTRO_DEV_BACKGROUND=0 keeps astro dev in the foreground when a coding agent starts it.",
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "cwd": "packages/website",
+        "command": "astro dev",
+        "env": { "ASTRO_TELEMETRY_DISABLED": "1", "ASTRO_DEV_BACKGROUND": "0" }
+      }
+    },
+    "build": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "outputs": ["{projectRoot}/dist"],
+      "options": {
+        "cwd": "packages/website",
+        "command": "astro build",
+        "env": { "ASTRO_TELEMETRY_DISABLED": "1" }
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "cwd": "packages/website",
+        "command": "astro check --tsconfig tsconfig.json",
+        "env": { "ASTRO_TELEMETRY_DISABLED": "1" }
+      }
+    }
+  }
+}

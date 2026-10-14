@@ -72,3 +72,10 @@ playwright-report/
 
 # Environment files
 .env
+
+# Astro's generated types and caches (packages/website)
+.astro/
+
+# Per-target env files Nx loads into tasks — never committable, since a deploy
+# token is exactly what someone would put there
+.env.*

@@ -1,0 +1,12 @@
+---
+/** The page's content column: centred, capped, with side padding that never lets text touch the edge. */
+interface Props {
+  class?: string;
+}
+
+const { class: className } = Astro.props;
+---
+
+<div class:list={['mx-auto w-full max-w-content px-4 sm:px-6 lg:px-8', className]}>
+  <slot />
+</div>
