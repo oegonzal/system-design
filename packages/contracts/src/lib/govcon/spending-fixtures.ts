@@ -1,5 +1,6 @@
 import { NO_FACETS, NO_SET_ASIDE } from './facets';
 import { FISCAL_PERIODS } from './fiscal';
+import type { SpendingReach } from './reach';
 import { opportunityOf } from './fixtures';
 import {
   noticeRefOf,
@@ -14,7 +15,6 @@ import {
   type SpendingBreakdown,
   type SpendingHorizon,
   type SpendingPulse,
-  type SpendingReach,
   type SpendingScope,
 } from './spending';
 

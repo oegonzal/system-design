@@ -23,6 +23,13 @@ describe('narrowing a scope’s facets', () => {
     expect(narrowFacets(eightA, { setAside: LANES })?.setAside).toEqual(['SBA']);
     expect(narrowFacets(eightA, { setAside: [] })?.setAside).toEqual(['8A', 'SBA']);
     expect(narrowFacets({ ...NO_FACETS, setAside: ['8A'] }, { setAside: LANES })).toBeNull();
+    // Firms meet the same way: the ones both name, or nothing to count.
+    const firms: SpendingFacets = { ...NO_FACETS, recipient: ['AAAAAAAAAAA1', 'BBBBBBBBBBB2'] };
+    expect(narrowFacets(firms, { recipient: ['BBBBBBBBBBB2', 'CCCCCCCCCCC3'] })?.recipient).toEqual(
+      ['BBBBBBBBBBB2'],
+    );
+    expect(narrowFacets(firms, { recipient: ['CCCCCCCCCCC3'] })).toBeNull();
+    expect(narrowFacets(firms, {})?.recipient).toEqual(firms.recipient);
 
     // Ranges meet as their overlap, an open end giving way to a bound.
     const held: SpendingFacets = { ...NO_FACETS, amount: { min: 100_000, max: null } };

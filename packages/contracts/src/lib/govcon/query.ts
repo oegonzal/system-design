@@ -1,4 +1,4 @@
-import { facetParams, type SpendingFacets } from './facets';
+import { facetParams, formatAmountRange, type AmountRange, type SpendingFacets } from './facets';
 import type {
   AwardFamily,
   AwardFamilyChoice,
@@ -140,6 +140,30 @@ export interface CountRequest extends ScopeRequest {
   to: string;
 }
 
+/** The subcontracts reported under a scope's prime awards over a window of subcontract dates, within a size of subcontract. */
+export interface SubawardScopeRequest extends ScopeRequest {
+  from: string;
+  to: string;
+  /** Dollars of the subcontract itself, inclusive; null is any size. */
+  band: AmountRange | null;
+}
+
+/** One page of those subcontracts, most recent first. */
+export interface SubawardsRequest extends SubawardScopeRequest {
+  limit: number;
+  page: number;
+}
+
+/** One award by the source's own id. */
+export interface AwardDetailRequest {
+  externalId: string;
+}
+
+/** The largest subcontracts reported under one award. */
+export interface AwardSubawardsRequest extends AwardDetailRequest {
+  limit: number;
+}
+
 export interface AgencyBudgetRequest {
   toptierCode: string;
 }
@@ -173,6 +197,11 @@ export interface SourceCallQueries {
   'agency-directory': NoRequest;
   freshness: NoRequest;
   'award-count': CountRequest;
+  'subaward-count': SubawardScopeRequest;
+  subawards: SubawardsRequest;
+  'award-detail': AwardDetailRequest;
+  'award-orders': AwardDetailRequest;
+  'award-subawards': AwardSubawardsRequest;
 }
 
 /** `operation` discriminates `query`: one member per source operation. */
@@ -213,6 +242,9 @@ const scopeOf = (query: ScopeRequest): string =>
     ...Object.entries(facetParams(query.facets)).map(([id, value]) => `${id}=${value}`),
   ].join(' ');
 
+const subawardScopeOf = (query: SubawardScopeRequest): string =>
+  `${scopeOf(query)} size=${query.band === null ? '*' : formatAmountRange(query.band)} ${query.from}..${query.to}`;
+
 /** One line per operation — the discriminator picks the describer, never the query's shape. */
 const DESCRIBERS: { [K in SourceOperation]: (query: SourceCallQueries[K]) => string } = {
   search: describeQuery,
@@ -238,6 +270,11 @@ const DESCRIBERS: { [K in SourceOperation]: (query: SourceCallQueries[K]) => str
   freshness: () => 'freshness',
   'award-count': (query) =>
     `count ${query.awardFamily} ${scopeOf(query)} ${query.from}..${query.to}`,
+  'subaward-count': (query) => `subcontract count ${subawardScopeOf(query)}`,
+  subawards: (query) => `subcontracts ${subawardScopeOf(query)} page ${query.page}`,
+  'award-detail': (query) => `award ${query.externalId}`,
+  'award-orders': (query) => `orders under ${query.externalId}`,
+  'award-subawards': (query) => `subcontractors of ${query.externalId}`,
 };
 
 /** A ledger row's query as one line. */

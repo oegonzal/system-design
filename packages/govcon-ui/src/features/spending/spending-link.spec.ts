@@ -60,6 +60,8 @@ describe('the spending view in its address', () => {
   it('[GOVU-14] carries every facet in the address in its one spelling and reads it back, and a saved view’s address spells its codes out even when they are the profile’s own', () => {
     const base = defaultView(PROFILE_NAICS);
     const facets = {
+      ...NO_FACETS,
+      recipient: ['SMNWM6HN79X5'],
       recipientSize: 'small' as const,
       placement: 'standalone' as const,
       setAside: ['NONE', 'SBA'],
@@ -69,7 +71,7 @@ describe('the spending view in its address', () => {
     const view = { ...base, scope: { ...base.scope, facets }, tab: 'reach' as const };
     const href = spendingHref(view, PROFILE_NAICS);
     expect(href).toBe(
-      '/spending?recipientSize=small&placement=standalone&setAside=NONE%2CSBA&amount=15000.01-350000&newOnly=true&tab=reach',
+      '/spending?recipient=SMNWM6HN79X5&recipientSize=small&placement=standalone&setAside=NONE%2CSBA&amount=15000.01-350000&newOnly=true&tab=reach',
     );
     expect(
       parseSpendingView(new URL(href, 'http://localhost').searchParams, PROFILE_NAICS),

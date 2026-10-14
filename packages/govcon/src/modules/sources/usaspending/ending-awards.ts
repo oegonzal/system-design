@@ -115,7 +115,11 @@ export function normalizeEndingAward(raw: unknown, family: AwardFamily): Normali
  */
 export class UsaSpendingEndingAwards implements EndingAwards {
   readonly id = USASPENDING_SOURCE_ID;
-  readonly disclosures = [...USASPENDING_DISCLOSURES.awards, ...USASPENDING_DISCLOSURES.horizon];
+  readonly disclosures = [
+    ...USASPENDING_DISCLOSURES.awards,
+    ...USASPENDING_DISCLOSURES.horizon,
+    ...USASPENDING_DISCLOSURES.endDates,
+  ];
 
   constructor(
     private readonly http: AttemptedHttp,

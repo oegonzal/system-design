@@ -1,3 +1,4 @@
+import { UEI_SHAPE } from './entity';
 import type { ScoringPolicy } from './profile';
 import { AWARD_SIZE_BANDS } from './thresholds';
 import { SET_ASIDE_CODES, type AwardFamilyChoice } from './vocab';
@@ -69,6 +70,8 @@ export interface AmountRange {
 }
 
 export interface SpendingFacets {
+  /** The firms an award went to, by UEI, sorted; none listed is any firm. In a subcontract search this is the subcontractor. */
+  recipient: string[];
   recipientSize: RecipientSize | null;
   placement: AwardPlacement | null;
   /** Set-aside codes, sorted; `NONE` is no set-aside; none listed is any. */
@@ -81,6 +84,7 @@ export type FacetId = keyof SpendingFacets;
 
 /** A scope narrowed by nothing. */
 export const NO_FACETS: SpendingFacets = {
+  recipient: [],
   recipientSize: null,
   placement: null,
   setAside: [],
@@ -121,6 +125,7 @@ export type Facet<V> = {
 } & (
   | { kind: 'choice'; choices: readonly FacetChoice[] }
   | { kind: 'codes'; choices: readonly FacetChoice[] }
+  | { kind: 'entry'; hint: string }
   | { kind: 'range'; choices: readonly (FacetChoice & AmountRange)[] }
   | { kind: 'flag' }
 );
@@ -146,6 +151,20 @@ const codes = (label: string, choices: readonly FacetChoice[]): Facet<string[]> 
   spell: (value) => (value.length > 0 ? value.join(',') : undefined),
 });
 
+/** Codes that are typed, not chosen: no list of them could be offered. Anything not of the shape is dropped. */
+const entry = (label: string, hint: string, shape: RegExp): Facet<string[]> => ({
+  kind: 'entry',
+  label,
+  hint,
+  read: (raw) =>
+    raw === null
+      ? []
+      : facetCodesOf(raw.split(',').map((code) => code.toUpperCase())).filter((code) =>
+          shape.test(code),
+        ),
+  spell: (value) => (value.length > 0 ? value.join(',') : undefined),
+});
+
 /** A dollar range: the choices are the bands offered, and a parameter may name any range. */
 const range = (
   label: string,
@@ -167,6 +186,7 @@ const flag = (label: string): Facet<boolean> => ({
 
 /** Every facet, in the order the scope bar shows them. */
 export const SPENDING_FACETS: { [K in FacetId]: Facet<SpendingFacets[K]> } = {
+  recipient: entry('Awarded to', 'UEIs, comma-separated', UEI_SHAPE),
   recipientSize: choice('Won by', RECIPIENT_SIZES),
   placement: choice('Placed as', AWARD_PLACEMENTS),
   setAside: codes('Set-aside', SET_ASIDE_LANES),
@@ -192,6 +212,7 @@ export function facetParams(facets: SpendingFacets): Partial<Record<FacetId, str
 export function facetsFromParams(read: (id: FacetId) => string | null): SpendingFacets {
   const one = <K extends FacetId>(id: K): SpendingFacets[K] => SPENDING_FACETS[id].read(read(id));
   return {
+    recipient: one('recipient'),
     recipientSize: one('recipientSize'),
     placement: one('placement'),
     setAside: one('setAside'),
@@ -211,6 +232,7 @@ export type FacetQuery = { [K in FacetId]?: NonNullable<SpendingFacets[K]> };
 
 /** A query's facets with every one not named unset, and its codes in their one spelling. */
 export const facetsOfQuery = (query: FacetQuery): SpendingFacets => ({
+  recipient: facetCodesOf(query.recipient ?? NO_FACETS.recipient),
   recipientSize: query.recipientSize ?? NO_FACETS.recipientSize,
   placement: query.placement ?? NO_FACETS.placement,
   setAside: facetCodesOf(query.setAside ?? NO_FACETS.setAside),
@@ -220,6 +242,7 @@ export const facetsOfQuery = (query: FacetQuery): SpendingFacets => ({
 
 /** The facets as a query names them: those set, and nothing for the rest. */
 export const facetQueryOf = (facets: SpendingFacets): FacetQuery => ({
+  ...(facets.recipient.length === 0 ? {} : { recipient: facets.recipient }),
   ...(facets.recipientSize === null ? {} : { recipientSize: facets.recipientSize }),
   ...(facets.placement === null ? {} : { placement: facets.placement }),
   ...(facets.setAside.length === 0 ? {} : { setAside: facets.setAside }),

@@ -15,7 +15,13 @@ export const USASPENDING_DISCLOSURES = {
   horizon: [
     'USAspending cannot filter by period of performance: today’s place among a scope’s awards by end date is found by paging, and they are read from the soonest-ending forward within the lookback window, so a wide scope is complete only for its nearest months.',
     'An indefinite-delivery vehicle’s amount is what has been obligated on it so far, often zero — its count is the signal.',
+  ],
+  endDates: [
     'An end date here is the award’s current end. Options not yet exercised can carry it further, and the award search does not return the end with options: of eight large awards ending in one week of October 2026, four ran on with options, one by three years.',
+  ],
+  subcontracts: [
+    'Primes report first-tier subcontracts only, of $40,000 or more since October 2025 and $30,000 before; a prime with under $300,000 in income is exempt, and a small-business prime owes no subcontracting plan, so small primes barely appear.',
+    'A prime often reports an earlier subcontract again, and USAspending keeps both: the same prime award, subcontractor and amount is counted once here. Read a count as a floor on activity, not a measure of it.',
   ],
 } as const;
 

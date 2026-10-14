@@ -1,0 +1,35 @@
+{
+  "page_metadata": {
+    "page": 1,
+    "next": 2,
+    "previous": null,
+    "hasNext": true,
+    "hasPrevious": false
+  },
+  "results": [
+    {
+      "id": 10747444,
+      "subaward_number": "S904385BAH1 (P2908-53)",
+      "description": "CLEARFOCUS IS PROVIDING CYBERSECURITY SERVICES FOR DOE OFFICE OF INTELLIGENCE AND COUNTERINTELLIGENCE WHICH INCLUDES SECURITY ENGINEERNG, SECURITY OPERATIONS, THREAT INTELLIGENCE AND INFORMATION ASSURANCE.",
+      "action_date": "2020-02-25",
+      "amount": 15300000.0,
+      "recipient_name": "CLEARFOCUS TECHNOLOGIES LLC"
+    },
+    {
+      "id": 10656892,
+      "subaward_number": "P117324-21",
+      "description": "COMMERCIAL STAFFING SERVICES.",
+      "action_date": "2023-04-21",
+      "amount": 6000000.0,
+      "recipient_name": "KFORCE INC."
+    },
+    {
+      "id": 10656893,
+      "subaward_number": "P8310-4",
+      "description": "PHIA LLC PROVIDES TECHNICAL EXPERTISE AND SERVICES IN CYBER ASSESSMENTS, CYBERSECURITY OPERATIONS, CYBER THREAT/INTEL, SECURITY ENGINEERING & DEVELOPMENT, GOVERNANCE/RISK AND COMPLIANCE, AND THE DEVELOPMENT/EXECUTION OF STRATEGY, POLICIES, AND PROCESSES.",
+      "action_date": "2021-04-30",
+      "amount": 3307976.8,
+      "recipient_name": "PHIA LLC"
+    }
+  ]
+}

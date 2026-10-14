@@ -1,0 +1,149 @@
+{
+  "id": 292033080,
+  "generated_unique_award_id": "CONT_AWD_89303019FET000003_8900_89303019AET000001_8900",
+  "piid": "89303019FET000003",
+  "category": "contract",
+  "type": "A",
+  "type_description": "BPA CALL",
+  "description": "THIS CALL PROVIDES INCREMENTAL FUNDING FOR NON-IT CYSOC SUPPORT",
+  "total_obligation": 44095065.78,
+  "subaward_count": 7,
+  "total_subaward_amount": 30993310.09,
+  "date_signed": "2019-09-27",
+  "base_exercised_options": 45969821.2,
+  "base_and_all_options": 46119821.2,
+  "total_account_outlay": 34816901.25,
+  "total_account_obligation": 40509042.27,
+  "parent_award": {
+    "agency_id": 930,
+    "agency_name": "Department of Energy",
+    "agency_slug": "department-of-energy",
+    "sub_agency_id": "8900",
+    "sub_agency_name": "Department of Energy",
+    "award_id": 351039326,
+    "generated_unique_award_id": "CONT_IDV_89303019AET000001_8900",
+    "idv_type_description": "BPA",
+    "multiple_or_single_aw_desc": "SINGLE AWARD",
+    "piid": "89303019AET000001",
+    "type_of_idc_description": null
+  },
+  "latest_transaction_contract_data": {
+    "solicitation_identifier": null,
+    "solicitation_procedures": "MAFO",
+    "number_of_offers_received": null,
+    "extent_competed": "A",
+    "type_set_aside": null,
+    "type_set_aside_description": null,
+    "product_or_service_code": "D310",
+    "naics": "541511",
+    "naics_description": "CUSTOM COMPUTER PROGRAMMING SERVICES",
+    "type_of_contract_pricing": "Y",
+    "solicitation_procedures_description": "SUBJECT TO MULTIPLE AWARD FAIR OPPORTUNITY",
+    "extent_competed_description": "FULL AND OPEN COMPETITION",
+    "product_or_service_description": "IT AND TELECOM- CYBER SECURITY AND DATA BACKUP",
+    "type_of_contract_pricing_description": "TIME AND MATERIALS"
+  },
+  "awarding_agency": {
+    "id": 930,
+    "has_agency_page": true,
+    "toptier_agency": {
+      "name": "Department of Energy",
+      "code": "089",
+      "abbreviation": "DOE",
+      "slug": "department-of-energy"
+    },
+    "subtier_agency": {
+      "name": "Department of Energy",
+      "code": "8900",
+      "abbreviation": "DOE"
+    },
+    "office_agency_name": "HEADQUARTERS PROCUREMENT SERVICES"
+  },
+  "period_of_performance": {
+    "start_date": "2019-09-27",
+    "end_date": "2026-12-26",
+    "last_modified_date": "2026-09-16",
+    "potential_end_date": "2026-12-26 00:00:00"
+  },
+  "recipient": {
+    "recipient_hash": "ffca72e5-fba2-798a-6969-2a6c45e9f985-C",
+    "recipient_name": "BOOZ ALLEN HAMILTON INC",
+    "recipient_uei": "JCBMLGPE6Z71",
+    "recipient_unique_id": null,
+    "parent_recipient_hash": "ed02855e-60d7-2540-e3d7-18fba1dd1316-P",
+    "parent_recipient_name": "BOOZ ALLEN HAMILTON HOLDING CORPORATION",
+    "parent_recipient_uei": "MBPHTU7Y9S65",
+    "parent_recipient_unique_id": null,
+    "business_categories": [
+      "Category Business",
+      "Corporate Entity Not Tax Exempt",
+      "Not Designated a Small Business",
+      "Special Designations",
+      "U.S.-Owned Business"
+    ],
+    "location": {
+      "location_country_code": "USA",
+      "country_name": "UNITED STATES",
+      "state_code": "VA",
+      "state_name": "VIRGINIA",
+      "city_name": "MCLEAN",
+      "county_code": "059",
+      "county_name": "FAIRFAX",
+      "address_line1": "8283 GREENSBORO DR",
+      "address_line2": null,
+      "address_line3": null,
+      "congressional_code": "11",
+      "zip4": "3830",
+      "zip5": "22102",
+      "foreign_postal_code": null,
+      "foreign_province": null
+    }
+  },
+  "place_of_performance": {
+    "location_country_code": "USA",
+    "country_name": "UNITED STATES",
+    "county_code": "001",
+    "county_name": "DISTRICT OF COLUMBIA",
+    "city_name": "WASHINGTON",
+    "state_code": "DC",
+    "state_name": "DISTRICT OF COLUMBIA",
+    "congressional_code": "98",
+    "zip4": "0002",
+    "zip5": "20585",
+    "address_line1": null,
+    "address_line2": null,
+    "address_line3": null,
+    "foreign_province": null,
+    "foreign_postal_code": null
+  },
+  "psc_hierarchy": {
+    "toptier_code": {
+      "code": "D",
+      "description": "IT AND TELECOM - INFORMATION TECHNOLOGY AND TELECOMMUNICATIONS"
+    },
+    "midtier_code": {
+      "code": "D3",
+      "description": "ADP AND TELECOMMUNICATIONS"
+    },
+    "subtier_code": {},
+    "base_code": {
+      "code": "D310",
+      "description": "IT AND TELECOM- CYBER SECURITY AND DATA BACKUP"
+    }
+  },
+  "naics_hierarchy": {
+    "toptier_code": {
+      "code": "54",
+      "description": "Professional, Scientific, and Technical Services"
+    },
+    "midtier_code": {
+      "code": "5415",
+      "description": "Computer Systems Design and Related Services"
+    },
+    "base_code": {
+      "code": "541511",
+      "description": "Custom Computer Programming Services"
+    }
+  },
+  "total_outlay": 34816901.25
+}

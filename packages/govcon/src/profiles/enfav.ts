@@ -79,6 +79,8 @@ export const ENFAV = {
   leads: { horizonDays: 120 },
   // The daily digest: awards in these codes ending within a quarter, and a month running above every prior year's.
   alerts: { endingWithinDays: 90, pulseAboveBand: true },
+  // The subcontracts a firm this size could take: a prime is ranked by how many of these it reports.
+  teaming: { subcontract: { min: 50_000, max: 2_000_000 } },
   scoring: {
     weights: {
       naics: 0.3,

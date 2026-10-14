@@ -17,6 +17,7 @@ const text = z.string().nullish();
 const categoryRowSchema = z.looseObject({
   id: z.union([z.number(), z.string()]).nullish(),
   code: text,
+  uei: text,
   name: text,
   amount: z.union([z.number(), z.string()]).nullish(),
 });
@@ -37,10 +38,16 @@ export function toBreakdownBody(request: BreakdownRequest): Record<string, unkno
   };
 }
 
+/**
+ * One ranked row. Its code is the one a reader can act on: a firm's UEI
+ * where the source gives one — a recipient row's own `code` is the retired
+ * DUNS number — and the source's code otherwise: an abbreviation, a NAICS,
+ * a state.
+ */
 export function normalizeCategoryRow(raw: unknown): CategoryRow | null {
   const parsed = categoryRowSchema.safeParse(raw);
   if (!parsed.success) return null;
-  const code = clean(parsed.data.code);
+  const code = clean(parsed.data.uei) ?? clean(parsed.data.code);
   return {
     id: parsed.data.id === null || parsed.data.id === undefined ? null : String(parsed.data.id),
     code,

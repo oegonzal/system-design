@@ -2,6 +2,7 @@ import {
   AWARD_SOURCES,
   DEFAULT_AWARD_LIMIT,
   MAX_AWARD_LIMIT,
+  UEI_SHAPE,
   type AwardsQuery,
   type FetchAwardsRequest,
 } from '@sysdesign/contracts';
@@ -18,10 +19,7 @@ export const awardFiltersSchema = z.strictObject({
   psc: psc.optional(),
   agency: z.string().min(1).max(200).optional(),
   solicitationNumber: z.string().min(1).max(200).optional(),
-  awardeeUei: z
-    .string()
-    .regex(/^[A-Z0-9]{12}$/)
-    .optional(),
+  awardeeUei: z.string().regex(UEI_SHAPE).optional(),
   from: isoDate.optional(),
   to: isoDate.optional(),
   source: z.enum(AWARD_SOURCES).optional(),

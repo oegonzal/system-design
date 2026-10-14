@@ -15,8 +15,10 @@ import {
   ChipGroup,
   SelectField,
   Stack,
+  TextField,
   type ChipOption,
 } from '@sysdesign/design-system';
+import { useState } from 'react';
 
 /** A one-press setting for a facet that comes from somewhere else — the profile, say — as its spelling. */
 export interface FacetPreset {
@@ -48,6 +50,46 @@ const rangeLabel = (raw: string): string => {
 
 interface FacetControlProps extends FacetControlsProps {
   id: FacetId;
+}
+
+interface EntryControlProps {
+  label: string;
+  hint: string;
+  /** The facet as it is spelled now; null when unset. */
+  spelled: string | null;
+  /** What the facet would spell after reading `text` — what is typed, less whatever is not a code yet. */
+  spellingOf(text: string): string | null;
+  onType(text: string): void;
+  disabled?: boolean;
+}
+
+/**
+ * Codes that are typed. The field keeps what is being typed — half a code
+ * reads as no code, and must not vanish from under the cursor — and gives
+ * way to the facet's own spelling only when that spelling changes to
+ * something the typing does not say: a link followed, a view opened, the
+ * facet cleared elsewhere. An owner that has not caught up yet, or that
+ * settles on exactly what was typed, changes nothing here.
+ */
+function EntryControl({ label, hint, spelled, spellingOf, onType, disabled }: EntryControlProps) {
+  const [text, setText] = useState(spelled ?? '');
+  const [seen, setSeen] = useState(spelled);
+  if (spelled !== seen) {
+    setSeen(spelled);
+    if (spellingOf(text) !== spelled) setText(spelled ?? '');
+  }
+  return (
+    <TextField
+      label={label}
+      hint={hint}
+      value={text}
+      disabled={disabled}
+      onChange={(event) => {
+        setText(event.target.value);
+        onType(event.target.value);
+      }}
+    />
+  );
 }
 
 /**
@@ -94,6 +136,17 @@ function FacetControl({ id, facets, onCommit, onSettle, presets, disabled }: Fac
             </option>
           ))}
         </SelectField>
+      );
+    case 'entry':
+      return (
+        <EntryControl
+          label={facet.label}
+          hint={facet.hint}
+          spelled={spelled}
+          spellingOf={(text) => facetParams(set(text))[id] ?? null}
+          onType={(text) => onSettle(set(text))}
+          disabled={disabled}
+        />
       );
     case 'codes': {
       const chosen = spelled === null ? [] : spelled.split(',');
@@ -158,7 +211,7 @@ function FacetControl({ id, facets, onCommit, onSettle, presets, disabled }: Fac
 }
 
 /** The kinds whose control is one small field: they share a row, where a row of chips takes a line of its own. */
-const COMPACT_KINDS: readonly string[] = ['choice', 'flag'];
+const COMPACT_KINDS: readonly string[] = ['entry', 'choice', 'flag'];
 const isCompact = (id: FacetId): boolean => COMPACT_KINDS.includes(SPENDING_FACETS[id].kind);
 
 /** Every declared facet, in the table's order: the small controls on one row, then each row of chips. */

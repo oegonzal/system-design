@@ -42,6 +42,11 @@ export const OPERATION_TONE: Record<SourceOperation, BadgeTone> = {
   'agency-directory': 'neutral',
   freshness: 'neutral',
   'award-count': 'medium',
+  'subaward-count': 'medium',
+  subawards: 'medium',
+  'award-detail': 'medium',
+  'award-orders': 'medium',
+  'award-subawards': 'medium',
 };
 
 export const TIER_TONE: Record<LeadTier, BadgeTone> = {

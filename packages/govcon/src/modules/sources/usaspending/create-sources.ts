@@ -4,11 +4,13 @@ import { UsaSpendingAgencyBudgets } from './agency-budgets';
 import { UsaSpendingAgencyCatalog } from './agency-catalog';
 import { UsaSpendingAgencyOffices } from './agency-offices';
 import { UsaSpendingAwardCounts } from './award-counts';
+import { UsaSpendingAwardRecords } from './award-records';
 import { UsaSpendingAwards } from './awards';
 import { UsaSpendingBreakdowns } from './breakdowns';
 import { UsaSpendingEndingAwards } from './ending-awards';
 import { UsaSpendingFreshness } from './freshness';
 import { UsaSpendingSeries } from './series';
+import { UsaSpendingSubcontracts } from './subcontracts';
 import { USASPENDING_BASE_URL } from './source';
 
 /**
@@ -32,6 +34,8 @@ export function createUsaSpendingSources(
       breakdowns: new UsaSpendingBreakdowns(http, baseUrl, warn),
       ending: new UsaSpendingEndingAwards(http, baseUrl, warn),
       counts: new UsaSpendingAwardCounts(http, baseUrl),
+      subcontracts: new UsaSpendingSubcontracts(http, baseUrl, warn),
+      awards: new UsaSpendingAwardRecords(http, baseUrl, warn),
       budgets: new UsaSpendingAgencyBudgets(http, baseUrl, warn),
       offices: new UsaSpendingAgencyOffices(http, baseUrl, warn),
       catalog: new UsaSpendingAgencyCatalog(http, baseUrl, warn),

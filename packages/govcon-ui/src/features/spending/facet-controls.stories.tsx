@@ -20,6 +20,8 @@ export const Unset: Story = {};
 export const Narrowed: Story = {
   args: {
     facets: {
+      ...NO_FACETS,
+      recipient: ['SMNWM6HN79X5'],
       recipientSize: 'small',
       placement: 'standalone',
       setAside: ['NONE', 'SBA'],

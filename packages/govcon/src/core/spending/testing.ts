@@ -4,6 +4,9 @@ import {
   type AgencyDirectoryEntry,
   type AgencyYear,
   type AlertKey,
+  type AwardOrders,
+  type AwardSubcontract,
+  type FacetId,
   type GovconAlert,
   type InteractionPrompt,
   type SpendingLens,
@@ -14,6 +17,7 @@ import type {
   AlertLedger,
   AlertSink,
   AwardCounts,
+  AwardRecord,
   CategoryPage,
   EndingAwardsPage,
   OfficesPage,
@@ -23,6 +27,7 @@ import type {
   SnapshotRow,
   SpendingSnapshotStore,
   SpendingSources,
+  SubcontractPage,
 } from '../ports';
 import { asAttempted, type Scripted } from '../testing';
 
@@ -85,6 +90,11 @@ interface ScriptValues {
   breakdowns: CategoryPage;
   ending: EndingAwardsPage;
   counts: AwardCounts;
+  subawardCounts: number;
+  subawards: SubcontractPage;
+  awardDetails: AwardRecord | null;
+  awardOrders: AwardOrders;
+  awardSubawards: AwardSubcontract[];
   budgets: AgencyYear[];
   offices: OfficesPage;
   catalog: AgencyDirectoryEntry[];
@@ -108,6 +118,15 @@ const withDefaults = (script: SpendingScript): Required<SpendingScript> => ({
   breakdowns: script.breakdowns ?? [fetchedOf<CategoryPage>({ rows: [], hasMore: false })],
   ending: script.ending ?? [fetchedOf<EndingAwardsPage>({ rows: [], rejected: 0, hasMore: false })],
   counts: script.counts ?? [fetchedOf<AwardCounts>({ contracts: 0, idvs: 0 })],
+  subawardCounts: script.subawardCounts ?? [fetchedOf(0)],
+  subawards: script.subawards ?? [
+    fetchedOf<SubcontractPage>({ rows: [], rejected: 0, hasMore: false }),
+  ],
+  awardDetails: script.awardDetails ?? [fetchedOf<AwardRecord | null>(null)],
+  awardOrders: script.awardOrders ?? [
+    fetchedOf<AwardOrders>({ count: 0, obligated: 0, vehicles: 0 }),
+  ],
+  awardSubawards: script.awardSubawards ?? [fetchedOf<AwardSubcontract[]>([])],
   budgets: script.budgets ?? [fetchedOf<AgencyYear[]>([])],
   offices: script.offices ?? [fetchedOf<OfficesPage>({ subAgencies: [], hasMore: false })],
   catalog: script.catalog ?? [fetchedOf([agencyDirectoryEntryOf()])],
@@ -123,6 +142,7 @@ const withDefaults = (script: SpendingScript): Required<SpendingScript> => ({
 export function scriptedSpendingSources(
   script: SpendingScript = {},
   publicationLags: readonly PublicationLag[] = [],
+  unsupportedFacets: readonly FacetId[] = [],
 ): ScriptedSpendingSources {
   const id = 'usaspending';
   const requests: Record<Port, unknown[]> = {
@@ -130,6 +150,11 @@ export function scriptedSpendingSources(
     breakdowns: [],
     ending: [],
     counts: [],
+    subawardCounts: [],
+    subawards: [],
+    awardDetails: [],
+    awardOrders: [],
+    awardSubawards: [],
     budgets: [],
     offices: [],
     catalog: [],
@@ -140,6 +165,11 @@ export function scriptedSpendingSources(
     breakdowns: 0,
     ending: 0,
     counts: 0,
+    subawardCounts: 0,
+    subawards: 0,
+    awardDetails: 0,
+    awardOrders: 0,
+    awardSubawards: 0,
     budgets: 0,
     offices: 0,
     catalog: 0,
@@ -166,6 +196,20 @@ export function scriptedSpendingSources(
     breakdowns: { id, disclosures: ['breakdown disclosure'], breakdown: replier('breakdowns') },
     ending: { id, disclosures: ['horizon disclosure'], page: replier('ending') },
     counts: { id, disclosures: ['count disclosure'], count: replier('counts') },
+    subcontracts: {
+      id,
+      disclosures: ['subcontract disclosure'],
+      unsupportedFacets,
+      count: replier('subawardCounts'),
+      page: replier('subawards'),
+    },
+    awards: {
+      id,
+      disclosures: ['award disclosure'],
+      detail: replier('awardDetails'),
+      orders: replier('awardOrders'),
+      subcontracts: replier('awardSubawards'),
+    },
     budgets: { id, disclosures: ['budget disclosure'], budgets: replier('budgets') },
     offices: { id, disclosures: ['offices disclosure'], offices: replier('offices') },
     catalog: { id, disclosures: ['catalog disclosure'], agencies: replier('catalog') },

@@ -33,13 +33,16 @@ const RECIPIENT_TYPE: Record<RecipientSize, string> = {
  * the count, the series and the category endpoints alike: a set-aside list
  * with `NONE` selects awards made under no set-aside; `award_amounts` bounds
  * are inclusive at both ends; `date_type: new_awards_only` counts an award
- * only when it began inside the window. A placement is a kind of contract,
- * so it names the award types outright, whatever family the request asked
- * for.
+ * only when it began inside the window; and `recipient_search_text` given a
+ * UEI selects that firm's awards, several of them their union. A placement
+ * is a kind of contract, so it names the award types outright, whatever
+ * family the request asked for.
  */
 const FACET_FILTERS: {
   [K in FacetId]: (value: SpendingFacets[K], filters: AwardFilters) => AwardFilters;
 } = {
+  recipient: (ueis, filters) =>
+    ueis.length === 0 ? filters : { ...filters, recipient_search_text: [...ueis] },
   recipientSize: (size, filters) =>
     size === null ? filters : { ...filters, recipient_type_names: [RECIPIENT_TYPE[size]] },
   placement: (placement, filters) =>

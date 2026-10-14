@@ -68,5 +68,15 @@ export const ALERT_PROMPT_MAX_ITEMS = 10;
 export const ALERT_PROMPT_TTL_DAYS = 7;
 /** Agencies the warm reads an outlook for, from the top of the breakdown. */
 export const WARM_TOP_AGENCIES = 3;
+/** Pages of reported subcontracts one primes ranking may read, most recent first; the answer says how far back that reached. */
+export const MAX_SUBAWARD_PAGES = 30;
+/** USAspending's page ceiling for subcontract rows. */
+export const SUBAWARD_PAGE_SIZE = 100;
+/** Primes one ranking lists; the answer says how many it found in all. */
+export const PRIMES_LISTED = 50;
+/** Subcontractors listed for one prime, and for one award. */
+export const SUBCONTRACTORS_LISTED = 10;
+/** Recipients read, by obligations, to say what each ranked prime itself holds in the scope. */
+export const PRIME_OBLIGATION_ROWS = 100;
 /** USAspending's award search begins on 2007-10-01, the first day of FY2008. */
 export const FIRST_FISCAL_YEAR = 2008;

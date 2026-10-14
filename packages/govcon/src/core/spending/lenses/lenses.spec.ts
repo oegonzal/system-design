@@ -1,47 +1,15 @@
 import { agencyDirectoryEntryOf, horizonRowOf, NO_FACETS } from '@sysdesign/contracts';
 
-import { RequestGate } from '../../budget';
-import { attemptOf, attempted, failure, InMemorySourceCallLog } from '../../testing';
-import { SnapshotCache } from '../lens';
-import {
-  fetchedOf,
-  InMemorySnapshotStore,
-  scriptedSpendingSources,
-  seriesPointOf,
-  type SpendingScript,
-} from '../testing';
+import { attemptOf, attempted, failure } from '../../testing';
+import { fetchedOf, seriesPointOf } from '../testing';
 import { agencyLens } from './agency';
 import { breakdownLens } from './breakdown';
-import type { LensDeps } from './deps';
 import { directoryLens } from './directory';
 import { freshnessLens } from './freshness';
 import { horizonLens } from './horizon';
 import { pulseLens } from './pulse';
 import { reachLens } from './reach';
-
-const NOW = new Date('2026-06-15T12:00:00Z');
-const SCOPE = {
-  naics: ['332710'],
-  psc: [],
-  agency: '097',
-  awardFamily: 'both' as const,
-  facets: NO_FACETS,
-};
-
-function harness(script: SpendingScript = {}) {
-  const sources = scriptedSpendingSources(script);
-  const log = new InMemorySourceCallLog();
-  const gate = new RequestGate(log, { ttlMs: 0, pullDeadlineMs: 60_000, buckets: {} }, () => NOW);
-  const cache = new SnapshotCache(new InMemorySnapshotStore(), 60 * 60 * 1000, () => NOW);
-  const deps: LensDeps = {
-    sources,
-    gate,
-    now: () => NOW,
-    deadlineMs: 60_000,
-    read: (spec, query) => cache.read(spec, query),
-  };
-  return { deps, sources, operations: () => log.calls.map((call) => call.operation) };
-}
+import { harness, SCOPE } from './testing';
 
 describe('the spending lenses', () => {
   it('[GOV-11] [GOV-20] every lens spends through the gate under its own operation, counts its HTTP attempts into provenance, and an agency’s offices default to the year its directory entry reports active', async () => {
@@ -168,10 +136,10 @@ describe('the spending lenses', () => {
       psc: [],
       agency: null,
       facets: {
+        ...NO_FACETS,
         recipientSize: 'small',
         placement: 'standalone',
         setAside: ['NONE', 'SBA'],
-        amount: null,
         newOnly: true,
       },
       awardFamily: 'contracts',

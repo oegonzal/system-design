@@ -11,11 +11,13 @@ import {
   MAX_SCOPE_CODES,
   parseAmountRange,
   RECIPIENT_SIZES,
+  UEI_SHAPE,
   type AgencyOutlookQuery,
   type FacetId,
   type FacetQuery,
   type SpendingBreakdownQuery,
   type SpendingHorizonQuery,
+  type SpendingPrimesQuery,
   type SpendingPulseQuery,
   type SpendingReachQuery,
 } from '@sysdesign/contracts';
@@ -60,6 +62,10 @@ const amountRange = z.string().transform((text, context) => {
 
 /** The facets a scoped query may carry — one field per facet, so a facet without one cannot compile. */
 const facetFields = {
+  // A UEI is read in capitals however it was typed, as the address reads one.
+  recipient: codes(
+    z.string().toUpperCase().regex(UEI_SHAPE, 'a UEI is twelve letters and digits'),
+  ).default([]),
   recipientSize: idsOf(RECIPIENT_SIZES).optional(),
   placement: idsOf(AWARD_PLACEMENTS).optional(),
   setAside: codes(setAside).default([]),
@@ -130,6 +136,19 @@ export const reachQuerySchema = overWindow(
   }),
 ) satisfies z.ZodType<SpendingReachQuery>;
 export type ReachQueryInput = z.output<typeof reachQuerySchema>;
+
+export const primesQuerySchema = overWindow(
+  z.strictObject({
+    ...scopeFields,
+    from: isoDate,
+    to: isoDate,
+    band: amountRange.optional(),
+  }),
+) satisfies z.ZodType<SpendingPrimesQuery>;
+export type PrimesQueryInput = z.output<typeof primesQuerySchema>;
+
+/** An award's id as the source mints it: one path segment, no whitespace. */
+export const awardIdSchema = z.string().regex(/^[^\s/]{1,200}$/, 'an award id is one path segment');
 
 /** What a scope is read out of: any validated query's codes, agency, family and facets. */
 export type ScopeInput = Pick<

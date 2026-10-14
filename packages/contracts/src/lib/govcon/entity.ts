@@ -1,5 +1,8 @@
 import type { ApiResponse } from '../envelope';
 
+/** A firm's unique entity id, as SAM.gov issues one: twelve capital letters and digits. Every layer that reads a UEI checks it against this. */
+export const UEI_SHAPE = /^[A-Z0-9]{12}$/;
+
 /** A NAICS code an entity registered, and whether SBA sizes it small there. */
 export interface EntityNaics {
   code: string;

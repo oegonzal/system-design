@@ -2,8 +2,7 @@ import type { ApiResponse } from '../envelope';
 import type { FacetQuery, SpendingFacets } from './facets';
 import type { FiscalPeriod } from './fiscal';
 import type { Opportunity } from './opportunity';
-import type { AwardSizeBandId } from './thresholds';
-import type { AwardFamily, AwardFamilyChoice, BreakdownCategory, ReachCutId } from './vocab';
+import type { AwardFamily, AwardFamilyChoice, BreakdownCategory } from './vocab';
 
 /**
  * Spending research over USAspending: four lenses on one scope. Every answer
@@ -130,44 +129,6 @@ export interface SpendingBreakdown {
   rows: BreakdownRow[];
   /** More rows exist beyond the declared bound. */
   truncated: boolean;
-  /** Null unless the window reaches past what an agency the scope counts has published. */
-  delay: PublicationDelay | null;
-  provenance: Provenance;
-}
-
-// ---------------------------------------------------------------------------
-// Reach — how much of a scope's new work a firm could have competed for.
-
-export interface ReachCut {
-  id: ReachCutId;
-  /** The facets the cut counted under: the scope's own, narrowed this far. Null when they leave the cut nothing to count. */
-  facets: SpendingFacets | null;
-  awards: number;
-  /** Obligated on those awards inside the window. */
-  amount: number;
-}
-
-export interface ReachBand {
-  id: AwardSizeBandId;
-  awards: number;
-}
-
-/**
- * A scope's new contracts over a window, cut down step by step to the ones a
- * firm with the given lanes could have won as it stands. Contracts only: a
- * vehicle is not work until an order is placed under it.
- */
-export interface SpendingReach {
-  scope: SpendingScope;
-  /** ISO dates, inclusive, on the action date. */
-  from: string;
-  to: string;
-  /** The set-aside lanes the count was taken for. */
-  lanes: string[];
-  /** In `REACH_CUTS` order; each narrows the one before it. */
-  cuts: ReachCut[];
-  /** The last cut by award size; the bands add up to it. */
-  bands: ReachBand[];
   /** Null unless the window reaches past what an agency the scope counts has published. */
   delay: PublicationDelay | null;
   provenance: Provenance;
@@ -354,14 +315,6 @@ export interface SpendingHorizonQuery extends ScopeQuery {
   months?: number;
 }
 
-/** Reach names no award family: it counts contracts. */
-export interface SpendingReachQuery extends Omit<ScopeQuery, 'awardFamily'> {
-  from: string;
-  to: string;
-  /** The set-aside lanes to count for; none named counts every lane. */
-  lanes?: string[];
-}
-
 export interface AgencyOutlookQuery {
   fiscalYear?: number;
   awardFamily?: AwardFamilyChoice;
@@ -370,6 +323,5 @@ export interface AgencyOutlookQuery {
 export type GetSpendingPulseResponse = ApiResponse<SpendingPulse>;
 export type GetSpendingBreakdownResponse = ApiResponse<SpendingBreakdown>;
 export type GetSpendingHorizonResponse = ApiResponse<SpendingHorizon>;
-export type GetSpendingReachResponse = ApiResponse<SpendingReach>;
 export type GetAgenciesResponse = ApiResponse<AgencyDirectory>;
 export type GetAgencyOutlookResponse = ApiResponse<AgencyOutlook>;

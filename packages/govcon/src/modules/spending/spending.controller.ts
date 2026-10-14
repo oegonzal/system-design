@@ -2,6 +2,8 @@ import { Controller, Get, Param, Query } from '@nestjs/common';
 import type {
   GetAgenciesResponse,
   GetAgencyOutlookResponse,
+  GetAwardDetailResponse,
+  GetSpendingPrimesResponse,
   GetSpendingBreakdownResponse,
   GetSpendingHorizonResponse,
   GetSpendingPulseResponse,
@@ -11,14 +13,17 @@ import { ZodValidationPipe } from '@sysdesign/nest-kit';
 
 import {
   agencyOutlookQuerySchema,
+  awardIdSchema,
   breakdownQuerySchema,
   horizonQuerySchema,
+  primesQuerySchema,
   pulseQuerySchema,
   reachQuerySchema,
   toptierCodeSchema,
   type AgencyOutlookQueryInput,
   type BreakdownQueryInput,
   type HorizonQueryInput,
+  type PrimesQueryInput,
   type PulseQueryInput,
   type ReachQueryInput,
 } from './spending-requests';
@@ -48,6 +53,20 @@ export class SpendingController {
     @Query(new ZodValidationPipe(reachQuerySchema)) query: ReachQueryInput,
   ): Promise<GetSpendingReachResponse> {
     return { data: await this.spending.reach(query) };
+  }
+
+  @Get('primes')
+  async primes(
+    @Query(new ZodValidationPipe(primesQuerySchema)) query: PrimesQueryInput,
+  ): Promise<GetSpendingPrimesResponse> {
+    return { data: await this.spending.primes(query) };
+  }
+
+  @Get('awards/:externalId')
+  async award(
+    @Param('externalId', new ZodValidationPipe(awardIdSchema)) externalId: string,
+  ): Promise<GetAwardDetailResponse> {
+    return { data: await this.spending.award(externalId) };
   }
 
   @Get('horizon')

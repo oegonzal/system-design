@@ -8,9 +8,11 @@ import {
   RECIPIENT_SIZES,
   type AgencyDirectory,
   type AgencyOutlook,
+  type AwardBody,
   type HorizonBody,
   type SpendingBreakdown,
   type SpendingFacets,
+  type SpendingPrimes,
   type SpendingPulse,
   type SpendingReach,
 } from '@sysdesign/contracts';
@@ -33,11 +35,14 @@ const label = z.string();
 export const idsOf = <T extends string>(choices: readonly { id: T }[]) =>
   z.enum(choices.map((choice) => choice.id) as [T, ...T[]]);
 
+const amountRange = z.strictObject({ min: amount.nullable(), max: amount.nullable() });
+
 const facetsSchema = z.strictObject({
+  recipient: z.array(code),
   recipientSize: idsOf(RECIPIENT_SIZES).nullable(),
   placement: idsOf(AWARD_PLACEMENTS).nullable(),
   setAside: z.array(code),
-  amount: z.strictObject({ min: amount.nullable(), max: amount.nullable() }).nullable(),
+  amount: amountRange.nullable(),
   newOnly: z.boolean(),
 }) satisfies z.ZodType<SpendingFacets>;
 
@@ -123,6 +128,78 @@ export const reachBodySchema = z.strictObject({
   bands: z.array(z.strictObject({ id: idsOf(AWARD_SIZE_BANDS), awards: count })),
   delay: publicationDelay,
 }) satisfies z.ZodType<LensBody<SpendingReach>>;
+
+const firm = { uei: label.nullable(), name: label };
+const tallied = { ...firm, subcontracts: count, amount };
+
+export const primesBodySchema = z.strictObject({
+  scope: scopeSchema,
+  from: isoDate,
+  to: isoDate,
+  band: amountRange.nullable(),
+  total: count,
+  read: count,
+  duplicates: count,
+  capped: z.boolean(),
+  reachedBack: isoDate.nullable(),
+  primeCount: count,
+  subcontractorCount: count,
+  primes: z.array(
+    z.strictObject({
+      ...tallied,
+      subcontractors: count,
+      serviceShare: amount,
+      obligations: amount.nullable(),
+      topSubcontractors: z.array(z.strictObject(tallied)),
+    }),
+  ),
+}) satisfies z.ZodType<LensBody<SpendingPrimes>>;
+
+const text = label.nullable();
+const date = isoDate.nullable();
+
+export const awardBodySchema = z.strictObject({
+  externalId: code,
+  piid: text,
+  family: z.enum(['contracts', 'idvs']),
+  typeDescription: text,
+  description: text,
+  recipient: z.strictObject(firm),
+  parent: z.strictObject(firm).nullable(),
+  agencyPath: text,
+  agencyCode: text,
+  vehicle: z
+    .strictObject({ externalId: text, piid: text, kind: text, agency: text, holders: text })
+    .nullable(),
+  holders: text,
+  orders: z.strictObject({ count, obligated: amount, vehicles: count }).nullable(),
+  obligated: amount,
+  exercised: amount.nullable(),
+  ceiling: amount.nullable(),
+  signedAt: date,
+  startsAt: date,
+  endsAt: date,
+  endsWithOptionsAt: date,
+  naicsCode: text,
+  naicsDescription: text,
+  pscCode: text,
+  pscDescription: text,
+  placeOfPerformance: text,
+  competition: z.strictObject({
+    offers: count.nullable(),
+    setAsideCode: text,
+    setAside: text,
+    extentCompeted: text,
+    solicitationProcedures: text,
+    pricing: text,
+    solicitationId: text,
+  }),
+  subcontractCount: count,
+  subcontractAmount: amount,
+  subcontracts: z.array(
+    z.strictObject({ id: code, name: text, amount, actionDate: date, description: text }),
+  ),
+}) satisfies z.ZodType<AwardBody>;
 
 const familyTotals = z.strictObject({ count, amount });
 

@@ -81,6 +81,17 @@ export interface AlertPolicy {
 /** What a profile alerts on until it says otherwise; a stored document from before the policy reads as this. */
 export const DEFAULT_ALERT_POLICY: AlertPolicy = { endingWithinDays: 90, pulseAboveBand: true };
 
+/** What the profile looks for in a prime to work under. */
+export interface TeamingPolicy {
+  /** The size of subcontract the company could take, in dollars, inclusive: a prime is ranked by the subcontracts it reports inside it. */
+  subcontract: { min: number; max: number };
+}
+
+/** The band a profile ranks primes by until it says otherwise; a stored document from before the policy reads as this. */
+export const DEFAULT_TEAMING_POLICY: TeamingPolicy = {
+  subcontract: { min: 50_000, max: 2_000_000 },
+};
+
 export interface SearchProfile {
   /** A slug: the path segment and the key everything else joins on. */
   id: string;
@@ -99,6 +110,7 @@ export interface SearchProfile {
   };
   scoring: ScoringPolicy;
   alerts: AlertPolicy;
+  teaming: TeamingPolicy;
 }
 
 /** A profile as stored: the document plus what the store knows about it. */

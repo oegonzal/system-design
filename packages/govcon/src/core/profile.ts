@@ -1,11 +1,13 @@
 import {
   DEFAULT_ALERT_POLICY,
+  DEFAULT_TEAMING_POLICY,
   FACTOR_IDS,
   MAX_ALERT_ENDING_DAYS,
   MAX_PAGE_SIZE,
   MAX_PULL_DAYS,
   NOTICE_STATUSES,
   NOTICE_TYPES,
+  UEI_SHAPE,
   type FactorId,
   type NoticeTypeCode,
   type QueryFilter,
@@ -77,14 +79,16 @@ const alertPolicySchema = z.strictObject({
   pulseAboveBand: z.boolean(),
 });
 
+/** The size of subcontract the company could take; a document from before the policy reads as the declared default. */
+const teamingPolicySchema = z.strictObject({
+  subcontract: z.strictObject({ min: z.number().min(0), max: z.number().min(0) }),
+});
+
 export const searchProfileSchema = z
   .strictObject({
     id: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/),
     company: z.string().min(1),
-    entityUei: z
-      .string()
-      .regex(/^[A-Z0-9]{12}$/)
-      .nullable(),
+    entityUei: z.string().regex(UEI_SHAPE).nullable(),
     /** NAICS codes or families, 2–6 digits; a shorter code is the whole family. */
     naics: z.array(z.string().regex(/^\d{2,6}$/)).min(1),
     /** PSC codes or families, 1–4 characters. */
@@ -124,6 +128,7 @@ export const searchProfileSchema = z
       }),
     }),
     alerts: alertPolicySchema.default(DEFAULT_ALERT_POLICY),
+    teaming: teamingPolicySchema.default(DEFAULT_TEAMING_POLICY),
   })
   .superRefine((profile, ctx) => {
     const sum = Object.values(profile.scoring.weights).reduce((total, weight) => total + weight, 0);
@@ -145,6 +150,13 @@ export const searchProfileSchema = z
           message: 'bands must ascend by maxDays',
         });
       }
+    }
+    if (profile.teaming.subcontract.min > profile.teaming.subcontract.max) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['teaming', 'subcontract'],
+        message: 'the smallest subcontract must not be above the largest',
+      });
     }
     if (profile.scoring.tiers.high <= profile.scoring.tiers.medium) {
       ctx.addIssue({

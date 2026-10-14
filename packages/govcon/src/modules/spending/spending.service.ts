@@ -14,10 +14,11 @@ import {
   isoDateOf,
   type AgencyDirectory,
   type AgencyOutlook,
-  type HorizonRow,
+  type AwardDetail,
   type Provenance,
   type SpendingBreakdown,
   type SpendingHorizon,
+  type SpendingPrimes,
   type SpendingPulse,
   type SpendingReach,
   type SpendingScope,
@@ -31,19 +32,27 @@ import type {
 } from '../../core/ports';
 import { SnapshotCache, type LensAnswer, type ReadOptions } from '../../core/spending/lens';
 import { agencyLens } from '../../core/spending/lenses/agency';
+import { awardLens } from '../../core/spending/lenses/award';
 import { breakdownLens } from '../../core/spending/lenses/breakdown';
 import type { LensDeps } from '../../core/spending/lenses/deps';
 import { directoryLens } from '../../core/spending/lenses/directory';
 import { horizonLens } from '../../core/spending/lenses/horizon';
+import { primesLens } from '../../core/spending/lenses/primes';
 import { pulseLens } from '../../core/spending/lenses/pulse';
 import { reachLens } from '../../core/spending/lenses/reach';
-import { horizonNaics, matchOpenNotices, openNoticesFilter } from '../../core/spending/recompetes';
+import {
+  horizonNaics,
+  matchOpenNotices,
+  openNoticesFilter,
+  type JoinedAward,
+} from '../../core/spending/recompetes';
 import { OPPORTUNITY_REPOSITORY } from '../opportunities/tokens';
 import { BUDGET_POLICY, CLOCK, REQUEST_GATE, SPENDING_SOURCES } from '../sources/tokens';
 import type {
   AgencyOutlookQueryInput,
   BreakdownQueryInput,
   HorizonQueryInput,
+  PrimesQueryInput,
   PulseQueryInput,
   ReachQueryInput,
   ScopeInput,
@@ -139,6 +148,23 @@ export class SpendingService {
     );
   }
 
+  primes(query: PrimesQueryInput, options: ReadOptions = {}): Promise<SpendingPrimes> {
+    return this.answer(
+      this.cache.read(
+        primesLens(this.deps),
+        { ...scopeOf(query), from: query.from, to: query.to, band: query.band ?? null },
+        options,
+      ),
+    );
+  }
+
+  /** One award's record, with the open stored notices sharing its NAICS and buyer joined on every read. */
+  async award(externalId: string, options: ReadOptions = {}): Promise<AwardDetail> {
+    const body = await this.answer(this.cache.read(awardLens(this.deps), { externalId }, options));
+    const { openNotices } = await this.openNoticesOf([body]);
+    return { ...body, openNotices: openNotices[0]?.notices ?? [] };
+  }
+
   async horizon(query: HorizonQueryInput, options: ReadOptions = {}): Promise<SpendingHorizon> {
     const body = await this.answer(
       this.cache.read(
@@ -176,7 +202,7 @@ export class SpendingService {
 
   /** The open stored notices the rows share a NAICS and a buyer with — joined on every read, never stored. */
   private async openNoticesOf(
-    rows: readonly HorizonRow[],
+    rows: readonly JoinedAward[],
   ): Promise<Pick<SpendingHorizon, 'openNotices' | 'openNoticesCapped'>> {
     const naics = horizonNaics(rows);
     if (naics.length === 0) return { openNotices: [], openNoticesCapped: false };

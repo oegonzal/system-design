@@ -1,0 +1,100 @@
+{
+  "spending_level": "subawards",
+  "limit": 5,
+  "results": [
+    {
+      "internal_id": "P208250",
+      "prime_award_internal_id": 292033080,
+      "Sub-Award ID": "P208250",
+      "Sub-Awardee Name": "TELOS CORPORATION",
+      "Sub-Award Date": "2024-11-06",
+      "Sub-Award Amount": 2000000.0,
+      "Awarding Agency": "Department of Energy",
+      "Awarding Sub Agency": "Department of Energy",
+      "Prime Award ID": "89303019FET000003",
+      "Prime Recipient Name": "BOOZ ALLEN HAMILTON INC.",
+      "prime_award_recipient_id": "ffca72e5-fba2-798a-6969-2a6c45e9f985-C",
+      "Prime Award Recipient UEI": "JCBMLGPE6Z71",
+      "Sub-Recipient UEI": "JLW7WAKPEKD4",
+      "prime_award_generated_internal_id": "CONT_AWD_89303019FET000003_8900_89303019AET000001_8900",
+      "Sub-Award Type": "sub-contract",
+      "NAICS": {
+        "code": "541511",
+        "description": "CUSTOM COMPUTER PROGRAMMING SERVICES"
+      },
+      "PSC": {
+        "code": "D310",
+        "description": "IT AND TELECOM- CYBER SECURITY AND DATA BACKUP"
+      },
+      "Sub-Award Description": "TELECOMMUNICATIONS",
+      "sub_award_recipient_id": "4cc248e8-f64a-f442-4b15-888273e4933a-C"
+    },
+    {
+      "internal_id": "GDIT-74404",
+      "prime_award_internal_id": 291526984,
+      "Sub-Award ID": "GDIT-74404",
+      "Sub-Awardee Name": "SRAAYA LLC",
+      "Sub-Award Date": "2025-06-28",
+      "Sub-Award Amount": 2000000.0,
+      "Awarding Agency": "Department of Health and Human Services",
+      "Awarding Sub Agency": "Food and Drug Administration",
+      "Prime Award ID": "75F40125F80027",
+      "Prime Recipient Name": "GENERAL DYNAMICS INFORMATION TECHNOLOGY, INC.",
+      "prime_award_recipient_id": "455555be-773d-eab1-1e6b-7b94400b757e-C",
+      "Prime Award Recipient UEI": "SMNWM6HN79X5",
+      "Sub-Recipient UEI": "SV5THMAB8758",
+      "prime_award_generated_internal_id": "CONT_AWD_75F40125F80027_7524_GS35F393CA_4732",
+      "Sub-Award Type": "sub-contract",
+      "NAICS": {
+        "code": "541511",
+        "description": "CUSTOM COMPUTER PROGRAMMING SERVICES"
+      },
+      "PSC": {
+        "code": "DG01",
+        "description": "IT AND TELECOM - NETWORK SUPPORT SERVICES (LABOR)"
+      },
+      "Sub-Award Description": "SERVICES",
+      "sub_award_recipient_id": null
+    },
+    {
+      "internal_id": "P010287490",
+      "prime_award_internal_id": 291183257,
+      "Sub-Award ID": "P010287490",
+      "Sub-Awardee Name": "VASTLY AI LLC",
+      "Sub-Award Date": "2025-02-24",
+      "Sub-Award Amount": 2000000.0,
+      "Awarding Agency": "Department of Homeland Security",
+      "Awarding Sub Agency": "U.S. Customs and Border Protection",
+      "Prime Award ID": "70B04C20F00001359",
+      "Prime Recipient Name": "SCIENCE APPLICATIONS INTERNATIONAL CORPORATION",
+      "prime_award_recipient_id": "20af0683-f17d-1f8f-38ee-2f11bd124559-C",
+      "Prime Award Recipient UEI": "MMLKPW9JLX64",
+      "Sub-Recipient UEI": "CUJSVJLLYEA5",
+      "prime_award_generated_internal_id": "CONT_AWD_70B04C20F00001359_7014_47QTCK18D0001_4732",
+      "Sub-Award Type": "sub-contract",
+      "NAICS": {
+        "code": "541512",
+        "description": "COMPUTER SYSTEMS DESIGN SERVICES"
+      },
+      "PSC": {
+        "code": "D399",
+        "description": "IT AND TELECOM- OTHER IT AND TELECOMMUNICATIONS"
+      },
+      "Sub-Award Description": "OPERATION AND MAINTENANCE SUPPORT FOR THE DHS (DEPT OF HOMELAND SECURITY) CBP CUSTOMS AND BORDER PROTECTION) TASPD (TARGETING AND ANALYSIS SYSTEMS PROGRAM DIRECTORATE) SUITE OF COMPUTER AND SOFTWARE APPLICATIONS. INCLUDES UPGRADES, UPDATES, MODIFICATIONS AND ENHANCEMENTS OF APPLICATIONS IN RESPONSE TO EVOLVING TECHNOLOGIES, THREATS, AND MISSION REQUIREMENTS IN DIRECT SUPPORT OF DHS AND CBP IN THEIR MISSION CRITICAL INITIATIVES TO PROTECT THE BORDERS (AIR, LAND, AND SEA) OF THE UNITED STATES.",
+      "sub_award_recipient_id": null
+    },
+    {
+      "internal_id": "bad",
+      "Sub-Award Amount": "not a number"
+    }
+  ],
+  "page_metadata": {
+    "page": 1,
+    "hasNext": true,
+    "last_record_unique_id": "281082733",
+    "last_record_sort_value": "200000000"
+  },
+  "messages": [
+    "For searches, time period start and end dates are currently limited to an earliest date of 2007-10-01.  For data going back to 2000-10-01, use either the Custom Award Download feature on the website or one of our download or bulk_download API endpoints as listed on https://api.usaspending.gov/docs/endpoints. "
+  ]
+}

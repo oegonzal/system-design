@@ -11,7 +11,7 @@ import * as stories from './profile-editor.stories';
 const { Default, Creating, WithIssues, Saving } = composeStories(stories);
 
 describe('ProfileEditor', () => {
-  it('[GOVU-1] [GOVU-10] shows the codes, interests, weights, prices, bands, tiers and alert thresholds as fields, with the weights summed live', () => {
+  it('[GOVU-1] [GOVU-10] shows the codes, interests, weights, prices, bands, tiers, alert thresholds and the size of subcontract as fields, with the weights summed live', () => {
     const onChange = vi.fn();
     renderWithTheme(<Default onChange={onChange} />);
     expect(screen.getByRole('form', { name: 'Profile enfav' })).toBeTruthy();
@@ -63,6 +63,15 @@ describe('ProfileEditor', () => {
     fireEvent.click(screen.getByLabelText('Alert when the pulse runs above its band'));
     expect(onChange).toHaveBeenLastCalledWith(
       expect.objectContaining({ alerts: { endingWithinDays: 90, pulseAboveBand: false } }),
+    );
+    expect((screen.getByLabelText('Smallest subcontract (USD)') as HTMLInputElement).value).toBe(
+      '50000',
+    );
+    fireEvent.change(screen.getByLabelText('Largest subcontract (USD)'), {
+      target: { value: '750000' },
+    });
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ teaming: { subcontract: { min: 50_000, max: 750_000 } } }),
     );
     expect(weightSum({ ...PROFILE.scoring.weights, naics: 0.5 })).toBe(1.2);
   });

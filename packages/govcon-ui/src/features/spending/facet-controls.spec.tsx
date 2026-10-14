@@ -37,6 +37,28 @@ describe('FacetControls', () => {
     expect(onCommit).toHaveBeenLastCalledWith({ ...NO_FACETS, newOnly: true });
   });
 
+  it('[GOVU-14] keeps a firm’s UEI as it is typed — half a code is no code, and is not taken from under the cursor — hands it on in capitals once it is one, and gives way to a value set from outside', () => {
+    const onSettle = vi.fn();
+    const { rerender } = renderWithTheme(<Unset onSettle={onSettle} />);
+    const field = screen.getByLabelText('Awarded to') as HTMLInputElement;
+    expect(screen.getByText('UEIs, comma-separated')).toBeTruthy();
+
+    fireEvent.change(field, { target: { value: 'smnwm6' } });
+    expect(field.value).toBe('smnwm6');
+    expect(onSettle).toHaveBeenLastCalledWith(NO_FACETS);
+    fireEvent.change(field, { target: { value: 'smnwm6hn79x5' } });
+    expect(onSettle).toHaveBeenLastCalledWith({ ...NO_FACETS, recipient: ['SMNWM6HN79X5'] });
+
+    // The owner now holds what was typed: the field keeps the typing as it stands.
+    rerender(<Unset onSettle={onSettle} facets={{ ...NO_FACETS, recipient: ['SMNWM6HN79X5'] }} />);
+    expect(field.value).toBe('smnwm6hn79x5');
+    // A link followed sets another firm: the field shows it.
+    rerender(<Unset onSettle={onSettle} facets={{ ...NO_FACETS, recipient: ['JCBMLGPE6Z71'] }} />);
+    expect(field.value).toBe('JCBMLGPE6Z71');
+    rerender(<Unset onSettle={onSettle} facets={NO_FACETS} />);
+    expect(field.value).toBe('');
+  });
+
   it('[GOVU-14] shows what is set, releases a pressed chip, and unsets a select back to any', () => {
     const onCommit = vi.fn();
     const onSettle = vi.fn();

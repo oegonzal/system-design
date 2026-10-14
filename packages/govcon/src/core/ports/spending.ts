@@ -3,12 +3,21 @@ import type {
   AgencyDirectoryEntry,
   AgencyOfficesRequest,
   AgencyYear,
+  AwardBody,
+  AwardDetailRequest,
+  AwardOrders,
+  AwardSubawardsRequest,
+  AwardSubcontract,
   BreakdownRequest,
   CountRequest,
+  FacetId,
+  FirmRef,
   HorizonRequest,
   HorizonRow,
   SeriesRequest,
   SubAgencyObligations,
+  SubawardScopeRequest,
+  SubawardsRequest,
 } from '@sysdesign/contracts';
 
 import type { Attempted, Fetched } from '../budget';
@@ -81,6 +90,46 @@ export interface SpendingCounts extends SpendingPort {
   count(request: CountRequest): Promise<Attempted<Fetched<AwardCounts>>>;
 }
 
+/** One subcontract as its prime reported it. */
+export interface SubcontractRow {
+  prime: FirmRef;
+  subcontractor: FirmRef;
+  /** The prime award it was placed under, by the source's own id. */
+  primeAwardId: string | null;
+  amount: number;
+  /** ISO date. */
+  date: string | null;
+  /** The product service code of the prime award. */
+  pscCode: string | null;
+}
+
+/** One page of subcontracts, most recent first, and whether another follows. */
+export interface SubcontractPage {
+  rows: SubcontractRow[];
+  /** Records the source returned that did not normalize — counted, never kept. */
+  rejected: number;
+  hasMore: boolean;
+}
+
+export interface Subcontracts extends SpendingPort {
+  /** The facets a subcontract search cannot honour — a provider fact the adapter declares, so a lens reports the scope it really read. */
+  readonly unsupportedFacets: readonly FacetId[];
+  count(request: SubawardScopeRequest): Promise<Attempted<Fetched<number>>>;
+  page(request: SubawardsRequest): Promise<Attempted<Fetched<SubcontractPage>>>;
+}
+
+/** One award's own record, less the subcontractors read beside it. */
+export type AwardRecord = Omit<AwardBody, 'orders' | 'subcontracts'>;
+
+export interface AwardRecords extends SpendingPort {
+  /** Null when the source has no award by that id. */
+  detail(request: AwardDetailRequest): Promise<Attempted<Fetched<AwardRecord | null>>>;
+  /** What was ordered under a vehicle. */
+  orders(request: AwardDetailRequest): Promise<Attempted<Fetched<AwardOrders>>>;
+  /** The largest subcontracts reported under it, largest first. */
+  subcontracts(request: AwardSubawardsRequest): Promise<Attempted<Fetched<AwardSubcontract[]>>>;
+}
+
 export interface AgencyBudgets extends SpendingPort {
   budgets(request: AgencyBudgetRequest): Promise<Attempted<Fetched<AgencyYear[]>>>;
 }
@@ -113,6 +162,8 @@ export interface SpendingSources {
   breakdowns: SpendingBreakdowns;
   ending: EndingAwards;
   counts: SpendingCounts;
+  subcontracts: Subcontracts;
+  awards: AwardRecords;
   budgets: AgencyBudgets;
   offices: AgencyOffices;
   catalog: AgencyCatalog;

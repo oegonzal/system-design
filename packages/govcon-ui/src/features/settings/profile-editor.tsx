@@ -410,6 +410,35 @@ export function ProfileEditor({
         </Stack>
         <FieldIssues issues={issues} path="alerts" />
       </Section>
+
+      <Section
+        title="Teaming"
+        hint="The size of subcontract this company could take. The Primes lens ranks a prime by the subcontracts it reports inside it."
+      >
+        <Stack direction="row" gap={4} align="center" wrap>
+          <NumberField
+            label="Smallest subcontract (USD)"
+            value={value.teaming.subcontract.min}
+            min={0}
+            step={1000}
+            disabled={saving}
+            onChange={(min) =>
+              patch({ teaming: { subcontract: { ...value.teaming.subcontract, min } } })
+            }
+          />
+          <NumberField
+            label="Largest subcontract (USD)"
+            value={value.teaming.subcontract.max}
+            min={0}
+            step={1000}
+            disabled={saving}
+            onChange={(max) =>
+              patch({ teaming: { subcontract: { ...value.teaming.subcontract, max } } })
+            }
+          />
+        </Stack>
+        <FieldIssues issues={issues} path="teaming" />
+      </Section>
       <Text tone="muted" size="sm">
         Saved as one document; the service validates it whole and writes nothing on an issue.
       </Text>

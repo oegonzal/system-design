@@ -1,0 +1,23 @@
+{
+  "award_id": 351818111,
+  "generated_unique_award_id": "CONT_IDV_W912DY20D0079_9700",
+  "child_idv_count": 0,
+  "child_award_count": 9,
+  "child_award_total_obligation": 47594534.33,
+  "child_award_total_outlay": null,
+  "child_award_base_and_all_options_value": 78019542.82,
+  "child_award_base_exercised_options_val": 49482190.82,
+  "child_total_account_outlay": 0,
+  "child_total_account_obligation": 0,
+  "child_account_outlays_by_defc": [],
+  "child_account_obligations_by_defc": [],
+  "grandchild_award_count": 0,
+  "grandchild_award_total_obligation": 0.0,
+  "grandchild_award_total_outlay": null,
+  "grandchild_award_base_and_all_options_value": 0.0,
+  "grandchild_award_base_exercised_options_val": 0.0,
+  "grandchild_total_account_outlay": 0,
+  "grandchild_total_account_obligation": 0,
+  "grandchild_account_outlays_by_defc": [],
+  "grandchild_account_obligations_by_defc": []
+}

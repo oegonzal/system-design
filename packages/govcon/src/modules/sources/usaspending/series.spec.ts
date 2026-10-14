@@ -17,11 +17,12 @@ const request: SeriesRequest = {
 };
 
 describe('the USAspending series', () => {
-  it('[GOV-26] spells every facet as the source filters by it — the winner’s size, the set-asides with NONE for none, a dollar range with an open end left out, new awards as the window’s date type — and a placement names the award types outright, whatever family was asked', () => {
+  it('[GOV-26] spells every facet as the source filters by it — the firms by UEI, the winner’s size, the set-asides with NONE for none, a dollar range with an open end left out, new awards as the window’s date type — and a placement names the award types outright, whatever family was asked', () => {
     const narrowed = toSeriesBody({
       ...request,
       agency: null,
       facets: {
+        recipient: ['JCBMLGPE6Z71', 'SMNWM6HN79X5'],
         recipientSize: 'small',
         placement: 'standalone',
         setAside: ['NONE', 'SBA', 'SBP'],
@@ -37,6 +38,7 @@ describe('the USAspending series', () => {
         ],
         award_type_codes: ['B', 'D'],
         naics_codes: { require: ['332710', '541511'] },
+        recipient_search_text: ['JCBMLGPE6Z71', 'SMNWM6HN79X5'],
         recipient_type_names: ['small_business'],
         set_aside_type_codes: ['NONE', 'SBA', 'SBP'],
         award_amounts: [{ lower_bound: 15000.01, upper_bound: 350000 }],
@@ -58,6 +60,7 @@ describe('the USAspending series', () => {
       award_amounts: [{ lower_bound: 900000.01 }],
     });
     expect(open.filters).not.toHaveProperty('set_aside_type_codes');
+    expect(open.filters).not.toHaveProperty('recipient_search_text');
     expect(open.filters['time_period']).toEqual([
       { start_date: '2025-10-01', end_date: '2026-09-30' },
     ]);

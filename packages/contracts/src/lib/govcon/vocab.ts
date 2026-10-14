@@ -58,8 +58,9 @@ export type SourceCallOutcome = (typeof SOURCE_CALL_OUTCOMES)[number];
  * from `series` on are USAspending — one operation per endpoint, ledgered for
  * the record and priced at nothing: the obligation series, a category
  * breakdown, a page of the horizon walk, an agency's budget, its offices, the
- * agency directory, the source's own freshness, and a count of the awards a
- * scope holds. `exclusions` is reserved:
+ * agency directory, the source's own freshness, a count of the awards a
+ * scope holds, a count and a page of the subcontracts reported under it, and
+ * one award's own record and its subcontractors. `exclusions` is reserved:
  * a registration carries its exclusion flag, so the exclusions API is not
  * called today.
  */
@@ -79,6 +80,11 @@ export const SOURCE_OPERATIONS = [
   'agency-directory',
   'freshness',
   'award-count',
+  'subaward-count',
+  'subawards',
+  'award-detail',
+  'award-orders',
+  'award-subawards',
 ] as const;
 export type SourceOperation = (typeof SOURCE_OPERATIONS)[number];
 
@@ -138,6 +144,8 @@ export const SPENDING_LENSES = [
   'agency',
   'freshness',
   'reach',
+  'primes',
+  'award',
 ] as const;
 export type SpendingLens = (typeof SPENDING_LENSES)[number];
 

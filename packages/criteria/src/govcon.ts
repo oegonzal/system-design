@@ -210,7 +210,7 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
   {
     id: 'GOV-26',
     statement:
-      'A spending scope’s facets — the winner’s size, how the award was placed, its set-aside lanes, its dollar range, new awards only — are declared data: one table gives each its one spelling as a parameter, the request schema refuses a value outside it, every award search maps each facet through one table to the source’s filters, a placement makes the scope one of contracts whatever family was asked, and a snapshot is keyed by the scope’s one spelling at every depth.',
+      'A spending scope’s facets — the firms an award went to, the winner’s size, how the award was placed, its set-aside lanes, its dollar range, new awards only — are declared data: one table gives each its one spelling as a parameter, the request schema refuses a value outside it, every award search maps each facet through one table to the source’s filters, a placement makes the scope one of contracts whatever family was asked, and a snapshot is keyed by the scope’s one spelling at every depth.',
   },
   {
     id: 'GOV-27',
@@ -221,6 +221,16 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
     id: 'GOV-28',
     statement:
       'A saved view is an address inside the client that a profile keeps by name: an address that is not a path beginning with one slash is refused, saving under a name already kept replaces its address on the same row, views are listed by name and gone with their profile, and an unknown profile or view is a 404.',
+  },
+  {
+    id: 'GOV-29',
+    statement:
+      'The primes ranking reads a scope’s reported subcontracts within the profile’s size of subcontract, most recent first: one count, then pages up to MAX_SUBAWARD_PAGES inside the wall-clock deadline, each through the gate as its own operation. The same prime award, subcontractor and amount is counted once; a prime is its UEI, and its name only where the source gave none; and the answer says how many rows it read, how many repeated, how far back they reached and whether the source holds more. A facet a subcontract search cannot honour is unset in the scope answered, a scope narrowed to one firm ranks the primes that reported paying it, and rows the source cut short are answered and not kept.',
+  },
+  {
+    id: 'GOV-30',
+    statement:
+      'One award is read by the source’s own id through the gate: its holder and parent, buyer, vehicle, obligations against what it can reach, its end and its end with every option, how it was competed — a not-counted offers placeholder read as unknown in every source that relays it — what was ordered under it when it is itself a vehicle, its own orders and those placed through the vehicles awarded under it as one count and one total, and the largest subcontracts reported under it, joined on every read to the open stored notices sharing its NAICS and buyer. An id the source does not have is a 404; an award that is no vehicle and has no subcontracts reported costs one request.',
   },
   {
     id: 'GOV-21',

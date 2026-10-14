@@ -17,6 +17,7 @@ import {
 import { AWARD_SIZE_BANDS } from './thresholds';
 
 const EVERY: SpendingFacets = {
+  recipient: ['JCBMLGPE6Z71', 'SMNWM6HN79X5'],
   recipientSize: 'small',
   placement: 'standalone',
   setAside: ['NONE', 'SBA'],
@@ -34,6 +35,7 @@ describe('the spending facets', () => {
     expect(facetParams(NO_FACETS)).toEqual({});
     const params = facetParams(EVERY);
     expect(params).toEqual({
+      recipient: 'JCBMLGPE6Z71,SMNWM6HN79X5',
       recipientSize: 'small',
       placement: 'standalone',
       setAside: 'NONE,SBA',
@@ -47,10 +49,11 @@ describe('the spending facets', () => {
     expect(FACET_IDS).toEqual(Object.keys(SPENDING_FACETS));
   });
 
-  it('[GOV-26] leaves unset whatever an address says that it does not understand, and gives a list of codes one spelling', () => {
+  it('[GOV-26] leaves unset whatever an address says that it does not understand, gives a list of codes one spelling, and reads a typed UEI in capitals, dropping what is not one', () => {
     expect(
       facetsFromParams(
         reader({
+          recipient: ' smnwm6hn79x5 , not-a-uei, SMNWM6HN79X5',
           recipientSize: 'enormous',
           placement: '',
           setAside: ' SBP , NONE,SBP,,',
@@ -58,7 +61,7 @@ describe('the spending facets', () => {
           newOnly: 'yes',
         }),
       ),
-    ).toEqual({ ...NO_FACETS, setAside: ['NONE', 'SBP'] });
+    ).toEqual({ ...NO_FACETS, recipient: ['SMNWM6HN79X5'], setAside: ['NONE', 'SBP'] });
     expect(facetsOfQuery({ setAside: ['SBP', 'NONE', 'SBP'] }).setAside).toEqual(['NONE', 'SBP']);
     expect(facetQueryOf(NO_FACETS)).toEqual({});
     expect(facetsOfQuery(facetQueryOf(EVERY))).toEqual(EVERY);

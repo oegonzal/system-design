@@ -50,6 +50,33 @@ describe('the USAspending breakdowns', () => {
       { id: null, code: 'DOI', name: 'DOI', amount: 0 },
     ]);
 
+    // A recipient is ranked under its UEI: the source's own `code` for one is the retired DUNS number.
+    const firms = httpOf([
+      {
+        body: {
+          results: [
+            {
+              recipient_id: 'h-C',
+              name: 'CARAHSOFT TECHNOLOGY CORP',
+              code: '088365767',
+              uei: 'DT8KJHZXVJH5',
+              amount: 5,
+            },
+            { recipient_id: null, name: null, code: null, uei: null, amount: 9 },
+          ],
+          page_metadata: { hasNext: false },
+        },
+      },
+    ]);
+    const ranked = await new UsaSpendingBreakdowns(firms.http).breakdown({
+      ...request,
+      category: 'recipient',
+    });
+    expect(okValue(ranked.result).rows).toEqual([
+      { id: null, code: 'DT8KJHZXVJH5', name: 'CARAHSOFT TECHNOLOGY CORP', amount: 5 },
+      { id: null, code: null, name: '(unnamed)', amount: 9 },
+    ]);
+
     const odd = httpOf([{ body: { results: 'nope' } }]);
     expect((await new UsaSpendingBreakdowns(odd.http).breakdown(request)).result).toMatchObject({
       kind: 'error',

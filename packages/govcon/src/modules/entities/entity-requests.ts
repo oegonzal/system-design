@@ -1,7 +1,7 @@
-import { MAX_UEI_BATCH, type LookupEntitiesRequest } from '@sysdesign/contracts';
+import { MAX_UEI_BATCH, UEI_SHAPE, type LookupEntitiesRequest } from '@sysdesign/contracts';
 import { z } from 'zod';
 
-export const ueiSchema = z.string().regex(/^[A-Z0-9]{12}$/, 'a UEI is twelve letters and digits');
+export const ueiSchema = z.string().regex(UEI_SHAPE, 'a UEI is twelve letters and digits');
 
 /** The body of `POST /entities/lookup`: at most one batch per request. */
 export const lookupEntitiesRequestSchema = z.strictObject({

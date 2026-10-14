@@ -1,5 +1,6 @@
 import {
   DEFAULT_ALERT_POLICY,
+  DEFAULT_TEAMING_POLICY,
   MAX_ALERT_ENDING_DAYS,
   type SearchProfile,
 } from '@sysdesign/contracts';
@@ -17,6 +18,27 @@ describe('the search profile', () => {
   it('[GOV-5] [GOV-24] reads a document without an alert policy as the declared default', () => {
     const { alerts: _alerts, ...bare } = tinyProfile();
     expect(validateProfile(bare).alerts).toEqual(DEFAULT_ALERT_POLICY);
+  });
+
+  it('[GOV-5] [GOV-29] reads a document without a teaming policy as the declared default, and refuses a smallest subcontract above the largest with the path named', () => {
+    const { teaming: _teaming, ...bare } = tinyProfile();
+    expect(validateProfile(bare).teaming).toEqual(DEFAULT_TEAMING_POLICY);
+    expect(validateProfile(ENFAV).teaming).toEqual({
+      subcontract: { min: 50_000, max: 2_000_000 },
+    });
+    const inverted = parseProfile({
+      ...tinyProfile(),
+      teaming: { subcontract: { min: 2_000_000, max: 50_000 } },
+    });
+    expect(inverted).toEqual({
+      ok: false,
+      issues: [
+        {
+          path: 'teaming.subcontract',
+          message: 'the smallest subcontract must not be above the largest',
+        },
+      ],
+    });
   });
 
   it('[GOV-5] accepts the tiny profile and the shipped Enfav profile', () => {

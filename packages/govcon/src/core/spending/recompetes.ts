@@ -18,8 +18,11 @@ import type { CandidateFilter } from '../ports';
  * join is those two and nothing read off a name.
  */
 
+/** What the join reads of an award: its id and the two facts it shares with a notice. */
+export type JoinedAward = Pick<HorizonRow, 'externalId' | 'naicsCode' | 'agencyCode'>;
+
 /** The distinct NAICS codes the rows name, sorted — what the store is asked for; empty when no row has one. */
-export const horizonNaics = (rows: readonly HorizonRow[]): string[] =>
+export const horizonNaics = (rows: readonly JoinedAward[]): string[] =>
   [...new Set(rows.flatMap((row) => (row.naicsCode === null ? [] : [row.naicsCode])))].sort();
 
 /**
@@ -63,7 +66,7 @@ const byDeadlineThenId = (a: NoticeRef, b: NoticeRef): number => {
  * Rows keep the order given.
  */
 export function matchOpenNotices(
-  rows: readonly HorizonRow[],
+  rows: readonly JoinedAward[],
   notices: readonly Opportunity[],
 ): HorizonNoticeMatch[] {
   const byKey = new Map<string, NoticeRef[]>();

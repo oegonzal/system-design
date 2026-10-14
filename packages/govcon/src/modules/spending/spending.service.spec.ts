@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import {
   agencyDirectoryEntryOf,
+  awardBodyOf,
   horizonRowOf,
   NO_FACETS,
   noticeRefOf,
@@ -22,6 +23,7 @@ import {
   type SpendingScript,
 } from '../../core/spending/testing';
 import { failure, InMemoryOpportunityRepository, InMemorySourceCallLog } from '../../core/testing';
+import { pulseQuerySchema } from './spending-requests';
 import { SpendingService } from './spending.service';
 
 const T0 = new Date('2026-06-15T12:00:00Z');
@@ -77,14 +79,8 @@ function harness({
   };
 }
 
-/** A scope as the request schema hands it on: no facet set. */
-const scope = {
-  naics: ['332710'],
-  psc: [],
-  awardFamily: 'both' as const,
-  setAside: [],
-  newOnly: false,
-};
+/** A scope as the request schema hands it on: every facet at the schema's own default, so a new facet needs nothing here. */
+const { lookback: _lookback, ...scope } = pulseQuerySchema.parse({ naics: '332710' });
 
 describe('the spending service', () => {
   it('[GOV-20] answers the pulse from the source once, then from the snapshot inside the TTL with no new ledger row, keyed on the fiscal period the clock names', async () => {
@@ -206,6 +202,79 @@ describe('the spending service', () => {
     const second = await service.horizon({ ...scope, awardFamily: 'contracts', months: 6 });
     expect(second.provenance.servedFrom).toBe('snapshot');
     expect(second.openNotices[0]?.notices.map((notice) => notice.noticeId)).toEqual(['n-2', 'n-1']);
+  });
+
+  it('[GOV-29] [GOV-30] ranks a scope’s primes through the snapshot cache, and answers one award with the open stored notices sharing its NAICS and buyer joined on every read — an id the source does not have a 404', async () => {
+    const notices = new InMemoryOpportunityRepository();
+    await notices.upsertMany([opportunityOf()], T0);
+    const {
+      orders: _orders,
+      subcontracts: _roster,
+      ...record
+    } = awardBodyOf({
+      naicsCode: '332710',
+      agencyCode: '097.97AS',
+      subcontractCount: 0,
+    });
+    const { service, operations, advance } = harness({
+      notices,
+      script: {
+        subawardCounts: [fetchedOf(1)],
+        subawards: [
+          fetchedOf({
+            rows: [
+              {
+                prime: { uei: 'JCBMLGPE6Z71', name: 'BOOZ ALLEN HAMILTON INC.' },
+                subcontractor: { uei: 'JLW7WAKPEKD4', name: 'TELOS CORPORATION' },
+                primeAwardId: record.externalId,
+                amount: 250_000,
+                date: '2025-09-19',
+                pscCode: 'D310',
+              },
+            ],
+            rejected: 0,
+            hasMore: false,
+          }),
+        ],
+        awardDetails: [fetchedOf(record), fetchedOf(null)],
+      },
+    });
+    const query = {
+      ...scope,
+      from: '2024-10-01',
+      to: '2025-09-30',
+      band: { min: 50_000, max: 2_000_000 },
+    };
+    const primes = await service.primes(query);
+    expect(primes).toMatchObject({
+      total: 1,
+      read: 1,
+      capped: false,
+      primes: [{ uei: 'JCBMLGPE6Z71', subcontracts: 1, subcontractors: 1 }],
+      provenance: { servedFrom: 'source', requests: 3 },
+    });
+    advance(60_000);
+    expect((await service.primes(query)).provenance.servedFrom).toBe('snapshot');
+    // Another size of subcontract is another question.
+    expect((await service.primes({ ...query, band: undefined })).provenance.servedFrom).toBe(
+      'source',
+    );
+
+    const before = operations().length;
+    const award = await service.award(record.externalId);
+    expect(award).toMatchObject({ piid: record.piid, subcontracts: [] });
+    expect(award.openNotices).toEqual([noticeRefOf(opportunityOf())]);
+    expect(operations().slice(before)).toEqual(['award-detail']);
+    // A snapshot read still joins what the store holds now.
+    await notices.upsertMany(
+      [opportunityOf({ noticeId: 'n-2', responseDeadlineAt: '2026-09-01T00:00:00.000Z' })],
+      T0,
+    );
+    const again = await service.award(record.externalId);
+    expect(again.provenance.servedFrom).toBe('snapshot');
+    expect(again.openNotices.map((notice) => notice.noticeId)).toEqual(['n-2', 'n-1']);
+
+    await expect(service.award('CONT_AWD_NOPE')).rejects.toBeInstanceOf(NotFoundException);
   });
 
   it('[GOV-8] [GOV-20] an unknown agency is a 404, a spent budget a 503, a rate limit a 503, a provider error a 502, and a fiscal year after the current one a 400', async () => {

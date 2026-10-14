@@ -30,6 +30,18 @@ const agree = <T>(held: T | null, asked: T | null | undefined): T | null | 'impo
   return held === null || held === asked ? asked : 'impossible';
 };
 
+/** Two lists of codes as the codes both name: either when the other names none, or `impossible` when they share none. */
+const meet = (
+  held: readonly string[],
+  asked: readonly string[] | undefined,
+): string[] | 'impossible' => {
+  const wanted = facetCodesOf(asked ?? []);
+  if (wanted.length === 0) return [...held];
+  if (held.length === 0) return wanted;
+  const shared = wanted.filter((code) => held.includes(code));
+  return shared.length === 0 ? 'impossible' : shared;
+};
+
 /** `facets` narrowed by `by`; null when nothing can satisfy both. */
 export function narrowFacets(
   facets: SpendingFacets,
@@ -37,16 +49,16 @@ export function narrowFacets(
 ): SpendingFacets | null {
   const recipientSize = agree(facets.recipientSize, by.recipientSize);
   const placement = agree(facets.placement, by.placement);
-  if (recipientSize === 'impossible' || placement === 'impossible') return null;
-
-  const asked = facetCodesOf(by.setAside ?? []);
-  const setAside =
-    asked.length === 0
-      ? facets.setAside
-      : facets.setAside.length === 0
-        ? asked
-        : asked.filter((code) => facets.setAside.includes(code));
-  if (asked.length > 0 && setAside.length === 0) return null;
+  const recipient = meet(facets.recipient, by.recipient);
+  const setAside = meet(facets.setAside, by.setAside);
+  if (
+    recipientSize === 'impossible' ||
+    placement === 'impossible' ||
+    recipient === 'impossible' ||
+    setAside === 'impossible'
+  ) {
+    return null;
+  }
 
   const amount =
     by.amount === null || by.amount === undefined
@@ -57,6 +69,7 @@ export function narrowFacets(
   if (by.amount !== null && by.amount !== undefined && amount === null) return null;
 
   return {
+    recipient,
     recipientSize,
     placement,
     setAside,
