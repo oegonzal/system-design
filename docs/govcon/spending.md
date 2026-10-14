@@ -296,6 +296,34 @@ the ranking's bound: a firm that is not among the `PRIMES_LISTED` primes
 reporting the most is said to be outside it, with the count the last listed
 prime reported.
 
+**Who holds the work a notice is about** is on the notice's own page, under
+the panel "Who holds this work". The Horizon joins an expiring award to the
+open notices at its buyer; this is the same join read the other way. A
+button asks for it, and says it is free; nothing is read until it is
+pressed. The read is the Horizon over the notice's NAICS code and its
+product service code, ending inside the next `INCUMBENT_HORIZON_MONTHS`
+(24), with the buyer's department as the agency when the directory lists
+it, and only the awards at the notice's own sub-agency are kept. Each is a
+link to its award page, and its holder a link to the firm. The panel says
+how many the scope listed and how far the list is complete. Untick "Only
+under PSC" to drop the product service code: many more requests, and a
+list complete only for the nearest months. A notice with no NAICS code, or
+a buyer named only down to its department, says which fact it lacks and
+reads nothing.
+
+The join is on agency codes, never names: SAM.gov files the Army under its
+own department code and USAspending under Defense, and the source ORs the
+entries of an agency filter, so a sub-agency cannot be asked for beside its
+department. Measured 2026-10-14 on the Army's Electronic Security System
+VIII solicitation:
+
+| Scope                     | Listed | At the buyer | Requests | Complete               |
+| ------------------------- | ------ | ------------ | -------- | ---------------------- |
+| NAICS 541512 and PSC J059 | 58     | 56           | 2        | yes                    |
+| NAICS 541512, any PSC     | 200    | 4            | 53       | only before 2027-06-03 |
+
+These are candidates, not a confirmed match: the panel says so.
+
 ### Agency — how much is left
 
 The directory of toptier agencies with their budget authority. Picking one
@@ -433,13 +461,15 @@ the way SAM.gov writes a notice's; a name's own dots are dropped when the
 path is built, so `U.S. Coast Guard` is stored and shown as `US Coast Guard`.
 Pure arithmetic lives in
 `packages/govcon/src/core/spending/` (the series aligner, the projection,
-the horizon walk, the agency alignment, the recompete join, the alert rules,
-how a publication delay marks a period, and how facets narrow cut by cut);
-one adapter per USAspending endpoint lives in
-`packages/govcon/src/modules/sources/usaspending/`; the warm, the alert
-ledger and the bus sink in `packages/govcon/src/modules/spending/`; saved
-views in `packages/govcon/src/modules/views/`. The criteria are `GOV-20..30`
-and `GOVU-11..19` in `packages/criteria`.
+the horizon walk, the agency alignment, the recompete join and its reverse
+for a notice's incumbents, how a publication delay marks a period, and how
+facets narrow cut by cut), and the alert rules with their digest in
+`packages/govcon/src/core/alerts/`; one adapter per USAspending endpoint
+lives in `packages/govcon/src/modules/sources/usaspending/`; the warm in
+`packages/govcon/src/modules/spending/warm/`; the alert raiser, the ledger
+and the bus sink in `packages/govcon/src/modules/alerts/`; saved views in
+`packages/govcon/src/modules/views/`. The criteria are `GOV-20..30`,
+`GOV-32..34`, `GOVU-11..19`, `GOVU-21` and `GOVU-24` in `packages/criteria`.
 
 ## How to use the tools
 
@@ -458,6 +488,7 @@ curl -s 'localhost:3004/spending/primes?naics=541511,541512,541519&awardFamily=c
 curl -s 'localhost:3004/spending/primes?naics=541511&from=2023-10-01&to=2025-09-30&recipient=JLW7WAKPEKD4' | jq '.data.primes[:5]'
 curl -s 'localhost:3004/spending/awards/CONT_AWD_W912DY23F0468_9700_W912DY20D0079_9700' | jq '.data | {piid, endsAt, endsWithOptionsAt, vehicle, competition}'
 curl -s 'localhost:3004/spending/horizon?naics=541511&months=12' | jq '.data | {capped, stoppedBy, completeBefore, rows: (.rows|length), open: (.openNotices|length)}'
+curl -s 'localhost:3004/spending/incumbents/<noticeId>' | jq '.data | {gap, listed, capped, rows: [.rows[]|{endsAt, piid, recipientName}]}'
 curl -s 'localhost:3004/spending/agencies' | jq '.data.entries | length'
 curl -s 'localhost:3004/spending/agencies/097?fiscalYear=2026' | jq '.data | {name, years: [.years[]|{fiscalYear, periods: (.byPeriod|length)}]}'
 ```
