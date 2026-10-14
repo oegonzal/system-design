@@ -141,6 +141,15 @@ export interface MemoryProbe {
   filter?: ProbeFilter;
 }
 
+/**
+ * What a point retraction met at its address. A point whose payload this
+ * build cannot read is none of its memories — a search passes it by — so it
+ * is left standing, and answered as held rather than as a point the store
+ * never had.
+ */
+export type PointRetraction =
+  { status: 'removed'; memory: MemoryChunk } | { status: 'unreadable' } | { status: 'not-held' };
+
 export interface MemoryStore {
   /** Reachable and bound to a model? Derived facts, reported as data. */
   verify(): Promise<MemoryStoreAvailabilityDto>;
@@ -186,9 +195,10 @@ export interface MemoryStore {
    * One point gone, by the run that stored it and its ref within that run — a
    * fact since corrected, when the rest of its run still holds. Answers the
    * memory as it was held, because the store keeps nothing of a point once it
-   * is gone; a point the store never held removes nothing and answers null.
+   * is gone. A point the store never held removes nothing, and so does one
+   * this build cannot read, which stays where it is.
    */
-  retractPoint(point: PointRef): Promise<MemoryChunk | null>;
+  retractPoint(point: PointRef): Promise<PointRetraction>;
 }
 
 export interface EmbeddingCache {

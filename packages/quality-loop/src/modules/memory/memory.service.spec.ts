@@ -1,5 +1,6 @@
+import { Logger } from '@nestjs/common';
 import type { OrchestrationRunDto, QualityRunDto } from '@sysdesign/contracts';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { toRunDto } from '../../core/contracts';
 import { contentHash, type MemoryPorts } from '../../orchestrators/memory/ports';
@@ -227,5 +228,28 @@ describe('the memory service’s retractions', () => {
     // A store it cannot reach is a failure, never an answer that nothing was held.
     store.unreachable = true;
     await expect(service.retractPoint('run-a', 'memory.1')).rejects.toThrow(/unreachable/);
+  });
+  it('[QL-70] a point held but unreadable by this build answers null as a point never held does, and the log tells the two apart', async () => {
+    const ports = memoryPorts();
+    const store = ports.store as InMemoryMemoryStore;
+    // What the adapter answers for a payload this build would not write; the fake only holds chunks it wrote.
+    vi.spyOn(store, 'retractPoint').mockResolvedValueOnce({ status: 'unreadable' });
+    const warned = vi.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+    const logged = vi.spyOn(Logger.prototype, 'log').mockImplementation(() => undefined);
+    const service = serviceOver(ports);
+
+    const unreadable = await service.retractPoint('run-a', 'memory.1');
+    const missing = await service.retractPoint('run-c', 'memory.1');
+    const warnings = warned.mock.calls.map(([message]) => message);
+    const lines = logged.mock.calls.map(([message]) => message);
+    warned.mockRestore();
+    logged.mockRestore();
+
+    expect(unreadable).toEqual({ runId: 'run-a', ref: 'memory.1', removed: null });
+    expect(missing).toEqual({ runId: 'run-c', ref: 'memory.1', removed: null });
+    expect(warnings).toEqual([
+      'memory memory.1 of run run-a held but unreadable by this build: nothing removed',
+    ]);
+    expect(lines).toEqual(['memory memory.1 of run run-c not held: nothing removed']);
   });
 });

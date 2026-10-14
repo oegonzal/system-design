@@ -1,7 +1,7 @@
 import { QdrantClient } from '@qdrant/js-client-rest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { collectionName, INDEXED_FIELDS, pointId } from './collection';
+import { collectionName, INDEXED_FIELDS, pointId, toPayload } from './collection';
 import { DEFAULT_QDRANT_URL, QdrantMemoryStore } from './qdrant-memory-store';
 import { hitOf } from '../../../orchestrators/memory/testing';
 import { vectorOf } from '../testing';
@@ -235,23 +235,54 @@ describe('the Qdrant memory store', () => {
 
     // The memory as stored — read back through the payload, never its vectors or keys.
     expect(await store.retractPoint({ runId: 'run-p1', ref: 'memory.1' })).toEqual({
-      text: corrected.text,
-      contentHash: corrected.contentHash,
-      model,
-      evidence: corrected.evidence,
-      digestRunId: null,
-      lineage: null,
-      source: corrected.source,
-      scope: 'unit',
+      status: 'removed',
+      memory: {
+        text: corrected.text,
+        contentHash: corrected.contentHash,
+        model,
+        evidence: corrected.evidence,
+        digestRunId: null,
+        lineage: null,
+        source: corrected.source,
+        scope: 'unit',
+      },
     });
     expect((await store.verify()).chunks).toBe(before + 2);
-    expect(await store.retractPoint({ runId: 'run-p1', ref: 'memory.1' })).toBeNull();
-    expect(await store.retractPoint({ runId: 'run-p3', ref: 'memory.1' })).toBeNull();
+    expect(await store.retractPoint({ runId: 'run-p1', ref: 'memory.1' })).toEqual({
+      status: 'not-held',
+    });
+    expect(await store.retractPoint({ runId: 'run-p3', ref: 'memory.1' })).toEqual({
+      status: 'not-held',
+    });
     expect((await store.verify()).chunks).toBe(before + 2);
 
     // What stands is the run's other point and the other run's point under the same ref.
     expect(await store.retractRun('run-p1')).toBe(1);
     expect(await store.retractRun('run-p2')).toBe(1);
+    expect((await store.verify()).chunks).toBe(before);
+  });
+  it('[QL-70] leaves a point it cannot read where it stands, and answers it as held but unreadable, never as a point it does not hold', async () => {
+    const before = (await store.verify()).chunks;
+    const collection = collectionName(model, DIMENSIONS);
+    const written = chunk('page the listing by its cursor', 'run-u1', 'memory.1');
+    const id = pointId('run-u1', 'memory.1');
+    // What a newer build might write: the payload this one writes, plus a key it does not declare.
+    const payload = { ...toPayload(written, '2026-10-13T00:00:00.000Z'), writtenLater: true };
+    await client.upsert(collection, {
+      wait: true,
+      points: [{ id, vector: written.vectors, payload }],
+    });
+    expect((await store.verify()).chunks).toBe(before + 1);
+
+    expect(await store.retractPoint({ runId: 'run-u1', ref: 'memory.1' })).toEqual({
+      status: 'unreadable',
+    });
+    // Nothing removed: the point stands at its id with the payload it was written with.
+    expect((await store.verify()).chunks).toBe(before + 1);
+    const standing = (await client.retrieve(collection, { ids: [id], with_payload: true })).at(0);
+    expect(standing?.payload).toEqual(payload);
+
+    expect(await store.retractRun('run-u1')).toBe(1);
     expect((await store.verify()).chunks).toBe(before);
   });
 });

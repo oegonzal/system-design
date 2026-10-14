@@ -168,17 +168,27 @@ export class MemoryService implements OnModuleInit {
    * ref within it — a fact since corrected, when the rest of its run still
    * holds. The store keeps nothing of a point once it is gone, so the answer
    * and the log carry what went: its text, its kind and the scope it was
-   * stored with. A point the store never held removes nothing and is no error.
+   * stored with. Nothing removed is no error, and answers `removed: null`
+   * whether the store held no such point or held one this build cannot read,
+   * which stays; the log says which.
    */
   async retractPoint(runId: string, ref: string): Promise<RetractedMemoryPointDto> {
-    const held = await this.ports.store.retractPoint({ runId, ref });
-    if (held === null) {
-      this.logger.log(`memory ${ref} of run ${runId} not held: nothing removed`);
-      return { runId, ref, removed: null };
+    const found = await this.ports.store.retractPoint({ runId, ref });
+    const point = `memory ${ref} of run ${runId}`;
+    switch (found.status) {
+      case 'removed': {
+        const { text, source, scope } = found.memory;
+        const removed = { text, kind: source.kind, scope: scope ?? null };
+        this.logger.log(`${point} retracted (${removed.kind}): ${removed.text}`);
+        return { runId, ref, removed };
+      }
+      case 'unreadable':
+        this.logger.warn(`${point} held but unreadable by this build: nothing removed`);
+        return { runId, ref, removed: null };
+      case 'not-held':
+        this.logger.log(`${point} not held: nothing removed`);
+        return { runId, ref, removed: null };
     }
-    const removed = { text: held.text, kind: held.source.kind, scope: held.scope ?? null };
-    this.logger.log(`memory ${ref} of run ${runId} retracted (${removed.kind}): ${removed.text}`);
-    return { runId, ref, removed };
   }
 
   /**

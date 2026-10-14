@@ -10,11 +10,11 @@ import { describeError } from '@sysdesign/run-dump';
 import {
   VECTOR_NAMES,
   type ChunkKindScope,
-  type MemoryChunk,
   type MemoryHit,
   type MemoryProbe,
   type MemoryStore,
   type PointRef,
+  type PointRetraction,
   type ProbeFilter,
   type StoredChunk,
 } from '../../../orchestrators/memory/ports';
@@ -148,15 +148,17 @@ export class QdrantMemoryStore implements MemoryStore {
    * and a retrieve answers only the ids the collection holds, so a point never
    * stored comes back as nothing and nothing is deleted. A point whose payload
    * this module would not write is none of its memories — a search skips it —
-   * and is left standing.
+   * so it is left standing and answered as unreadable, never as absent.
    */
-  async retractPoint(point: PointRef): Promise<MemoryChunk | null> {
+  async retractPoint(point: PointRef): Promise<PointRetraction> {
     const collection = await this.bound();
     const id = pointId(point.runId, point.ref);
     const held = (await this.client.retrieve(collection, { ids: [id], with_payload: true })).at(0);
-    const memory = held === undefined ? null : fromPayload(held.payload);
-    if (memory !== null) await this.client.delete(collection, { wait: true, points: [id] });
-    return memory;
+    if (held === undefined) return { status: 'not-held' };
+    const memory = fromPayload(held.payload);
+    if (memory === null) return { status: 'unreadable' };
+    await this.client.delete(collection, { wait: true, points: [id] });
+    return { status: 'removed', memory };
   }
 
   /**

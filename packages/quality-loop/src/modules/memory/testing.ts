@@ -12,11 +12,11 @@ import { CachedEmbeddings } from '../../orchestrators/memory/embeddings';
 import type {
   ChunkKindScope,
   EmbeddingCache,
-  MemoryChunk,
   MemoryHit,
   MemoryProbe,
   MemoryStore,
   PointRef,
+  PointRetraction,
   ProbeFilter,
   StoredChunk,
 } from '../../orchestrators/memory/ports';
@@ -176,13 +176,18 @@ export class InMemoryMemoryStore implements MemoryStore {
     return Promise.resolve(removed);
   }
 
-  /** As the adapter does: the point at `(runId, ref)` goes and answers as it was held; one never stored is null. */
-  retractPoint(point: PointRef): Promise<MemoryChunk | null> {
+  /**
+   * As the adapter does: the point at `(runId, ref)` goes and answers as it was
+   * held, and one never stored is not held. Every point here is a chunk this
+   * build wrote, so none answers unreadable.
+   */
+  retractPoint(point: PointRef): Promise<PointRetraction> {
     if (this.unreachable) return Promise.reject(new Error('store unreachable'));
     const id = pointId(point.runId, point.ref);
-    const held = this.points.get(id) ?? null;
+    const held = this.points.get(id);
+    if (held === undefined) return Promise.resolve({ status: 'not-held' });
     this.points.delete(id);
-    return Promise.resolve(held);
+    return Promise.resolve({ status: 'removed', memory: held });
   }
 
   /** As the adapter does: the counts are set on points that stand, and an unknown point is left alone. */

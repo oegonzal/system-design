@@ -403,14 +403,16 @@ writer per digest run — which is how a document taught or ingested again close
 behind itself (`memory-ingest ingest` once the store holds every fact of a
 document's current text, `memory-ingest retract` retiring one,
 `browser-session teach-again`); a run the store never held removes nothing and
-is no error. `DELETE /memory/:id/points/:ref` retracts one point of such a
-run — the memory it stored under that ref — for a fact since corrected while
-the rest of its digest still holds, and answers the text, kind and scope it
-held, the only record of it once the point is gone; a point the store never
-held answers `removed: null`. The literal `points` is what keeps an empty ref
-from retracting the whole run: Express leaves `strict routing` off, so
-`/memory/<run>/` is the run's own address, while `/memory/<run>/points/`
-matches no route and answers 404. It is the operator's: no client calls it.
+is no error. `DELETE
+/memory/:id/points/:ref` retracts one point of such a run — the memory it stored
+under that ref — for a fact since corrected while the rest of its digest still
+holds, and answers the text, kind and scope it held, the only record of it once
+the point is gone; a point the store never held answers `removed: null`, and so
+does one whose payload this build cannot read, which is left standing and
+logged as held. The literal `points` is what keeps an empty ref from retracting
+the whole run: Express leaves `strict routing` off, so `/memory/<run>/` is the
+run's own address, while `/memory/<run>/points/` matches no route and is a 404.
+It is the operator's: no client calls it.
 
 Guards, before any row exists: an unknown orchestrator is a 404; a pipeline
 not in `RunsService.list()` is a 404, the same as `POST /runs`; whatever the

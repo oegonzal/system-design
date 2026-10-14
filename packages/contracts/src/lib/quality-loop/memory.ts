@@ -89,8 +89,10 @@ export type RetractMemoryRunResponse = ApiResponse<RetractedMemoryRunDto>;
  * gone from the store — a fact since corrected, when the rest of its run still
  * holds. The store keeps nothing of a point once it is gone, so the answer
  * carries what it held: its text, its kind, and the scope it was stored with
- * (null on a point stored without one). A point the store never held removes
- * nothing and is no error: `removed` is null.
+ * (null on a point stored without one). `removed` is null when nothing went,
+ * which is no error, and covers two cases the service's log tells apart: the
+ * store held no point at that address, or held one whose payload this build
+ * cannot read, which is left standing.
  */
 export interface RetractedMemoryPointDto {
   runId: string;
