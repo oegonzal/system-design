@@ -2,8 +2,8 @@ import type { OrchestrationRunDto, QualityRunDto } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { toRunDto } from '../../core/contracts';
-import { contentHash } from '../../orchestrators/memory/ports';
-import { childRun, memoryPorts } from '../../orchestrators/memory/steps.testing';
+import { contentHash, type MemoryPorts } from '../../orchestrators/memory/ports';
+import { childRun, memoryPorts, sampleHits } from '../../orchestrators/memory/steps.testing';
 import { ACCEPT_AT, digestInput, readoutTrace } from '../../orchestrators/memory/testing';
 import { fromRun } from '../../pipelines/experience-digest/from-run';
 import { renderGoal as renderRecord } from '../../pipelines/experience-digest/input';
@@ -50,6 +50,13 @@ const memoryRun = (digestRunId: string, targetRunId: string): OrchestrationRunDt
     },
     error: null,
   };
+};
+
+/** The service over these ports alone: a retraction reads no run and no orchestration record. */
+const serviceOver = (ports: MemoryPorts): MemoryService => {
+  const runs = { get: () => Promise.resolve(null) } as unknown as RunsService;
+  const records = { find: () => Promise.resolve(null) } as unknown as OrchestrationRunRepository;
+  return new MemoryService(runs, ports, records);
 };
 
 describe('the memory service’s re-index', () => {
@@ -124,6 +131,9 @@ describe('the memory service’s re-index', () => {
     await expect(service.reindex('not-a-uuid')).rejects.toThrow(/not found/);
     await expect(service.reindex(undigested.orchestrationRunId)).rejects.toThrow(/digested no run/);
   });
+});
+
+describe('the memory service’s retractions', () => {
   it('[QL-70] retracts every point a digest run stored and nothing else; a run the store never held removes nothing', async () => {
     const ports = memoryPorts();
     const store = ports.store as InMemoryMemoryStore;
@@ -150,14 +160,72 @@ describe('the memory service’s re-index', () => {
         vectors: { condition: [0, 1, 0, 0, 0, 0, 0, 0], lesson: [0, 1, 0, 0, 0, 0, 0, 0] },
       },
     ]);
-    const service = new MemoryService(
-      { get: () => Promise.resolve(null) } as unknown as RunsService,
-      ports,
-      { find: () => Promise.resolve(null) } as unknown as OrchestrationRunRepository,
-    );
+    const service = serviceOver(ports);
 
     expect(await service.retract('run-a')).toEqual({ runId: 'run-a', removed: seeded });
     expect([...store.points.values()].map((chunk) => chunk.source.runId)).toEqual(['run-b']);
     expect(await service.retract('run-a')).toEqual({ runId: 'run-a', removed: 0 });
+  });
+  it('[QL-70] retracts one memory by its run and ref and answers what it held; the run’s other memories and another run’s same ref stand, and a point never held removes nothing', async () => {
+    const ports = memoryPorts();
+    const store = ports.store as InMemoryMemoryStore;
+    const text = 'Alex Example works on the orders team at Acme.';
+    await store.replaceRunChunks('run-b', [
+      {
+        text,
+        keys: { condition: 'a form asks whether the subject works at Acme', lesson: text },
+        contentHash: contentHash(text),
+        source: {
+          runId: 'run-b',
+          pipeline: 'document-digest',
+          kind: 'profile_fact',
+          ref: 'memory.1',
+          decision: 'accept',
+          iteration: 1,
+          when: '2026-10-12',
+        },
+        evidence: [{ kind: 'section', ref: 'section.1' }],
+        digestRunId: 'run-b',
+        lineage: null,
+        model: 'fake-embedding',
+        vectors: { condition: [0, 0, 1, 0, 0, 0, 0, 0], lesson: [0, 0, 1, 0, 0, 0, 0, 0] },
+        scope: 'unit',
+      },
+    ]);
+    const service = serviceOver(ports);
+    const standing = () =>
+      [...store.points.values()].map(({ source }) => `${source.runId} ${source.ref}`);
+    expect(standing()).toEqual(['run-a memory.1', 'run-a memory.2', 'run-b memory.1']);
+
+    // The same ref under another run is another point: run-a's memory.1 stands.
+    expect(await service.retractPoint('run-b', 'memory.1')).toEqual({
+      runId: 'run-b',
+      ref: 'memory.1',
+      removed: { text, kind: 'profile_fact', scope: 'unit' },
+    });
+    // A memory stored without a scope answers null for it, and its run's other memory stands.
+    expect(await service.retractPoint('run-a', 'memory.2')).toEqual({
+      runId: 'run-a',
+      ref: 'memory.2',
+      removed: { text: sampleHits[1].text, kind: 'lesson', scope: null },
+    });
+    expect(standing()).toEqual(['run-a memory.1']);
+
+    // Retracted already, or never stored: nothing removed, and no error.
+    expect(await service.retractPoint('run-a', 'memory.2')).toEqual({
+      runId: 'run-a',
+      ref: 'memory.2',
+      removed: null,
+    });
+    expect(await service.retractPoint('run-c', 'memory.1')).toEqual({
+      runId: 'run-c',
+      ref: 'memory.1',
+      removed: null,
+    });
+    expect(standing()).toEqual(['run-a memory.1']);
+
+    // A store it cannot reach is a failure, never an answer that nothing was held.
+    store.unreachable = true;
+    await expect(service.retractPoint('run-a', 'memory.1')).rejects.toThrow(/unreachable/);
   });
 });

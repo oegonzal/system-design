@@ -21,7 +21,7 @@ import {
   EVIDENCE_KINDS,
   type ChunkFacets,
   type IndexedChunk,
-  type MemoryHit,
+  type MemoryChunk,
   type VectorName,
 } from '../../../orchestrators/memory/ports';
 import { chunkSourceSchema } from '../../../pipelines/memory-recall/input';
@@ -184,8 +184,11 @@ function facetsOf(payload: ChunkPayload): ChunkFacets | undefined {
   return entries.length === 0 ? undefined : (Object.fromEntries(entries) as ChunkFacets);
 }
 
-/** A hit from a stored payload, or null for a point this module did not write. */
-export function fromPayload(payload: unknown, score: number): MemoryHit | null {
+/**
+ * The memory a stored payload holds, or null for a point this module did not
+ * write. A search's score is the search's, not the payload's: a hit adds it.
+ */
+export function fromPayload(payload: unknown): MemoryChunk | null {
   const parsed = payloadSchema.safeParse(payload);
   if (!parsed.success) return null;
   const {
@@ -209,8 +212,8 @@ export function fromPayload(payload: unknown, score: number): MemoryHit | null {
     scope,
     ...source
   } = parsed.data;
-  // Neither is a fact about the hit: one is when it was written, the other is
-  // what it was indexed by, and a reader judges the lesson, not its key. The
+  // Neither is a fact about the memory: one is when it was written, the other
+  // is what it was indexed by, and a reader judges the lesson, not its key. The
   // facets are destructured out of `source` and handed back under one key, so
   // a chunk source stays exactly the recall pipeline's own shape.
   void storedAt;
@@ -233,7 +236,6 @@ export function fromPayload(payload: unknown, score: number): MemoryHit | null {
     digestRunId,
     lineage,
     source,
-    score,
     ...(facets === undefined ? {} : { facets }),
     ...(scope === undefined ? {} : { scope }),
   };

@@ -12,6 +12,7 @@ import { CachedEmbeddings } from '../../orchestrators/memory/embeddings';
 import type {
   ChunkKindScope,
   EmbeddingCache,
+  MemoryChunk,
   MemoryHit,
   MemoryProbe,
   MemoryStore,
@@ -173,6 +174,15 @@ export class InMemoryMemoryStore implements MemoryStore {
       removed += 1;
     }
     return Promise.resolve(removed);
+  }
+
+  /** As the adapter does: the point at `(runId, ref)` goes and answers as it was held; one never stored is null. */
+  retractPoint(point: PointRef): Promise<MemoryChunk | null> {
+    if (this.unreachable) return Promise.reject(new Error('store unreachable'));
+    const id = pointId(point.runId, point.ref);
+    const held = this.points.get(id) ?? null;
+    this.points.delete(id);
+    return Promise.resolve(held);
   }
 
   /** As the adapter does: the counts are set on points that stand, and an unknown point is left alone. */

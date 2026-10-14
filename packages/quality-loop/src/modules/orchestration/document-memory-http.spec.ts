@@ -1,6 +1,12 @@
 import type { INestApplication } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
-import type { OrchestrationRunDto, QualityRunDto, RetrievalReportDto } from '@sysdesign/contracts';
+import type {
+  OrchestrationRunDto,
+  QualityRunDto,
+  RetractedMemoryPointDto,
+  RetractedMemoryRunDto,
+  RetrievalReportDto,
+} from '@sysdesign/contracts';
 import { renderDocumentGoal, resumeChunk } from '@sysdesign/contracts';
 import {
   ensureDatabase,
@@ -158,5 +164,34 @@ describe('the document-memory HTTP surface', () => {
         candidate.text.includes('Senior Software Engineer at Acme from 2020 to 2026'),
       ),
     ).toBe(true);
+  });
+
+  it('[QL-70] one stored memory is retracted by its run id and ref, answering what it held, beside the retraction of its whole run', async () => {
+    // The two facts the digest above stored, under its run.
+    const held = [...store.points.values()];
+    expect(held).toHaveLength(2);
+    const [first, second] = held;
+    expect(second.source.runId).toBe(first.source.runId);
+    const { runId, ref } = first.source;
+    const retract = async <T>(path: string): Promise<{ status: number; data: T }> => {
+      const answer = await fetch(`${url}${path}`, { method: 'DELETE' });
+      return { status: answer.status, data: ((await answer.json()) as Envelope<T>).data };
+    };
+
+    expect(await retract<RetractedMemoryPointDto>(`/memory/${runId}/${ref}`)).toEqual({
+      status: 200,
+      data: { runId, ref, removed: { text: first.text, kind: 'profile_fact', scope: 'subject' } },
+    });
+    expect([...store.points.values()]).toEqual([second]);
+    expect(await retract<RetractedMemoryPointDto>(`/memory/${runId}/${ref}`)).toEqual({
+      status: 200,
+      data: { runId, ref, removed: null },
+    });
+    // One segment is still the run: the point retraction never answers for it.
+    expect(await retract<RetractedMemoryRunDto>(`/memory/${runId}`)).toEqual({
+      status: 200,
+      data: { runId, removed: 1 },
+    });
+    expect(store.points.size).toBe(0);
   });
 });

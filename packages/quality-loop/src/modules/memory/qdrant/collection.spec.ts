@@ -74,8 +74,8 @@ describe('the memory point payload', () => {
       evidence: chunk.evidence,
       digestRunId: 'digest-run',
     });
-    const hit = fromPayload(payload, 0.91);
-    expect(hit).toEqual({
+    const memory = fromPayload(payload);
+    expect(memory).toEqual({
       text: chunk.text,
       contentHash: chunk.contentHash,
       model: chunk.model,
@@ -83,39 +83,36 @@ describe('the memory point payload', () => {
       digestRunId: 'digest-run',
       lineage: chunk.lineage,
       source: chunk.source,
-      score: 0.91,
     });
     // A point written before the widening — run-row evidence only — still parses.
     const earlier = toPayload(
       { ...chunk, evidence: [{ kind: 'criterion', ref: 'c1' }] },
       '2026-09-06T00:00:00.000Z',
     );
-    expect(fromPayload(earlier, 0.5)?.evidence).toEqual([{ kind: 'criterion', ref: 'c1' }]);
+    expect(fromPayload(earlier)?.evidence).toEqual([{ kind: 'criterion', ref: 'c1' }]);
     // A kind nobody declared is a point this module did not write.
-    expect(
-      fromPayload({ ...payload, evidence: [{ kind: 'paragraph', ref: 'p1' }] }, 0.5),
-    ).toBeNull();
+    expect(fromPayload({ ...payload, evidence: [{ kind: 'paragraph', ref: 'p1' }] })).toBeNull();
     // [QL-69] A declared scope rides on the point and comes back as declared; a point written before scopes carries none.
     const scoped = toPayload({ ...chunk, scope: 'unit' }, '2026-10-12T00:00:00.000Z');
     expect(scoped.scope).toBe('unit');
-    expect(fromPayload(scoped, 0.5)?.scope).toBe('unit');
-    expect('scope' in (fromPayload(payload, 0.5) ?? {})).toBe(false);
+    expect(fromPayload(scoped)?.scope).toBe('unit');
+    expect('scope' in (fromPayload(payload) ?? {})).toBe(false);
   });
 
   it('[QL-60] carries the lineage of the cited iteration, reads a point written before it as null, and refuses a malformed one', () => {
     const adopted = { ...factChunk(), lineage: ADOPTED_LINEAGE };
     const payload = toPayload(adopted, '2026-10-02T00:00:00.000Z');
     expect(payload.lineage).toEqual(adopted.lineage);
-    expect(fromPayload(payload, 0.5)?.lineage).toEqual(adopted.lineage);
+    expect(fromPayload(payload)?.lineage).toEqual(adopted.lineage);
 
     // A point written before the payload carried lineage has none, and still parses.
     const { lineage, ...earlier } = payload;
     void lineage;
-    expect(fromPayload(earlier, 0.5)?.lineage).toBeNull();
-    expect(fromPayload({ ...earlier, lineage: null }, 0.5)?.lineage).toBeNull();
+    expect(fromPayload(earlier)?.lineage).toBeNull();
+    expect(fromPayload({ ...earlier, lineage: null })?.lineage).toBeNull();
     // A lineage this module would not write is a point it did not write.
     expect(
-      fromPayload({ ...payload, lineage: { ...adopted.lineage, goalHash: 'short' } }, 0.5),
+      fromPayload({ ...payload, lineage: { ...adopted.lineage, goalHash: 'short' } }),
     ).toBeNull();
   });
 
@@ -159,15 +156,15 @@ describe('the memory point payload', () => {
       expect(value, `no value at ${field}`).toBeDefined();
       expect(indexFor(value), `the index ${field} declares`).toBe(schema);
     }
-    expect(fromPayload(payload, 0.8)?.facets).toEqual(facets);
+    expect(fromPayload(payload)?.facets).toEqual(facets);
 
     // A point stored before facets existed reads exactly as it did: no facets at all.
-    const older = fromPayload(toPayload(chunk, '2026-09-06T00:00:00.000Z'), 0.5);
+    const older = fromPayload(toPayload(chunk, '2026-09-06T00:00:00.000Z'));
     expect(older).not.toBeNull();
     expect(older === null ? null : 'facets' in older).toBe(false);
 
     // A facet value nobody declared is a point this module did not write.
-    expect(fromPayload({ ...payload, polarity: 'maybe' }, 0.5)).toBeNull();
+    expect(fromPayload({ ...payload, polarity: 'maybe' })).toBeNull();
   });
 
   it('[QL-41] [QL-60] MERGE GUARD — a point carrying facets and lineage reads back with both, and both are indexed', () => {
@@ -180,9 +177,9 @@ describe('the memory point payload', () => {
       grounding: 'proven' as const,
     };
     const chunk = { ...factChunk(), lineage: ADOPTED_LINEAGE, facets };
-    const hit = fromPayload(toPayload(chunk, '2026-10-03T00:00:00.000Z'), 0.7);
-    expect(hit?.lineage).toEqual(ADOPTED_LINEAGE);
-    expect(hit?.facets).toEqual(facets);
+    const memory = fromPayload(toPayload(chunk, '2026-10-03T00:00:00.000Z'));
+    expect(memory?.lineage).toEqual(ADOPTED_LINEAGE);
+    expect(memory?.facets).toEqual(facets);
     // Lineage stays nested beside the flat facets: what a recall screens by is indexed at its dotted paths.
     expect(Object.entries(INDEXED_FIELDS).filter(([field]) => rootOf(field) === 'lineage')).toEqual(
       [

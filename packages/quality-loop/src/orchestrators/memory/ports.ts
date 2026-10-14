@@ -182,6 +182,13 @@ export interface MemoryStore {
    * store never held removes nothing.
    */
   retractRun(sourceRunId: string): Promise<number>;
+  /**
+   * One point gone, by the run that stored it and its ref within that run — a
+   * fact since corrected, when the rest of its run still holds. Answers the
+   * memory as it was held, because the store keeps nothing of a point once it
+   * is gone; a point the store never held removes nothing and answers null.
+   */
+  retractPoint(point: PointRef): Promise<MemoryChunk | null>;
 }
 
 export interface EmbeddingCache {

@@ -218,4 +218,40 @@ describe('the Qdrant memory store', () => {
     expect(await store.retractRun('run-r2')).toBe(1);
     expect((await store.verify()).chunks).toBe(before);
   });
+  it('[QL-70] retracts one point by its run and ref and answers it as stored; its run’s other point and another run’s same ref stand, and a point never stored removes nothing', async () => {
+    const before = (await store.verify()).chunks;
+    const corrected = {
+      ...chunk('page the listing by its last key', 'run-p1', 'memory.1'),
+      scope: 'unit' as const,
+    };
+    await store.replaceRunChunks('run-p1', [
+      corrected,
+      chunk('index the listing by its filter key', 'run-p1', 'memory.2'),
+    ]);
+    await store.replaceRunChunks('run-p2', [
+      chunk('page the listing by an offset', 'run-p2', 'memory.1'),
+    ]);
+    expect((await store.verify()).chunks).toBe(before + 3);
+
+    // The memory as stored — read back through the payload, never its vectors or keys.
+    expect(await store.retractPoint({ runId: 'run-p1', ref: 'memory.1' })).toEqual({
+      text: corrected.text,
+      contentHash: corrected.contentHash,
+      model,
+      evidence: corrected.evidence,
+      digestRunId: null,
+      lineage: null,
+      source: corrected.source,
+      scope: 'unit',
+    });
+    expect((await store.verify()).chunks).toBe(before + 2);
+    expect(await store.retractPoint({ runId: 'run-p1', ref: 'memory.1' })).toBeNull();
+    expect(await store.retractPoint({ runId: 'run-p3', ref: 'memory.1' })).toBeNull();
+    expect((await store.verify()).chunks).toBe(before + 2);
+
+    // What stands is the run's other point and the other run's point under the same ref.
+    expect(await store.retractRun('run-p1')).toBe(1);
+    expect(await store.retractRun('run-p2')).toBe(1);
+    expect((await store.verify()).chunks).toBe(before);
+  });
 });

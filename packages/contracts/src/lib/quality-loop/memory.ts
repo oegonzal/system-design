@@ -1,12 +1,14 @@
 /**
  * The memory orchestrator's own wire types: what it observes at open, the
- * reasons its steps may give, and the two tools beside it — the re-index and
- * the retrieval report. The run itself is an `OrchestrationRunDto`.
+ * reasons its steps may give, and the tools beside it — the re-index, the
+ * retractions and the retrieval report. The run itself is an
+ * `OrchestrationRunDto`.
  */
 import { z } from 'zod';
 
 import type { ApiResponse } from '../envelope';
 import { llmAvailabilitySchema } from '../llm-availability';
+import type { MemoryScope } from './document-digest';
 import type { OrchestrationStepDto } from './orchestration';
 
 export const MEMORY_ORCHESTRATOR_ID = 'memory';
@@ -81,6 +83,21 @@ export interface RetractedMemoryRunDto {
   removed: number;
 }
 export type RetractMemoryRunResponse = ApiResponse<RetractedMemoryRunDto>;
+
+/**
+ * What a point retraction did: the one memory a digest run stored under `ref`,
+ * gone from the store — a fact since corrected, when the rest of its run still
+ * holds. The store keeps nothing of a point once it is gone, so the answer
+ * carries what it held: its text, its kind, and the scope it was stored with
+ * (null on a point stored without one). A point the store never held removes
+ * nothing and is no error: `removed` is null.
+ */
+export interface RetractedMemoryPointDto {
+  runId: string;
+  ref: string;
+  removed: { text: string; kind: string; scope: MemoryScope | null } | null;
+}
+export type RetractMemoryPointResponse = ApiResponse<RetractedMemoryPointDto>;
 
 /** One chunk as a search returned it. */
 export interface RetrievalHitDto {

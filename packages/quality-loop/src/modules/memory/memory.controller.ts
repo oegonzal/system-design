@@ -4,6 +4,7 @@ import type {
   FormRetrievalRequest,
   RecallEffectivenessResponse,
   ReindexMemoryRunResponse,
+  RetractMemoryPointResponse,
   RetractMemoryRunResponse,
   RetrievalReportResponse,
   StandingGapsResponse,
@@ -40,6 +41,22 @@ export class MemoryController {
   @HttpCode(200)
   async retract(@Param('id') id: string): Promise<RetractMemoryRunResponse> {
     return { data: await this.memory.retract(id) };
+  }
+
+  /**
+   * Retract one memory a digest run stored, by the run's id and the memory's
+   * ref — a fact since corrected, when the rest of its run still holds. Answers
+   * the text, kind and scope that went; a point the store never held removes
+   * nothing and answers `removed: null`. Two segments, where the run's own
+   * retraction above takes one, so neither route ever answers for the other.
+   */
+  @Delete(':id/:ref')
+  @HttpCode(200)
+  async retractPoint(
+    @Param('id') id: string,
+    @Param('ref') ref: string,
+  ): Promise<RetractMemoryPointResponse> {
+    return { data: await this.memory.retractPoint(id, ref) };
   }
 
   /**

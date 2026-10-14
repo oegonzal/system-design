@@ -10,6 +10,7 @@ import { describeError } from '@sysdesign/run-dump';
 import {
   VECTOR_NAMES,
   type ChunkKindScope,
+  type MemoryChunk,
   type MemoryHit,
   type MemoryProbe,
   type MemoryStore,
@@ -99,10 +100,10 @@ export class QdrantMemoryStore implements MemoryStore {
       const seen = new Set<string>();
       const hits: MemoryHit[] = [];
       for (const point of response.points) {
-        const hit = fromPayload(point.payload, point.score);
-        if (hit === null || seen.has(hit.contentHash)) continue;
-        seen.add(hit.contentHash);
-        hits.push(hit);
+        const memory = fromPayload(point.payload);
+        if (memory === null || seen.has(memory.contentHash)) continue;
+        seen.add(memory.contentHash);
+        hits.push({ ...memory, score: point.score });
         if (hits.length === probes[index].limit) break;
       }
       return hits;
@@ -140,6 +141,22 @@ export class QdrantMemoryStore implements MemoryStore {
     const { count } = await this.client.count(collection, { filter, exact: true });
     if (count > 0) await this.client.delete(collection, { wait: true, filter });
     return count;
+  }
+
+  /**
+   * Read before it goes, by id: the id is a pure function of `(runId, ref)`,
+   * and a retrieve answers only the ids the collection holds, so a point never
+   * stored comes back as nothing and nothing is deleted. A point whose payload
+   * this module would not write is none of its memories — a search skips it —
+   * and is left standing.
+   */
+  async retractPoint(point: PointRef): Promise<MemoryChunk | null> {
+    const collection = await this.bound();
+    const id = pointId(point.runId, point.ref);
+    const held = (await this.client.retrieve(collection, { ids: [id], with_payload: true })).at(0);
+    const memory = held === undefined ? null : fromPayload(held.payload);
+    if (memory !== null) await this.client.delete(collection, { wait: true, points: [id] });
+    return memory;
   }
 
   /**

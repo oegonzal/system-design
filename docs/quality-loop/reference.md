@@ -328,14 +328,16 @@ Owns the memory tier's adapters. Tokens: `EMBEDDING_CLIENT`, `EMBEDDING_CACHE`, 
 | `query-probes/llm-query-probes.ts`         | Turns a goal into retrieval probes with one structured model call. |
 | `reports/effectiveness.ts`                 | Did a recalled lesson's run see its defects resolve.               |
 | `reports/gaps.ts`                          | What no recall could serve, by brief.                              |
-| `memory.service.ts`                        | Re-index, the retrieval report, and the two reports' paging.       |
+| `memory.service.ts`                        | Re-index, retraction by run or by point, and the four reports.     |
 
 `KNOWLEDGE_PORTS` is the same embeddings and store object the memory ports hold, plus the support
 store: one adapter set, two port shapes, because `support` belongs to one orchestrator and widening
 `MemoryPorts` would reach every fake of it.
 
-Six routes. `POST /memory/:id/reindex` re-embeds a finished memory run's lessons. `DELETE /memory/:id`
-retracts every point a digest run stored, for a document taught or ingested again.
+Seven routes. `POST /memory/:id/reindex` re-embeds a finished memory run's lessons. `DELETE /memory/:id`
+retracts every point a digest run stored, for a document taught or ingested again;
+`DELETE /memory/:id/:ref` retracts one of them, for a fact since corrected, and answers the text, kind
+and scope it held — the only record of it once the point is gone.
 `POST /memory/form-retrieval-report` answers what a form page's recall would retrieve for a list of
 fields — each field's probe, both named vectors' rankings with cosines, its fused list and the dealt
 evidence — the form path's own measurement seam, as `retrieval-report` is the curated path's.

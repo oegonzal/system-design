@@ -1,7 +1,8 @@
 /**
- * The two memory tools that need the ports without running the orchestrator:
- * a re-index of a finished memory run's lessons, and the retrieval report
- * that shows what a recall would find for a goal. Memory runs themselves are
+ * The memory tools that need the ports without running the orchestrator: a
+ * re-index of a finished memory run's lessons, the retractions — of a digest
+ * run's every point, or of one — and the reports of what a recall would find
+ * and of what recalls did. Memory runs themselves are
  * `POST /orchestrations/memory`.
  */
 import {
@@ -19,6 +20,7 @@ import type {
   QualityRunDto,
   QualityRunSummaryDto,
   RecallEffectivenessDto,
+  RetractedMemoryPointDto,
   RetractedMemoryRunDto,
   RetrievalProbeDto,
   RetrievalReportDto,
@@ -159,6 +161,24 @@ export class MemoryService implements OnModuleInit {
     const removed = await this.ports.store.retractRun(runId);
     this.logger.log(`digest run ${runId} retracted: ${removed} point(s) removed`);
     return { runId, removed };
+  }
+
+  /**
+   * Retract one memory a digest run stored, by the run's id and the memory's
+   * ref within it — a fact since corrected, when the rest of its run still
+   * holds. The store keeps nothing of a point once it is gone, so the answer
+   * and the log carry what went: its text, its kind and the scope it was
+   * stored with. A point the store never held removes nothing and is no error.
+   */
+  async retractPoint(runId: string, ref: string): Promise<RetractedMemoryPointDto> {
+    const held = await this.ports.store.retractPoint({ runId, ref });
+    if (held === null) {
+      this.logger.log(`memory ${ref} of run ${runId} not held: nothing removed`);
+      return { runId, ref, removed: null };
+    }
+    const removed = { text: held.text, kind: held.source.kind, scope: held.scope ?? null };
+    this.logger.log(`memory ${ref} of run ${runId} retracted (${removed.kind}): ${removed.text}`);
+    return { runId, ref, removed };
   }
 
   /**

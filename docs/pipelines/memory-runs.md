@@ -384,12 +384,13 @@ that need them without a run.
 | `GET`    | `/orchestrations/:id`                    | 200  | —                                                     | `{ data: OrchestrationRunDto }`, 404 otherwise |
 | `POST`   | `/memory/:id/reindex`                    | 200  | —                                                     | `{ data: OrchestrationStepDto }`               |
 | `DELETE` | `/memory/:id`                            | 200  | —                                                     | `{ data: { runId, removed } }`                 |
+| `DELETE` | `/memory/:id/:ref`                       | 200  | —                                                     | `{ data: { runId, ref, removed } }`            |
 | `POST`   | `/memory/retrieval-report`               | 200  | `{ goal }`, up to 64,000 B                            | `{ data: RetrievalReportDto }`                 |
 | `POST`   | `/memory/form-retrieval-report`          | 200  | `{ fields: [{ name, context?, role?, inputType? }] }` | `{ data: FormRetrievalReportDto }`             |
 
 `/memory-runs` is retired, not aliased. The body of a memory orchestration is
 **exactly** the body of a quality run; `output` and `maxIterations` reach the
-target only. The four `/memory` routes run **no pipeline at all**: `reindex`
+target only. The five `/memory` routes run **no pipeline at all**: `reindex`
 re-embeds a memory run's lessons from the digest artifact it already produced,
 which is what makes a generation bump survivable (§6); `retrieval-report`
 answers what a recall _would_ retrieve for a goal without running one, and
@@ -402,7 +403,12 @@ writer per digest run — which is how a document taught or ingested again close
 behind itself (`memory-ingest ingest` once the store holds every fact of a
 document's current text, `memory-ingest retract` retiring one,
 `browser-session teach-again`); a run the store never held removes nothing and
-is no error.
+is no error. `DELETE /memory/:id/:ref`
+retracts one point of such a run — the memory it stored under that ref — for a
+fact since corrected while the rest of its digest still holds, and answers the
+text, kind and scope it held, the only record of it once the point is gone; a
+point the store never held answers `removed: null`. It is the operator's: no
+client calls it.
 
 Guards, before any row exists: an unknown orchestrator is a 404; a pipeline
 not in `RunsService.list()` is a 404, the same as `POST /runs`; whatever the
