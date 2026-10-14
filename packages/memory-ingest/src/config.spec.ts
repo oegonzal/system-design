@@ -1,3 +1,5 @@
+import { recoverySchema } from '@sysdesign/contracts';
+
 import { COMMANDS } from './cli';
 import {
   chunkBytes,
@@ -7,11 +9,20 @@ import {
   DEFAULT_STUDIO_URL,
   INGEST_ENV,
   INGEST_FLAGS,
+  INGEST_LOOP_RECOVERY,
   IngestConfigError,
   ingestKind,
   loadIngestConfig,
   subjectName,
 } from './config';
+
+describe('INGEST_LOOP_RECOVERY', () => {
+  it('is a recovery the loop client can ride a restart out by: a window and a pause, as the contract declares them', () => {
+    expect(recoverySchema.parse(INGEST_LOOP_RECOVERY)).toEqual(INGEST_LOOP_RECOVERY);
+    // A window, not a single attempt: a restarting loop is asked again before a start counts as unreachable.
+    expect(INGEST_LOOP_RECOVERY.windowMs).toBeGreaterThan(INGEST_LOOP_RECOVERY.pauseMs);
+  });
+});
 
 describe('loadIngestConfig', () => {
   it('answers the defaults from an empty environment', () => {

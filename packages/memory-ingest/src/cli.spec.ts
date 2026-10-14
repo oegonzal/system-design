@@ -4,12 +4,12 @@ import { tableReader } from './adapters/readers/reader-table';
 import { execute, parseOptions, USAGE, type CliDeps, type Io, type Options } from './cli';
 import { PARTS_PER_CHUNK } from './core/chunk';
 import { DEFAULT_CHUNK_BYTES, INGEST_ENV } from './config';
-import type { ManifestEntry } from './core/ports';
 import {
   FIXED_NOW,
   fixedClock,
   InMemoryLedger,
   InMemoryWriter,
+  manifestEntry,
   sampleExperience,
   sampleStory,
   ScriptedSink,
@@ -74,6 +74,18 @@ describe('parseOptions', () => {
       force: false,
       json: false,
     });
+    expect(parsed(['retract', 'a.md', 'b.pdf', '--dry-run', '--json'])).toEqual({
+      command: 'retract',
+      paths: ['a.md', 'b.pdf'],
+      dryRun: true,
+      json: true,
+    });
+    expect(parsed(['retract', 'a.md'])).toEqual({
+      command: 'retract',
+      paths: ['a.md'],
+      dryRun: false,
+      json: false,
+    });
     expect(parsed(['status'])).toEqual({ command: 'status', refresh: false, json: false });
     expect(parsed(['status', '--refresh', '--json'])).toEqual({
       command: 'status',
@@ -103,6 +115,10 @@ describe('parseOptions', () => {
     ],
     [['ingest', 'a.md', '--subject', '  '], '--subject must name the subject in 1 to 120'],
     [['ingest', 'a.md', '--refresh'], "Unknown option '--refresh'"],
+    [['retract'], 'retract takes at least one document path'],
+    [['retract', '--dry-run'], 'retract takes at least one document path'],
+    [['retract', 'a.md', '--force'], "Unknown option '--force'"],
+    [['retract', 'a.md', '--kind', 'resume'], "Unknown option '--kind'"],
     [['status', '--force'], "Unknown option '--force'"],
     [['status', 'a.md'], "Unexpected argument 'a.md'"],
     [['export-studio'], '--out is required'],
@@ -255,27 +271,21 @@ describe('execute', () => {
     expect(third.out[0]).toContain('chunks 1 · posted 0 · unstored 1 · skipped 0 · failed 0');
   });
 
-  const entry = (overrides: Partial<ManifestEntry> = {}): ManifestEntry => ({
-    chunkHash: 'abc',
-    document: 'notes.md',
-    chunk: { index: 1, of: 1 },
-    kind: 'notes',
-    orchestrationRunId: 'orch-1',
-    digestRunId: null,
-    status: 'failed',
-    steps: { digest: null, store: null },
-    error: 'lost',
-    ingestedAt: FIXED_NOW,
-    loopUrl: 'http://loop.test',
-    ...overrides,
-  });
-
   it('status prints the manifest, and --refresh rewrites what the loop has settled', async () => {
     const empty = io();
     expect(await execute(parsed(['status']), deps(), empty.sink)).toBe(0);
     expect(empty.out[0]).toContain('the manifest is empty');
 
-    const ledger = new InMemoryLedger([entry()]);
+    // A wait lost after the start: the loop has settled it since.
+    const ledger = new InMemoryLedger([
+      manifestEntry({
+        chunkHash: 'abc',
+        digestRunId: null,
+        status: 'failed',
+        steps: { digest: null, store: null },
+        error: 'lost',
+      }),
+    ]);
     const d = deps({ ledger });
     d.scripted.records.set(
       'orch-1',
@@ -305,6 +315,95 @@ describe('execute', () => {
       refresh: null,
     });
   });
+
+  it('[ING-3] retract retires each document, prints the points each digest run removed with the runs that held nothing apart, and exits 0 — also when everything was retracted already', async () => {
+    const ledger = new InMemoryLedger([
+      manifestEntry({ chunkHash: 'h1', digestRunId: 'run-1' }),
+      manifestEntry({ chunkHash: 'h2', digestRunId: 'run-2', status: 'unstored' }),
+    ]);
+    const d = deps({ ledger });
+    d.scripted.points.set('run-1', 3);
+    const { out, sink } = io();
+    expect(await execute(parsed(['retract', 'notes.md']), d, sink)).toBe(0);
+    expect(out[0]).toContain('notes.md · 2 entries');
+    expect(out[0]).toMatch(/run-1\s+3/);
+    expect(out[0]).toContain('held nothing (1): run-2');
+    expect(out[0]).toContain('retracted 2 digest runs (3 points)');
+    expect(d.scripted.retracted).toEqual(['run-1', 'run-2']);
+    expect(ledger.entries.map((entry) => [entry.retractedAt, entry.retractedPoints])).toEqual([
+      [FIXED_NOW, 3],
+      [FIXED_NOW, 0],
+    ]);
+
+    const again = io();
+    expect(await execute(parsed(['retract', 'notes.md', '--json']), d, again.sink)).toBe(0);
+    expect(JSON.parse(again.out[0] ?? '')).toMatchObject({
+      dryRun: false,
+      documents: [{ document: 'notes.md', already: ['run-1', 'run-2'], runs: [] }],
+    });
+    expect(d.scripted.retracted).toEqual(['run-1', 'run-2']);
+  });
+
+  it('[ING-3] retract exits 2 naming the manifest when it has no entry for a path, retracting nothing, and 1 when a retraction left a digest run standing', async () => {
+    const ledger = new InMemoryLedger([manifestEntry({ digestRunId: 'run-1' })]);
+    const missing = deps({ ledger });
+    const { errors, sink } = io();
+    expect(await execute(parsed(['retract', 'notes.md', 'resume.pdf']), missing, sink)).toBe(2);
+    expect(errors[0]).toContain(`${ledger.path} has no entry for resume.pdf`);
+    expect(missing.scripted.retracted).toEqual([]);
+
+    const failing = deps({ ledger });
+    failing.scripted.failingRetractions.set(
+      'run-1',
+      new LoopRefused(503, 'the store is unavailable'),
+    );
+    const second = io();
+    expect(await execute(parsed(['retract', 'notes.md']), failing, second.sink)).toBe(1);
+    expect(second.out[0]).toContain('left standing (1): run-1 — 503: the store is unavailable');
+    expect(ledger.entries[0]?.retractedAt).toBeNull();
+  });
+
+  it('[ING-3] a command that saves the manifest runs as its one writer: ingest, retract and status --refresh refuse a home another command holds with exit 2, and release it when done, thrown or not; a dry run and a plain status save nothing and take no lock', async () => {
+    const ledger = new InMemoryLedger([manifestEntry({ digestRunId: 'run-1' })]);
+    const d = deps({ ledger });
+    ledger.held = true;
+    for (const argv of [
+      ['ingest', 'notes.md', '--subject', 'Ada'],
+      ['retract', 'notes.md'],
+      ['status', '--refresh'],
+    ]) {
+      const { errors, sink } = io();
+      expect(await execute(parsed(argv), d, sink)).toBe(2);
+      expect(errors[0]).toContain(ledger.path);
+    }
+    expect(d.scripted.posted).toHaveLength(0);
+    expect(d.scripted.retracted).toEqual([]);
+    expect(ledger.saves).toBe(0);
+    for (const argv of [
+      ['ingest', 'notes.md', '--subject', 'Ada', '--dry-run'],
+      ['retract', 'notes.md', '--dry-run'],
+      ['status'],
+    ]) {
+      expect(await execute(parsed(argv), d, io().sink)).toBe(0);
+    }
+
+    ledger.held = false;
+    expect(await execute(parsed(['ingest', 'notes.md', '--subject', 'Ada']), d, io().sink)).toBe(0);
+    expect(ledger.held).toBe(false);
+    const down = deps({
+      ledger,
+      sink: {
+        post: () => Promise.reject(new Error('not posted')),
+        status: () => Promise.reject(new Error('the quality loop is unreachable: ECONNREFUSED')),
+        retract: () => Promise.resolve(0),
+      },
+    });
+    await expect(execute(parsed(['status', '--refresh']), down, io().sink)).rejects.toThrow(
+      'unreachable',
+    );
+    expect(ledger.held).toBe(false);
+  });
+
   it('[ING-3] export-studio writes the studio’s record as documents under the folder, relative to the working directory, and exits 2 writing nothing when the studio cannot be read', async () => {
     const { out, sink } = io();
     const d = deps();

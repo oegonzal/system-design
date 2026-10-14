@@ -2,6 +2,7 @@ import {
   DOCUMENT_SUBJECT_MAX_LENGTH,
   GOAL_BUDGET_BYTES,
   type DocumentKind,
+  type Recovery,
 } from '@sysdesign/contracts';
 
 import { MAX_PARTS_PER_CHUNK, PARTS_PER_CHUNK } from './core/chunk';
@@ -29,6 +30,19 @@ export const DEFAULT_STUDIO_URL = 'http://localhost:3000/api';
 export const DEFAULT_HOME = 'static/memory-ingest';
 
 /**
+ * How long a call to the loop rides out a loop that is restarting before its
+ * failure stands: a call that never reached it, or a read or a retraction it
+ * answered with a server error, is asked again at the pause within the
+ * window. The browser session's `loopRecovery` numbers, reused: they were
+ * sized from the loop's measured restarts (2026-10-10: fifteen watch-mode
+ * restarts each listened again within six seconds, and three calls in the
+ * three seconds of one restart ended a session forty minutes in), and the
+ * ingester calls the same loop the same way. A start still unreachable past
+ * the window stops the run.
+ */
+export const INGEST_LOOP_RECOVERY: Recovery = { windowMs: 60_000, pauseMs: 2_000 };
+
+/**
  * Every flag, by its long name, with the type `parseArgs` reads it as. Which
  * command takes which flag is `COMMANDS` in `cli.ts`; the meaning is here.
  */
@@ -39,11 +53,15 @@ export const INGEST_FLAGS = {
   date: { type: 'string', describe: 'the day the documents speak for, as YYYY-MM-DD' },
   limit: { type: 'string', describe: 'post at most this many chunks, then halt' },
   'parts-per-chunk': { type: 'string', describe: 'the most sections one chunk may carry' },
-  'dry-run': { type: 'boolean', describe: 'print the chunks; post nothing, record nothing' },
+  'dry-run': {
+    type: 'boolean',
+    describe:
+      'print what would be posted (ingest) or retracted (retract); post nothing, retract nothing, record nothing',
+  },
   force: {
     type: 'boolean',
     describe:
-      'post chunks the manifest already holds as complete, retracting what their earlier digests stored',
+      'post again the chunks the manifest holds as stored; their earlier digests are retracted once every chunk is stored',
   },
   json: { type: 'boolean', describe: 'print the report as JSON' },
   refresh: { type: 'boolean', describe: 'read every recorded orchestration back from the loop' },

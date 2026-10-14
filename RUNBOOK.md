@@ -378,7 +378,7 @@ rather than an answer given about another application. Then:
 
 ```bash
 pnpm memory-ingest ingest docs/ingestion/standing-answers.md --kind notes --subject "Your Name" --date 2026-10-12
-pnpm memory-ingest ingest docs/ingestion/standing-answers.md --kind notes --subject "Your Name" --date 2026-10-19 --force   # after an edit: retracts the earlier digest first
+pnpm memory-ingest ingest docs/ingestion/standing-answers.md --kind notes --subject "Your Name" --date 2026-10-19   # after an edit: posts what changed, then retracts the digests it replaced
 ```
 
 A measured note: a plan costs four model calls and an answer page four more,

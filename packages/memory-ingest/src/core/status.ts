@@ -4,8 +4,10 @@ import { entryOf, statusOf } from './record';
 /**
  * The manifest read back through the loop. An entry that names an
  * orchestration is re-read; one the loop has settled is rewritten from the
- * record (status, steps, digest run), one still running or one the loop no
- * longer has is left as it was and counted.
+ * record (status, steps, digest run) with its retraction mark kept — the loop
+ * still reports an orchestration whose points were since retracted as having
+ * stored them — and one still running or one the loop no longer has is left
+ * as it was and counted.
  */
 export interface StatusRefresh {
   entries: readonly ManifestEntry[];
@@ -39,6 +41,8 @@ export async function refreshStatus(deps: {
         error: orchestration.error?.message ?? null,
         ingestedAt: entry.ingestedAt,
         loopUrl: entry.loopUrl,
+        retractedAt: entry.retractedAt,
+        retractedPoints: entry.retractedPoints,
       }),
     );
   }

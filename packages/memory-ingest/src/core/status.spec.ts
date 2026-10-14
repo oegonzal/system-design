@@ -1,6 +1,6 @@
 import {
-  FIXED_NOW,
   InMemoryLedger,
+  manifestEntry,
   ScriptedSink,
   settledOrchestration,
   stepOf,
@@ -8,29 +8,25 @@ import {
 import type { ManifestEntry } from './ports';
 import { refreshStatus } from './status';
 
-const entry = (overrides: Partial<ManifestEntry> = {}): ManifestEntry => ({
-  chunkHash: 'abc',
-  document: 'notes.md',
-  chunk: { index: 1, of: 4 },
-  kind: 'notes',
-  orchestrationRunId: 'orch-1',
-  digestRunId: null,
-  status: 'failed',
-  steps: { digest: null, store: null },
-  error: 'lost mid-wait',
-  ingestedAt: FIXED_NOW,
-  loopUrl: 'http://loop.test',
-  ...overrides,
-});
+/** A posting whose wait was lost after the start: the orchestration is known, nothing it reported is. */
+const lost = (overrides: Partial<ManifestEntry> = {}): ManifestEntry =>
+  manifestEntry({
+    chunk: { index: 1, of: 4 },
+    digestRunId: null,
+    status: 'failed',
+    steps: { digest: null, store: null },
+    error: 'lost mid-wait',
+    ...overrides,
+  });
 
 describe('refreshStatus', () => {
   it('[ING-1] rewrites what the loop has settled by its steps, leaves a running or a lost entry as it was, and counts each', async () => {
     const entries = [
-      entry({ chunkHash: 'settled', orchestrationRunId: 'orch-settled' }),
-      entry({ chunkHash: 'unstored', orchestrationRunId: 'orch-unstored' }),
-      entry({ chunkHash: 'running', orchestrationRunId: 'orch-running' }),
-      entry({ chunkHash: 'lost', orchestrationRunId: 'orch-lost' }),
-      entry({ chunkHash: 'refused', orchestrationRunId: null, status: 'refused', error: '400' }),
+      lost({ chunkHash: 'settled', orchestrationRunId: 'orch-settled' }),
+      lost({ chunkHash: 'unstored', orchestrationRunId: 'orch-unstored' }),
+      lost({ chunkHash: 'running', orchestrationRunId: 'orch-running' }),
+      lost({ chunkHash: 'lost', orchestrationRunId: 'orch-lost' }),
+      lost({ chunkHash: 'refused', orchestrationRunId: null, status: 'refused', error: '400' }),
     ];
     const ledger = new InMemoryLedger(entries);
     const sink = new ScriptedSink();
@@ -81,5 +77,26 @@ describe('refreshStatus', () => {
     expect(refresh.entries[2]).toEqual(entries[2]);
     expect(refresh.entries[3]).toEqual(entries[3]);
     expect(refresh.entries[4]).toEqual(entries[4]);
+    expect(ledger.entries).toEqual(refresh.entries);
+  });
+
+  it('[ING-3] keeps the retraction mark on an entry it rewrites: the loop still reports the orchestration as having stored what was since retracted', async () => {
+    const retracted = manifestEntry({
+      orchestrationRunId: 'orch-1',
+      retractedAt: '2026-10-14T08:00:00.000Z',
+      retractedPoints: 7,
+    });
+    const ledger = new InMemoryLedger([retracted]);
+    const sink = new ScriptedSink();
+    sink.records.set('orch-1', settledOrchestration());
+
+    const refresh = await refreshStatus({ sink, ledger });
+    expect(refresh.refreshed).toBe(1);
+    expect(ledger.entries).toEqual([retracted]);
+    expect(ledger.entries[0]).toMatchObject({
+      status: 'complete',
+      retractedAt: '2026-10-14T08:00:00.000Z',
+      retractedPoints: 7,
+    });
   });
 });

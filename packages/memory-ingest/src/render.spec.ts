@@ -1,15 +1,11 @@
-import type { IngestReport } from './core/ingest';
-import type { ManifestEntry } from './core/ports';
-import { renderIngest, renderStatus } from './render';
-import { FIXED_NOW } from './test/fakes';
-
-const STORED: ManifestEntry['steps'] = {
-  digest: { status: 'complete', reason: null, note: null, counts: { memories: 3, kept: 3 } },
-  store: { status: 'complete', reason: null, note: null, counts: { chunks: 3, embedded: 3 } },
-};
+import type { FileReport, IngestReport } from './core/ingest';
+import type { DocumentRetraction, RetractReport } from './core/retract';
+import { renderIngest, renderRetract, renderStatus } from './render';
+import { manifestEntry } from './test/fakes';
 
 const report = (overrides: Partial<IngestReport> = {}): IngestReport => ({
   dryRun: false,
+  force: false,
   files: [
     {
       document: 'notes.md',
@@ -25,7 +21,7 @@ const report = (overrides: Partial<IngestReport> = {}): IngestReport => ({
           outcome: 'posted',
           orchestrationRunId: 'orch-1',
           status: 'complete',
-          steps: STORED,
+          steps: manifestEntry().steps,
           error: null,
         },
         {
@@ -63,15 +59,15 @@ const report = (overrides: Partial<IngestReport> = {}): IngestReport => ({
           error: null,
         },
       ],
+      replaced: null,
     },
-    { document: 'empty.pdf', parts: 0, chunks: [] },
+    { document: 'empty.pdf', parts: 0, chunks: [], replaced: null },
   ],
   chunks: 3,
   posted: 1,
   unstored: 1,
   skipped: 0,
   failed: 1,
-  retracted: 0,
   stopped: null,
   halted: null,
   ...overrides,
@@ -90,6 +86,7 @@ describe('renderIngest', () => {
       'empty.pdf · 0 parts · 0 chunks\n(no text was read — nothing to ingest)',
     );
     expect(text).toContain('chunks 3 · posted 1 · unstored 1 · skipped 0 · failed 1');
+    expect(text).not.toContain('retracted');
     expect(text).not.toContain('dry run');
   });
 
@@ -103,15 +100,95 @@ describe('renderIngest', () => {
       ),
     ).toContain('stopped at notes.md chunk 2: 400: no index');
   });
+
+  it('[ING-3] says how to resume a halted run — without --force when the halted run was forced, since what it posted is stored', () => {
+    const halted = { reason: 'limit' as const, after: 1 };
+    expect(renderIngest(report({ halted }))).toContain(
+      'halted after 1 chunk(s): limit — the pending chunks post on re-running the same command',
+    );
+    expect(renderIngest(report({ halted }))).not.toContain('--force');
+    expect(renderIngest(report({ halted, force: true }))).toContain(
+      'the pending chunks post on re-running the same command without --force',
+    );
+  });
+
+  it('[ING-3] prints what replacing a document retracted — points per run, the runs that held nothing apart, and what was left standing — and totals it in the summary', () => {
+    const base = report();
+    const [notes, empty] = base.files as [FileReport, FileReport];
+    const text = renderIngest({
+      ...base,
+      files: [
+        {
+          ...notes,
+          replaced: {
+            retracted: [
+              { digestRunId: 'run-1', removed: 4 },
+              { digestRunId: 'run-2', removed: 0 },
+              { digestRunId: 'run-3', removed: 2 },
+            ],
+            left: { digestRunIds: ['run-4'], error: '503: the store is unavailable' },
+          },
+        },
+        empty,
+      ],
+    });
+    expect(text).toContain('replaced 3 digest runs (6 points)');
+    expect(text).toMatch(/digest run\s+points\n-+\s+-+\nrun-1\s+4\nrun-3\s+2/);
+    expect(text).toContain('held nothing (1): run-2');
+    expect(text).toContain('left standing (1): run-4 — 503: the store is unavailable');
+    expect(text).toContain(
+      'chunks 3 · posted 1 · unstored 1 · skipped 0 · failed 1 · retracted 3 digest runs (6 points)',
+    );
+  });
+});
+
+describe('renderRetract', () => {
+  const retired: RetractReport = {
+    dryRun: false,
+    documents: [
+      {
+        document: 'Resume.pdf',
+        entries: 4,
+        already: ['run-0'],
+        runs: ['run-1', 'run-2', 'run-3'],
+        retraction: {
+          retracted: [
+            { digestRunId: 'run-1', removed: 8 },
+            { digestRunId: 'run-2', removed: 0 },
+            { digestRunId: 'run-3', removed: 1 },
+          ],
+          left: null,
+        },
+        unresolved: 1,
+      },
+    ],
+  };
+
+  it('[ING-3] prints the points each run removed, the runs that removed none apart, what was retracted before, and what the record cannot say', () => {
+    const text = renderRetract(retired);
+    expect(text).toContain('Resume.pdf · 4 entries');
+    expect(text).toMatch(/digest run\s+points\n-+\s+-+\nrun-1\s+8\nrun-3\s+1/);
+    expect(text).toContain('held nothing (1): run-2');
+    expect(text).toContain('already retracted (1): run-0');
+    expect(text).toContain('unresolved: 1 entry with an orchestration whose report was never read');
+    expect(text).toContain('retracted 3 digest runs (9 points)');
+  });
+
+  it('lists what a dry run would retract and says nothing was', () => {
+    const [document] = retired.documents as [DocumentRetraction];
+    const text = renderRetract({
+      dryRun: true,
+      documents: [{ ...document, retraction: null, unresolved: 0 }],
+    });
+    expect(text).toContain('would retract (3): run-1, run-2, run-3');
+    expect(text).toContain('dry run — nothing was retracted and nothing was recorded');
+    expect(text).not.toContain('unresolved');
+  });
 });
 
 describe('renderStatus', () => {
-  const entry: ManifestEntry = {
-    chunkHash: 'abc',
-    document: 'notes.md',
+  const entry = manifestEntry({
     chunk: { index: 1, of: 2 },
-    kind: 'notes',
-    orchestrationRunId: 'orch-1',
     digestRunId: 'd-1',
     status: 'unstored',
     steps: {
@@ -123,10 +200,7 @@ describe('renderStatus', () => {
         counts: {},
       },
     },
-    error: null,
-    ingestedAt: FIXED_NOW,
-    loopUrl: 'http://loop.test',
-  };
+  });
 
   it('prints each entry with its steps summarized — reason and note — and the refresh counts when there was one', () => {
     const text = renderStatus([entry], { entries: [entry], refreshed: 1, running: 2, missing: 3 });
@@ -135,5 +209,15 @@ describe('renderStatus', () => {
     );
     expect(text).toContain('refreshed 1 · still running 2 · no longer at the loop 3');
     expect(renderStatus([])).toBe('(the manifest is empty — nothing has been ingested)');
+  });
+
+  it('[ING-3] says beside its status when what an entry stored was retracted, and how many points went', () => {
+    const text = renderStatus([
+      manifestEntry({ retractedAt: '2026-10-14T08:00:00.000Z', retractedPoints: 4 }),
+    ]);
+    expect(text).toMatch(/document\s+chunk\s+kind\s+status\s+retracted\s+digest/);
+    expect(text).toMatch(
+      /notes\.md\s+1\/1\s+notes\s+complete\s+2026-10-14T08:00:00\.000Z \(4 points\)\s+complete/,
+    );
   });
 });

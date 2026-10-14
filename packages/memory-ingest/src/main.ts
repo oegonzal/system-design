@@ -3,7 +3,8 @@ import { cli } from './cli';
 /**
  * memory-ingest: `main.js ingest <path…>` chunks the user's documents and
  * hands each chunk to the quality loop's document-memory orchestrator, one
- * at a time; `main.js status` reads the manifest back. One process, one
+ * at a time; `main.js retract <path…>` takes a document's digests back out of
+ * the store; `main.js status` reads the manifest back. One process, one
  * command, an exit code — no server. The environment and the working
  * directory are read here, once, and handed in; `config.ts` declares what is
  * read from them. An interrupt is a process concern too: the first asks the

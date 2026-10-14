@@ -1,13 +1,16 @@
 /**
  * `main.js ingest <path…> [--kind resume|notes] [--subject <name>] [--chunk-bytes <n>] [--date <day>] [--limit <n>] [--dry-run] [--force] [--json]`
+ * `main.js retract <path…> [--dry-run] [--json]`
  * `main.js status [--refresh] [--json]`
  * `main.js export-studio --out <dir> [--json]`
  *
  * `parseOptions` reads argv; `execute` runs the options over the ports and
  * writes through `io`; `cli` wires the real adapters around them — no
- * framework, no database — and exits by the result: 2 for a usage problem or
- * an input the program cannot use, 1 when a chunk failed, was refused or was
- * settled with nothing stored, 0 otherwise.
+ * framework, no database — and exits by the result: 2 for a usage problem, an
+ * input the program cannot use, a path the manifest has no entry for, or a
+ * manifest home another command is writing; 1 when a chunk failed, was
+ * refused or was settled with nothing stored, or a retraction left a digest
+ * run standing; 0 otherwise.
  */
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -31,6 +34,7 @@ import {
   INGEST_ENV,
   INGEST_FLAGS,
   INGEST_KINDS,
+  INGEST_LOOP_RECOVERY,
   ingestKind,
   loadIngestConfig,
   subjectName,
@@ -41,21 +45,26 @@ import {
 import { exportStudio } from './core/export-studio';
 import { planIngest, runIngest, type IngestDeps } from './core/ingest';
 import type { DocumentWriter, StudioSource } from './core/ports';
+import { leftStanding, NotInManifest, retractDocuments } from './core/retract';
 import { refreshStatus } from './core/status';
-import { renderExport, renderIngest, renderStatus } from './render';
+import { renderExport, renderIngest, renderRetract, renderStatus } from './render';
 
 export const USAGE = `usage: memory-ingest <command> [options]
   ingest  <path…> [--kind ${INGEST_KINDS.join('|')}] [--subject <name>] [--chunk-bytes <n>] [--parts-per-chunk <n>] [--date <day>] [--limit <n>] [--dry-run] [--force] [--json]
           reads each document (${Object.keys(READERS).join(', ')}), chunks it and posts one chunk at a time to the loop;
           --chunk-bytes defaults to ${DEFAULT_CHUNK_BYTES}; --date is the day the documents speak for;
           --limit posts at most n chunks then halts, the rest pending; --dry-run prints the chunks and posts nothing;
-          a chunk whose facts the manifest holds as stored is skipped unless --force
+          a chunk whose facts the manifest holds as stored is skipped unless --force; once every chunk of a
+          document is stored, every other digest the manifest holds as stored for it is retracted
+  retract <path…> [--dry-run] [--json]
+          retracts every digest run the manifest's entries for each document name, whatever their status,
+          and marks the entries; the documents are never read; --dry-run lists the runs and retracts nothing
   status  [--refresh] [--json]
           the manifest; --refresh re-reads every recorded orchestration from the loop
   export-studio --out <dir> [--json]
           writes the studio's experience profiles and STAR stories as markdown documents under <dir>,
           one titled section per record, for ingest to read like any notes file
-exit: 0 ok · 1 a chunk failed, was refused or stored nothing · 2 usage, or an input the program cannot use
+exit: 0 ok · 1 a chunk failed, was refused or stored nothing, or a retraction left a digest run standing · 2 usage, an input the program cannot use, a path the manifest has no entry for, or a manifest home another command is writing
 environment: ${INGEST_ENV.loopUrl} (default ${DEFAULT_LOOP_URL}), ${INGEST_ENV.studioUrl} (default ${DEFAULT_STUDIO_URL}), ${INGEST_ENV.home} (default ${DEFAULT_HOME}), ${INGEST_ENV.subject}`;
 
 /** Commands, the flags each takes and whether it takes paths — as data. */
@@ -74,6 +83,7 @@ export const COMMANDS = {
     ],
     paths: true,
   },
+  retract: { flags: ['dry-run', 'json'], paths: true },
   status: { flags: ['refresh', 'json'], paths: false },
   'export-studio': { flags: ['out', 'json'], paths: false },
 } as const satisfies Record<string, { flags: readonly IngestFlag[]; paths: boolean }>;
@@ -94,6 +104,7 @@ export type Options =
       force: boolean;
       json: boolean;
     }
+  | { command: 'retract'; paths: string[]; dryRun: boolean; json: boolean }
   | { command: 'status'; refresh: boolean; json: boolean }
   | { command: 'export-studio'; out: string; json: boolean };
 
@@ -129,8 +140,11 @@ export function parseOptions(argv: readonly string[]): Options | Error {
         spec.flags.map((flag) => [flag, { type: INGEST_FLAGS[flag].type }]),
       ),
     });
+    if (spec.paths && positionals.length === 0) {
+      return new Error(`${command} takes at least one document path`);
+    }
+    const flag = (name: IngestFlag): boolean => (values[name] as boolean | undefined) ?? false;
     if (command === 'ingest') {
-      if (positionals.length === 0) return new Error('ingest takes at least one document path');
       return {
         command,
         paths: positionals,
@@ -140,21 +154,20 @@ export function parseOptions(argv: readonly string[]): Options | Error {
         partsPerChunk: partsPerChunk(values['parts-per-chunk'] as string | undefined),
         date: documentDate(values['date'] as string | undefined),
         limit: postLimit(values['limit'] as string | undefined),
-        dryRun: (values['dry-run'] as boolean | undefined) ?? false,
-        force: (values['force'] as boolean | undefined) ?? false,
-        json: (values['json'] as boolean | undefined) ?? false,
+        dryRun: flag('dry-run'),
+        force: flag('force'),
+        json: flag('json'),
       };
+    }
+    if (command === 'retract') {
+      return { command, paths: positionals, dryRun: flag('dry-run'), json: flag('json') };
     }
     if (command === 'export-studio') {
       const out = values['out'] as string | undefined;
       if (out === undefined || out.trim() === '') return new Error('--out is required');
-      return { command, out, json: (values['json'] as boolean | undefined) ?? false };
+      return { command, out, json: flag('json') };
     }
-    return {
-      command,
-      refresh: (values['refresh'] as boolean | undefined) ?? false,
-      json: (values['json'] as boolean | undefined) ?? false,
-    };
+    return { command, refresh: flag('refresh'), json: flag('json') };
   } catch (error) {
     return error instanceof Error ? error : new Error(messageOf(error));
   }
@@ -163,8 +176,31 @@ export function parseOptions(argv: readonly string[]): Options | Error {
 const print = (io: Io, json: boolean, raw: unknown, text: string): void =>
   io.out(json ? JSON.stringify(raw, null, 2) : text);
 
-/** The options over the ports; the exit code. */
+/** Whether the command saves the manifest: what it does then runs holding the home's lock. */
+const savesManifest = (options: Options): boolean => {
+  if (options.command === 'ingest' || options.command === 'retract') return !options.dryRun;
+  return options.command === 'status' && options.refresh;
+};
+
+/** The options over the ports; the exit code. A command that saves the manifest runs as its one writer. */
 export async function execute(options: Options, deps: CliDeps, io: Io): Promise<number> {
+  if (!savesManifest(options)) return dispatch(options, deps, io);
+  let release: () => Promise<void>;
+  try {
+    release = await deps.ledger.lock();
+  } catch (error) {
+    // Another command is writing the home: anything saved now would overwrite what it records.
+    io.error(messageOf(error));
+    return 2;
+  }
+  try {
+    return await dispatch(options, deps, io);
+  } finally {
+    await release();
+  }
+}
+
+async function dispatch(options: Options, deps: CliDeps, io: Io): Promise<number> {
   if (options.command === 'export-studio') {
     try {
       const report = await exportStudio(deps, resolve(deps.cwd, options.out));
@@ -181,6 +217,23 @@ export async function execute(options: Options, deps: CliDeps, io: Io): Promise<
     const entries = refresh?.entries ?? (await deps.ledger.load());
     print(io, options.json, { entries, refresh }, renderStatus(entries, refresh));
     return 0;
+  }
+  if (options.command === 'retract') {
+    let report;
+    try {
+      report = await retractDocuments(
+        options.paths,
+        { dryRun: options.dryRun, cwd: deps.cwd },
+        deps,
+      );
+    } catch (error) {
+      if (!(error instanceof NotInManifest)) throw error;
+      // Nothing was retracted: a path given from another directory, or under another home, reads as no document.
+      io.error(error.message);
+      return 2;
+    }
+    print(io, options.json, report, renderRetract(report));
+    return report.documents.some((document) => leftStanding(document.retraction) > 0) ? 1 : 0;
   }
 
   const subject = options.subject ?? deps.config.subject;
@@ -201,8 +254,10 @@ export async function execute(options: Options, deps: CliDeps, io: Io): Promise<
   }
   const report = await runIngest(documents, options, deps);
   print(io, options.json, report, renderIngest(report));
-  // Anything short of facts in the store is not ok: a failure, a refusal, or a loop that settled with nothing stored.
-  return report.failed > 0 || report.unstored > 0 || report.stopped !== null ? 1 : 0;
+  // Anything short of facts in the store is not ok: a failure, a refusal, a loop that settled with
+  // nothing stored, or an earlier digest left standing beside its replacement.
+  const standing = report.files.some((file) => leftStanding(file.replaced) > 0);
+  return report.failed > 0 || report.unstored > 0 || report.stopped !== null || standing ? 1 : 0;
 }
 
 /** The real adapters around `execute`. The environment and working directory are handed in by `main.ts`, read nowhere here. */
@@ -225,7 +280,7 @@ export async function cli(
     console.error(messageOf(error));
     return 2;
   }
-  const client = new HttpLoopClient(config.loopUrl);
+  const client = new HttpLoopClient(config.loopUrl, fetch, INGEST_LOOP_RECOVERY);
   const deps: CliDeps = {
     config,
     cwd,

@@ -25,21 +25,38 @@ import type {
  * build (`tsconfig.app.json`) and nothing reachable from `main.ts` imports it.
  * The shared fake loop behind the shipping sink is `fake-ingest-loop.ts`.
  */
+
+/**
+ * The ledger in memory. Loading and saving copy, as a file does, so `entries`
+ * is only ever what was saved: a mark the code made and never saved is not
+ * there for a spec to find.
+ */
 export class InMemoryLedger implements IngestLedger {
-  entries: ManifestEntry[] = [];
+  readonly path = 'memory/manifest.json';
+  entries: ManifestEntry[];
   saves = 0;
+  /** Whether a command holds the ledger now; a spec sets it to stand for another command. */
+  held = false;
 
   constructor(entries: readonly ManifestEntry[] = []) {
-    this.entries = [...entries];
+    this.entries = structuredClone([...entries]);
   }
 
   async load(): Promise<readonly ManifestEntry[]> {
-    return [...this.entries];
+    return structuredClone(this.entries);
   }
 
   async save(entries: readonly ManifestEntry[]): Promise<void> {
     this.saves += 1;
-    this.entries = [...entries];
+    this.entries = structuredClone([...entries]);
+  }
+
+  async lock(): Promise<() => Promise<void>> {
+    if (this.held) throw new Error(`${this.path} is held by another command`);
+    this.held = true;
+    return async () => {
+      this.held = false;
+    };
   }
 }
 
@@ -57,6 +74,27 @@ export const scriptedReader = (documents: Readonly<Record<string, string>>): Doc
 export const FIXED_NOW = '2026-10-02T12:00:00.000Z';
 export const fixedClock = (at: string = FIXED_NOW): Clock => ({ now: () => at });
 
+/** A posting as the manifest records one: its facts stored and standing, unless the overrides say otherwise. */
+export const manifestEntry = (overrides: Partial<ManifestEntry> = {}): ManifestEntry => ({
+  chunkHash: 'a'.repeat(64),
+  document: 'notes.md',
+  chunk: { index: 1, of: 1 },
+  kind: 'notes',
+  orchestrationRunId: 'orch-1',
+  digestRunId: 'digest-run-1',
+  status: 'complete',
+  steps: {
+    digest: { status: 'complete', reason: null, note: null, counts: { memories: 3, kept: 3 } },
+    store: { status: 'complete', reason: null, note: null, counts: { chunks: 3, embedded: 3 } },
+  },
+  error: null,
+  ingestedAt: FIXED_NOW,
+  loopUrl: 'http://loop.test',
+  retractedAt: null,
+  retractedPoints: null,
+  ...overrides,
+});
+
 /** A step as the loop records one, complete unless the overrides say otherwise. */
 export const stepOf = (overrides: Partial<OrchestrationStepDto> = {}): OrchestrationStepDto => ({
   status: 'complete',
@@ -70,11 +108,13 @@ export const stepOf = (overrides: Partial<OrchestrationStepDto> = {}): Orchestra
   ...overrides,
 });
 
-/** Both steps complete — the digest kept three facts and the store took them. */
-export const STORED_STEPS: Record<string, OrchestrationStepDto> = {
-  digest: stepOf({ runIds: ['digest-run-1'], counts: { memories: 3, kept: 3 } }),
+/** Both steps complete — the digest run kept three facts and the store took them. */
+export const storedSteps = (
+  digestRunId = 'digest-run-1',
+): Record<string, OrchestrationStepDto> => ({
+  digest: stepOf({ runIds: [digestRunId], counts: { memories: 3, kept: 3 } }),
   store: stepOf({ counts: { chunks: 3, embedded: 3 } }),
-};
+});
 
 /** A settled orchestration as the loop would record one: complete with its facts stored, unless overridden. */
 export const settledOrchestration = (
@@ -96,7 +136,7 @@ export const settledOrchestration = (
   },
   openedBy: null,
   context: {},
-  steps: STORED_STEPS,
+  steps: storedSteps(),
   error: null,
   ...overrides,
 });
@@ -108,12 +148,20 @@ export class ScriptedSink implements IngestSink {
 
   constructor(private readonly outcomes: (OrchestrationRunDto | Error)[] = []) {}
 
-  /** Digest runs retracted, in order; the scripted sink keeps no points, so each removes none. */
+  /** Points the store holds by digest run, as a spec sets them; a retraction removes a run's once. */
+  readonly points = new Map<string, number>();
+  /** Retractions that fail, by digest run: each throws its error and removes nothing. */
+  readonly failingRetractions = new Map<string, Error>();
+  /** Digest runs retracted, in order. */
   readonly retracted: string[] = [];
 
   retract(digestRunId: string): Promise<number> {
+    const failure = this.failingRetractions.get(digestRunId);
+    if (failure !== undefined) return Promise.reject(failure);
     this.retracted.push(digestRunId);
-    return Promise.resolve(0);
+    const removed = this.points.get(digestRunId) ?? 0;
+    this.points.delete(digestRunId);
+    return Promise.resolve(removed);
   }
 
   async post(planned: PlannedChunk): Promise<OrchestrationRunDto> {

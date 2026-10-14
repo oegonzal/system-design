@@ -2,6 +2,7 @@ import type { ExportReport } from './core/export-studio';
 import type { ChunkReport, FileReport, IngestReport } from './core/ingest';
 import type { ManifestEntry, ManifestStep } from './core/ports';
 import { whyNotStored } from './core/record';
+import type { DocumentRetraction, RetractReport, Retraction } from './core/retract';
 import type { StatusRefresh } from './core/status';
 
 /**
@@ -25,7 +26,8 @@ function table(header: readonly string[], rows: readonly (readonly string[])[]):
 const SHORT_HASH = 12;
 const NONE = '—';
 
-const count = (n: number, noun: string): string => `${n} ${noun}${n === 1 ? '' : 's'}`;
+const count = (n: number, noun: string, plural = `${noun}s`): string =>
+  `${n} ${n === 1 ? noun : plural}`;
 
 const chunkRow = (chunk: ChunkReport): string[] => [
   `${chunk.index}/${chunk.of}`,
@@ -38,6 +40,41 @@ const chunkRow = (chunk: ChunkReport): string[] => [
   whyNotStored(chunk) ?? chunk.context ?? NONE,
 ];
 
+/** Digest runs retracted and the points they removed, across batches; a batch that did not run counts nothing. */
+function retractedTotal(retractions: readonly (Retraction | null)[]): string {
+  const runs = retractions.flatMap((retraction) => retraction?.retracted ?? []);
+  const points = runs.reduce((sum, run) => sum + run.removed, 0);
+  return `${count(runs.length, 'digest run')} (${count(points, 'point')})`;
+}
+
+/**
+ * A batch of retractions: the runs that removed points, with how many; the
+ * runs that removed none, apart — what they stored was gone already, or they
+ * stored nothing; and the runs left standing, with why.
+ */
+function retractionLines(retraction: Retraction): string[] {
+  const removed = retraction.retracted.filter((run) => run.removed > 0);
+  const empty = retraction.retracted.filter((run) => run.removed === 0);
+  const runs = (ids: readonly string[]): string => `(${ids.length}): ${ids.join(', ')}`;
+  return [
+    ...(removed.length === 0
+      ? []
+      : [
+          table(
+            ['digest run', 'points'],
+            removed.map((run) => [run.digestRunId, String(run.removed)]),
+          ),
+        ]),
+    ...(empty.length === 0 ? [] : [`held nothing ${runs(empty.map((run) => run.digestRunId))}`]),
+    ...(retraction.left === null
+      ? []
+      : [`left standing ${runs(retraction.left.digestRunIds)} — ${retraction.left.error}`]),
+  ];
+}
+
+const touched = (retraction: Retraction | null): retraction is Retraction =>
+  retraction !== null && (retraction.retracted.length > 0 || retraction.left !== null);
+
 function renderFile(file: FileReport): string {
   const head = `${file.document} · ${count(file.parts, 'part')} · ${count(file.chunks.length, 'chunk')}`;
   if (file.chunks.length === 0) return `${head}\n(no text was read — nothing to ingest)`;
@@ -47,28 +84,58 @@ function renderFile(file: FileReport): string {
       ['chunk', 'hash', 'bytes', 'parts', 'outcome', 'orchestration', 'under / error'],
       file.chunks.map(chunkRow),
     ),
+    ...(touched(file.replaced)
+      ? [`replaced ${retractedTotal([file.replaced])}`, ...retractionLines(file.replaced)]
+      : []),
   ].join('\n');
 }
 
 export function renderIngest(report: IngestReport): string {
+  const replaced = report.files.map((file) => file.replaced);
   const summary = [
     `chunks ${report.chunks}`,
     `posted ${report.posted}`,
     `unstored ${report.unstored}`,
     `skipped ${report.skipped}`,
     `failed ${report.failed}`,
-    ...(report.retracted > 0 ? [`retracted ${report.retracted}`] : []),
+    ...(replaced.some(touched) ? [`retracted ${retractedTotal(replaced)}`] : []),
   ].join(' · ');
+  const resume = `re-running the same command${report.force ? ' without --force' : ''}`;
   const tail = [
     report.dryRun ? 'dry run — nothing was posted and nothing was recorded' : null,
     report.stopped
       ? `stopped at ${report.stopped.document} chunk ${report.stopped.chunk}: ${report.stopped.message}`
       : null,
     report.halted
-      ? `halted after ${report.halted.after} chunk(s): ${report.halted.reason} — the pending chunks post on re-running the same command`
+      ? `halted after ${report.halted.after} chunk(s): ${report.halted.reason} — the pending chunks post on ${resume}`
       : null,
   ].filter((line): line is string => line !== null);
   return [...report.files.map(renderFile), [summary, ...tail].join('\n')].join('\n\n');
+}
+
+/** One document retired: what its runs removed, what was retracted already, and what the record cannot say. */
+function renderRetiring(document: DocumentRetraction): string {
+  const ids = (label: string, runs: readonly string[]): string[] =>
+    runs.length === 0 ? [] : [`${label} (${runs.length}): ${runs.join(', ')}`];
+  return [
+    `${document.document} · ${count(document.entries, 'entry', 'entries')}`,
+    ...(document.retraction === null
+      ? ids('would retract', document.runs)
+      : retractionLines(document.retraction)),
+    ...ids('already retracted', document.already),
+    ...(document.unresolved === 0
+      ? []
+      : [
+          `unresolved: ${count(document.unresolved, 'entry', 'entries')} with an orchestration whose report was never read — status --refresh reads it back from the loop; then retract again`,
+        ]),
+  ].join('\n');
+}
+
+export function renderRetract(report: RetractReport): string {
+  const foot = report.dryRun
+    ? 'dry run — nothing was retracted and nothing was recorded'
+    : `retracted ${retractedTotal(report.documents.map((document) => document.retraction))}`;
+  return [...report.documents.map(renderRetiring), foot].join('\n\n');
 }
 
 const stepCell = (step: ManifestStep | null): string => {
@@ -81,11 +148,18 @@ const stepCell = (step: ManifestStep | null): string => {
   return `${step.status}${reason}${note}${counts === '' ? '' : ` (${counts})`}`;
 };
 
+/** When what the posting stored was retracted, and how many points went; empty while it stands. */
+const retractedCell = (entry: ManifestEntry): string =>
+  entry.retractedAt === null
+    ? ''
+    : `${entry.retractedAt} (${count(entry.retractedPoints ?? 0, 'point')})`;
+
 const entryRow = (entry: ManifestEntry): string[] => [
   entry.document,
   `${entry.chunk.index}/${entry.chunk.of}`,
   entry.kind,
   entry.status,
+  retractedCell(entry),
   stepCell(entry.steps.digest),
   stepCell(entry.steps.store),
   entry.ingestedAt,
@@ -106,6 +180,7 @@ export function renderStatus(
             'chunk',
             'kind',
             'status',
+            'retracted',
             'digest',
             'store',
             'ingested',

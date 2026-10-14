@@ -104,12 +104,28 @@ export interface ManifestEntry {
   error: string | null;
   ingestedAt: string;
   loopUrl: string;
+  /**
+   * When what this posting's digest run stored was retracted — replaced by a
+   * later digest of the document, or the document retired; null while it stands.
+   */
+  retractedAt: string | null;
+  /** How many points that retraction removed — 0 when the store held none of them by then; null while it stands. */
+  retractedPoints: number | null;
 }
 
 /** Where outcomes are kept. `save` replaces the whole ledger, atomically. */
 export interface IngestLedger {
+  /** Where the ledger is kept, as a refusal names it. */
+  readonly path: string;
   load(): Promise<readonly ManifestEntry[]>;
   save(entries: readonly ManifestEntry[]): Promise<void>;
+  /**
+   * Make this process the ledger's one writer until the answer is called. A
+   * ledger another command holds is refused, naming what holds it: `save`
+   * replaces the whole ledger, so a second writer would overwrite what the
+   * first recorded — its postings, or the marks of what it retracted.
+   */
+  lock(): Promise<() => Promise<void>>;
 }
 
 export interface Clock {

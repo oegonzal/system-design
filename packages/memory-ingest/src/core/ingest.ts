@@ -1,4 +1,4 @@
-import { basename, relative, resolve } from 'node:path';
+import { basename, resolve } from 'node:path';
 
 import { DOCUMENT_TITLE_MAX_LENGTH } from '@sysdesign/contracts';
 import { LoopRefused, LoopTimeout, LoopUnreachable } from '@sysdesign/loop-client';
@@ -15,7 +15,8 @@ import {
   type ManifestEntry,
   type PlannedChunk,
 } from './ports';
-import { entryOf, identityOf, statusOf } from './record';
+import { documentKey, entryOf, identityOf, loopError, statusOf, stored } from './record';
+import { retractRuns, type Retraction } from './retract';
 
 /**
  * The ingest, in two phases. `planIngest` reads and chunks every document
@@ -23,15 +24,24 @@ import { entryOf, identityOf, statusOf } from './record';
  * refuses the whole run up front. `runIngest` then posts one chunk at a time,
  * awaiting each orchestration to settle before the next, and records every
  * outcome in the ledger. A chunk whose facts the ledger holds as stored is
- * skipped unless forced — and a forced document is digested again whole:
- * every digest the ledger holds as stored for that document is retracted by
- * its run id before the document's first chunk is posted, so the store never
- * holds two digests of one document. Retraction goes by the document, not by
- * the chunk hash, because the hash is of the rendered goal, and a change to
- * the goal's rules renames every chunk at once (measured 2026-10-13: a forced
- * résumé re-ingest after a rules change retracted nothing and left 48 facts
- * beside their 50 replacements). A refusal from the loop stops the run,
- * because the next chunk would be refused the same way.
+ * skipped unless forced.
+ *
+ * A document's digests follow its current text, make before break: once every
+ * chunk of its current plan is stored — posted complete in this run, or
+ * skipped for a posting that stands — every other digest the ledger holds as
+ * stored for that document is retracted by its run id and marked. So an edit
+ * replaces only the chunks it changed, a forced document is posted whole
+ * before anything of it is taken out, and a document the run did not store
+ * whole — halted, refused, failed — keeps everything it had. Replacement goes
+ * by the document, not by the chunk hash, because the hash is of the rendered
+ * goal, and a change to the goal's rules renames every chunk at once
+ * (measured 2026-10-13: a forced résumé re-ingest after a rules change
+ * matched no hash and left 48 facts beside their 50 replacements). A document
+ * that read as no text replaces nothing: retiring one is `retract`'s.
+ *
+ * A refusal from the loop, or a start still unreachable once the client's
+ * recovery window has passed, stops the run, because the next chunk would
+ * meet the same answer.
  */
 export interface IngestOptions {
   kind: IngestKind;
@@ -107,10 +117,19 @@ export interface FileReport {
   document: string;
   parts: number;
   chunks: ChunkReport[];
+  /**
+   * The document's other digests, retracted once every chunk of its current
+   * plan was stored; null when the plan was not stored whole in this run — a
+   * dry run, a halt or a stop before its last chunk, a chunk not stored — so
+   * nothing of the document was taken out.
+   */
+  replaced: Retraction | null;
 }
 
 export interface IngestReport {
   dryRun: boolean;
+  /** Whether stored chunks were posted again: a forced run that ends short resumes without --force, which skips what it stored. */
+  force: boolean;
   files: FileReport[];
   chunks: number;
   /** Chunks whose facts the loop stored. */
@@ -120,14 +139,19 @@ export interface IngestReport {
   skipped: number;
   /** Failed and refused together. */
   failed: number;
-  /** Digest runs retracted before a forced document was posted again: everything its earlier digests had stored, gone. */
-  retracted: number;
-  /** Set when a refusal stopped the run before every chunk was posted. */
+  /**
+   * Set when the run stopped on an answer the next chunk would meet too — a
+   * refusal, or a start still unreachable past the client's recovery window —
+   * before every chunk was posted.
+   */
   stopped: { document: string; chunk: number; message: string } | null;
   /**
-   * Set when the run halted as asked rather than by a refusal — the limit was
-   * reached, or the operator interrupted. The chunks not reached stay
-   * `pending`, and re-running the same command posts them.
+   * Set when the run halted as asked, with chunks still to reach, rather than
+   * by a refusal — the limit was reached, or the operator interrupted. The
+   * chunks not reached stay `pending`, and re-running the command posts them:
+   * the same command, or without --force when this one was forced, since what
+   * it posted is stored. A limit or an interrupt met at the last chunk halts
+   * nothing: the run has ended.
    */
   halted: { reason: HaltReason; after: number } | null;
 }
@@ -137,22 +161,16 @@ export interface PlannedDocument {
   plan: ChunkPlan;
 }
 
-/** Statuses a re-run does not post again: the chunk's facts are in the store. */
-const INGESTED: ReadonlySet<IngestStatus> = new Set(['complete']);
-
-/** The digest runs a document's stored postings went through, each once, in the order recorded. */
+/** The digest runs a document's standing postings went through, each once, in the order recorded. */
 const storedDigestsOf = (entries: readonly ManifestEntry[], document: string): string[] => [
   ...new Set(
     entries.flatMap((entry) =>
-      entry.document === document && INGESTED.has(entry.status) && entry.digestRunId !== null
+      entry.document === document && stored(entry) && entry.digestRunId !== null
         ? [entry.digestRunId]
         : [],
     ),
   ),
 ];
-
-/** Start failures that are an outcome of one chunk, not a fault in the program. */
-const START_FAILURES = [LoopUnreachable, LoopTimeout] as const;
 
 /** A file name past the contract's title bound, refused by name rather than by the schema's raw issue. */
 export class DocumentNameTooLong extends Error {
@@ -183,7 +201,7 @@ export async function planIngest(
     if (title.length > DOCUMENT_TITLE_MAX_LENGTH) throw new DocumentNameTooLong(path, title.length);
     const text = await deps.reader.read(absolute);
     planned.push({
-      document: relative(options.cwd, absolute),
+      document: documentKey(path, options.cwd),
       plan: chunkDocument({
         text,
         kind: options.kind,
@@ -205,55 +223,58 @@ export function latestByHash(
   return new Map(entries.map((entry) => [entry.chunkHash, entry]));
 }
 
+/** A posting's record, and whether the run stops on it. */
+interface Posting {
+  entry: ManifestEntry;
+  /** The next chunk would meet the same answer: a refusal, or a start unreachable past the recovery window. */
+  stops: boolean;
+}
+
 /** Post one chunk and say how it ended. Anything but a loop outcome is a fault and propagates. */
 async function postOne(
   planned: PlannedChunk,
   document: string,
   deps: IngestDeps,
-): Promise<ManifestEntry> {
+): Promise<Posting> {
   const base = {
     identity: identityOf(planned, document),
     ingestedAt: deps.clock.now(),
     loopUrl: deps.loopUrl,
+    // A fresh posting stands until a retraction marks it.
+    retractedAt: null,
+    retractedPoints: null,
   };
+  /** The record of a posting the loop never settled: refused, unreachable, unanswered, or lost mid-wait. */
+  const unsettled = (
+    status: IngestStatus,
+    orchestrationRunId: string | null,
+    error: string,
+  ): ManifestEntry => entryOf({ ...base, orchestrationRunId, orchestration: null, status, error });
   try {
     const orchestration = await deps.sink.post(planned);
-    return entryOf({
+    const entry = entryOf({
       ...base,
       orchestrationRunId: orchestration.orchestrationRunId,
       orchestration,
       status: statusOf(orchestration),
       error: orchestration.error?.message ?? null,
     });
+    return { entry, stops: false };
   } catch (error) {
     if (error instanceof LoopRefused) {
-      const message = `${error.status}: ${error.message}`;
-      return entryOf({
-        ...base,
-        orchestrationRunId: null,
-        orchestration: null,
-        status: 'refused',
-        error: message,
-      });
+      return { entry: unsettled('refused', null, loopError(error)), stops: true };
     }
     if (error instanceof IngestWaitFailed) {
-      return entryOf({
-        ...base,
-        orchestrationRunId: error.orchestrationRunId,
-        orchestration: null,
-        status: 'failed',
-        error: error.cause.message,
-      });
+      const entry = unsettled('failed', error.orchestrationRunId, error.cause.message);
+      return { entry, stops: false };
     }
-    if (START_FAILURES.some((kind) => error instanceof kind)) {
-      const message = (error as Error).message;
-      return entryOf({
-        ...base,
-        orchestrationRunId: null,
-        orchestration: null,
-        status: 'failed',
-        error: message,
-      });
+    // The client rides a restarting loop out within its recovery window: a start
+    // still unreachable past it would hold every chunk after it for the same window.
+    if (error instanceof LoopUnreachable) {
+      return { entry: unsettled('failed', null, error.message), stops: true };
+    }
+    if (error instanceof LoopTimeout) {
+      return { entry: unsettled('failed', null, error.message), stops: false };
     }
     throw error;
   }
@@ -290,50 +311,51 @@ export async function runIngest(
   options: Pick<IngestOptions, 'dryRun' | 'force' | 'limit'>,
   deps: IngestDeps,
 ): Promise<IngestReport> {
-  const entries = [...(await deps.ledger.load())];
+  let entries = await deps.ledger.load();
   // Kept current through the run, so a chunk met twice in one invocation is posted once.
-  const known = new Map(latestByHash(entries));
+  let known = new Map(latestByHash(entries));
   const files: FileReport[] = documents.map(({ document, plan }) => ({
     document,
     parts: plan.parts,
     chunks: plan.chunks.map(reportOf),
+    replaced: null,
   }));
   const report: IngestReport = {
     dryRun: options.dryRun,
+    force: options.force,
     files,
     chunks: files.reduce((sum, file) => sum + file.chunks.length, 0),
     posted: 0,
     unstored: 0,
     skipped: 0,
     failed: 0,
-    retracted: 0,
     stopped: null,
     halted: null,
   };
   // Skipped chunks cost nothing, so they do not count against a limit.
   let posted = 0;
+  // Chunks reached, skipped or posted, across every document: a halt leaves the rest pending.
+  let reached = 0;
 
   for (const [fileIndex, { document, plan }] of documents.entries()) {
-    // A forced document goes whole: what every earlier digest of it stored goes before its first chunk is posted.
-    if (options.force && !options.dryRun && report.stopped === null && report.halted === null) {
-      for (const digestRunId of storedDigestsOf(entries, document)) {
-        await deps.sink.retract(digestRunId);
-        report.retracted += 1;
-      }
-    }
+    const file = files[fileIndex] as FileReport;
+    // The digest runs the current plan stands on, chunk by chunk; null once one is not stored, or under a dry run.
+    let standing: Set<string> | null = plan.chunks.length > 0 && !options.dryRun ? new Set() : null;
     for (const [chunkIndex, planned] of plan.chunks.entries()) {
       if (report.stopped !== null || report.halted !== null) return report;
-      const row = (files[fileIndex] as FileReport).chunks[chunkIndex] as ChunkReport;
+      reached += 1;
+      const row = file.chunks[chunkIndex] as ChunkReport;
       const prior = known.get(planned.chunkHash);
-      if (prior !== undefined && INGESTED.has(prior.status) && !options.force) {
+      if (prior !== undefined && stored(prior) && !options.force) {
         settle(row, prior, 'skipped');
         report.skipped += 1;
+        if (prior.digestRunId !== null) standing?.add(prior.digestRunId);
         continue;
       }
       if (options.dryRun) continue;
 
-      const entry = await postOne(planned, document, deps);
-      entries.push(entry);
+      const { entry, stops } = await postOne(planned, document, deps);
+      entries = [...entries, entry];
       known.set(entry.chunkHash, entry);
       await deps.ledger.save(entries);
       const outcome = OUTCOME_OF[entry.status];
@@ -341,16 +363,28 @@ export async function runIngest(
       if (outcome === 'posted') report.posted += 1;
       else if (outcome === 'unstored') report.unstored += 1;
       else report.failed += 1;
-      if (outcome === 'refused') {
+      if (!stored(entry)) standing = null;
+      else if (entry.digestRunId !== null) standing?.add(entry.digestRunId);
+      if (stops) {
         report.stopped = { document, chunk: planned.chunk.chunk.index, message: entry.error ?? '' };
       }
       posted += 1;
+      // A halt leaves chunks pending; at the run's last chunk there are none, and the run simply ends.
+      if (reached === report.chunks) continue;
       if (options.limit !== null && posted >= options.limit) {
         report.halted = { reason: 'limit', after: posted };
       } else if (deps.interrupted?.() === true) {
         report.halted = { reason: 'interrupted', after: posted };
       }
     }
+    if (standing === null) continue;
+    // Make before break: every chunk of the current plan is stored, so what else of the document stands goes.
+    const current = standing;
+    const replaced = storedDigestsOf(entries, document).filter((run) => !current.has(run));
+    const done = await retractRuns(entries, replaced, deps);
+    entries = done.entries;
+    known = new Map(latestByHash(entries));
+    file.replaced = done.retraction;
   }
   return report;
 }
