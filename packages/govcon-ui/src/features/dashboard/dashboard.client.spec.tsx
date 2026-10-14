@@ -55,6 +55,7 @@ describe('DashboardClient', () => {
     await screen.findByRole('table', { name: 'Early notices' });
     await screen.findByLabelText('Reach by cut');
     await screen.findByRole('heading', { name: 'ENFAV LLC' });
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Dashboard');
     expect(
       screen
         .getAllByRole('region')

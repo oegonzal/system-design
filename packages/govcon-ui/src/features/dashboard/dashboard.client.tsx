@@ -1,7 +1,7 @@
 'use client';
 
 import { EARLY_NOTICE_TYPES } from '@sysdesign/contracts';
-import { LiveRegion, Stack, Surface } from '@sysdesign/design-system';
+import { Heading, LiveRegion, Stack, Surface } from '@sysdesign/design-system';
 import { useState } from 'react';
 
 import { useProfile } from '../../providers/profile-context';
@@ -36,6 +36,7 @@ export function DashboardClient() {
   const [message, setMessage] = useState('');
   return (
     <Stack gap={6}>
+      <Heading level={1}>Dashboard</Heading>
       <Surface as="section" aria-label="Due this week">
         <DueThisWeekPanel profileId={profileId} version={version} />
       </Surface>
