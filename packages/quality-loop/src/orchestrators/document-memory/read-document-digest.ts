@@ -5,27 +5,25 @@
  * through here, and what it reads is in the store's own item shape, so the
  * store step hands it to `indexMemories` as it is.
  *
- * A document that declares its scope settles every memory's scope: each one
- * endorsed carries the declaration, whatever the digest wrote — the goal's
- * index is an engine fact, the digest's scope a model's — and the finding
- * that faults a memory's scope withholds nothing, since the scope it faulted
- * is not the one stored.
+ * A document that declares its scope settles every memory's scope: its
+ * declaration decides each memory's scope over the judges' verdict. Each
+ * memory endorsed carries the declaration, whatever the digest wrote — the
+ * goal's index is an engine fact, the digest's scope a model's — and what
+ * withholds is the table the pipeline declares for that case, under which a
+ * scope finding withholds nothing (`WITHHOLDING_UNDER_DECLARED_SCOPE`).
  */
 import type { Admission } from '@sysdesign/contracts';
 
-import { withholdingOf, type RunOutputs, type WithholdingRules } from '../../core/outputs';
-import { DOCUMENT_DIGEST, SCOPE_FINDING_TYPE } from '../../pipelines/document-digest/definition';
+import { withholdingOf, type RunOutputs } from '../../core/outputs';
+import {
+  DOCUMENT_DIGEST,
+  WITHHOLDING_UNDER_DECLARED_SCOPE,
+} from '../../pipelines/document-digest/definition';
 import { readIndex } from '../../pipelines/document-digest/input';
 import { documentDigestSchema } from '../../pipelines/document-digest/output';
 import { ADMITTED_ONLY, endorsedMemories, type DigestReadout } from '../memory/digest/endorsed';
 
 const WITHHOLDING = withholdingOf(DOCUMENT_DIGEST);
-
-/** What withholds under a declared scope: as the definition declares, but the scope finding nothing. */
-const UNDER_DECLARED_SCOPE: WithholdingRules = {
-  ...WITHHOLDING,
-  findingTypes: { ...WITHHOLDING.findingTypes, [SCOPE_FINDING_TYPE]: { withholds: 'none' } },
-};
 
 export const readDocumentDigest = (
   outputs: RunOutputs,
@@ -40,7 +38,7 @@ export const readDocumentDigest = (
     {
       schema: documentDigestSchema,
       readIndex,
-      withholding: declared === undefined ? WITHHOLDING : UNDER_DECLARED_SCOPE,
+      withholding: declared === undefined ? WITHHOLDING : WITHHOLDING_UNDER_DECLARED_SCOPE,
     },
     admits,
   );

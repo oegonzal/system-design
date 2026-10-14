@@ -1580,11 +1580,16 @@ findings and its validation reports — and withholds every item an
 `every-ref` naming names; a finding type or validator that declares nothing
 withholds every item it names. Its readers are a digest's memories
 (`endorsedMemories`, for the experience, document and knowledge digests) and a
-recall's kept chunks (`readPack`), and each binds `withholdingOf(definition)` —
-the rules read off its own pipeline's definition, never a table of its own.
-Each readout carries `withheld`, one entry per item with what withheld it
-(`finding` or `validator`, and the type or id), so a reader counts what it
-withheld by source and type.
+recall's kept chunks (`readPack`), and each binds the rules its own pipeline
+declares, never a table of its own: `withholdingOf(definition)`, read off the
+definition — or, for a document digest under a declared scope, the table the
+document-digest pipeline declares for that case beside its policy
+(`WITHHOLDING_UNDER_DECLARED_SCOPE`). There the document's declaration decides
+each memory's scope over the judges' verdict, so a scope finding
+(`misscoped_fact`) withholds nothing, and every other type withholds as the
+policy declares. Each readout carries `withheld`, one entry per item with what
+withheld it (`finding` or `validator`, and the type or id), so a reader counts
+what it withheld by source and type.
 
 **A duplicate set withholds nothing.** Every duplicate type — `duplicate_fact`,
 `duplicate_memory`, `duplicate_item`, `redundant_chunk` — declares `none`. A

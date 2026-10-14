@@ -112,9 +112,12 @@ export interface DigestIndexLike {
 /**
  * How one digest pipeline's artifact and goal are read: its output schema,
  * its own index reader, and what its finding types — and any validator whose
- * problems name a memory — withhold, as its definition declares them
- * (`withholdingOf(definition)`). Without them, everything confirmed against a
- * memory withholds it.
+ * problems name a memory — withhold, as its pipeline declares them: read off
+ * its definition (`withholdingOf(definition)`), or, in a case the goal's index
+ * declares, the table the pipeline declares for that case beside its policy —
+ * a document digest under a declared scope withholds by
+ * `WITHHOLDING_UNDER_DECLARED_SCOPE`. Without them, everything confirmed
+ * against a memory withholds it.
  */
 export interface DigestCodec<D extends DigestLike, I extends DigestIndexLike> {
   schema: ZodType<D>;

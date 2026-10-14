@@ -8,9 +8,14 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline } from '../../core/describe-pipeline';
+import { withholdingOf } from '../../core/outputs';
 import { validatePipeline } from '../../core/validate-pipeline';
 import { capsAgainstMeasured, deriverSchema, jsonSchemaTypes } from '../../core/testing';
-import { DOCUMENT_DIGEST, SCOPE_FINDING_TYPE } from './definition';
+import {
+  DOCUMENT_DIGEST,
+  SCOPE_FINDING_TYPE,
+  WITHHOLDING_UNDER_DECLARED_SCOPE,
+} from './definition';
 import measured from './measured.json';
 import { documentDigestOutput } from './output';
 import { sampleDocumentDigest } from './testing';
@@ -80,7 +85,7 @@ describe('the document-digest pipeline', () => {
     // A wrong scope is a falsehood and withholds; a provenance leak is wording and withholds nothing.
     expect(DOCUMENT_DIGEST.policy.findingTypes[SCOPE_FINDING_TYPE]?.withholds).toBe('every-ref');
     expect(DOCUMENT_DIGEST.policy.findingTypes['provenance_leak']?.withholds).toBe('none');
-    // The grounding critic reports the very type a reader lets a declared scope settle.
+    // The grounding critic reports the very type a declared scope withholds otherwise.
     expect(DOCUMENT_DIGEST.critics[0].persona).toContain(SCOPE_FINDING_TYPE);
     expect(DOCUMENT_DIGEST.critics[2].persona).toContain('provenance_leak');
     // The producer names the kinds as the schema spells them, never a word of its own.
@@ -161,6 +166,35 @@ describe('the document-digest pipeline', () => {
       // A duplicate set may hold a bystander, and a stored twin is recoverable
       // where a dropped fact is not, so every member stands.
       duplicate_fact: ['none', false],
+    });
+  });
+
+  it('[QL-69] under a declared scope a scope finding withholds nothing, and every other type and validator withholds as the definition declares', () => {
+    const underDeclared = Object.fromEntries(
+      Object.entries(WITHHOLDING_UNDER_DECLARED_SCOPE.findingTypes).map(([type, mapped]) => [
+        type,
+        mapped.withholds,
+      ]),
+    );
+    expect(underDeclared).toEqual({
+      // A falsehood is withheld under a declaration as without one.
+      invented_fact: 'every-ref',
+      misread_section: 'every-ref',
+      // The document's declaration decides each memory's scope over the judges' verdict.
+      misscoped_fact: 'none',
+      missed_fact: 'none',
+      unusable_fact: 'none',
+      vague_condition: 'none',
+      provenance_leak: 'none',
+      duplicate_fact: 'none',
+    });
+    expect(WITHHOLDING_UNDER_DECLARED_SCOPE.validators).toEqual(
+      withholdingOf(DOCUMENT_DIGEST).validators,
+    );
+    // It withholds otherwise without pricing otherwise: the policy still gates the scope finding.
+    expect(DOCUMENT_DIGEST.policy.findingTypes[SCOPE_FINDING_TYPE]).toMatchObject({
+      gate: true,
+      withholds: 'every-ref',
     });
   });
 

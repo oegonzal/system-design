@@ -5,11 +5,14 @@
  * finding withholds what its type declares on the policy (`WITHHOLDINGS`); a
  * validator's problem what that validator declares on itself; and anything
  * undeclared withholds every item it names, the rule before any was declared.
- * Both are read off the pipeline's definition (`withholdingOf`), so a reader
- * cannot hold a second copy of either. Written once, so no two readers can
- * withhold differently, and over engine facts only — the ledger's findings,
- * its validation reports and its criteria's citations — never over what any
- * of them says in prose.
+ * Both are the pipeline's to declare, so a reader never holds a table of its
+ * own: it reads them off the definition (`withholdingOf`), or, in a case the
+ * goal's index declares, takes the table the pipeline declares for that case
+ * beside its policy — a document digest under a declared scope withholds by
+ * the document-digest pipeline's `WITHHOLDING_UNDER_DECLARED_SCOPE`. Written
+ * once, so no two readers can withhold differently, and over engine facts only
+ * — the ledger's findings, its validation reports and its criteria's citations
+ * — never over what any of them says in prose.
  */
 import type {
   DecisionPolicy,

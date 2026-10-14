@@ -175,7 +175,7 @@ describe('the document-memory steps', () => {
     expect(unvalidated.output).toBeUndefined();
   });
 
-  it('[QL-69] a document that declares its scope has every memory stored under it, whatever the digest wrote, and a finding against a memory’s scope withholds nothing there', async () => {
+  it('[QL-69] a document that declares its scope has every memory stored under it, whatever the digest wrote, and a finding against a memory’s scope withholds nothing there — that finding alone, a memory confirmed false withheld there as anywhere', async () => {
     // The digest scoped the role unit and the home subject, and both samples of
     // a critic faulted the role's scope: the document's declaration decides.
     const [role, home] = sampleDocumentDigest().memories;
@@ -205,6 +205,20 @@ describe('the document-memory steps', () => {
         ['memory.1', scope],
         ['memory.2', scope],
       ]);
+
+      // The declaration settles the scope finding and nothing else: beside the
+      // memory faulted for its scope, which it keeps, a memory confirmed false
+      // is withheld under it as without one.
+      for (const falsehood of ['invented_fact', 'misread_section']) {
+        const findings = [...faulted, faulting(falsehood, ['memory.2'])];
+        const narrowed = await digest(
+          ctx(child(digestTrace('accept', { goal, artifact, findings })), { goal }),
+        );
+        expect(narrowed).toMatchObject({ status: 'complete', counts: { memories: 2, kept: 1 } });
+        expect(
+          narrowed.output?.digested.memories.map((memory) => [memory.position, memory.scope]),
+        ).toEqual([[1, scope]]);
+      }
     }
 
     // A document that declares nothing keeps the scopes its digest wrote, and

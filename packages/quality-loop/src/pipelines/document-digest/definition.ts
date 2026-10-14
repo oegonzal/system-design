@@ -13,6 +13,7 @@
  * memory from the store.
  */
 import { STANDARD } from '../../core/controllers';
+import { withholdingOf, type WithholdingRules } from '../../core/outputs';
 import type { PipelineDefinition } from '../../core/pipeline';
 import { STANDARD_SCORING } from '../../core/policy';
 import { DOCUMENT_DIGEST_ID, MAX_CRITERIA, STATEMENT_BOUND } from './input';
@@ -27,11 +28,9 @@ import { documentDigestOutput, type DocumentDigest } from './output';
 import { limitsValidator, referencesValidator } from './validators';
 
 /**
- * The finding type that faults a memory's scope, named because a reader of the
- * digest asks for it: a document that declares its scope has every memory
- * stored under the declaration whatever the digest wrote, so there this
- * finding faults nothing the store keeps and withholds nothing
- * (`readDocumentDigest`).
+ * The finding type that faults a memory's scope, named once for the two tables
+ * that withhold by it: the policy's, and the one this pipeline declares for a
+ * document that declares its scope (`WITHHOLDING_UNDER_DECLARED_SCOPE`).
  */
 export const SCOPE_FINDING_TYPE = 'misscoped_fact';
 
@@ -139,12 +138,12 @@ export const DOCUMENT_DIGEST: PipelineDefinition<DocumentDigest> = {
     // fact scoped where it does not hold — one application's answer asserted
     // of the subject everywhere — is wrong: storing it would have the corpus
     // assert something about the subject that their own documents do not, so
-    // every memory such a finding names is withheld. The scope finding has one
-    // exception, declared by the goal rather than judged: a document that
-    // declares its scope has every memory stored under it, whatever the digest
-    // wrote, so there the finding faults nothing stored and withholds nothing
-    // (`SCOPE_FINDING_TYPE`). The remaining types fault a fact that is true,
-    // and withhold nothing — a provenance leak among
+    // every memory such a finding names is withheld — except under a declared
+    // scope, where the document's declaration decides each memory's scope over
+    // the judges' verdict, so a scope finding withholds nothing: the one case
+    // this pipeline withholds otherwise, declared below the definition
+    // (`WITHHOLDING_UNDER_DECLARED_SCOPE`). The remaining types fault a fact
+    // that is true, and withhold nothing — a provenance leak among
     // them: the fact holds, only its wording keeps a reworded question from
     // finding it, and a revise fixes wording where a loss fixes nothing. A duplicate's confirmed set is a component of
     // overlapping claims, not one pair, so keeping one of it may drop a
@@ -169,5 +168,24 @@ export const DOCUMENT_DIGEST: PipelineDefinition<DocumentDigest> = {
     evidence: { minHits: 2, minAssessedShare: 0.75 },
     thresholds: { acceptAt: 75, rejectBelow: 30 },
     loop: { maxIterations: 2, plateauAfter: 2, concurrency: 2, lostProduces: 1 },
+  },
+};
+
+/**
+ * What withholds what in the digest of a document that declares its scope — a
+ * fact of the goal's index, by which the reader chooses this table over the
+ * definition's own (`readDocumentDigest`). There the document's declaration
+ * decides each memory's scope over the judges' verdict, so a scope finding
+ * withholds nothing. Nothing else differs: every other finding type and every
+ * validator withholds as the definition declares, so a memory confirmed false
+ * is withheld under a declaration as without one. Nor does what a finding
+ * prices: the policy's gate still counts a confirmed scope finding against the
+ * run.
+ */
+export const WITHHOLDING_UNDER_DECLARED_SCOPE: WithholdingRules = {
+  validators: withholdingOf(DOCUMENT_DIGEST).validators,
+  findingTypes: {
+    ...DOCUMENT_DIGEST.policy.findingTypes,
+    [SCOPE_FINDING_TYPE]: { withholds: 'none' },
   },
 };
