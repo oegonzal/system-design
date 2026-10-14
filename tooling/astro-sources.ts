@@ -1,9 +1,9 @@
 import { parse, type DiagnosticMessage } from '@astrojs/compiler-rs';
 
 /**
- * An Astro component (`.astro`), read for the inert-code gate the way a
- * TypeScript module is read there: through the compiler that builds it, never
- * through the shape of its text.
+ * An Astro component (`.astro`), read for the repo's gates (inert code, the
+ * site's imports) the way a TypeScript module is read there: through the
+ * compiler that builds it, never through the shape of its text.
  *
  * Astro's compiler returns the whole file as one ESTree tree. Verified on
  * @astrojs/compiler-rs 0.5.1: the frontmatter is an `AstroFrontmatter` whose

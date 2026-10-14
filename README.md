@@ -25,7 +25,7 @@ sits alongside for the behavioral half of the interview.
 - **PostgreSQL** + **MikroORM** (hand-written migrations, `migration:check` drift gate) · **Qdrant** for the loop's memory
 - **Tilt** + Docker Desktop **Kubernetes** dev environment
 - **Astro** + **Tailwind CSS** for the Enfav LLC marketing site — every page prerendered, no client JavaScript, served by **Cloudflare Workers** static assets
-- **Vitest** + **Playwright** · GitHub Actions CI with an LLM + rules code-review pipeline
+- **Vitest** + **Playwright** · GitHub Actions CI with an LLM + rules code-review pipeline, and production deploys of the Enfav site from `main` (`.github/workflows/deploy-website.yml`)
 
 ## Getting started
 

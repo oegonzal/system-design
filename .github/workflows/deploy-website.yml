@@ -1,0 +1,238 @@
+# Production deploys of the Enfav LLC site (packages/website) to Cloudflare Workers
+# Static Assets. packages/website/wrangler.jsonc is the deployment source of truth;
+# this workflow verifies the build, uploads exactly that build, then checks what
+# production serves. Setup, rollback and validation: docs/enfav/website.md.
+name: Deploy website
+
+on:
+  push:
+    branches: [main]
+    # What the build reads: the site, and the root files that pin its toolchain.
+    # tooling/website-imports.spec.ts keeps this complete (the site imports
+    # nothing outside its package but root dependencies). A dependency bump made
+    # for another package also redeploys — one redundant Worker version.
+    paths:
+      - 'packages/website/**'
+      - '!packages/website/README.md'
+      - '!packages/website/**/*.spec.ts'
+      - '!packages/website/vitest.config.ts'
+      - '!packages/website/eslint.config.mjs'
+      - '!packages/website/prettier.config.mjs'
+      - 'package.json'
+      - 'pnpm-lock.yaml'
+      - 'pnpm-workspace.yaml'
+      - '.nvmrc'
+      - 'nx.json'
+      - '.github/workflows/deploy-website.yml'
+  # Redeploys main's tip: the retry path after a failed run, and after a rollback.
+  workflow_dispatch:
+
+permissions: {}
+
+# One production deploy at a time: a running deploy always finishes, and a newer
+# pending run replaces an older one. Keyed by ref, so a dispatch on another branch
+# (which deploys nothing) can never cancel main's pending run.
+concurrency:
+  group: deploy-website-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Verify and build
+    # Deploys stay off until the owner sets the repository variable WEBSITE_DEPLOYS
+    # to `on`; unsetting it is the pause switch (docs/enfav/website.md).
+    if: github.ref == 'refs/heads/main' && vars.WEBSITE_DEPLOYS == 'on'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    outputs:
+      site_url: ${{ steps.site.outputs.url }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Read the production origin
+        id: site
+        # From its one declaration, packages/website/src/data/site.ts (Node strips the types).
+        run: |
+          url="$(node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --input-type=module -e "const { SITE } = await import('./packages/website/src/data/site.ts'); process.stdout.write(SITE.origin);")"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Lint, typecheck, test and build
+        run: pnpm exec nx run-many -t lint typecheck test build -p website website-e2e
+
+      - name: Install Playwright chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: End-to-end against the built site
+        run: pnpm exec nx run website-e2e:e2e
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: website-dist
+          path: packages/website/dist
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: website-e2e-report
+          path: dist/.playwright/packages/website-e2e
+          if-no-files-found: ignore
+          retention-days: 7
+
+  deploy:
+    name: Deploy to Cloudflare
+    needs: build
+    if: github.ref == 'refs/heads/main' && vars.WEBSITE_DEPLOYS == 'on'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    environment:
+      name: production
+      url: ${{ needs.build.outputs.site_url }}
+    outputs:
+      deployed: ${{ steps.deploy.outcome == 'success' }}
+    steps:
+      # First attempts need no such check: concurrency already orders them. A
+      # re-run keeps its original commit, so it must not deploy over a newer one.
+      - name: Refuse a re-run of a superseded commit
+        if: github.run_attempt != '1'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tip="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
+          if [ "$tip" != "$GITHUB_SHA" ]; then
+            echo "::error title=Superseded re-run::This run is for $GITHUB_SHA but main is at $tip; re-running it would deploy older code. Use Run workflow on main instead."
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+
+      # No dependency cache in the job that holds the deploy token.
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+
+      # An assets-only deploy bundles nothing and starts no runtime, so no install
+      # script needs to run here.
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: website-dist
+          path: packages/website/dist
+
+      # The only step that sees the token, and it runs nothing but wrangler.
+      - name: Deploy
+        id: deploy
+        working-directory: packages/website
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_OUTPUT_FILE_PATH: ${{ runner.temp }}/wrangler-output.ndjson
+        run: |
+          missing=()
+          [ -n "$CLOUDFLARE_API_TOKEN" ] || missing+=(CLOUDFLARE_API_TOKEN)
+          [ -n "$CLOUDFLARE_ACCOUNT_ID" ] || missing+=(CLOUDFLARE_ACCOUNT_ID)
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error title=Missing secrets::Set ${missing[*]} as secrets of the production environment (docs/enfav/website.md)."
+            exit 1
+          fi
+          wrangler=../../node_modules/.bin/wrangler
+          # The version serving before this deploy, by traffic: what a rollback returns to.
+          previous="$("$wrangler" deployments status --config wrangler.jsonc --json 2>/dev/null \
+            | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const [top]=JSON.parse(s).versions.toSorted((a,b)=>b.percentage-a.percentage);process.stdout.write(top?.version_id??"")}catch{}})' || true)"
+          echo "previous=$previous" >> "$GITHUB_OUTPUT"
+          "$wrangler" deploy --config wrangler.jsonc --message "$GITHUB_SHA run $GITHUB_RUN_ID"
+
+      - name: Summarize the deploy
+        if: always() && steps.deploy.outcome != 'skipped'
+        env:
+          OUTCOME: ${{ steps.deploy.outcome }}
+          PREVIOUS: ${{ steps.deploy.outputs.previous }}
+          OUTPUT_FILE: ${{ runner.temp }}/wrangler-output.ndjson
+        run: |
+          deployed="$(node -e 'const fs=require("fs");const f=process.argv[1];if(!fs.existsSync(f))process.exit(0);const e=fs.readFileSync(f,"utf8").split("\n").filter(Boolean).map(l=>JSON.parse(l)).filter(e=>e.type==="deploy").at(-1);process.stdout.write(e?.version_id??"")' "$OUTPUT_FILE")"
+          {
+            echo "### Website deploy: $OUTCOME"
+            echo ""
+            echo "- Commit: \`$GITHUB_SHA\`"
+            echo "- Deployed version: \`${deployed:-none}\`"
+            echo "- Live before this run: \`${PREVIOUS:-none}\`"
+            if [ -n "$PREVIOUS" ]; then
+              echo "- Roll back (pause deploys first): \`pnpm exec wrangler rollback $PREVIOUS --config packages/website/wrangler.jsonc --message \"<reason>\"\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  verify-production:
+    name: Verify production
+    needs: [build, deploy]
+    # Whenever a new version went live, even if a later step of the deploy job failed.
+    if: ${{ !cancelled() && needs.deploy.outputs.deployed == 'true' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The suite compares what production serves with the build it deployed.
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: website-dist
+          path: packages/website/dist
+
+      - name: Install Playwright chromium
+        run: pnpm exec playwright install --with-deps chromium
+
+      # Its first check waits up to two minutes for production to serve this build
+      # byte for byte; a zone feature that rewrites responses fails it.
+      - name: End-to-end against production
+        env:
+          WEBSITE_E2E_BASE_URL: ${{ needs.build.outputs.site_url }}
+        run: pnpm exec nx run website-e2e:e2e --excludeTaskDependencies
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: failure()
+        with:
+          name: website-production-report
+          path: dist/.playwright/packages/website-e2e
+          if-no-files-found: ignore
+          retention-days: 7

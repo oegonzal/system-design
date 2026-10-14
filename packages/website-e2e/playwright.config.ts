@@ -16,6 +16,11 @@ const BASE_URL = process.env['WEBSITE_E2E_BASE_URL'];
 /** WCAG 2.2 SC 1.4.10 (Reflow): content works at 320 CSS px, a 1280 px screen at 400% zoom. */
 const NARROW_VIEWPORT = { width: 320, height: 640 };
 
+/** Whether the server answers with this build: every other check depends on it. */
+const BUILD_SERVED = /build-served\.spec\.ts$/;
+/** Printing to PDF is a Chromium feature whose result does not depend on the window. */
+const PRINT = /print\.spec\.ts$/;
+
 export default defineConfig({
   ...nxE2EPreset(__filename, { testDir: './src' }),
 
@@ -38,15 +43,22 @@ export default defineConfig({
 
   /*
    * Chrome only, as in studio-e2e: the desktop layout, and the narrowest width
-   * WCAG asks for. Printing to PDF is a Chromium feature whose result does not
-   * depend on the window, so the print spec runs on the desktop project alone.
+   * WCAG asks for, the print spec on the desktop project alone. Both wait for
+   * the server to answer with this build.
    */
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
+    { name: 'build-served', testMatch: BUILD_SERVED },
+    {
+      name: 'chromium',
+      use: { ...devices['Desktop Chrome'] },
+      dependencies: ['build-served'],
+      testIgnore: BUILD_SERVED,
+    },
     {
       name: 'narrow',
       use: { ...devices['Desktop Chrome'], viewport: NARROW_VIEWPORT },
-      testIgnore: /print\.spec\.ts$/,
+      dependencies: ['build-served'],
+      testIgnore: [BUILD_SERVED, PRINT],
     },
   ],
 });

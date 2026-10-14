@@ -25,7 +25,7 @@ export const SITE_CRITERIA: readonly Criterion[] = [
   {
     id: 'SITE-5',
     statement:
-      'The site is checked as Cloudflare serves it: a page asked for without its trailing slash redirects to it, an unknown path gets the 404 page with a 404 status, every response carries the declared headers, and no page needs anything inline the Content-Security-Policy would have to allow.',
+      'The site is checked as Cloudflare serves it: every built file is served unchanged, a page asked for without its trailing slash redirects to it, an unknown path gets the 404 page with a 404 status, every response carries the declared headers, and no page needs anything inline the Content-Security-Policy would have to allow.',
   },
   {
     id: 'SITE-6',
