@@ -16,7 +16,7 @@ import {
   type PlannedChunk,
 } from './ports';
 import { documentKey, entryOf, identityOf, loopError, statusOf, stored } from './record';
-import { retractRuns, type Retraction } from './retract';
+import { replaceDocument, type Retraction } from './retract';
 
 /**
  * The ingest, in two phases. `planIngest` reads and chunks every document
@@ -160,17 +160,6 @@ export interface PlannedDocument {
   document: string;
   plan: ChunkPlan;
 }
-
-/** The digest runs a document's standing postings went through, each once, in the order recorded. */
-const storedDigestsOf = (entries: readonly ManifestEntry[], document: string): string[] => [
-  ...new Set(
-    entries.flatMap((entry) =>
-      entry.document === document && stored(entry) && entry.digestRunId !== null
-        ? [entry.digestRunId]
-        : [],
-    ),
-  ),
-];
 
 /** A file name past the contract's title bound, refused by name rather than by the schema's raw issue. */
 export class DocumentNameTooLong extends Error {
@@ -379,9 +368,7 @@ export async function runIngest(
     }
     if (standing === null) continue;
     // Make before break: every chunk of the current plan is stored, so what else of the document stands goes.
-    const current = standing;
-    const replaced = storedDigestsOf(entries, document).filter((run) => !current.has(run));
-    const done = await retractRuns(entries, replaced, deps);
+    const done = await replaceDocument(entries, document, standing, deps);
     entries = done.entries;
     known = new Map(latestByHash(entries));
     file.replaced = done.retraction;

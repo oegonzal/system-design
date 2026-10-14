@@ -1,7 +1,7 @@
 import { LoopRefused, LoopTimeout, LoopUnreachable } from '@sysdesign/loop-client';
 
 import type { Clock, IngestLedger, IngestSink, ManifestEntry } from './ports';
-import { documentKey, loopError, markRetracted } from './record';
+import { documentKey, loopError, markRetracted, stored } from './record';
 
 /**
  * Retraction: what a digest run stored, taken out of the store by the run id
@@ -51,7 +51,7 @@ export const leftStanding = (retraction: Retraction | null): number =>
  * out ends the batch, everything before it already saved; anything else is a
  * fault and propagates, the marks before it saved too.
  */
-export async function retractRuns(
+async function retractRuns(
   entries: readonly ManifestEntry[],
   digestRunIds: readonly string[],
   deps: RetractDeps,
@@ -73,6 +73,35 @@ export async function retractRuns(
   }
   return { entries: marked, retraction: { retracted, left: null } };
 }
+
+/** The digest runs a document's standing postings went through, each once, in the order recorded. */
+const storedDigestsOf = (entries: readonly ManifestEntry[], document: string): string[] => [
+  ...new Set(
+    entries.flatMap((entry) =>
+      entry.document === document && stored(entry) && entry.digestRunId !== null
+        ? [entry.digestRunId]
+        : [],
+    ),
+  ),
+];
+
+/**
+ * Make before break: a document whose current plan stands, every chunk of it
+ * stored, on these digest runs has every other digest run the manifest holds
+ * as stored for it retracted — what an edit replaced, what a forced run
+ * posted again, what a change to the goal's rules renamed.
+ */
+export const replaceDocument = (
+  entries: readonly ManifestEntry[],
+  document: string,
+  standing: ReadonlySet<string>,
+  deps: RetractDeps,
+): Promise<{ entries: readonly ManifestEntry[]; retraction: Retraction }> =>
+  retractRuns(
+    entries,
+    storedDigestsOf(entries, document).filter((digestRunId) => !standing.has(digestRunId)),
+    deps,
+  );
 
 /** Paths the manifest holds no entry for, refused by name before anything is retracted. */
 export class NotInManifest extends Error {
