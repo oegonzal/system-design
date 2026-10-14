@@ -1,30 +1,41 @@
 import { z } from 'zod';
 
-import { FISCAL_PERIODS } from './fiscal';
+import type { ApiListResponse } from '../envelope';
+import { FISCAL_PERIODS, periodMonthLabel } from './fiscal';
+import { agencyOf, compactMoney, day } from './format';
 import { AWARD_FAMILIES } from './vocab';
 
 /**
- * What govcon's spending warm found worth a person's attention, as declared
- * topics on the notifications bus: an award in the profile's codes ending
- * soon, a fiscal period obligating above its projection's band. Each event
- * carries the profile it was found for and the key that makes it the same
- * alert tomorrow, so whoever keeps a record — govcon's own ledger first —
- * raises it once. The digest a person reads is a separate prompt; these are
- * the record.
+ * What govcon's daily warm found worth a person's attention, as declared
+ * topics on the notifications bus: an award ending soon, a tracked award
+ * whose end moved, a stored notice that may be a tracked award's follow-on,
+ * a fiscal period obligating above its projection's band. Each event carries
+ * the profile it was found for and the key that makes it the same alert
+ * tomorrow, so whoever keeps a record — govcon's own ledger first — raises
+ * it once. The digest a person reads is a separate prompt; these are the
+ * record.
  */
 export const GOVCON_TOPICS = {
   awardEnding: 'govcon.award.ending',
+  awardEndMoved: 'govcon.award.end-moved',
+  awardNotice: 'govcon.award.notice',
   pulseAboveBand: 'govcon.pulse.above-band',
 } as const;
 
-export const ALERT_KINDS = ['award-ending', 'pulse-above-band'] as const;
+export const ALERT_KINDS = [
+  'award-ending',
+  'award-end-moved',
+  'award-notice',
+  'pulse-above-band',
+] as const;
 export type AlertKind = (typeof ALERT_KINDS)[number];
 
 /**
  * What makes one alert the same alert tomorrow, or in another scope: its kind
- * and its subject — an award's id, a fiscal period. The scope it was found in
- * travels in the payload, not the key, so an award seen through two scopes is
- * one alert to the person who reads the digest.
+ * and its subject — an award's id, an award and the day its end moved to, an
+ * award and a notice, a fiscal period. The scope it was found in travels in
+ * the payload, not the key, so an award seen through two scopes is one alert
+ * to the person who reads the digest.
  */
 export interface AlertKey {
   kind: AlertKind;
@@ -35,19 +46,23 @@ export interface AlertKey {
 export const alertKeyOf = (key: AlertKey): string => `${key.kind}:${key.subject}`;
 
 const isoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/);
-const alertBase = {
-  profileId: z.string().min(1),
-  /** sha256 hex of the scope the alert was computed in. */
-  scopeKey: z.string().length(64),
+const profileId = z.string().min(1);
+/** sha256 hex of the scope an alert was computed in. */
+const scopeKey = z.string().length(64);
+/** The award an alert is about, as a person would recognise it. */
+const award = {
+  externalId: z.string().min(1),
+  piid: z.string().nullable(),
+  recipientName: z.string().nullable(),
+  agencyPath: z.string().nullable(),
 };
 
 export const awardEndingSchema = z.strictObject({
-  ...alertBase,
-  externalId: z.string().min(1),
-  piid: z.string().nullable(),
+  profileId,
+  /** Null for an award raised because it is tracked, not because a scope listed it. */
+  scopeKey: scopeKey.nullable(),
+  ...award,
   family: z.enum(AWARD_FAMILIES),
-  recipientName: z.string().nullable(),
-  agencyPath: z.string().nullable(),
   naicsCode: z.string().nullable(),
   /** Obligated so far on the award. */
   amount: z.number().finite(),
@@ -56,8 +71,30 @@ export const awardEndingSchema = z.strictObject({
 });
 export type AwardEndingAlert = z.infer<typeof awardEndingSchema>;
 
+/** A tracked award whose end is no longer the one last read: an option exercised, an extension, a cut. */
+export const awardEndMovedSchema = z.strictObject({
+  profileId,
+  ...award,
+  from: isoDate,
+  to: isoDate,
+});
+export type AwardEndMovedAlert = z.infer<typeof awardEndMovedSchema>;
+
+/** A stored open notice sharing a tracked award's NAICS and buyer: a candidate for its follow-on. */
+export const awardNoticeSchema = z.strictObject({
+  profileId,
+  ...award,
+  noticeId: z.string().min(1),
+  title: z.string(),
+  noticeType: z.string().nullable(),
+  /** ISO 8601, when the notice states one. */
+  responseDeadlineAt: z.string().nullable(),
+});
+export type AwardNoticeAlert = z.infer<typeof awardNoticeSchema>;
+
 export const pulseAboveBandSchema = z.strictObject({
-  ...alertBase,
+  profileId,
+  scopeKey,
   fiscalYear: z.number().int(),
   period: z.number().int().min(1).max(FISCAL_PERIODS),
   /** Obligated so far in the period in progress. */
@@ -71,4 +108,109 @@ export type PulseAboveBandAlert = z.infer<typeof pulseAboveBandSchema>;
 /** One alert as the warm raises it: its topic, its key, and the payload that topic's schema declares. */
 export type GovconAlert =
   | { topic: typeof GOVCON_TOPICS.awardEnding; key: AlertKey; payload: AwardEndingAlert }
+  | { topic: typeof GOVCON_TOPICS.awardEndMoved; key: AlertKey; payload: AwardEndMovedAlert }
+  | { topic: typeof GOVCON_TOPICS.awardNotice; key: AlertKey; payload: AwardNoticeAlert }
   | { topic: typeof GOVCON_TOPICS.pulseAboveBand; key: AlertKey; payload: PulseAboveBandAlert };
+
+/**
+ * Every kind of alert, declared once: the topic it is published on, the
+ * payload that topic carries, and how a stored payload is read back as the
+ * alert it was. The bus's registry, the ledger's reader and the line a person
+ * reads are all driven by this table, so a new kind is one row and one
+ * member of the union above.
+ */
+export const ALERT_DECLARATIONS: {
+  [K in AlertKind]: {
+    topic: GovconAlert['topic'];
+    schema: z.ZodType;
+    /** The stored payload as the alert it was, or null when its schema refuses it. */
+    read(key: AlertKey, payload: unknown): GovconAlert | null;
+  };
+} = {
+  'award-ending': {
+    topic: GOVCON_TOPICS.awardEnding,
+    schema: awardEndingSchema,
+    read: (key, payload) => {
+      const parsed = awardEndingSchema.safeParse(payload);
+      return parsed.success
+        ? { topic: GOVCON_TOPICS.awardEnding, key, payload: parsed.data }
+        : null;
+    },
+  },
+  'award-end-moved': {
+    topic: GOVCON_TOPICS.awardEndMoved,
+    schema: awardEndMovedSchema,
+    read: (key, payload) => {
+      const parsed = awardEndMovedSchema.safeParse(payload);
+      return parsed.success
+        ? { topic: GOVCON_TOPICS.awardEndMoved, key, payload: parsed.data }
+        : null;
+    },
+  },
+  'award-notice': {
+    topic: GOVCON_TOPICS.awardNotice,
+    schema: awardNoticeSchema,
+    read: (key, payload) => {
+      const parsed = awardNoticeSchema.safeParse(payload);
+      return parsed.success
+        ? { topic: GOVCON_TOPICS.awardNotice, key, payload: parsed.data }
+        : null;
+    },
+  },
+  'pulse-above-band': {
+    topic: GOVCON_TOPICS.pulseAboveBand,
+    schema: pulseAboveBandSchema,
+    read: (key, payload) => {
+      const parsed = pulseAboveBandSchema.safeParse(payload);
+      return parsed.success
+        ? { topic: GOVCON_TOPICS.pulseAboveBand, key, payload: parsed.data }
+        : null;
+    },
+  },
+};
+
+/** How an award is named in a line: its PIID, or the source's id when it has none. */
+const awardName = (payload: { piid: string | null; externalId: string }): string =>
+  payload.piid ?? payload.externalId;
+
+/** One line a person reads per alert — the digest's, and the list's. */
+export function describeAlert(alert: GovconAlert): string {
+  switch (alert.topic) {
+    case GOVCON_TOPICS.awardEnding: {
+      const ending = alert.payload;
+      const who = ending.recipientName ?? 'recipient not named';
+      const buyer = agencyOf(ending.agencyPath) ?? 'agency not named';
+      return `${awardName(ending)} (${ending.family}) ends ${ending.endsAt}, in ${ending.daysLeft} day(s): ${who}, ${compactMoney(ending.amount)} obligated, ${buyer}.`;
+    }
+    case GOVCON_TOPICS.awardEndMoved: {
+      const moved = alert.payload;
+      const who = moved.recipientName ?? 'recipient not named';
+      return `${awardName(moved)} now ends ${moved.to}, not ${moved.from}: ${who}. ${moved.to > moved.from ? 'It was extended, so its follow-on is further off.' : 'It was cut short.'}`;
+    }
+    case GOVCON_TOPICS.awardNotice: {
+      const found = alert.payload;
+      const due =
+        found.responseDeadlineAt === null
+          ? 'no deadline stated'
+          : `due ${day(found.responseDeadlineAt)}`;
+      return `A stored notice may follow ${awardName(found)}: “${found.title}” (${found.noticeType ?? 'notice'}, ${due}), same buyer and code.`;
+    }
+    case GOVCON_TOPICS.pulseAboveBand: {
+      const pulse = alert.payload;
+      return `FY${pulse.fiscalYear} period ${pulse.period} (${periodMonthLabel(pulse.period)}) has ${compactMoney(pulse.total)} obligated so far, above every prior year's ${compactMoney(pulse.high)} for that period (mean ${compactMoney(pulse.expected)}).`;
+    }
+  }
+}
+
+/** One alert as the ledger kept it, for a person to read back. */
+export interface RaisedAlertView {
+  id: string;
+  key: AlertKey;
+  profileId: string;
+  /** ISO 8601. */
+  raisedAt: string;
+  /** The alert as it was published; null for one raised before the ledger kept payloads. */
+  alert: GovconAlert | null;
+}
+
+export type ListAlertsResponse = ApiListResponse<RaisedAlertView>;

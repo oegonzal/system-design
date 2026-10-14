@@ -11,4 +11,5 @@ export * from './profiles';
 export * from './bids';
 export * from './awards';
 export * from './entities';
+export * from './targets';
 export * from './views';

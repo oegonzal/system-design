@@ -1,4 +1,5 @@
 import {
+  ALERT_AUDIENCES,
   DEFAULT_ALERT_POLICY,
   DEFAULT_TEAMING_POLICY,
   FACTOR_IDS,
@@ -77,6 +78,8 @@ const weightsSchema = z.strictObject(
 const alertPolicySchema = z.strictObject({
   endingWithinDays: z.number().int().min(0).max(MAX_ALERT_ENDING_DAYS),
   pulseAboveBand: z.boolean(),
+  audience: z.enum(ALERT_AUDIENCES).default(DEFAULT_ALERT_POLICY.audience),
+  minObligated: z.number().min(0).default(DEFAULT_ALERT_POLICY.minObligated),
 });
 
 /** The size of subcontract the company could take; a document from before the policy reads as the declared default. */

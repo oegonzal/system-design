@@ -1,16 +1,17 @@
 import {
-  agencyOf,
   ALERT_PROMPT_MAX_ITEMS,
   ALERT_PROMPT_TTL_DAYS,
-  compactMoney,
+  describeAlert,
   excerpt,
   GOVCON_TOPICS,
-  periodMonthLabel,
   PROMPT_LIMITS,
+  type AlertKind,
   type AlertPolicy,
+  type AwardBody,
   type GovconAlert,
   type HorizonBody,
   type InteractionPrompt,
+  type NoticeRef,
   type SearchProfile,
   type SpendingPulse,
 } from '@sysdesign/contracts';
@@ -23,27 +24,35 @@ import type { LensBody } from './lens';
  * no store — the day and the ids come in as parameters, so the same answers
  * always give the same alerts. The policy is the profile's; the key — kind
  * and subject — is what makes an alert the same alert tomorrow or in another
- * scope, and the scope it was found in rides in the payload.
+ * scope, and the scope it was found in rides in the payload. Two sets of
+ * rules: what a scope's lenses show, and what a tracked award's own record
+ * shows.
  */
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 const daysBetween = (from: string, to: string): number =>
   Math.round((Date.parse(`${to}T00:00:00Z`) - Date.parse(`${from}T00:00:00Z`)) / DAY_MS);
 
+/** Whether an end falls from that day through the policy's window; a window of zero holds nothing. */
+const endsWithin = (daysLeft: number, policy: AlertPolicy): boolean =>
+  policy.endingWithinDays > 0 && daysLeft >= 0 && daysLeft <= policy.endingWithinDays;
+
 /**
- * One alert per row ending from today through `endingWithinDays` days out. A
- * capped horizon yields only the rows it has; a window of zero yields none.
+ * One alert per row a scope's horizon lists ending from today through
+ * `endingWithinDays` days out, with at least the policy's floor obligated
+ * on it. A capped horizon yields only the rows it has; a policy that
+ * raises tracked awards alone yields none here.
  */
 export function awardEndingAlerts(
   horizon: HorizonBody,
   policy: AlertPolicy,
   profileId: string,
 ): GovconAlert[] {
-  if (policy.endingWithinDays <= 0) return [];
+  if (policy.audience !== 'scope') return [];
   const key = scopeKey(horizon.scope);
   return horizon.rows.flatMap((row) => {
     const daysLeft = daysBetween(horizon.today, row.endsAt);
-    if (daysLeft < 0 || daysLeft > policy.endingWithinDays) return [];
+    if (!endsWithin(daysLeft, policy) || row.amount < policy.minObligated) return [];
     return [
       {
         topic: GOVCON_TOPICS.awardEnding,
@@ -105,20 +114,74 @@ export function pulseAboveBandAlerts(
   ];
 }
 
-/** One line a person reads per alert. */
-export function describeAlert(alert: GovconAlert): string {
-  switch (alert.topic) {
-    case GOVCON_TOPICS.awardEnding: {
-      const award = alert.payload;
-      const who = award.recipientName ?? 'recipient not named';
-      const buyer = agencyOf(award.agencyPath) ?? 'agency not named';
-      return `${award.piid ?? award.externalId} (${award.family}) ends ${award.endsAt}, in ${award.daysLeft} day(s): ${who}, ${compactMoney(award.amount)} obligated, ${buyer}.`;
+/** A tracked award as the warm found it: what was last read of its end, its record today, and the open stored notices sharing its NAICS and buyer. */
+export interface WatchedAward {
+  /** The award's end as the target holds it from the warm before; null when it was never read. */
+  lastEndsAt: string | null;
+  award: AwardBody;
+  openNotices: readonly NoticeRef[];
+}
+
+/**
+ * What a tracked award's own record says today: that it ends inside the
+ * policy's window — whatever is obligated on it, since tracking it is the
+ * interest — that its end is no longer the one last read, and each open
+ * stored notice that may be its follow-on. An end read for the first time
+ * has moved from nothing, and raises nothing.
+ */
+export function watchedAwardAlerts(
+  { lastEndsAt, award, openNotices }: WatchedAward,
+  policy: AlertPolicy,
+  profileId: string,
+  today: string,
+): GovconAlert[] {
+  const named = {
+    profileId,
+    externalId: award.externalId,
+    piid: award.piid,
+    recipientName: award.recipient.name,
+    agencyPath: award.agencyPath,
+  };
+  const alerts: GovconAlert[] = [];
+  if (award.endsAt !== null) {
+    const daysLeft = daysBetween(today, award.endsAt);
+    if (endsWithin(daysLeft, policy)) {
+      alerts.push({
+        topic: GOVCON_TOPICS.awardEnding,
+        key: { kind: 'award-ending', subject: award.externalId },
+        payload: {
+          ...named,
+          scopeKey: null,
+          family: award.family,
+          naicsCode: award.naicsCode,
+          amount: award.obligated,
+          endsAt: award.endsAt,
+          daysLeft,
+        },
+      });
     }
-    case GOVCON_TOPICS.pulseAboveBand: {
-      const pulse = alert.payload;
-      return `FY${pulse.fiscalYear} period ${pulse.period} (${periodMonthLabel(pulse.period)}) has ${compactMoney(pulse.total)} obligated so far, above every prior year's ${compactMoney(pulse.high)} for that period (mean ${compactMoney(pulse.expected)}).`;
+    if (lastEndsAt !== null && lastEndsAt !== award.endsAt) {
+      alerts.push({
+        topic: GOVCON_TOPICS.awardEndMoved,
+        key: { kind: 'award-end-moved', subject: `${award.externalId}|${award.endsAt}` },
+        payload: { ...named, from: lastEndsAt, to: award.endsAt },
+      });
     }
   }
+  for (const notice of openNotices) {
+    alerts.push({
+      topic: GOVCON_TOPICS.awardNotice,
+      key: { kind: 'award-notice', subject: `${award.externalId}|${notice.noticeId}` },
+      payload: {
+        ...named,
+        noticeId: notice.noticeId,
+        title: notice.title,
+        noticeType: notice.noticeType,
+        responseDeadlineAt: notice.responseDeadlineAt,
+      },
+    });
+  }
+  return alerts;
 }
 
 export interface DigestInput {
@@ -129,17 +192,31 @@ export interface DigestInput {
   now: Date;
 }
 
-/** What an ending award has obligated on it; null for a finding about the whole scope. */
-const obligatedOn = (alert: GovconAlert): number | null =>
-  alert.topic === GOVCON_TOPICS.awardEnding ? alert.payload.amount : null;
-
-/** The digest's order: a finding about the whole scope first, then the awards with the most obligated on them, by subject among equals. */
-const byWeight = (a: GovconAlert, b: GovconAlert): number => {
-  const [left, right] = [obligatedOn(a), obligatedOn(b)];
-  if (left !== null && right !== null && left !== right) return right - left;
-  if ((left === null) !== (right === null)) return left === null ? -1 : 1;
-  return a.key.subject.localeCompare(b.key.subject);
+/**
+ * Where each kind of alert stands in the digest: a tracked award's news
+ * first, since someone chose to follow it, then a finding about the whole
+ * scope, then the ending awards.
+ */
+const DIGEST_RANK: Record<AlertKind, number> = {
+  'award-end-moved': 0,
+  'award-notice': 1,
+  'pulse-above-band': 2,
+  'award-ending': 3,
 };
+
+/** What an ending award has obligated on it; nothing for any other finding. */
+const obligatedOn = (alert: GovconAlert): number =>
+  alert.topic === GOVCON_TOPICS.awardEnding ? alert.payload.amount : 0;
+
+/**
+ * The order a person reads alerts in — the digest's, and the ledger's for
+ * the alerts of one warm: by kind as ranked above, then the most obligated
+ * first, then by subject.
+ */
+export const byWeight = (a: GovconAlert, b: GovconAlert): number =>
+  DIGEST_RANK[a.key.kind] - DIGEST_RANK[b.key.kind] ||
+  obligatedOn(b) - obligatedOn(a) ||
+  a.key.subject.localeCompare(b.key.subject);
 
 /**
  * The digest put to a person: the count and the company in the title, at
@@ -164,7 +241,7 @@ export function alertPromptOf({ id, profile, alerts, now }: DigestInput): Intera
       `${alerts.length} spending alert${alerts.length === 1 ? '' : 's'} for ${profile.company}`,
       PROMPT_LIMITS.titleMaxLength,
     ),
-    details: rest > 0 ? [...shown, `…and ${rest} more on the Spending page.`] : shown,
+    details: rest > 0 ? [...shown, `…and ${rest} more on the dashboard.`] : shown,
     choices: [{ id: 'noted', label: 'Noted', note: null }],
     freeText: null,
     commands: [],

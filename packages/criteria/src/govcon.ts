@@ -248,6 +248,21 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
       'One award is read by the source’s own id through the gate: its holder and parent, buyer, vehicle, obligations against what it can reach, its end and its end with every option, how it was competed — a not-counted offers placeholder read as unknown in every source that relays it — what was ordered under it when it is itself a vehicle, its own orders and those placed through the vehicles awarded under it as one count and one total, and the largest subcontracts reported under it, joined on every read to the open stored notices sharing its NAICS and buyer. An id the source does not have is a 404; an award that is no vehicle and has no subcontracts reported costs one request.',
   },
   {
+    id: 'GOV-31',
+    statement:
+      'A target is a firm or an award the company pursues, one row per kind and subject — a firm by its UEI, an award by the id its record is read by — each kind with its own stages ending in the one that closes a pursuit. A save refuses a stage that is not the kind’s own before anything is written, keeps the fields it leaves out, and moves the stage’s day only with the stage; whether something is tracked answers nothing when it is not; the list is newest change first and the summary counts every stage of every kind and what is due soon by its reminder.',
+  },
+  {
+    id: 'GOV-32',
+    statement:
+      'The daily warm reads every tracked award still being pursued — a bounded number, the never-read first and then the soonest to end — each through the award lens, and rules on its own record: that it ends inside the profile’s window whatever is obligated on it, that its end is no longer the one last read, and each open stored notice sharing its NAICS and buyer, each raised once per key on its declared topic. An end read is written back to the target only once the alert that says it moved is on the ledger, so one the bus refused is found again.',
+  },
+  {
+    id: 'GOV-33',
+    statement:
+      'The profile’s alert policy says whose ending awards are raised — the scope’s and the tracked ones, or the tracked ones alone — and the least obligated on a scope’s award for it to be raised; a stored profile from before either reads as the declared default. Every alert is ledgered with what was published and read back newest first at /alerts as the alert it was, a page at a time; a payload its kind’s schema refuses, or a row from before payloads were kept, reads as its key alone.',
+  },
+  {
     id: 'GOV-21',
     statement:
       'Spending arithmetic is pure and declared: fiscal periods start in October, a series is aligned on the periods asked for with the partial month marked, the projection is the declared seasonal mean of prior years scaled by the year-to-date ratio only after the declared base, the horizon walk pages the source by number, finds the page where end dates cross today by doubling and halving, reads forward from the soonest-ending award inside a page bound and the wall-clock deadline, and says how far the window is complete, and agency periods are aligned on those present, the year asked for an agency’s offices defaulting to the one the source’s own directory reports active.',

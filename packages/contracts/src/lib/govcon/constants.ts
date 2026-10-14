@@ -19,6 +19,15 @@ export const MAX_LEAD_LIMIT = 200;
 export const DEFAULT_CALL_LIMIT = 50;
 export const MAX_CALL_LIMIT = 200;
 
+/** A target's label, contact and notes, as a person types them. */
+export const MAX_TARGET_LABEL_LENGTH = 200;
+export const MAX_TARGET_CONTACT_LENGTH = 300;
+export const MAX_TARGET_NOTES_LENGTH = 20_000;
+/** Awards one daily warm reads because they are tracked; each is one to three free requests. */
+export const MAX_WATCHED_AWARDS = 25;
+/** `GET /alerts` page size, and its ceiling. */
+export const DEFAULT_ALERTS_LIMIT = 10;
+export const MAX_ALERTS_LIMIT = 100;
 export const DEFAULT_PIPELINE_LIMIT = 50;
 export const MAX_PIPELINE_LIMIT = 200;
 /** A bid or a deadline inside this many days is "due soon". */

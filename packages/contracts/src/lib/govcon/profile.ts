@@ -1,5 +1,5 @@
 import type { ApiResponse } from '../envelope';
-import type { FactorId } from './vocab';
+import type { AlertAudience, FactorId } from './vocab';
 
 /**
  * The search profile as data: everything the scorer, the ranking and the
@@ -72,14 +72,23 @@ export interface ScoringPolicy {
 
 /** What the daily spending warm alerts on, declared per profile. */
 export interface AlertPolicy {
-  /** An award in the profile's codes ending within this many days raises one alert; 0 raises none. */
+  /** An award ending within this many days raises one alert; 0 raises none. */
   endingWithinDays: number;
   /** The fiscal period in progress obligating above every prior year's amount for that period. */
   pulseAboveBand: boolean;
+  /** Whose ending awards are raised: the scope's and the tracked ones, or the tracked ones alone. */
+  audience: AlertAudience;
+  /** An award found in the scope is raised only with at least this much obligated on it; a tracked award always is. */
+  minObligated: number;
 }
 
-/** What a profile alerts on until it says otherwise; a stored document from before the policy reads as this. */
-export const DEFAULT_ALERT_POLICY: AlertPolicy = { endingWithinDays: 90, pulseAboveBand: true };
+/** What a profile alerts on until it says otherwise; a stored document from before a field reads as this. */
+export const DEFAULT_ALERT_POLICY: AlertPolicy = {
+  endingWithinDays: 90,
+  pulseAboveBand: true,
+  audience: 'scope',
+  minObligated: 0,
+};
 
 /** What the profile looks for in a prime to work under. */
 export interface TeamingPolicy {

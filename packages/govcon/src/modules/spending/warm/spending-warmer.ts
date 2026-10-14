@@ -28,6 +28,7 @@ import { topAgencyCodes } from '../../../core/spending/agency';
 import {
   alertPromptOf,
   awardEndingAlerts,
+  byWeight,
   pulseAboveBandAlerts,
 } from '../../../core/spending/alerts';
 import type { ReadOptions } from '../../../core/spending/lens';
@@ -43,6 +44,7 @@ import {
 import { SpendingService } from '../spending.service';
 import { ALERT_LEDGER, ALERT_SINK, SPENDING_WARM_POLICY } from '../tokens';
 import type { SpendingWarmPolicy } from './warm-policy';
+import { WatchedAwards, type WatchedReading } from './watched-awards';
 
 /** What a scheduled warm asks of every lens: the source, inside the cache window. */
 const RENEW: ReadOptions = { refresh: true };
@@ -68,6 +70,11 @@ export interface WarmReport {
 }
 
 const NO_ALERTS: WarmAlerts = { found: 0, fresh: 0, published: 0, prompted: false };
+const NOTHING_WATCHED: WatchedReading = { alerts: [], observations: [] };
+
+/** The scope an alert was found in, when it was found in one. */
+const scopeKeyOf = (alert: GovconAlert): string | null =>
+  'scopeKey' in alert.payload ? alert.payload.scopeKey : null;
 
 /** The scope the warm reads — what the client opens on: the profile's NAICS, no PSC (the source ANDs the two, so PSC only narrows), every agency, both families. */
 const scopeWireOf = (profile: SearchProfile) => ({
@@ -107,10 +114,11 @@ const uniqueByKey = (alerts: readonly GovconAlert[]): GovconAlert[] => {
  * for each top agency the breakdown
  * names, the horizon narrowed to it — the scope a directory pick opens, and
  * the one whose walk reaches today where a wide scope's caps first — and its
- * outlook; then the alert rules over every horizon and the pulse, each alert
- * raised once per key, published on its topic, and listed in one digest put
- * to a person. Started by `serve()` alone — a lifecycle hook would also run under
- * the CLI and the HTTP suite — and stopped before the store closes.
+ * outlook; then every tracked award's own record; then the alert rules over
+ * the tracked awards, every horizon and the pulse, each alert raised once per
+ * key, published on its topic, and listed in one digest put to a person.
+ * Started by `serve()` alone — a lifecycle hook would also run under the CLI
+ * and the HTTP suite — and stopped before the store closes.
  */
 @Injectable()
 export class SpendingWarmer implements OnModuleDestroy {
@@ -123,6 +131,7 @@ export class SpendingWarmer implements OnModuleDestroy {
     @Inject(SPENDING_WARM_POLICY) private readonly policy: SpendingWarmPolicy,
     private readonly spending: SpendingService,
     private readonly profiles: ProfilesService,
+    private readonly watched: WatchedAwards,
     @Inject(ALERT_LEDGER) private readonly ledger: AlertLedger,
     @Inject(ALERT_SINK) private readonly sink: AlertSink,
     @Inject(CLOCK) private readonly now: () => Date,
@@ -221,11 +230,38 @@ export class SpendingWarmer implements OnModuleDestroy {
       );
     }
 
+    const tracked = await this.tracked(profile, options, read);
+    // A tracked award's own record comes first, so it is the one kept when a scope lists the same award.
     const found = uniqueByKey([
+      ...tracked.alerts,
       ...horizons.flatMap((body) => awardEndingAlerts(body, profile.alerts, profile.id)),
       ...(pulse ? pulseAboveBandAlerts(pulse, profile.alerts, profile.id) : []),
     ]);
-    return { profile: profile.id, lenses, alerts: await this.raise(profile, found) };
+    const alerts = await this.raise(profile, found);
+    await this.settle(tracked);
+    return { profile: profile.id, lenses, alerts };
+  }
+
+  /** The tracked awards read and ruled on; a target store that cannot be read is one logged line, and the scope's alerts still run. */
+  private async tracked(
+    profile: SearchProfile,
+    options: ReadOptions,
+    read: Parameters<WatchedAwards['read']>[2],
+  ): Promise<WatchedReading> {
+    try {
+      return await this.watched.read(profile, options, read);
+    } catch (error) {
+      this.logger.warn(`tracked awards not read: ${messageOf(error)}`);
+      return NOTHING_WATCHED;
+    }
+  }
+
+  private async settle(tracked: WatchedReading): Promise<void> {
+    try {
+      await this.watched.settle(tracked.observations);
+    } catch (error) {
+      this.logger.warn(`tracked ends not written, compared again next warm: ${messageOf(error)}`);
+    }
   }
 
   private async defaultProfile(): Promise<SearchProfile | null> {
@@ -258,13 +294,13 @@ export class SpendingWarmer implements OnModuleDestroy {
     }
   }
 
-  /** What was not raised before, published in order; one digest for what was; recorded only once published. */
+  /** What was not raised before, published the weightiest first — the order the digest and the ledger keep; one digest for what was; recorded only once published. */
   private async raise(profile: SearchProfile, found: readonly GovconAlert[]): Promise<WarmAlerts> {
     if (found.length === 0) {
       this.logger.log('warm alerts: none');
       return NO_ALERTS;
     }
-    const fresh = await this.unraised(found);
+    const fresh = (await this.unraised(found)).sort(byWeight);
     const published: { alert: GovconAlert; seq: string }[] = [];
     for (const alert of fresh) {
       try {
@@ -324,9 +360,11 @@ export class SpendingWarmer implements OnModuleDestroy {
     promptId: string | null,
   ): Promise<void> {
     const raisedAt = this.now();
-    const rows: RaisedAlert[] = published.map(({ alert, seq }) => ({
+    const rows: RaisedAlert[] = published.map(({ alert, seq }, position) => ({
       key: alert.key,
-      scopeKey: alert.payload.scopeKey,
+      scopeKey: scopeKeyOf(alert),
+      payload: alert.payload,
+      position,
       profileId: profile.id,
       raisedAt,
       eventSeq: seq,

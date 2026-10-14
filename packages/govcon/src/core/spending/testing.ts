@@ -23,6 +23,7 @@ import type {
   OfficesPage,
   PublicationLag,
   RaisedAlert,
+  StoredAlert,
   SeriesPoint,
   SnapshotRow,
   SpendingSnapshotStore,
@@ -219,6 +220,7 @@ export function scriptedSpendingSources(
 
 /** The alert ledger in memory: what was recorded is raised. */
 export class InMemoryAlertLedger implements AlertLedger {
+  /** In the order they were recorded. */
   readonly rows: RaisedAlert[] = [];
   /** When set, every method throws — the "store unavailable" branch. */
   failing: Error | null = null;
@@ -232,6 +234,32 @@ export class InMemoryAlertLedger implements AlertLedger {
   async record(rows: readonly RaisedAlert[]): Promise<void> {
     if (this.failing) throw this.failing;
     this.rows.push(...rows);
+  }
+
+  async list({
+    limit,
+    offset,
+  }: {
+    limit: number;
+    offset: number;
+  }): Promise<[StoredAlert[], number]> {
+    if (this.failing) throw this.failing;
+    const newestFirst = this.rows
+      .map((row, index) => ({ row, index }))
+      .sort(
+        (a, b) =>
+          b.row.raisedAt.getTime() - a.row.raisedAt.getTime() ||
+          a.row.position - b.row.position ||
+          alertKeyOf(a.row.key).localeCompare(alertKeyOf(b.row.key)),
+      )
+      .map(({ row, index }) => ({
+        id: `alert-${index + 1}`,
+        key: row.key,
+        profileId: row.profileId,
+        raisedAt: row.raisedAt,
+        payload: row.payload,
+      }));
+    return [newestFirst.slice(offset, offset + limit), newestFirst.length];
   }
 }
 

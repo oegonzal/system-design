@@ -13,6 +13,7 @@ import {
   GovconSearchProfile,
   GovconSourceCall,
   GovconSpendingSnapshot,
+  GovconTarget,
   truncateTestTables,
 } from '@sysdesign/db';
 
@@ -159,6 +160,7 @@ export const truncateGovcon = (em: EntityManager): Promise<void> =>
     GovconOpportunity,
     GovconSavedSearch,
     GovconSavedView,
+    GovconTarget,
     GovconSearchProfile,
   ]);
 

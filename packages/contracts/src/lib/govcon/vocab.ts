@@ -112,6 +112,32 @@ export const BID_STAGES = [
 ] as const;
 export type BidStage = (typeof BID_STAGES)[number];
 
+/** What a target is: a firm to work with, or an award whose work may be bought again. */
+export const TARGET_KINDS = ['firm', 'award'] as const;
+export type TargetKind = (typeof TARGET_KINDS)[number];
+
+/** The stage that ends a pursuit of either kind: the target is kept for the record and watched no more. */
+export const TARGET_CLOSED_STAGE = 'passed';
+
+/**
+ * Where a pursuit stands, in the order it moves, for each kind of target: a
+ * firm is identified, contacted, talked with and teamed with; an award is
+ * watched, researched, positioned for and pursued. Either can be passed on.
+ */
+export const TARGET_STAGES = {
+  firm: ['identified', 'contacted', 'talking', 'teamed', TARGET_CLOSED_STAGE],
+  award: ['watching', 'researching', 'positioning', 'pursuing', TARGET_CLOSED_STAGE],
+} as const satisfies Record<TargetKind, readonly string[]>;
+export type TargetStage<K extends TargetKind = TargetKind> = (typeof TARGET_STAGES)[K][number];
+
+/** Whether a stage is one of a kind's own. */
+export const isTargetStage = (kind: TargetKind, stage: string): stage is TargetStage =>
+  (TARGET_STAGES[kind] as readonly string[]).includes(stage);
+
+/** Whose ending awards the daily warm raises: every award the scope's horizons list, or only the awards tracked as targets. */
+export const ALERT_AUDIENCES = ['scope', 'watched'] as const;
+export type AlertAudience = (typeof ALERT_AUDIENCES)[number];
+
 /** Where an award record came from. */
 export const AWARD_SOURCES = ['sam.gov', 'usaspending'] as const;
 export type AwardSource = (typeof AWARD_SOURCES)[number];

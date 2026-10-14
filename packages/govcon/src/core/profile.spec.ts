@@ -20,6 +20,30 @@ describe('the search profile', () => {
     expect(validateProfile(bare).alerts).toEqual(DEFAULT_ALERT_POLICY);
   });
 
+  it('[GOV-5] [GOV-33] reads an alert policy stored before it said whose awards are raised or how much must be obligated as the declared default for each, and refuses an audience it does not have or a floor below nothing with the path named', () => {
+    const stored = { ...tinyProfile(), alerts: { endingWithinDays: 30, pulseAboveBand: false } };
+    expect(validateProfile(stored).alerts).toEqual({
+      endingWithinDays: 30,
+      pulseAboveBand: false,
+      audience: DEFAULT_ALERT_POLICY.audience,
+      minObligated: DEFAULT_ALERT_POLICY.minObligated,
+    });
+    expect(
+      validateProfile({
+        ...tinyProfile(),
+        alerts: { ...DEFAULT_ALERT_POLICY, audience: 'watched', minObligated: 250_000 },
+      }).alerts,
+    ).toMatchObject({ audience: 'watched', minObligated: 250_000 });
+    for (const [alerts, path] of [
+      [{ ...DEFAULT_ALERT_POLICY, audience: 'everyone' }, 'alerts.audience'],
+      [{ ...DEFAULT_ALERT_POLICY, minObligated: -1 }, 'alerts.minObligated'],
+    ] as const) {
+      const parsed = parseProfile({ ...tinyProfile(), alerts });
+      if (parsed.ok) throw new Error('expected issues');
+      expect(parsed.issues.map((issue) => issue.path)).toEqual([path]);
+    }
+  });
+
   it('[GOV-5] [GOV-29] reads a document without a teaming policy as the declared default, and refuses a smallest subcontract above the largest with the path named', () => {
     const { teaming: _teaming, ...bare } = tinyProfile();
     expect(validateProfile(bare).teaming).toEqual(DEFAULT_TEAMING_POLICY);

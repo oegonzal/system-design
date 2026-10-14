@@ -2,14 +2,25 @@ import { Check, Entity, Index, PrimaryKey, Property, Unique } from '@mikro-orm/d
 import type * as Contracts from '@sysdesign/contracts';
 
 type ContractKinds = (typeof Contracts)['ALERT_KINDS'];
-const KINDS = ['award-ending', 'pulse-above-band'] as const satisfies ContractKinds;
+const KINDS = [
+  'award-ending',
+  'award-end-moved',
+  'award-notice',
+  'pulse-above-band',
+] as const satisfies ContractKinds;
 
 /**
- * One alert the spending warm raised, by the key that makes it the same alert
+ * One alert the daily warm raised, by the key that makes it the same alert
  * tomorrow or in another scope — its kind and its subject — so a warm raises
- * each once; `scope_key` is where it was first found. `event_seq` is the bus's receipt for the published
- * event; `prompt_id` the digest it was listed in, null when the digest could
- * not be published. Rows are only ever written for what was published.
+ * each once. `scope_key` is the scope it was first found in, null for one
+ * found on a tracked target. `payload` is what was published, kept so the
+ * alert can be read back as the line a person was sent; null on a row from
+ * before payloads were kept. `position` is its place among the alerts raised
+ * with it, the weightiest first, so they read back in the digest's order.
+ * `event_seq` is the bus's receipt for the
+ * published event; `prompt_id` the digest it was listed in, null when the
+ * digest could not be published. Rows are only ever written for what was
+ * published.
  */
 @Entity()
 @Index({ properties: ['raisedAt'] })
@@ -30,14 +41,20 @@ export class GovconAlert {
   subject!: string;
 
   /** sha256 hex of the scope the alert was computed in. */
-  @Property({ type: 'varchar', length: 64 })
-  scopeKey!: string;
+  @Property({ type: 'varchar', length: 64, nullable: true })
+  scopeKey!: string | null;
+
+  @Property({ type: 'json', nullable: true })
+  payload!: unknown;
 
   @Property({ type: 'varchar', length: 40 })
   profileId!: string;
 
   @Property({ type: 'timestamptz' })
   raisedAt!: Date;
+
+  @Property({ type: 'integer', default: 0 })
+  position!: number;
 
   @Property({ type: 'text' })
   eventSeq!: string;

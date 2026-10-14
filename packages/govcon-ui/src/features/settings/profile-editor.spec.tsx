@@ -58,11 +58,11 @@ describe('ProfileEditor', () => {
     );
     fireEvent.change(screen.getByLabelText('Ending within days'), { target: { value: '120' } });
     expect(onChange).toHaveBeenLastCalledWith(
-      expect.objectContaining({ alerts: { endingWithinDays: 120, pulseAboveBand: true } }),
+      expect.objectContaining({ alerts: { ...PROFILE.alerts, endingWithinDays: 120 } }),
     );
     fireEvent.click(screen.getByLabelText('Alert when the pulse runs above its band'));
     expect(onChange).toHaveBeenLastCalledWith(
-      expect.objectContaining({ alerts: { endingWithinDays: 90, pulseAboveBand: false } }),
+      expect.objectContaining({ alerts: { ...PROFILE.alerts, pulseAboveBand: false } }),
     );
     expect((screen.getByLabelText('Smallest subcontract (USD)') as HTMLInputElement).value).toBe(
       '50000',

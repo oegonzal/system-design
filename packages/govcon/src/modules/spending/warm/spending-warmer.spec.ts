@@ -1,14 +1,15 @@
 import {
   agencyDirectoryEntryOf,
+  awardBodyOf,
+  DEFAULT_ALERT_POLICY,
   horizonRowOf,
   interactionPromptSchema,
   type HorizonRequest,
-  type SearchProfile,
   type SeriesRequest,
 } from '@sysdesign/contracts';
 
 import { RequestGate, type BudgetPolicy } from '../../../core/budget';
-import type { SeriesPoint } from '../../../core/ports';
+import type { AwardRecord, SeriesPoint } from '../../../core/ports';
 import {
   fetchedOf,
   InMemoryAlertLedger,
@@ -24,12 +25,14 @@ import {
   InMemoryProfileRepository,
   InMemorySavedSearchRepository,
   InMemorySourceCallLog,
+  InMemoryTargetRepository,
   tinyProfile,
 } from '../../../core/testing';
 import { ProfilesService } from '../../profiles/profiles.service';
 import { SpendingService } from '../spending.service';
 import { SpendingWarmer, type WarmReport } from './spending-warmer';
 import type { SpendingWarmPolicy } from './warm-policy';
+import { WatchedAwards } from './watched-awards';
 
 /** 2026-06-15: period 9 of FY2026. */
 const T0 = new Date('2026-06-15T12:00:00Z');
@@ -96,10 +99,12 @@ function harness(options: { script?: SpendingScript; policy?: SpendingWarmPolicy
   );
   const ledger = new InMemoryAlertLedger();
   const sink = new RecordingAlertSink();
+  const targets = new InMemoryTargetRepository();
   const warmer = new SpendingWarmer(
     options.policy ?? { everyMs: null },
     spending,
     profiles,
+    new WatchedAwards(spending, targets, ledger, clock),
     ledger,
     sink,
     clock,
@@ -110,6 +115,7 @@ function harness(options: { script?: SpendingScript; policy?: SpendingWarmPolicy
     ledger,
     sink,
     profiles,
+    targets,
     operations: () => log.calls.map((call) => call.operation),
   };
 }
@@ -298,9 +304,10 @@ describe('the spending warmer', () => {
     await profiles.create(tinyProfile());
     const first = await warmer.warm();
     expect(first.alerts).toEqual({ found: 2, fresh: 2, published: 2, prompted: true });
+    // Published in the order the digest lists them: the finding about the whole scope, then the ending award.
     expect(sink.published.map((alert) => alert.topic)).toEqual([
-      'govcon.award.ending',
       'govcon.pulse.above-band',
+      'govcon.award.ending',
     ]);
     expect(sink.prompts).toHaveLength(1);
     const [prompt] = sink.prompts;
@@ -309,11 +316,13 @@ describe('the spending warmer', () => {
     expect(prompt.title).toBe('2 spending alerts for Tiny LLC');
     expect(prompt.details).toHaveLength(2);
     // The same award came through three horizons — the profile's and two agencies' — and is one alert.
-    expect(ledger.rows.map((row) => [row.key.kind, row.eventSeq, row.promptId])).toEqual([
-      ['award-ending', '1', prompt.id],
-      ['pulse-above-band', '2', prompt.id],
+    expect(
+      ledger.rows.map((row) => [row.key.kind, row.position, row.eventSeq, row.promptId]),
+    ).toEqual([
+      ['pulse-above-band', 0, '1', prompt.id],
+      ['award-ending', 1, '2', prompt.id],
     ]);
-    expect(ledger.rows[0]?.scopeKey).toMatch(/^[0-9a-f]{64}$/);
+    expect(ledger.rows[1]?.scopeKey).toMatch(/^[0-9a-f]{64}$/);
 
     const second = await warmer.warm();
     expect(second.alerts).toEqual({ found: 2, fresh: 0, published: 0, prompted: false });
@@ -329,9 +338,7 @@ describe('the spending warmer', () => {
 
     const quiet = harness();
     await quiet.profiles.create(
-      tinyProfile({
-        alerts: { endingWithinDays: 90, pulseAboveBand: false },
-      } as Partial<SearchProfile>),
+      tinyProfile({ alerts: { ...DEFAULT_ALERT_POLICY, pulseAboveBand: false } }),
     );
     expect((await quiet.warmer.warm()).alerts.found).toBe(1);
     expect(quiet.sink.published.map((alert) => alert.topic)).toEqual(['govcon.award.ending']);
@@ -345,5 +352,92 @@ describe('the spending warmer', () => {
       published: 0,
       prompted: false,
     });
+  });
+
+  it('[GOV-32] [GOV-33] a warm reads every tracked award after the scope and raises what its record shows once — its own record kept when a scope lists the same award — keeps what was published on the ledger, and writes back the end it read only once the alert for the move is raised', async () => {
+    // The award the scope's horizon lists, tracked too: its record ends the same day, and its end was last read five days earlier.
+    const id = horizonRowOf().externalId;
+    const {
+      orders: _orders,
+      subcontracts: _roster,
+      ...body
+    } = awardBodyOf({
+      externalId: id,
+      endsAt: '2026-07-05',
+      subcontractCount: 0,
+    });
+    const script = { ...SCRIPT, awardDetails: [fetchedOf<AwardRecord | null>(body)] };
+    const key = { kind: 'award' as const, subject: id };
+    const input = {
+      label: 'P',
+      stage: 'watching' as const,
+      notes: '',
+      contact: '',
+      reminderAt: null,
+    };
+    const tracking = async (options: Parameters<typeof harness>[0] = { script }) => {
+      const made = harness(options);
+      await made.profiles.create(tinyProfile());
+      await made.targets.save(key, input, T0);
+      await made.targets.observe(key, '2026-06-30');
+      return made;
+    };
+
+    const { warmer, sink, ledger, targets } = await tracking();
+    const report = await warmer.warm();
+    expect(outcomes(report).at(-1)).toEqual([`award ${id}`, 'ok', null]);
+    expect(report.alerts).toEqual({ found: 3, fresh: 3, published: 3, prompted: true });
+    // Raised in the order a person reads them: the tracked award's news, the whole-scope finding, the ending award.
+    expect(sink.published.map((alert) => alert.topic)).toEqual([
+      'govcon.award.end-moved',
+      'govcon.pulse.above-band',
+      'govcon.award.ending',
+    ]);
+    // One ending alert for the award, and it is the tracked record's: no scope found it first.
+    expect(ledger.rows.map((row) => [row.key.kind, row.position, row.scopeKey === null])).toEqual([
+      ['award-end-moved', 0, true],
+      ['pulse-above-band', 1, false],
+      ['award-ending', 2, true],
+    ]);
+    expect(ledger.rows[0]?.payload).toEqual({
+      profileId: 'tiny',
+      externalId: id,
+      piid: body.piid,
+      recipientName: body.recipient.name,
+      agencyPath: body.agencyPath,
+      from: '2026-06-30',
+      to: '2026-07-05',
+    });
+    expect(ledger.rows[2]?.payload).toEqual(sink.published[2]?.payload);
+    expect((await targets.find(key))?.endsAt).toBe('2026-07-05');
+    // The digest leads with the tracked award's news.
+    expect(sink.prompts[0]?.details[0]).toContain('now ends 2026-07-05, not 2026-06-30');
+
+    // A bus that is down raises nothing, so the end read is not written: the next warm finds the move again.
+    const down = await tracking();
+    down.sink.failing = new Error('bus down');
+    expect((await down.warmer.warm()).alerts).toMatchObject({ found: 3, published: 0 });
+    expect((await down.targets.find(key))?.endsAt).toBe('2026-06-30');
+    down.sink.failing = null;
+    expect((await down.warmer.warm()).alerts).toMatchObject({ fresh: 3, published: 3 });
+    expect((await down.targets.find(key))?.endsAt).toBe('2026-07-05');
+
+    // A policy that raises tracked awards alone: the scope's ending award is not raised, the tracked one is.
+    const narrow = harness({ script });
+    await narrow.profiles.create(
+      tinyProfile({ alerts: { ...DEFAULT_ALERT_POLICY, audience: 'watched' } }),
+    );
+    expect((await narrow.warmer.warm()).alerts.found).toBe(1);
+    expect(narrow.sink.published.map((alert) => alert.topic)).toEqual(['govcon.pulse.above-band']);
+    await narrow.targets.save(key, input, T0);
+    expect((await narrow.warmer.warm()).alerts).toMatchObject({ found: 2, fresh: 1 });
+    expect(narrow.sink.published.at(-1)?.topic).toBe('govcon.award.ending');
+
+    // A target store that cannot be read is one line; the scope's alerts are still raised.
+    const blind = await tracking();
+    vi.spyOn(blind.targets, 'listAll').mockRejectedValue(new Error('store down'));
+    const unseen = await blind.warmer.warm();
+    expect(outcomes(unseen).some(([lens]) => String(lens).startsWith('award '))).toBe(false);
+    expect(unseen.alerts).toEqual({ found: 2, fresh: 2, published: 2, prompted: true });
   });
 });

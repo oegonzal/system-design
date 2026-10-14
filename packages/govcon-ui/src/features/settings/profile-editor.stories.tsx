@@ -27,7 +27,7 @@ export const WithIssues: Story = {
       ...PROFILE,
       scoring: { ...PROFILE.scoring, weights: { ...PROFILE.scoring.weights, naics: 0.5 } },
       naics: ['33271A', '5415'],
-      alerts: { endingWithinDays: 400, pulseAboveBand: true },
+      alerts: { ...PROFILE.alerts, endingWithinDays: 400 },
     },
     issues: [
       { path: 'scoring.weights', message: 'weights sum to 1.2, not 1' },

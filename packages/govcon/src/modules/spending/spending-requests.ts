@@ -1,5 +1,6 @@
 import {
   AWARD_FAMILY_CHOICES,
+  AWARD_ID_SHAPE,
   AWARD_PLACEMENTS,
   BREAKDOWN_CATEGORIES,
   DEFAULT_HORIZON_MONTHS,
@@ -147,8 +148,8 @@ export const primesQuerySchema = overWindow(
 ) satisfies z.ZodType<SpendingPrimesQuery>;
 export type PrimesQueryInput = z.output<typeof primesQuerySchema>;
 
-/** An award's id as the source mints it: one path segment, no whitespace. */
-export const awardIdSchema = z.string().regex(/^[^\s/]{1,200}$/, 'an award id is one path segment');
+/** An award's id as the source mints it. */
+export const awardIdSchema = z.string().regex(AWARD_ID_SHAPE, 'an award id is one path segment');
 
 /** What a scope is read out of: any validated query's codes, agency, family and facets. */
 export type ScopeInput = Pick<

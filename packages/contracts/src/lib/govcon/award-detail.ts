@@ -5,6 +5,9 @@ import type { AwardFamily } from './vocab';
 
 // Award — one award's own record.
 
+/** An award's id as the source mints it: one path segment, no whitespace. */
+export const AWARD_ID_SHAPE = /^[^\s/]{1,200}$/;
+
 /** The vehicle an order was placed under. */
 export interface AwardVehicle {
   externalId: string | null;

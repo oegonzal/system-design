@@ -9,6 +9,7 @@ import { ProfilesModule } from '../profiles/profiles.module';
 import { PullsModule } from '../pulls/pulls.module';
 import { SourcesModule } from '../sources/sources.module';
 import { SpendingModule } from '../spending/spending.module';
+import { TargetsModule } from '../targets/targets.module';
 import { ViewsModule } from '../views/views.module';
 
 @Module({
@@ -22,6 +23,7 @@ import { ViewsModule } from '../views/views.module';
     BidsModule,
     EntitiesModule,
     SpendingModule,
+    TargetsModule,
     ViewsModule,
   ],
   controllers: [HealthController],
