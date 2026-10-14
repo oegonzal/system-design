@@ -94,9 +94,7 @@ curl -s -X POST localhost:3004/awards/fetch -H 'content-type: application/json' 
 
 Nine routes under one shell (the nav is one data table the bar, the titles
 and the route announcer read; the active profile is one choice in the header
-every page scores against): **Dashboard** (the buckets, a pull, what is due
-this week, what the daily warm and the daily pull raised, the ten best leads, the company's own
-registration), **Search**
+every page scores against): **Dashboard** (what to act on first — what is due this week across the tracked notices, firms and awards, what the daily warm and the daily pull raised, the open early notices and the best leads — then how much of the year's new work in the profile's codes was within reach, then the sources and a pull by hand, then the company's own registration; each a panel reading its own resource), **Search**
 (the store over every filter, free, with the notices a buyer posts before it
 solicits one press away; SAM.gov over every `QueryFilter` field, run and
 saved, each saved search togglable into the daily pull and saying what its

@@ -12,10 +12,17 @@ export interface LeadTableProps {
   activeNoticeId?: string | null;
   /** A shorter heading for a panel that is one of several. */
   heading?: string;
+  /** What to say when no lead matches, in the panel's own terms. */
+  emptyNote?: string;
 }
 
 /** The ranking as the service returned it; the title opens the notice, the link opens sam.gov. */
-export function LeadTable({ report, activeNoticeId = null, heading = 'Leads' }: LeadTableProps) {
+export function LeadTable({
+  report,
+  activeNoticeId = null,
+  heading = 'Leads',
+  emptyNote = 'No leads — pull first, or lower the minimum score.',
+}: LeadTableProps) {
   const Link = useLink();
   return (
     <Stack gap={3}>
@@ -27,7 +34,7 @@ export function LeadTable({ report, activeNoticeId = null, heading = 'Leads' }: 
       </Text>
       {report.leads.length === 0 ? (
         <Text tone="muted" size="sm">
-          No leads — pull first, or lower the minimum score.
+          {emptyNote}
         </Text>
       ) : (
         <Table aria-label={heading}>

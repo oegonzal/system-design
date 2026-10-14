@@ -16,8 +16,8 @@ import {
   PROFILE,
   SOURCE_STATUS,
 } from '../../testing/fixtures';
-import { PIPELINE_ROWS } from '../../testing/pipeline-fixtures';
-import { ALERT_VIEW } from '../../testing/spending-fixtures';
+import { PIPELINE_ROWS, TARGETS } from '../../testing/pipeline-fixtures';
+import { ALERT_VIEW, REACH } from '../../testing/spending-fixtures';
 import { DashboardClient } from './dashboard.client';
 
 vi.mock('next/navigation', async () => {
@@ -25,11 +25,15 @@ vi.mock('next/navigation', async () => {
   return harness.createNextNavigationMock();
 });
 
+const EARLY = '/leads?profile=enfav&limit=5&noticeTypes=Sources+Sought%2CPresolicitation';
+
 const baseRoutes = (): StubRoute[] => [
   { path: '/profiles', body: { data: [PROFILE] } },
   { path: '/source', body: { data: SOURCE_STATUS } },
   { path: '/leads', body: { data: makeLeadsReport() } },
-  { path: '/pipeline', body: { data: PIPELINE_ROWS, meta: { total: 3, limit: 50, offset: 0 } } },
+  { path: '/pipeline', body: { data: PIPELINE_ROWS, meta: { total: 3, limit: 200, offset: 0 } } },
+  { path: '/targets', body: { data: TARGETS, meta: { total: 2, limit: 200, offset: 0 } } },
+  { path: '/spending/reach', body: { data: REACH } },
   { path: '/entities/own', body: { data: OWN_ENTITY } },
   { path: '/alerts', body: { data: [ALERT_VIEW], meta: { total: 1, limit: 10, offset: 0 } } },
 ];
@@ -45,6 +49,51 @@ beforeEach(() => resetNavigationMock());
 afterEach(() => vi.unstubAllGlobals());
 
 describe('DashboardClient', () => {
+  it('[GOVU-26] leads with what to act on — what is due, what was raised, the early notices, the best leads — then what was within reach, then the sources and a pull, then the registration, each panel reading its own resource for the active profile', async () => {
+    const { calls } = stubApi(baseRoutes());
+    mount();
+    await screen.findByRole('table', { name: 'Early notices' });
+    await screen.findByLabelText('Reach by cut');
+    await screen.findByRole('heading', { name: 'ENFAV LLC' });
+    expect(
+      screen
+        .getAllByRole('region')
+        .map((region) => region.getAttribute('aria-label'))
+        .filter((label) => label !== null && !label.startsWith('Alerts ')),
+    ).toEqual([
+      'Due this week',
+      'Alerts',
+      'Early notices',
+      'New leads',
+      'Within reach',
+      'Pull',
+      'Registration',
+    ]);
+    expect(calls.map((call) => call.url)).toEqual(
+      expect.arrayContaining([
+        EARLY,
+        '/leads?profile=enfav&limit=10',
+        '/pipeline?profile=enfav&limit=200',
+        '/targets?limit=200',
+        '/entities/own?profile=enfav',
+      ]),
+    );
+    // The reach query is the warm's own: the profile's codes, its lanes, the last twelve months.
+    const reach = new URL(
+      `http://x${calls.find((call) => call.url.startsWith('/spending/reach'))?.url ?? ''}`,
+    );
+    expect(reach.searchParams.get('naics')).toBe(PROFILE.naics.join(','));
+    expect(reach.searchParams.get('lanes')).toBe('NONE,SBA,SBP');
+    // A firm due by its reminder stands among the tracked notices due.
+    const due = within(screen.getByRole('table', { name: 'Due this week' }));
+    expect(due.getByRole('link', { name: 'BOOZ ALLEN HAMILTON INC' }).getAttribute('href')).toBe(
+      '/primes/JCBMLGPE6Z71',
+    );
+    expect(
+      screen.getByRole('link', { name: 'Every early notice, on Search' }).getAttribute('href'),
+    ).toBe('/search?type=Presolicitation&type=Sources+Sought');
+  });
+
   it('[GOVU-1] loads the sources, the leads, the pipeline and the registration for the active profile, then pulls and re-reads', async () => {
     const { calls, fetchMock } = stubApi([
       ...baseRoutes(),
@@ -60,7 +109,7 @@ describe('DashboardClient', () => {
         '/profiles',
         '/source',
         '/leads?profile=enfav&limit=10',
-        '/pipeline?profile=enfav&limit=50',
+        '/pipeline?profile=enfav&limit=200',
         '/entities/own?profile=enfav',
       ]),
     );
@@ -78,7 +127,9 @@ describe('DashboardClient', () => {
         expect.arrayContaining([
           '/source',
           '/leads?profile=enfav&limit=10',
-          '/pipeline?profile=enfav&limit=50',
+          EARLY,
+          '/pipeline?profile=enfav&limit=200',
+          '/targets?limit=200',
         ]),
       );
     });
@@ -120,12 +171,19 @@ describe('DashboardClient', () => {
       { path: '/profiles', body: { data: [{ ...PROFILE, entityUei: null }] } },
       { path: '/source', body: { data: SOURCE_STATUS } },
       { path: '/leads', status: 500, body: { statusCode: 500, message: 'the store is down' } },
-      { path: '/pipeline', body: { data: [], meta: { total: 0, limit: 50, offset: 0 } } },
+      { path: '/pipeline', body: { data: [], meta: { total: 0, limit: 200, offset: 0 } } },
+      { path: '/targets', body: { data: [], meta: { total: 0, limit: 200, offset: 0 } } },
+      { path: '/spending/reach', body: { data: REACH } },
       { path: '/entities/own', body: { data: null } },
       { path: '/alerts', body: { data: [], meta: { total: 0, limit: 10, offset: 0 } } },
     ]);
     mount();
-    expect((await screen.findByRole('alert')).textContent).toBe('the store is down');
+    // Both rankings read the store, and each says so beside itself.
+    await waitFor(() =>
+      expect(
+        screen.getAllByRole('alert').filter((alert) => alert.textContent === 'the store is down'),
+      ).toHaveLength(2),
+    );
     await screen.findByText(/Nothing raised yet/);
     await screen.findByText(/Nothing due inside 7 days/);
     await screen.findByText(/Set the company UEI on the profile/);

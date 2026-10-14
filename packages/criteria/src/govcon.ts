@@ -131,6 +131,11 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
     statement:
       'The saved-search list says what each search’s last read of the source brought in, beside when it last ran: the day, how many records and how many of them new, how the profile ranked what it carried by tier, and what a gate keeps off the list — so a search is kept in the daily pull or dropped from it on evidence; a search that has not read the source says so.',
   },
+  {
+    id: 'GOVU-26',
+    statement:
+      'The dashboard leads with what to act on: what is due inside the week across the tracked notices — by reminder or deadline — and the tracked firms and awards — by reminder — in one list, soonest first; what was raised; the open early notices ranked for the profile, with the way to every one of them; and the best leads. Then how much of the year’s new work in the profile’s codes was within reach, cut by cut, read as the daily warm reads it so that it is the day’s snapshot; then the sources and a pull by hand; then the registration. Each panel reads its own resource and says its own failure, and a pull makes every panel that reads the store read it again.',
+  },
   // Government contracting: SAM.gov opportunities (packages/govcon)
   {
     id: 'GOV-1',
