@@ -2,7 +2,7 @@ import type { RaisedAlertView } from '@sysdesign/contracts';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { fn } from 'storybook/test';
 
-import { ALERT_VIEW } from '../../testing/fixtures';
+import { ALERT_VIEW } from '../../testing/spending-fixtures';
 import { AlertList } from './alert-list';
 
 const AWARD = ALERT_VIEW.key.subject;

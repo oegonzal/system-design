@@ -2,7 +2,7 @@ import { renderWithTheme, stubApi } from '@sysdesign/web-testing';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { FIRM_TARGET, TARGET, TARGET_SUMMARY, TARGETS } from '../../testing/fixtures';
+import { FIRM_TARGET, TARGET, TARGET_SUMMARY, TARGETS } from '../../testing/pipeline-fixtures';
 import { TargetsView } from './targets-view.client';
 
 afterEach(() => vi.unstubAllGlobals());

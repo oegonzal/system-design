@@ -3,7 +3,7 @@ import { composeStories } from '@storybook/react';
 import { fireEvent, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { FIRM_TARGET, TARGET } from '../../testing/fixtures';
+import { FIRM_TARGET, TARGET } from '../../testing/pipeline-fixtures';
 import * as stories from './target-panel.stories';
 
 const { Untracked, Tracked, Firm, Saving, Refused } = composeStories(stories);

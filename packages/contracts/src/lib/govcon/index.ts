@@ -36,3 +36,4 @@ export * from './award-detail';
 export * from './fixtures';
 export * from './spending-fixtures';
 export * from './prime-fixtures';
+export * from './target-fixtures';

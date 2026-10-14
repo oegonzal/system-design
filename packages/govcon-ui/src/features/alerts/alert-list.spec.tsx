@@ -3,7 +3,7 @@ import { composeStories } from '@storybook/react';
 import { fireEvent, screen, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { ALERT_VIEW } from '../../testing/fixtures';
+import { ALERT_VIEW } from '../../testing/spending-fixtures';
 import * as stories from './alert-list.stories';
 
 const { Default, Paged, Empty } = composeStories(stories);

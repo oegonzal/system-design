@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { fn } from 'storybook/test';
 
-import { PIPELINE_ROWS } from '../../testing/fixtures';
+import { PIPELINE_ROWS } from '../../testing/pipeline-fixtures';
 import { PipelineTable } from './pipeline-table';
 
 const NOW = Date.parse('2026-09-26T12:00:00Z');

@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { fn } from 'storybook/test';
 
-import { FIRM_TARGET, TARGET } from '../../testing/fixtures';
+import { FIRM_TARGET, TARGET } from '../../testing/pipeline-fixtures';
 import { TargetPanel } from './target-panel';
 
 const meta: Meta<typeof TargetPanel> = {

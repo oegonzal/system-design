@@ -4,19 +4,17 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   AWARDS,
   AWARDS_SUMMARY,
-  BID,
   CALLS,
   DESCRIPTION,
   ENTITY,
   makeLeadDetail,
   makeLeadsReport,
   makePullReport,
-  PIPELINE_ROWS,
-  PIPELINE_SUMMARY,
   PROFILE,
   SAVED_SEARCHES,
   SOURCE_STATUS,
 } from '../testing/fixtures';
+import { BID, PIPELINE_ROWS, PIPELINE_SUMMARY } from '../testing/pipeline-fixtures';
 import { AGENCIES, AGENCY_OUTLOOK, BREAKDOWN, HORIZON, PULSE } from '../testing/spending-fixtures';
 import { api } from './client';
 

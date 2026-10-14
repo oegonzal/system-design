@@ -5,6 +5,8 @@ import {
   fiscalPeriodEnd,
   projectedPeriodOf,
   publicationDelayOf,
+  type RaisedAlertView,
+  raisedAlertViewOf,
   spendingBreakdownOf,
   spendingHorizonOf,
   spendingPrimesOf,
@@ -43,3 +45,6 @@ export const AWARD_DETAIL = awardDetailOf();
 export const HORIZON = spendingHorizonOf();
 export const AGENCIES = agencyDirectoryOf();
 export const AGENCY_OUTLOOK = agencyOutlookOf();
+
+/** What the warm raised: a tracked award ending, as it was published. */
+export const ALERT_VIEW: RaisedAlertView = raisedAlertViewOf();

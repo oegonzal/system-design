@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { fn } from 'storybook/test';
 
-import { FIRM_TARGET, TARGET, TARGETS } from '../../testing/fixtures';
+import { FIRM_TARGET, TARGET, TARGETS } from '../../testing/pipeline-fixtures';
 import { TargetsTable } from './targets-table';
 
 const meta: Meta<typeof TargetsTable> = {

@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
-import { TARGET_SUMMARY } from '../../testing/fixtures';
+import { TARGET_SUMMARY } from '../../testing/pipeline-fixtures';
 import { TargetSummaryTiles } from './target-summary-tiles';
 
 const meta: Meta<typeof TargetSummaryTiles> = {

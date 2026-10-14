@@ -10,14 +10,14 @@ import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ProfileProvider } from '../../providers/profile-context';
+import { PROFILE } from '../../testing/fixtures';
 import {
   BID,
   PIPELINE_ROWS,
   PIPELINE_SUMMARY,
-  PROFILE,
   TARGET_SUMMARY,
   TARGETS,
-} from '../../testing/fixtures';
+} from '../../testing/pipeline-fixtures';
 import { PipelineClient } from './pipeline.client';
 
 vi.mock('next/navigation', async () => {

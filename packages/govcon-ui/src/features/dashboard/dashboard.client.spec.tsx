@@ -10,14 +10,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ProfileProvider } from '../../providers/profile-context';
 import {
-  ALERT_VIEW,
   makeLeadsReport,
   makePullReport,
   OWN_ENTITY,
-  PIPELINE_ROWS,
   PROFILE,
   SOURCE_STATUS,
 } from '../../testing/fixtures';
+import { PIPELINE_ROWS } from '../../testing/pipeline-fixtures';
+import { ALERT_VIEW } from '../../testing/spending-fixtures';
 import { DashboardClient } from './dashboard.client';
 
 vi.mock('next/navigation', async () => {

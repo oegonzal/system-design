@@ -2,7 +2,7 @@ import { renderWithTheme, stubApi } from '@sysdesign/web-testing';
 import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { TARGET } from '../../testing/fixtures';
+import { TARGET } from '../../testing/pipeline-fixtures';
 import { TrackTarget } from './track-target.client';
 
 const PATH = `/targets/award/${TARGET.subject}`;

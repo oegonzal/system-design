@@ -12,13 +12,13 @@ import { ProfileProvider } from '../../providers/profile-context';
 import {
   AWARDS,
   AWARDS_SUMMARY,
-  BID,
   DESCRIPTION,
   ENTITY,
   makeLeadDetail,
   NOTICE_ID,
   PROFILE,
 } from '../../testing/fixtures';
+import { BID } from '../../testing/pipeline-fixtures';
 import { NoticeClient } from './notice.client';
 
 vi.mock('next/navigation', async () => {
