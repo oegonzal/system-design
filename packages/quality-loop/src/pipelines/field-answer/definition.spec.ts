@@ -102,6 +102,14 @@ describe('the field-answer pipeline', () => {
     expect(FIELD_ANSWER.producer.persona).toMatch(/threshold/);
     expect(FIELD_ANSWER.producer.persona).toMatch(/names no subject/);
     expect(FIELD_ANSWER.critics[0].persona).toMatch(/threshold .* derived/);
+    // A bound — an earlier yes to a threshold, or a sum of the periods the evidence happens to list — is never the
+    // figure: measured 2026-10-14, a sum over the one dated role recalled answered "1" to years of full-stack work.
+    expect(FIELD_ANSWER.producer.persona).toMatch(/A bound is not a figure/);
+    expect(FIELD_ANSWER.critics[0].persona).toMatch(/A figure given from a bound/);
+    // A value the page refused is answered again, never kept: measured 2026-10-14, "9 years" kept twice in a field that
+    // takes a number set the application aside.
+    expect(FIELD_ANSWER.producer.persona).toMatch(/unless the page refused it/);
+    expect(FIELD_ANSWER.producer.persona).toMatch(/takes the bare whole number/);
     // A group describing one unnamed entry of a list is filled from one entry, in the order the policy declares,
     // and an earlier answer to one of its questions settles it only for the entry it was given about.
     expect(FIELD_ANSWER.producer.persona).toMatch(
