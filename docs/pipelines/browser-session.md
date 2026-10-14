@@ -44,7 +44,7 @@ names the TypeScript fact first for that field, with `runId` the digest run's
 id and `pipeline` `document-digest` — the form path's own recall (the field's
 words as the probe, both named vectors, the hits its field type takes), not
 the curated recall's `retrieval-report`, which derives probes with a model and
-searches every kind. Then `ingest Resume_a2.pdf --kind resume`.
+searches every kind. Then `ingest docs/ingestion/Resume_2026_c.pdf --kind resume`.
 
 ## 2. A benign session
 
