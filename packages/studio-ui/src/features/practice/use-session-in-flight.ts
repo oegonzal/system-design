@@ -1,6 +1,11 @@
 'use client';
 
-import type { DesignSessionDetailDto, SessionInFlightDto } from '@sysdesign/contracts';
+import type {
+  DesignRevisionSummaryDto,
+  DesignSessionDetailDto,
+  ImproveRunDto,
+  SessionInFlightDto,
+} from '@sysdesign/contracts';
 import { usePolledResource, type ApiError } from '@sysdesign/web-kit';
 import { useCallback, useState } from 'react';
 
@@ -46,4 +51,22 @@ export function useSessionInFlight(sessionId: string): SessionInFlight {
   const hold = useCallback((next: SessionInFlightDto | null) => setHeld(next), []);
   const inFlight = read === null ? held : isMissing(read) ? null : read.found.inFlight;
   return { inFlight, hold, recheck: restart, gone: goneRead(read) };
+}
+
+/**
+ * Who holds the session's slot: the server's word, or — while it has not
+ * said — the coach run this tab is watching revise, on the revision it
+ * started from.
+ */
+export function slotHolder(
+  inFlight: SessionInFlightDto | null,
+  run: ImproveRunDto | null,
+  revisions: readonly DesignRevisionSummaryDto[],
+): SessionInFlightDto | null {
+  if (inFlight !== null) return inFlight;
+  if (run === null || run.status !== 'running') return null;
+  const base = revisions.find((candidate) => candidate.id === run.baseRevisionId);
+  return base === undefined
+    ? null
+    : { kind: 'coach', runId: run.runId, revisionNumber: base.revisionNumber, state: 'running' };
 }
