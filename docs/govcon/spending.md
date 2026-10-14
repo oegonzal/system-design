@@ -1,13 +1,14 @@
 # Spending — where and when the government obligates money
 
 The Spending page of `packages/govcon-ui` and the `/spending/*` routes of
-`packages/govcon` answer five questions about one scope — a set of NAICS or
+`packages/govcon` answer six questions about one scope — a set of NAICS or
 PSC code families, one awarding agency or every agency, contracts or
-indefinite-delivery vehicles (IDVs) or both, narrowed by any of five facets —
+indefinite-delivery vehicles (IDVs) or both, narrowed by any of six facets —
 from USAspending, which needs no key: **when** the money moves (Pulse),
-**where** it goes (Where), **how much of it was open to you** (Reach), **what
-is ending** and so may be bought again (Horizon), and **how much an agency
-has left** (Agency). Every answer is a snapshot the service took through the one
+**where** it goes (Where), **how much of it was open to you** (Reach), **who
+passes work down** (Primes), **what is ending** and so may be bought again
+(Horizon), and **how much an agency has left** (Agency). One award and one
+firm each have a page of their own. Every answer is a snapshot the service took through the one
 request gate, kept for the cache window, and carries its provenance. A daily
 warm refreshes the default profile's lenses and puts what changed to a person
 as a Telegram digest. This guide says how each piece works and how to use it;
@@ -28,13 +29,14 @@ agency and the award family are handed on at once. USAspending ANDs the code fil
 narrows a NAICS scope rather than widening it; leave PSC empty to see the
 whole industry. The agency select is the directory USAspending publishes.
 
-**More filters.** Five facets narrow the scope further, behind one fold that
+**More filters.** Six facets narrow the scope further, behind one fold that
 says how many are set and is open when a link arrives with some. They are
 one declared table (`SPENDING_FACETS` in contracts), so the control, the
 address, the wire and the snapshot key all spell a value the same way:
 
 | Facet           | What it keeps                                                                                                                              |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Awarded to      | Awards to the firms named by UEI. In a subcontract search this is the subcontractor.                                                       |
 | Won by          | Awards to small businesses, or to everyone else, by the size the government recorded on that award.                                        |
 | Placed as       | Stand-alone contracts, or orders under a vehicle the winner already held. Choosing one makes the scope one of contracts.                   |
 | Set-aside       | Any of the set-aside codes, with `NONE` for an award made under no set-aside. **My lanes** presses the ones the profile's scoring may bid. |
@@ -42,7 +44,9 @@ address, the wire and the snapshot key all spell a value the same way:
 | New awards only | Awards that began inside the window, never a change to an older one.                                                                       |
 
 A code or a range the table does not offer, named by an address or a saved
-view, is shown pressed beside the ones it does.
+view, is shown pressed beside the ones it does. "Awarded to" is typed, since
+no list of firms could be offered: the field keeps what is being typed and
+hands a UEI on once it is one.
 
 **Largest codes in this scope.** One more fold under the bar ranks the
 scope's PSC and NAICS codes by what was obligated under them over the last
@@ -69,12 +73,13 @@ the same view. Only what differs from the profile's default is written:
 | `psc`           | one per code                                                                            | none                |
 | `agency`        | a toptier code (`097`)                                                                  | every agency        |
 | `awardFamily`   | `contracts`, `idvs`, `both`                                                             | `both`              |
+| `recipient`     | UEIs, comma-joined                                                                      | any firm            |
 | `recipientSize` | `small`, `other`                                                                        | anyone              |
 | `placement`     | `standalone`, `order`                                                                   | either              |
 | `setAside`      | codes, comma-joined (`NONE,SBA,SBP`)                                                    | any                 |
 | `amount`        | `min-max` in dollars, either end open (`15000.01-350000`, `-15000`)                     | any                 |
 | `newOnly`       | `true`                                                                                  | every action        |
-| `tab`           | `pulse`, `where`, `reach`, `horizon`, `agency`                                          | `pulse`             |
+| `tab`           | `pulse`, `where`, `reach`, `primes`, `horizon`, `agency`                                | `pulse`             |
 | `category`      | `awarding_agency`, `awarding_subagency`, `recipient`, `naics`, `psc`, `state_territory` | `awarding_agency`   |
 | `window`        | `fytd`, `prior-fy`, `fy-before-last`, `last-12-months`                                  | `last-12-months`    |
 | `months`        | `6`, `12`, `24`                                                                         | `12`                |
@@ -207,8 +212,89 @@ and USAspending's award search does not return that date (it answers null
 for it), so the list cannot show it. Measured 2026-10-13 on the eight
 largest software awards ending that week: four ran on with options, to
 January 2027, September 2027, October 2028 and October 2029. An award about
-to "end" is often an option decision, not a recompete; the award's own
-record holds both dates.
+to "end" is often an option decision, not a recompete. Each row links to the
+award's own page, which shows both dates, and its holder links to the
+firm's page.
+
+### Primes — who passes work down
+
+Ninety percent of software dollars are ordered through vehicles a new firm
+does not hold, so the lane open first is a subcontract. This tab ranks the
+scope's primes by the subcontracts they reported, within the size of
+subcontract the profile could take (`teaming.subcontract`, $50K to $2M
+unless Settings says otherwise) and over the page's window.
+
+It reads one count of what the source holds, then the rows most recent
+first, up to `MAX_SUBAWARD_PAGES` pages and the wall-clock deadline. A prime
+often reports an earlier subcontract again, so the same prime award,
+subcontractor and amount is counted once. A prime is its UEI; a firm that
+files under two UEIs is two rows, each with its own page. The tiles say how
+many subcontracts the source holds, how many were read and how far back,
+how many repeated, and how many primes and subcontractors that covers; when
+older rows were left unread a line says so, and a count is then a floor.
+
+Each prime shows its UEI, its subcontracts, the different firms they went
+to, the dollars, the share placed under prime awards coded as services (a
+product service code that begins with a letter), and what it holds itself as
+a prime in the scope over the same window. A large firm files under several
+UEIs, so its name can head several rows; the UEI is what tells them apart,
+and each row is that registration's own record. "Hires" lists the firms it
+reported
+most, each a link to **who hires that firm**: this tab with the scope
+narrowed to that subcontractor, since in a subcontract search "Awarded to"
+matches the subcontractor. The same link works from any UEI typed under
+More filters.
+
+A subcontract search honours the scope's codes, agency, set-aside, placement
+and winner's size as facts about the prime's award. It cannot ask for a
+prime award's size or for new awards only, so those two facets are unset in
+the scope the answer reports.
+
+Checked 2026-10-13 against the report in `enfav-prospects.md`, for NAICS
+541511, 541512 and 541519, fiscal 2024 and 2025, $50K to $2M: 16,771
+subcontracts held, 3,000 read back to 2025-04-03, 95 repeats removed, and
+the same six primes on top with the same counts once a firm's two UEIs are
+added together (CACI 325, General Dynamics IT 323, Booz Allen Hamilton 320,
+Leidos 308, Accenture Federal Services 269). Thirty-two requests.
+
+## One award, and one firm
+
+**An award** opens at `/awards/<id>` from the Horizon, from Intel for an
+award stored from USAspending, and from another award that names it as its
+vehicle. It shows who holds it and who owns the holder, the buyer down to
+the office, what is obligated against what the award can reach, when it
+ends beside when it would end with every option, the vehicle it sits under,
+how it was competed (offers received, or that the buyer did not count
+them), how it is priced and coded, the largest subcontracts reported under
+it, and the open stored notices from the same buyer and code.
+
+A vehicle is read differently, because its money is on its orders: its own
+obligations are usually zero. Its page shows what was ordered under it, in
+dollars and in orders, against its ceiling, counting orders placed through
+any vehicle awarded under it (a schedule's orders go through its
+agreements), and whether one firm or several hold it. Checked 2026-10-13 on
+one multiple-award vehicle: $0 obligated on the record itself, $47.6M in 9
+orders under it, a $2.6B ceiling.
+
+One request the first time that day for the record, one more for a
+vehicle's orders, and one more for the subcontracts when any are reported.
+
+**A firm** opens at `/primes/<uei>` from the Primes tab, the Horizon, Where
+ranked by recipient, Intel and an award. It is headed by the firm's name and
+what it was obligated in the active profile's codes over the last twelve
+months, which is the recipient ranking narrowed to that firm; until an award
+or a registration names it, the UEI heads the page. Its SAM.gov registration
+is shown as the store holds it, and looking it up is one budgeted request
+behind a button that says so. Under it are the Spending lenses narrowed to
+that firm in the profile's codes, each read only once its tab is opened: the
+awards it holds that are ending, who buys from it, the firms it reported
+hiring, and the primes that reported hiring it. The firm is one facet of a
+scope, so the page adds no second way of reading anything.
+
+"Who it hires" is the firm's own row of the profile's ranking, so it has
+the ranking's bound: a firm that is not among the `PRIMES_LISTED` primes
+reporting the most is said to be outside it, with the count the last listed
+prime reported.
 
 ### Agency — how much is left
 
@@ -311,8 +397,8 @@ how a publication delay marks a period, and how facets narrow cut by cut);
 one adapter per USAspending endpoint lives in
 `packages/govcon/src/modules/sources/usaspending/`; the warm, the alert
 ledger and the bus sink in `packages/govcon/src/modules/spending/`; saved
-views in `packages/govcon/src/modules/views/`. The criteria are `GOV-20..28`
-and `GOVU-11..16` in `packages/criteria`.
+views in `packages/govcon/src/modules/views/`. The criteria are `GOV-20..30`
+and `GOVU-11..19` in `packages/criteria`.
 
 ## How to use the tools
 
@@ -327,6 +413,9 @@ curl -s 'localhost:3004/spending/pulse?naics=541511,541512&lookback=3' | jq '.da
 curl -s 'localhost:3004/spending/breakdown?category=awarding_agency&naics=541511&from=2025-10-01&to=2026-09-30' | jq '.data | {total, truncated, top: .rows[:5]}'
 curl -s 'localhost:3004/spending/reach?naics=541511,541512,541519&from=2024-10-01&to=2025-09-30&lanes=NONE,SBA,SBP' | jq '.data | {cuts: [.cuts[]|{id, awards, amount}], bands}'
 curl -s 'localhost:3004/spending/breakdown?category=recipient&naics=541511&from=2024-10-01&to=2025-09-30&placement=standalone&setAside=NONE,SBA,SBP&recipientSize=small&newOnly=true' | jq '.data.rows[:10]'
+curl -s 'localhost:3004/spending/primes?naics=541511,541512,541519&awardFamily=contracts&from=2023-10-01&to=2025-09-30&band=50000-2000000' | jq '.data | {total, read, duplicates, reachedBack, primes: [.primes[:6][]|{name, uei, subcontracts}]}'
+curl -s 'localhost:3004/spending/primes?naics=541511&from=2023-10-01&to=2025-09-30&recipient=JLW7WAKPEKD4' | jq '.data.primes[:5]'
+curl -s 'localhost:3004/spending/awards/CONT_AWD_W912DY23F0468_9700_W912DY20D0079_9700' | jq '.data | {piid, endsAt, endsWithOptionsAt, vehicle, competition}'
 curl -s 'localhost:3004/spending/horizon?naics=541511&months=12' | jq '.data | {capped, stoppedBy, completeBefore, rows: (.rows|length), open: (.openNotices|length)}'
 curl -s 'localhost:3004/spending/agencies' | jq '.data.entries | length'
 curl -s 'localhost:3004/spending/agencies/097?fiscalYear=2026' | jq '.data | {name, years: [.years[]|{fiscalYear, periods: (.byPeriod|length)}]}'
@@ -334,11 +423,12 @@ curl -s 'localhost:3004/spending/agencies/097?fiscalYear=2026' | jq '.data | {na
 
 Lists are comma-joined on the wire; the server sorts and de-duplicates them,
 so the same scope in any spelling is one snapshot. Every scoped route takes
-the five facets under the names in the table above, and refuses a value
+the six facets under the names in the table above, and refuses a value
 outside the vocabulary with a 400 naming the field.
 
 **The ledger:** every page read is one row under its operation —
-`series`, `breakdown`, `horizon`, `award-count`, `agency-budget`,
+`series`, `breakdown`, `horizon`, `award-count`, `subaward-count`,
+`subawards`, `award-detail`, `award-orders`, `award-subawards`, `agency-budget`,
 `agency-offices`, `agency-directory`, `freshness` — in Settings → Ledger and at
 `GET /source/calls?operation=horizon`.
 
@@ -553,6 +643,9 @@ families and interests that name parts and repair.
 | `MAX_BREAKDOWN_ROWS`                                        | 25                 | rows one breakdown answers (`truncated` says when more exist)               |
 | `ACQUISITION_THRESHOLDS`                                    | $15K, $350K, $900K | the lines the award-size bands are cut at, as raised 2025-10-01             |
 | `MAX_VIEW_NAME_LENGTH` / `MAX_VIEW_HREF_LENGTH`             | 120 / 2000         | a saved view's name and address                                             |
+| `MAX_SUBAWARD_PAGES` × `SUBAWARD_PAGE_SIZE`                 | 30 × 100           | subcontract rows one primes ranking reads, most recent first                |
+| `PRIMES_LISTED` / `SUBCONTRACTORS_LISTED`                   | 50 / 10            | primes one ranking lists; firms listed for one prime, and for one award     |
+| `PRIME_OBLIGATION_ROWS`                                     | 100                | recipients read to say what each ranked prime itself holds                  |
 | `HORIZON_MONTH_CHOICES`                                     | 6, 12, 24          | the months the page offers (`MAX_HORIZON_MONTHS` 36 on the wire)            |
 | `HORIZON_LOOKBACK_YEARS`                                    | 5                  | the action-date window a horizon walk covers                                |
 | `MAX_HORIZON_PAGES` × `HORIZON_PAGE_SIZE`                   | 30 × 100           | pages per family (finding today's place and reading forward), rows per page |
@@ -580,6 +673,9 @@ Probed live on 2026-10-12 and 2026-10-13; free, no key.
 - `awards/last_updated` is `MM/DD/YYYY`; agency financials are revealed about five to six weeks after the period.
 - Department of Defense awards appear 90 days after signing. Measured 2026-10-13 against data as of 2026-10-12: Defense reported $43.3B for June 2026, $12.2B for July and $0.02B for August. The Army Corps of Engineers awards under Defense's code; as an awarding agency of its own (`096`) it reports no contract obligations. The adapter declares the lag as data (`USASPENDING_PUBLICATION_LAGS`), and the lenses derive everything else from it.
 - `spending_by_award` answers null for an award's end date with options, under every name tried; `awards/{id}` returns it as `period_of_performance.potential_end_date`.
+- Subcontracts are the same search with `subawards: true`. Measured 2026-10-13 on the count: every filter then narrows by a fact about the prime award — its type, set-aside, winner's size, codes and agency — except `award_amounts`, which bounds the subcontract's own amount, and `recipient_search_text`, which matches the subcontractor; `date_type: new_awards_only` answers a 500. A row carries the prime's UEI, the subcontractor's UEI, the prime award's id and the prime award's PSC. `spending_by_category/recipient` in that mode ranks subcontractors, so primes are ranked here from the rows.
+- `recipient_search_text` given a UEI selects that firm's awards on the count, the series, the category and the award search alike; several UEIs select their union.
+- `awards/{id}` answers one award: `parent_award` (the vehicle), `base_and_all_options`, `period_of_performance.potential_end_date`, `latest_transaction_contract_data` (offers, set-aside, competition, pricing), `subaward_count`. It carries the same 999 offers placeholder SAM.gov does, as text, on the same schedule records. A firm with no owner is named as its own parent. `subawards` with an `award_id` lists that award's subcontracts. A vehicle's own `total_obligation` is zero; `idvs/amounts/{id}` answers what was ordered under it: `child_award_count` and `child_award_total_obligation` for its own orders, `grandchild_*` for orders placed through the `child_idv_count` vehicles awarded under it, and `multiple_or_single_award_description` on the record says whether one firm or several hold it.
 - `spending_by_award_count` answers one count per award kind (`results.contracts`, `results.idvs`) for the same filters every search takes.
 - The facet filters, measured on the count, the series and the category endpoints: `recipient_type_names: ["small_business"]` or `["other_than_small_business"]`; `set_aside_type_codes` with `NONE` for no set-aside; `award_amounts: [{ lower_bound, upper_bound }]`, inclusive at both ends, so two bands that share an edge count an award on it twice; `time_period[].date_type: "new_awards_only"`; and among `award_type_codes`, `B` (purchase order) and `D` (definitive contract) stand alone while `A` (BPA call) and `C` (delivery or task order) are placed under a vehicle.
 

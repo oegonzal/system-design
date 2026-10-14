@@ -74,6 +74,8 @@ default answers.
 | `GET /spending/pulse?naics&psc&agency&awardFamily&lookback`                                                                                                                      | `SpendingPulse` — obligations by fiscal period over the lookback years and this year so far, the rest of the year projected; USAspending, free, snapshotted for the cache window                                                                                                                 |
 | `GET /spending/breakdown?category&naics&psc&agency&awardFamily&from&to`                                                                                                          | `SpendingBreakdown` — the scope's obligations over a window ranked by agency, sub-agency, recipient, NAICS, PSC or state, each a share of the scope's whole                                                                                                                                      |
 | `GET /spending/reach?naics&psc&agency&from&to&lanes`                                                                                                                             | `SpendingReach` — the scope's new contracts over a window cut down step by step: in the lanes named, placed as contracts of their own, won by a small business; then the last cut by award size                                                                                                  |
+| `GET /spending/primes?naics&psc&agency&awardFamily&from&to&band`                                                                                                                 | `SpendingPrimes` — the scope's primes ranked by the subcontracts they reported within a size of subcontract, most recent first, saying how far the read reached; with `recipient`, the primes that reported paying that firm                                                                     |
+| `GET /spending/awards/:id`                                                                                                                                                       | `AwardDetail` — one award by USAspending's id: holder, buyer, vehicle, obligations against its ceiling, both end dates, how it was competed, what was ordered under it when it is a vehicle, its largest subcontracts, and the open stored notices from the same buyer and code                  |
 | `GET/PUT /profiles/:id/views`, `DELETE /views/:id`                                                                                                                               | `SavedView` — an address inside the client kept by name; a `PUT` under a kept name replaces its address                                                                                                                                                                                          |
 | `GET /spending/horizon?naics&psc&agency&awardFamily&months`                                                                                                                      | `SpendingHorizon` — active contracts and IDVs ending inside the coming months, by month, with the soonest-ending rows, each joined at read time to the open stored notices sharing its NAICS and agency sub-tier; capped by `MAX_HORIZON_PAGES` and the pull deadline, saying how far it reached |
 | `GET /spending/agencies`, `GET /spending/agencies/:toptierCode?fiscalYear&awardFamily`                                                                                           | `AgencyDirectory`; `AgencyOutlook` — budgetary resources by fiscal year with the cadence by period, sub-agencies and offices with new-award counts                                                                                                                                               |
@@ -87,7 +89,7 @@ curl -s -X POST localhost:3004/awards/fetch -H 'content-type: application/json' 
 
 ## The web client (`packages/govcon-ui`, `pnpm govcon:start`, `:4202`)
 
-Seven routes under one shell (the nav is one data table the bar, the titles
+Nine routes under one shell (the nav is one data table the bar, the titles
 and the route announcer read; the active profile is one choice in the header
 every page scores against): **Dashboard** (the buckets, a pull, what is due
 this week, the ten best leads, the company's own registration), **Search**
@@ -98,14 +100,18 @@ stage, reminder, estimate and notes — opens under it), **Notice** (facts,
 place and contacts, the attachments as public links, the score trace, the
 description on demand, the awards of its solicitation and NAICS, the bid
 panel), **Intel** (fetch and summarize awards, look registrants up), **Spending**
-(five free USAspending lenses over one scope bar — when the money moves by
+(six free USAspending lenses over one scope bar — when the money moves by
 fiscal period with the rest of the year projected, where it goes by agency,
 recipient, code or state, how much of the new work was open to the profile,
-what is expiring month by month, and an agency's budget by year with its
-offices — the scope narrowed by five declared facets, every chart with a
-data-table twin and a tooltip, every panel with its provenance; the view is
-its address, opens on the profile's NAICS and can be kept by name; its guide
-is [spending.md](spending.md)) and
+which primes pass work down, what is expiring month by month, and an
+agency's budget by year with its offices — the scope narrowed by six
+declared facets, every chart with a data-table twin and a tooltip, every
+panel with its provenance; the view is its address, opens on the profile's
+NAICS and can be kept by name; its guide is [spending.md](spending.md)),
+**Award** (one award's record: its holder, buyer and vehicle, what it can
+reach, its end with and without options, how it was bought, who works under
+it, and for a vehicle what was ordered under it), **Firm** (one firm by UEI: its registration, and the spending lenses
+narrowed to it) and
 **Settings** (profiles as editable data with the service's issues per
 field; the sources and the full ledger). Every button that spends a request
 says so. Pure components carry stories and specs; containers are specified
@@ -131,6 +137,7 @@ seeds an empty store once with its eight NAICS searches flagged for the pull.
 | `scoring.history`                        | Stored awards in the same NAICS inside `days`, `saturateAt` of them worth 1, with how many were the notice's own subtier.                                                                                                    |
 | `scoring.tiers`                          | Score thresholds for `high` and `medium`.                                                                                                                                                                                    |
 | `alerts`                                 | What the daily spending warm alerts on: `endingWithinDays` (an award in the codes ending inside it; 0 none) and `pulseAboveBand` — see [spending.md](spending.md).                                                           |
+| `teaming`                                | What the company looks for in a prime: `subcontract.min` and `.max`, the size of subcontract it could take. The Primes lens ranks a prime by the subcontracts it reports inside it.                                          |
 
 A lead's score is `100 × Σ weight × value`, one decimal; the trace lists each
 factor's value, weight, points and evidence, and the points sum to the score.
@@ -211,7 +218,7 @@ exclusion flag, so the Exclusions API is never spent.
 | `packages/contracts/src/lib/govcon/`                                                              | The vocabularies, bounds, records, request/response shapes, the shared formatting and the fixture builders.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | `packages/db/src/entities/govcon-*.entity.ts`                                                     | Ten tables: opportunity, source call, search profile, saved search, saved view, bid, award, entity, spending snapshot, alert.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
 
-Criteria `GOV-1..28` and `GOVU-1..16` in `packages/criteria`; every spec
+Criteria `GOV-1..30` and `GOVU-1..19` in `packages/criteria`; every spec
 title claims one.
 
 ## First run
