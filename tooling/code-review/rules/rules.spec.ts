@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { fileSize, MAX_LINES } from './file-size';
+import { fileSize, LINE_BOUNDS, lineCount } from './file-size';
 import { countReExports, exportSurface, MAX_BARREL_EXPORTS } from './export-surface';
 import { RULE_NAMES, runRules, type ChangedFile } from './index';
 
@@ -10,21 +10,39 @@ const linesOf = (count: number) =>
   Array.from({ length: count }, (_, i) => `// line ${i}`).join('\n');
 
 describe('fileSize', () => {
-  it('passes a file at the limit exactly', () => {
-    expect(fileSize([file('a.ts', linesOf(MAX_LINES))])).toEqual([]);
+  it('passes a file at the warning bound exactly', () => {
+    expect(fileSize([file('a.ts', linesOf(LINE_BOUNDS.warn))])).toEqual([]);
   });
 
-  it('warns at medium one line over', () => {
-    const [found] = fileSize([file('a.ts', linesOf(MAX_LINES + 1))]);
+  it('warns at medium one line over the warning bound', () => {
+    const [found] = fileSize([file('a.ts', linesOf(LINE_BOUNDS.warn + 1))]);
 
     expect(found?.severity).toBe('medium');
     expect(found?.category).toBe('oversized-file');
-    expect(found?.evidence).toContain(String(MAX_LINES + 1));
+    expect(found?.evidence).toContain(String(LINE_BOUNDS.warn + 1));
   });
 
-  it('only measures TypeScript sources', () => {
+  it('refuses at high one line over the hard bound, and not at it', () => {
+    expect(fileSize([file('a.ts', linesOf(LINE_BOUNDS.max))])[0]?.severity).toBe('medium');
+
+    const [found] = fileSize([file('a.ts', linesOf(LINE_BOUNDS.max + 1))]);
+    expect(found?.severity).toBe('high');
+    expect(found?.evidence).toContain(String(LINE_BOUNDS.max + 1));
+  });
+
+  it('measures every script flavour, and nothing else', () => {
+    expect(fileSize([file('a.mjs', linesOf(LINE_BOUNDS.warn + 1))])).toHaveLength(1);
+    expect(fileSize([file('a.cts', linesOf(LINE_BOUNDS.warn + 1))])).toHaveLength(1);
     expect(fileSize([file('data.json', linesOf(2_000))])).toEqual([]);
     expect(fileSize([file('notes.md', linesOf(2_000))])).toEqual([]);
+  });
+
+  it('counts lines as an editor does, with or without a final newline', () => {
+    expect(lineCount('')).toBe(0);
+    expect(lineCount('a')).toBe(1);
+    expect(lineCount('a\nb')).toBe(2);
+    expect(lineCount('a\nb\n')).toBe(2);
+    expect(lineCount('a\n\n')).toBe(2);
   });
 
   it('treats unreadable content as nothing to measure', () => {
