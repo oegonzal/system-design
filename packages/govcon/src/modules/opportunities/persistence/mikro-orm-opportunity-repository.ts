@@ -88,7 +88,9 @@ export class MikroOrmOpportunityRepository implements OpportunityRepository {
       conditions.push({ naicsCode: { $in: [...filter.naicsCodes] } });
     }
     if (filter.setAsideCode !== null) conditions.push({ setAsideCode: filter.setAsideCode });
-    if (filter.noticeType !== null) conditions.push({ noticeType: filter.noticeType });
+    if (filter.noticeTypes !== null) {
+      conditions.push({ noticeType: { $in: [...filter.noticeTypes] } });
+    }
     if (filter.agencyContains !== null) {
       conditions.push({ agencyPath: { $ilike: `%${escapeLike(filter.agencyContains)}%` } });
     }

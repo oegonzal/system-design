@@ -27,7 +27,8 @@ export interface CandidateFilter {
   /** Exactly these primary NAICS codes; an empty set matches nothing. */
   naicsCodes: readonly string[] | null;
   setAsideCode: string | null;
-  noticeType: string | null;
+  /** Any of these notice types, by the source's label; an empty set matches nothing. */
+  noticeTypes: readonly string[] | null;
   /** Case-insensitive substring of the agency path. */
   agencyContains: string | null;
   /** Case-insensitive substring of the title or the solicitation number. */

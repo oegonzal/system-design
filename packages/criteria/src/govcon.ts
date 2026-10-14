@@ -111,6 +111,16 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
     statement:
       'The dashboard lists what the daily warm raised, newest first and a page at a time: each alert as the line a person was sent, with its kind and the day it was raised, and links to the award or notice it names; an alert kept without what was published is named by its key. It is where a digest’s "and more" lands, and reading it asks no source anything.',
   },
+  {
+    id: 'GOVU-22',
+    statement:
+      'The store search offers every notice type as a chip, any of them pressed together and a run of presses read as one change, and one preset presses the two a buyer posts before it solicits — sources sought and presolicitations — and lets them go again.',
+  },
+  {
+    id: 'GOVU-23',
+    statement:
+      'The search page and the intel page are their addresses, as the spending page is: the side in front, the filters and the page travel in the URL and are read against their vocabularies, so a ranking or a reading reloads, links, and is kept by name as a saved view listed on its own page; typed text reaches the address once it pauses.',
+  },
   // Government contracting: SAM.gov opportunities (packages/govcon)
   {
     id: 'GOV-1',
@@ -170,7 +180,7 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
   {
     id: 'GOV-15',
     statement:
-      "A ranking loads only what a gate would not exclude — active, open, a biddable set-aside or none, no excluded type — plus the request's filters, in SQL, bounded by MAX_CANDIDATES with the report saying when the bound cut; leads are ranked deterministically and paged.",
+      "A ranking loads only what a gate would not exclude — active, open, a biddable set-aside or none, no excluded type — plus the request's filters, a notice among any of the types it names, in SQL, bounded by MAX_CANDIDATES with the report saying when the bound cut; leads are ranked deterministically and paged.",
   },
   {
     id: 'GOV-12',

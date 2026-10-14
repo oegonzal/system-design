@@ -21,7 +21,7 @@ import { codesOf } from '../codes';
 import { AWARD_FAMILY_LABEL, SPENDING_COST } from './costs';
 import { FacetControls, type FacetPreset } from './facet-controls';
 import { toggleCode, type ScopeDraft } from './scope';
-import { useSettledDraft } from './use-settled-draft';
+import { useSettledDraft } from '../use-settled-draft';
 
 /** How long a run of code changes — typed or pressed — may pause before it is handed on as one. A read behind it can cost the source dozens of pages. */
 export const CODES_SETTLE_MS = 600;

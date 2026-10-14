@@ -43,7 +43,8 @@ export interface ListLeadsQuery {
   /** A NAICS code or family the primary code starts with (the store matches families; SAM.gov's `ncode` does not). */
   naics?: string;
   setAside?: string;
-  noticeType?: string;
+  /** Any of these notice types, by SAM.gov's label. */
+  noticeTypes?: string[];
   /** Substring of the agency path. */
   agency?: string;
   /** Substring of the title or the solicitation number. */

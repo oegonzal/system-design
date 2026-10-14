@@ -53,7 +53,7 @@ describe('the recompete join', () => {
       naicsPrefix: null,
       naicsCodes: ['332710'],
       setAsideCode: null,
-      noticeType: null,
+      noticeTypes: null,
       agencyContains: null,
       textContains: null,
       limit: MAX_RECOMPETE_NOTICES,

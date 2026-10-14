@@ -17,7 +17,7 @@ describe('candidateFilterOf', () => {
       naicsPrefix: null,
       naicsCodes: null,
       setAsideCode: null,
-      noticeType: null,
+      noticeTypes: null,
       agencyContains: null,
       textContains: null,
       limit: MAX_CANDIDATES,
@@ -28,7 +28,7 @@ describe('candidateFilterOf', () => {
         {
           naics: '5415',
           setAside: 'SBA',
-          noticeType: 'Solicitation',
+          noticeTypes: ['Solicitation', 'Presolicitation'],
           agency: 'DLA',
           q: 'bracket',
           deadlineWithinDays: 10,
@@ -39,7 +39,7 @@ describe('candidateFilterOf', () => {
       deadlineOnOrBefore: new Date('2026-10-06T12:00:00Z'),
       naicsPrefix: '5415',
       setAsideCode: 'SBA',
-      noticeType: 'Solicitation',
+      noticeTypes: ['Solicitation', 'Presolicitation'],
       agencyContains: 'DLA',
       textContains: 'bracket',
     });

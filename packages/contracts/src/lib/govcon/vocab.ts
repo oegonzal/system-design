@@ -44,6 +44,13 @@ export const NOTICE_TYPES = {
 } as const;
 export type NoticeTypeCode = keyof typeof NOTICE_TYPES;
 
+/**
+ * The notices a buyer posts before it solicits: asking who could do the
+ * work, and saying a solicitation is coming. The earliest a requirement is
+ * seen, and where a new firm can still shape it.
+ */
+export const EARLY_NOTICE_TYPES: readonly string[] = [NOTICE_TYPES.r, NOTICE_TYPES.p];
+
 /** `status` request values: which lifecycle state a search is limited to; unset means every state. */
 export const NOTICE_STATUSES = ['active', 'inactive', 'archived', 'cancelled', 'deleted'] as const;
 export type NoticeStatus = (typeof NOTICE_STATUSES)[number];

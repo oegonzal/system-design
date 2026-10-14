@@ -2,6 +2,8 @@ import type * as WebTesting from '@sysdesign/web-testing';
 import {
   renderWithTheme,
   resetNavigationMock,
+  routerMock,
+  setMockSearchParams,
   stubApi,
   type StubRoute,
 } from '@sysdesign/web-testing';
@@ -28,7 +30,14 @@ const baseRoutes = (): StubRoute[] => [
   { path: '/source', body: { data: SOURCE_STATUS } },
   { path: '/leads', body: { data: makeLeadsReport({ matching: 30, limit: 25 }) } },
   { path: '/profiles/enfav/searches', body: { data: SAVED_SEARCHES } },
+  { path: '/profiles/enfav/views', body: { data: [] } },
 ];
+
+/** The page with the request side in front, as its address names it. */
+const mountSamGov = () => {
+  setMockSearchParams('tab=samgov');
+  return mount();
+};
 
 const mount = () =>
   renderWithTheme(
@@ -53,28 +62,84 @@ beforeEach(() => resetNavigationMock());
 afterEach(() => vi.unstubAllGlobals());
 
 describe('SearchClient', () => {
-  it('[GOVU-6] ranks the store over the filters for the active profile without a request, re-queries on a change, and pages', async () => {
-    const { calls } = stubApi(baseRoutes());
+  it('[GOVU-6] [GOVU-23] ranks the store over the filters the address names for the active profile without a request, and a filter, a page or the other side each replace the address', async () => {
+    const first = stubApi(baseRoutes());
+    const opened = mount();
+    await screen.findByRole('table', { name: 'Leads' });
+    expect(first.calls.map((call) => call.url)).toContain(
+      '/leads?profile=enfav&minScore=0&limit=25&offset=0',
+    );
+    fireEvent.click(screen.getByRole('button', { name: '541511' }));
+    expect(routerMock.replace).toHaveBeenLastCalledWith('/search?naics=541511', { scroll: false });
+    fireEvent.change(screen.getByLabelText('Tier'), { target: { value: 'high' } });
+    expect(routerMock.replace).toHaveBeenLastCalledWith('/search?tier=high&naics=541511', {
+      scroll: false,
+    });
+    fireEvent.click(screen.getByRole('tab', { name: 'SAM.gov (spends requests)' }));
+    expect(routerMock.replace).toHaveBeenLastCalledWith('/search?tab=samgov', { scroll: false });
+    opened.unmount();
+    vi.unstubAllGlobals();
+
+    // The address is the view: the same filters, read from it.
+    const second = stubApi(baseRoutes());
+    setMockSearchParams('tier=high&naics=541511');
+    mount();
+    await screen.findByRole('table', { name: 'Leads' });
+    expect(second.calls.map((call) => call.url)).toContain(
+      '/leads?profile=enfav&minScore=0&tier=high&naics=541511&limit=25&offset=0',
+    );
+    expect((screen.getByLabelText('Tier') as HTMLSelectElement).value).toBe('high');
+    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
+    expect(routerMock.replace).toHaveBeenLastCalledWith(
+      '/search?tier=high&naics=541511&offset=25',
+      { scroll: false },
+    );
+    expect(second.calls.filter((call) => call.method !== 'GET')).toEqual([]);
+  });
+
+  it('[GOVU-22] [GOVU-23] opens on the early notices when the address names them — the store asked for both types at once, the preset pressed — and keeps the view by name as that address', async () => {
+    const kept = {
+      id: 'v-9',
+      profileId: 'enfav',
+      name: 'Early software notices',
+      href: '/search?type=Presolicitation&type=Sources+Sought',
+      createdAt: '2026-09-27T03:00:00.000Z',
+      updatedAt: '2026-09-27T03:00:00.000Z',
+    };
+    const elsewhere = { ...kept, id: 'v-1', name: 'Who buys', href: '/spending?tab=where' };
+    const { calls, fetchMock } = stubApi([
+      ...baseRoutes().filter((route) => route.path !== '/profiles/enfav/views'),
+      { path: '/profiles/enfav/views', body: { data: [elsewhere, kept] } },
+      { method: 'PUT', path: '/profiles/enfav/views', body: { data: kept } },
+    ]);
+    setMockSearchParams('type=Presolicitation&type=Sources+Sought&offset=25');
     mount();
     await screen.findByRole('table', { name: 'Leads' });
     expect(calls.map((call) => call.url)).toContain(
-      '/leads?profile=enfav&minScore=0&limit=25&offset=0',
+      '/leads?profile=enfav&minScore=0&limit=25&offset=25&noticeTypes=Presolicitation%2CSources+Sought',
     );
+    expect(screen.getByRole('button', { name: 'Early notices' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    // Only this page's views are listed.
+    const views = await screen.findByRole('list', { name: 'Saved views' });
+    expect(within(views).getByRole('link', { name: 'Early software notices' })).toBeTruthy();
+    expect(within(views).queryByRole('link', { name: 'Who buys' })).toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { name: '541511' }));
-    fireEvent.change(screen.getByLabelText('Tier'), { target: { value: 'high' } });
-    await waitFor(() => {
-      expect(calls.map((call) => call.url)).toContain(
-        '/leads?profile=enfav&minScore=0&tier=high&naics=541511&limit=25&offset=0',
-      );
+    fireEvent.change(screen.getByLabelText('Save this view as'), {
+      target: { value: 'Early software notices' },
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Next' }));
-    await waitFor(() => {
-      expect(calls.map((call) => call.url)).toContain(
-        '/leads?profile=enfav&minScore=0&tier=high&naics=541511&limit=25&offset=25',
-      );
+    // The name is already kept, so the save moves it to this address.
+    fireEvent.click(screen.getByRole('button', { name: 'Update view' }));
+    await waitFor(() =>
+      expect(calls.map((call) => `${call.method} ${call.url}`)).toContain(
+        'PUT /profiles/enfav/views',
+      ),
+    );
+    expect(body(fetchMock, '/profiles/enfav/views', 'PUT')).toEqual({
+      name: 'Early software notices',
+      href: '/search?type=Presolicitation&type=Sources+Sought&offset=25',
     });
-    expect(calls.filter((call) => call.method !== 'GET')).toEqual([]);
   });
 
   it('[GOVU-6] runs a filter against SAM.gov for one request per page, shows the report, and saves it under a name', async () => {
@@ -83,8 +148,7 @@ describe('SearchClient', () => {
       { method: 'POST', path: '/searches/run', body: { data: makePullReport() } },
       { method: 'POST', path: '/profiles/enfav/searches', body: { data: SAVED_SEARCHES[0] } },
     ]);
-    mount();
-    fireEvent.click(await screen.findByRole('tab', { name: 'SAM.gov (spends requests)' }));
+    mountSamGov();
     await screen.findByRole('table', { name: 'Saved searches' });
 
     fireEvent.change(screen.getByLabelText('NAICS (exact code, 2–6 digits)'), {
@@ -126,8 +190,7 @@ describe('SearchClient', () => {
       { method: 'POST', path: '/searches/s-2/run', body: { data: makePullReport() } },
       { method: 'DELETE', path: '/searches/s-1', status: 204 },
     ]);
-    mount();
-    fireEvent.click(await screen.findByRole('tab', { name: 'SAM.gov (spends requests)' }));
+    mountSamGov();
     const table = await screen.findByRole('table', { name: 'Saved searches' });
     expect(within(table).getAllByRole('row')).toHaveLength(4);
 
@@ -194,8 +257,7 @@ describe('SearchClient', () => {
         body: { statusCode: 409, message: 'a search named x already exists' },
       },
     ]);
-    mount();
-    fireEvent.click(await screen.findByRole('tab', { name: 'SAM.gov (spends requests)' }));
+    mountSamGov();
     await screen.findByRole('table', { name: 'Saved searches' });
     fireEvent.click(screen.getByLabelText('Include Brackets anywhere in the daily pull'));
     expect((await screen.findByRole('alert')).textContent).toBe('a search named x already exists');

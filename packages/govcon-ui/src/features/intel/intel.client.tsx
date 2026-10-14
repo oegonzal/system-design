@@ -25,14 +25,15 @@ import { useState } from 'react';
 import { api } from '../../api/client';
 import { useProfile } from '../../providers/profile-context';
 import { EntityCard } from '../entities/entity-card';
-import { AwardQueryForm, EMPTY_AWARD_FILTERS, type AwardFilters } from './award-query-form';
+import { useAddressView } from '../use-address-view';
+import { SavedViews } from '../views/saved-views.client';
+import { AwardQueryForm, type AwardFilters } from './award-query-form';
 import { AwardTable } from './award-table';
 import { AwardsSummaryTiles } from './awards-summary-tiles';
 import { EntityLookupForm } from './entity-lookup-form';
 import { EntityTable } from './entity-table';
 import { FetchAwardsForm } from './fetch-awards-form';
-
-type IntelTab = 'awards' | 'entities';
+import { INTEL_ROUTE, INTEL_TABS, intelHref, parseIntelView, type IntelTab } from './intel-link';
 
 /** The form's filters as the API's query: empty fields drop out. */
 const queryOf = (filters: AwardFilters): Omit<AwardsQuery, 'limit' | 'offset'> => ({
@@ -47,15 +48,17 @@ const queryOf = (filters: AwardFilters): Omit<AwardsQuery, 'limit' | 'offset'> =
 /**
  * Intel: what the government bought, from whom, against how many — and who
  * those registrants are. The list and the summary read the store and spend
- * nothing; the fetch and the lookup are the two writes, each behind a click
- * that states its cost, and each reloads what it changed.
+ * nothing, and what they are asked for is the page's address: the side in
+ * front, the filters and the page travel in the URL, so a reading can be
+ * linked to and kept by name. The fetch and the lookup are the two writes,
+ * each behind a click that states its cost, and each reloads what it
+ * changed.
  */
 export function IntelClient() {
   const { active } = useProfile();
   const profileId = active?.id;
-  const [tab, setTab] = useState<IntelTab>('awards');
-  const [filters, setFilters] = useState<AwardFilters>(EMPTY_AWARD_FILTERS);
-  const [offset, setOffset] = useState(0);
+  const { view, replace } = useAddressView(parseIntelView, intelHref);
+  const { tab, filters, offset } = view;
   const [report, setReport] = useState<FetchAwardsReport | null>(null);
   const [lookup, setLookup] = useState<EntityLookup | null>(null);
   const [message, setMessage] = useState('');
@@ -88,7 +91,7 @@ export function IntelClient() {
     setLookup(next);
     setMessage(`Looked up ${next.entities.length} registrant(s); ${next.unknown.length} unknown.`);
     own.reload();
-    setTab('entities');
+    replace({ ...view, tab: 'entities' });
     return next;
   });
   const [lookingUp, setLookingUp] = useState<string | null>(null);
@@ -101,10 +104,13 @@ export function IntelClient() {
   return (
     <Stack gap={5}>
       <Heading level={1}>Intel</Heading>
-      <Tabs value={tab} onChange={(value) => setTab(value as IntelTab)}>
+      <Tabs value={tab} onChange={(value) => replace({ ...view, tab: value as IntelTab })}>
         <TabList aria-label="Intel">
-          <Tab value="awards">Awards</Tab>
-          <Tab value="entities">Entities</Tab>
+          {INTEL_TABS.map(({ id, label }) => (
+            <Tab key={id} value={id}>
+              {label}
+            </Tab>
+          ))}
         </TabList>
         <TabPanel value="awards">
           <Stack gap={5}>
@@ -115,12 +121,16 @@ export function IntelClient() {
                   Reading the store spends nothing. The NAICS filter matches families; a fetch below
                   brings more in.
                 </Text>
+                {profileId === undefined ? null : (
+                  <SavedViews
+                    profileId={profileId}
+                    route={INTEL_ROUTE}
+                    currentHref={intelHref(view)}
+                  />
+                )}
                 <AwardQueryForm
                   value={filters}
-                  onChange={(next) => {
-                    setFilters(next);
-                    setOffset(0);
-                  }}
+                  onChange={(next) => replace({ ...view, filters: next, offset: 0 })}
                   naicsOptions={active?.naics ?? []}
                 />
               </Stack>
@@ -145,7 +155,7 @@ export function IntelClient() {
                   total={awards.data.meta.total}
                   limit={awards.data.meta.limit}
                   offset={awards.data.meta.offset}
-                  onPage={setOffset}
+                  onPage={(next) => replace({ ...view, offset: next })}
                 />
               ) : awards.error ? (
                 <Alert tone="danger">{awards.error}</Alert>

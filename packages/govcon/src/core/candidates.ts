@@ -7,7 +7,7 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** The store-side filters a lead request may add on top of the profile's gates. */
 export type LeadFilters = Pick<
   ListLeadsQuery,
-  'naics' | 'setAside' | 'noticeType' | 'agency' | 'q' | 'deadlineWithinDays'
+  'naics' | 'setAside' | 'noticeTypes' | 'agency' | 'q' | 'deadlineWithinDays'
 >;
 
 /**
@@ -36,7 +36,7 @@ export function candidateFilterOf(
     naicsPrefix: filters.naics ?? null,
     naicsCodes: null,
     setAsideCode: filters.setAside ?? null,
-    noticeType: filters.noticeType ?? null,
+    noticeTypes: filters.noticeTypes ?? null,
     agencyContains: filters.agency ?? null,
     textContains: filters.q ?? null,
     limit: MAX_CANDIDATES,

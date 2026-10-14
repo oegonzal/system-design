@@ -4,12 +4,15 @@ import { describe, expect, it } from 'vitest';
 import {
   defaultView,
   parseSpendingView,
-  sameView,
   SPENDING_ROUTE,
   spendingHref,
+  type SpendingView,
 } from './spending-link';
 
 const PROFILE_NAICS = ['332710', '541511'];
+/** Two views are one when they spell the same address: that is all the page compares before it replaces the URL. */
+const sameAddress = (a: SpendingView, b: SpendingView): boolean =>
+  spendingHref(a, PROFILE_NAICS) === spendingHref(b, PROFILE_NAICS);
 const params = (query: string) => new URLSearchParams(query);
 
 describe('the spending view in its address', () => {
@@ -76,10 +79,10 @@ describe('the spending view in its address', () => {
     expect(
       parseSpendingView(new URL(href, 'http://localhost').searchParams, PROFILE_NAICS),
     ).toEqual(view);
-    expect(
-      sameView(view, { ...view, scope: { ...view.scope, facets: { ...facets } } }, PROFILE_NAICS),
-    ).toBe(true);
-    expect(sameView(view, base, PROFILE_NAICS)).toBe(false);
+    expect(sameAddress(view, { ...view, scope: { ...view.scope, facets: { ...facets } } })).toBe(
+      true,
+    );
+    expect(sameAddress(view, base)).toBe(false);
 
     // Pinned: the same view whatever the profile comes to name.
     const pinned = spendingHref(base, PROFILE_NAICS, true);
@@ -116,9 +119,9 @@ describe('the spending view in its address', () => {
         PROFILE_NAICS,
       ),
     ).toBe('/spending?psc=da&psc=7030&window=fytd');
-    expect(
-      sameView(base, { ...base, scope: { ...base.scope, naics: '332710,541511' } }, PROFILE_NAICS),
-    ).toBe(true);
-    expect(sameView(base, view, PROFILE_NAICS)).toBe(false);
+    expect(sameAddress(base, { ...base, scope: { ...base.scope, naics: '332710,541511' } })).toBe(
+      true,
+    );
+    expect(sameAddress(base, view)).toBe(false);
   });
 });

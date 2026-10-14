@@ -124,7 +124,7 @@ describe('the opportunity repository in Postgres', () => {
       naicsPrefix: null,
       naicsCodes: null,
       setAsideCode: null,
-      noticeType: null,
+      noticeTypes: null,
       agencyContains: null,
       textContains: null,
       limit: 100,
@@ -150,7 +150,14 @@ describe('the opportunity repository in Postgres', () => {
     expect(await ids({ naicsCodes: ['541511', '999999'] })).toEqual(['unknown']);
     expect(await ids({ naicsCodes: [] })).toEqual([]);
     expect(await ids({ setAsideCode: 'SBA' })).toEqual(['open']);
-    expect(await ids({ noticeType: 'Solicitation' })).toEqual(['unknown', 'open']);
+    expect(await ids({ noticeTypes: ['Solicitation'] })).toEqual(['unknown', 'open']);
+    // Any of the types named; the profile's exclusion still stands; none named matches nothing.
+    expect(
+      await ids({ noticeTypes: ['Award Notice', 'Solicitation'], excludeNoticeTypes: [] }),
+    ).toEqual(['awarded', 'unknown', 'open']);
+    expect(await ids({ noticeTypes: ['Award Notice'] })).toEqual([]);
+    expect(await ids({ noticeTypes: ['Presolicitation'] })).toEqual([]);
+    expect(await ids({ noticeTypes: [] })).toEqual([]);
     expect(await ids({ agencyContains: 'dla aviation' })).toEqual(['unknown', 'open']);
     expect(await ids({ textContains: 'SOFTWARE' })).toEqual(['unknown']);
     expect(await ids({ textContains: 'SPE4A7-26' })).toEqual(['unknown', 'open']);

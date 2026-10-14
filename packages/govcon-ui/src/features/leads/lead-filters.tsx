@@ -1,4 +1,5 @@
 import {
+  EARLY_NOTICE_TYPES,
   LEAD_TIERS,
   MAX_LEAD_LIMIT,
   NOTICE_TYPES,
@@ -6,16 +7,19 @@ import {
   type LeadTier,
   type ListLeadsQuery,
 } from '@sysdesign/contracts';
-import { Button, SelectField, Stack, Text, TextField } from '@sysdesign/design-system';
+import { Button, ChipGroup, SelectField, Stack, Text, TextField } from '@sysdesign/design-system';
 
-/** Everything the store can be asked for, as the form holds it: empty text means "any". */
+import { useSettledDraft } from '../use-settled-draft';
+
+/** Everything the store can be asked for, as the form holds it: empty text and no notice type mean "any". */
 export interface LeadFilters {
   minScore: number;
   tier: LeadTier | null;
   /** A NAICS code or family the primary code starts with. */
   naics: string;
   setAside: string;
-  noticeType: string;
+  /** Any of these notice types, by SAM.gov's label; none is every type. */
+  noticeTypes: readonly string[];
   agency: string;
   q: string;
   deadlineWithinDays: number | null;
@@ -27,20 +31,23 @@ export const DEFAULT_LEAD_FILTERS: LeadFilters = {
   tier: null,
   naics: '',
   setAside: '',
-  noticeType: '',
+  noticeTypes: [],
   agency: '',
   q: '',
   deadlineWithinDays: null,
   limit: 25,
 };
 
-const clampScore = (value: number): number =>
+/** How long typing or a run of presses pauses before the filters are handed on as one change. */
+export const FILTERS_SETTLE_MS = 400;
+
+export const clampScore = (value: number): number =>
   Number.isFinite(value) ? Math.min(100, Math.max(0, Math.round(value))) : 0;
-const clampLimit = (value: number): number =>
+export const clampLimit = (value: number): number =>
   Number.isFinite(value)
     ? Math.min(MAX_LEAD_LIMIT, Math.max(1, Math.round(value)))
     : DEFAULT_LEAD_FILTERS.limit;
-const clampDays = (value: number): number | null =>
+export const clampDays = (value: number): number | null =>
   Number.isFinite(value) ? Math.max(0, Math.round(value)) : null;
 
 const text = (value: string): string | undefined =>
@@ -58,7 +65,7 @@ export function toLeadsQuery(
     tier: filters.tier ?? undefined,
     naics: text(filters.naics),
     setAside: text(filters.setAside),
-    noticeType: text(filters.noticeType),
+    noticeTypes: filters.noticeTypes.length > 0 ? [...filters.noticeTypes] : undefined,
     agency: text(filters.agency),
     q: text(filters.q),
     deadlineWithinDays: filters.deadlineWithinDays ?? undefined,
@@ -67,9 +74,14 @@ export function toLeadsQuery(
   };
 }
 
-/** The labels SAM.gov gives notice types — what the store matches `noticeType` against. */
-const NOTICE_TYPE_LABELS = Object.values(NOTICE_TYPES);
+/** The labels SAM.gov gives notice types — what the store matches against. */
+export const NOTICE_TYPE_LABELS: readonly string[] = Object.values(NOTICE_TYPES);
 const NO_CHOICES: readonly string[] = [];
+
+const sameSet = (a: readonly string[], b: readonly string[]): boolean =>
+  a.length === b.length && a.every((item) => b.includes(item));
+const toggled = (set: readonly string[], item: string): string[] =>
+  set.includes(item) ? set.filter((candidate) => candidate !== item) : [...set, item];
 
 export interface LeadFiltersProps {
   value: LeadFilters;
@@ -81,9 +93,11 @@ export interface LeadFiltersProps {
 
 /**
  * What the store is asked for: the profile's codes as chips, the codes and
- * words a notice must carry, a floor on the score, a tier, a deadline
- * horizon, a cap on the rows. Every field maps to one query parameter of
- * `GET /leads`; nothing here spends a request.
+ * words a notice must carry, the notice types it may be, a floor on the
+ * score, a tier, a deadline horizon, a cap on the rows. Every field maps to
+ * one query parameter of `GET /leads`; nothing here spends a request. Typed
+ * text and runs of chip presses are handed on once they pause, so composing
+ * a filter is one change; a select is handed on at once.
  */
 export function LeadFiltersControls({
   value,
@@ -91,8 +105,12 @@ export function LeadFiltersControls({
   naicsChoices = NO_CHOICES,
   disabled = false,
 }: LeadFiltersProps) {
-  const set = <K extends keyof LeadFilters>(key: K, next: LeadFilters[K]) =>
-    onChange({ ...value, [key]: next });
+  const { shown, settleLater, commit, settleNow } = useSettledDraft(
+    value,
+    onChange,
+    FILTERS_SETTLE_MS,
+  );
+  const early = sameSet(shown.noticeTypes, EARLY_NOTICE_TYPES);
   return (
     <Stack gap={3}>
       {naicsChoices.length > 0 ? (
@@ -105,27 +123,48 @@ export function LeadFiltersControls({
               key={code}
               size="sm"
               variant="subtle"
-              selected={value.naics === code}
+              selected={shown.naics === code}
               disabled={disabled}
-              onClick={() => set('naics', value.naics === code ? '' : code)}
+              onClick={() => commit({ naics: shown.naics === code ? '' : code })}
             >
               {code}
             </Button>
           ))}
         </Stack>
       ) : null}
+      <Stack direction="row" gap={3} align="center" wrap>
+        <ChipGroup
+          label="Notice types"
+          showLabel
+          options={NOTICE_TYPE_LABELS.map((label) => ({ id: label, label }))}
+          value={[...shown.noticeTypes]}
+          disabled={disabled}
+          onToggle={(label) => settleLater({ noticeTypes: toggled(shown.noticeTypes, label) })}
+        />
+        <Button
+          size="sm"
+          variant="subtle"
+          selected={early}
+          disabled={disabled}
+          title="Sources sought and presolicitations: what a buyer posts before it solicits"
+          onClick={() => commit({ noticeTypes: early ? [] : [...EARLY_NOTICE_TYPES] })}
+        >
+          Early notices
+        </Button>
+      </Stack>
       <Stack direction="row" gap={4} align="end" wrap>
         <TextField
           label="NAICS code or family"
-          value={value.naics}
+          value={shown.naics}
           disabled={disabled}
-          onChange={(event) => set('naics', event.target.value)}
+          onChange={(event) => settleLater({ naics: event.target.value })}
+          onBlur={settleNow}
         />
         <SelectField
           label="Set-aside"
-          value={value.setAside}
+          value={shown.setAside}
           disabled={disabled}
-          onChange={(event) => set('setAside', event.target.value)}
+          onChange={(event) => commit({ setAside: event.target.value })}
         >
           <option value="">any</option>
           {SET_ASIDE_CODES.map((code) => (
@@ -134,30 +173,19 @@ export function LeadFiltersControls({
             </option>
           ))}
         </SelectField>
-        <SelectField
-          label="Notice type"
-          value={value.noticeType}
-          disabled={disabled}
-          onChange={(event) => set('noticeType', event.target.value)}
-        >
-          <option value="">any</option>
-          {NOTICE_TYPE_LABELS.map((label) => (
-            <option key={label} value={label}>
-              {label}
-            </option>
-          ))}
-        </SelectField>
         <TextField
           label="Agency contains"
-          value={value.agency}
+          value={shown.agency}
           disabled={disabled}
-          onChange={(event) => set('agency', event.target.value)}
+          onChange={(event) => settleLater({ agency: event.target.value })}
+          onBlur={settleNow}
         />
         <TextField
           label="Title or solicitation contains"
-          value={value.q}
+          value={shown.q}
           disabled={disabled}
-          onChange={(event) => set('q', event.target.value)}
+          onChange={(event) => settleLater({ q: event.target.value })}
+          onBlur={settleNow}
         />
       </Stack>
       <Stack direction="row" gap={4} align="end" wrap>
@@ -166,16 +194,17 @@ export function LeadFiltersControls({
           type="number"
           min={0}
           max={100}
-          value={value.minScore}
+          value={shown.minScore}
           disabled={disabled}
-          onChange={(event) => set('minScore', clampScore(event.target.valueAsNumber))}
+          onChange={(event) => settleLater({ minScore: clampScore(event.target.valueAsNumber) })}
+          onBlur={settleNow}
         />
         <SelectField
           label="Tier"
-          value={value.tier ?? 'any'}
+          value={shown.tier ?? 'any'}
           disabled={disabled}
           onChange={(event) =>
-            set('tier', event.target.value === 'any' ? null : (event.target.value as LeadTier))
+            commit({ tier: event.target.value === 'any' ? null : (event.target.value as LeadTier) })
           }
         >
           <option value="any">any</option>
@@ -189,18 +218,22 @@ export function LeadFiltersControls({
           label="Deadline within days"
           type="number"
           min={0}
-          value={value.deadlineWithinDays ?? ''}
+          value={shown.deadlineWithinDays ?? ''}
           disabled={disabled}
-          onChange={(event) => set('deadlineWithinDays', clampDays(event.target.valueAsNumber))}
+          onChange={(event) =>
+            settleLater({ deadlineWithinDays: clampDays(event.target.valueAsNumber) })
+          }
+          onBlur={settleNow}
         />
         <TextField
           label="Show up to"
           type="number"
           min={1}
           max={MAX_LEAD_LIMIT}
-          value={value.limit}
+          value={shown.limit}
           disabled={disabled}
-          onChange={(event) => set('limit', clampLimit(event.target.valueAsNumber))}
+          onChange={(event) => settleLater({ limit: clampLimit(event.target.valueAsNumber) })}
+          onBlur={settleNow}
         />
       </Stack>
     </Stack>

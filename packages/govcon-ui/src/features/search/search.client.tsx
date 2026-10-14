@@ -21,51 +21,52 @@ import {
   Tabs,
   Text,
 } from '@sysdesign/design-system';
-import { useAction, useDebouncedValue, useResource } from '@sysdesign/web-kit';
+import { useAction, useResource } from '@sysdesign/web-kit';
 import { useState } from 'react';
 
 import { api } from '../../api/client';
 import { useProfile } from '../../providers/profile-context';
 import { sourceDisabledReason } from '../source/source-availability';
-import {
-  DEFAULT_LEAD_FILTERS,
-  LeadFiltersControls,
-  toLeadsQuery,
-  type LeadFilters,
-} from '../leads/lead-filters';
+import { LeadFiltersControls, toLeadsQuery } from '../leads/lead-filters';
 import { LeadTable } from '../leads/lead-table';
 import { PullReport } from '../pull/pull-report';
+import { useAddressView } from '../use-address-view';
+import { SavedViews } from '../views/saved-views.client';
 import { Pager } from './pager';
 import { SavedSearchList } from './saved-search-list';
 import { cleanFilter, SearchFilterForm } from './search-filter-form';
-
-const DEBOUNCE_MS = 300;
-
-type SearchTab = 'store' | 'samgov';
+import {
+  parseSearchView,
+  SEARCH_ROUTE,
+  SEARCH_TABS,
+  searchHref,
+  type SearchTab,
+} from './search-link';
 
 /**
  * Two ways to find a notice. The **Store** tab ranks what is already stored
- * over the filters the service accepts — free, as often as you like. The
- * **SAM.gov** tab is the request side: a filter run now (one request per
- * page), saved under a name, and the profile's saved searches — which of
- * them the daily pull runs, in what order, and a run or an edit of each.
- * Every read is one resource; every write says what it spends.
+ * over the filters the service accepts — free, as often as you like — and
+ * is its address: the filters and the page travel in the URL, so a ranking
+ * can be linked to and kept by name. The **SAM.gov** tab is the request
+ * side: a filter run now (one request per page), saved under a name, and
+ * the profile's saved searches — which of them the daily pull runs, in what
+ * order, and a run or an edit of each. Every read is one resource; every
+ * write says what it spends.
  */
 export function SearchClient() {
   const { active } = useProfile();
   const profileId = active?.id;
-  const [tab, setTab] = useState<SearchTab>('store');
+  const { view, replace } = useAddressView(parseSearchView, searchHref);
+  const { tab, filters, offset } = view;
 
   // Store.
-  const [filters, setFilters] = useState<LeadFilters>(DEFAULT_LEAD_FILTERS);
-  const [offset, setOffset] = useState(0);
-  const debounced = useDebouncedValue(filters, DEBOUNCE_MS);
+  const filtersKey = JSON.stringify(filters);
   const leads = useResource(
     (signal) =>
       profileId === undefined
         ? Promise.resolve(null)
-        : api.listLeads(toLeadsQuery(debounced, profileId, offset), { signal }),
-    [profileId, debounced, offset],
+        : api.listLeads(toLeadsQuery(filters, profileId, offset), { signal }),
+    [profileId, filtersKey, offset],
   );
 
   // SAM.gov.
@@ -177,10 +178,13 @@ export function SearchClient() {
   return (
     <Stack gap={5}>
       <Heading level={1}>Search</Heading>
-      <Tabs value={tab} onChange={(next) => setTab(next as SearchTab)}>
+      <Tabs value={tab} onChange={(next) => replace({ ...view, tab: next as SearchTab })}>
         <TabList aria-label="Where to search">
-          <Tab value="store">Store (free)</Tab>
-          <Tab value="samgov">SAM.gov (spends requests)</Tab>
+          {SEARCH_TABS.map(({ id, label }) => (
+            <Tab key={id} value={id}>
+              {label}
+            </Tab>
+          ))}
         </TabList>
 
         <TabPanel value="store">
@@ -191,13 +195,17 @@ export function SearchClient() {
                 store matches a NAICS code by family (33 finds 332710); SAM.gov&apos;s own search
                 matches it exactly.
               </Text>
+              {profileId === undefined ? null : (
+                <SavedViews
+                  profileId={profileId}
+                  route={SEARCH_ROUTE}
+                  currentHref={searchHref(view)}
+                />
+              )}
               <LeadFiltersControls
                 value={filters}
                 naicsChoices={active?.naics ?? []}
-                onChange={(next) => {
-                  setFilters(next);
-                  setOffset(0);
-                }}
+                onChange={(next) => replace({ ...view, filters: next, offset: 0 })}
               />
               {leads.data ? (
                 <>
@@ -206,7 +214,7 @@ export function SearchClient() {
                     offset={leads.data.offset}
                     limit={leads.data.limit}
                     total={leads.data.matching}
-                    onChange={setOffset}
+                    onChange={(next) => replace({ ...view, offset: next })}
                     disabled={leads.loading}
                   />
                 </>

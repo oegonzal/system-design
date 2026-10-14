@@ -246,6 +246,18 @@ describe('the govcon HTTP surface', () => {
     expect(software.data.leads.map((lead) => lead.opportunity.noticeId)).toEqual(['c']);
     expect((await fetch(`${url}/leads?profile=tiny&naics=x`)).status).toBe(400);
 
+    // Any of several notice types at once, comma-joined or repeated; one the store holds none of finds nothing.
+    const ids = async (query: string) =>
+      (await get<Envelope<LeadsReport>>(url, `/leads?profile=tiny&${query}`)).data.leads.map(
+        (lead) => lead.opportunity.noticeId,
+      );
+    expect(await ids('noticeTypes=Solicitation')).toEqual(['a', 'c']);
+    expect(await ids('noticeTypes=Sources%20Sought,Solicitation')).toEqual(['a', 'c']);
+    expect(await ids('noticeTypes=Sources%20Sought&noticeTypes=Solicitation')).toEqual(['a', 'c']);
+    expect(await ids('noticeTypes=Sources%20Sought,Presolicitation')).toEqual([]);
+    expect((await fetch(`${url}/leads?profile=tiny&noticeTypes=`)).status).toBe(400);
+    expect((await fetch(`${url}/leads?profile=tiny&noticeType=Solicitation`)).status).toBe(400);
+
     const one = await get<Envelope<LeadsReport>>(url, '/leads?profile=tiny&tier=high&limit=1');
     expect(one.data.leads).toHaveLength(1);
     expect(one.data.leads[0]?.tier).toBe('high');

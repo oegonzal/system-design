@@ -28,12 +28,19 @@ export const Narrowed: Story = {
       naics: '332710',
       tier: 'high',
       setAside: 'SBA',
-      noticeType: 'Solicitation',
+      noticeTypes: ['Solicitation'],
       agency: 'DLA',
       q: 'bracket',
       deadlineWithinDays: 30,
       limit: 10,
     },
+  },
+};
+
+/** The two types a buyer posts before it solicits, as the preset presses them. */
+export const EarlyNotices: Story = {
+  args: {
+    value: { ...DEFAULT_LEAD_FILTERS, noticeTypes: ['Sources Sought', 'Presolicitation'] },
   },
 };
 

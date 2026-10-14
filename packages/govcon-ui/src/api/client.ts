@@ -205,8 +205,16 @@ export const api = {
   async startPull(body: StartPullRequest): Promise<PullReport> {
     return unwrap(await request<StartPullResponse>('/pulls', { method: 'POST', body }));
   },
-  async listLeads(query: ListLeadsQuery = {}, opts: GetOptions = {}): Promise<LeadsReport> {
-    return unwrap(await request<ListLeadsResponse>(`/leads${toQueryString({ ...query })}`, opts));
+  async listLeads(
+    { noticeTypes, ...query }: ListLeadsQuery = {},
+    opts: GetOptions = {},
+  ): Promise<LeadsReport> {
+    return unwrap(
+      await request<ListLeadsResponse>(
+        `/leads${toQueryString({ ...query, noticeTypes: joined(noticeTypes) })}`,
+        opts,
+      ),
+    );
   },
 
   // One notice.

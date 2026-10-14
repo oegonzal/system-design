@@ -2,6 +2,8 @@ import type * as WebTesting from '@sysdesign/web-testing';
 import {
   renderWithTheme,
   resetNavigationMock,
+  routerMock,
+  setMockSearchParams,
   stubApi,
   type StubRoute,
 } from '@sysdesign/web-testing';
@@ -9,6 +11,7 @@ import { fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ProfileProvider } from '../../providers/profile-context';
+import { followAddress } from '../../testing/address';
 import { AWARDS, AWARDS_SUMMARY, ENTITY, OWN_ENTITY, PROFILE } from '../../testing/fixtures';
 import { LOOKUP } from './entity-table.stories';
 import { FETCH_REPORT } from './fetch-awards-form.stories';
@@ -25,25 +28,26 @@ const baseRoutes = (): StubRoute[] => [
   { path: '/awards', body: { data: AWARDS, meta } },
   { path: '/awards/summary', body: { data: AWARDS_SUMMARY } },
   { path: '/entities/own', body: { data: OWN_ENTITY } },
+  { path: '/profiles/enfav/views', body: { data: [] } },
 ];
 
-const mount = () =>
-  renderWithTheme(
-    <ProfileProvider>
-      <IntelClient />
-    </ProfileProvider>,
-  );
+const page = () => (
+  <ProfileProvider>
+    <IntelClient />
+  </ProfileProvider>
+);
+const mount = () => renderWithTheme(page());
 
 beforeEach(() => resetNavigationMock());
 afterEach(() => vi.unstubAllGlobals());
 
 describe('IntelClient', () => {
-  it('[GOVU-9] lists and summarizes the stored awards over the filters, then fetches from the chosen sources and reads the store again', async () => {
+  it('[GOVU-9] [GOVU-23] lists and summarizes the stored awards over the filters the address names, a filter replacing the address, then fetches from the chosen sources and reads the store again', async () => {
     const { calls, fetchMock } = stubApi([
       ...baseRoutes(),
       { method: 'POST', path: '/awards/fetch', body: { data: FETCH_REPORT } },
     ]);
-    mount();
+    const view = mount();
     await screen.findByRole('table', { name: 'Awards' });
     expect(screen.getByText('$156,000')).toBeTruthy();
     expect(calls.map((call) => call.url)).toEqual(
@@ -51,6 +55,8 @@ describe('IntelClient', () => {
     );
 
     fireEvent.click(screen.getByRole('button', { name: '332710' }));
+    expect(followAddress()).toBe('/intel?naics=332710');
+    view.rerender(page());
     await waitFor(() => {
       expect(calls.map((call) => call.url)).toContain('/awards?naics=332710&limit=50&offset=0');
       expect(calls.map((call) => call.url)).toContain('/awards/summary?naics=332710');
@@ -80,9 +86,15 @@ describe('IntelClient', () => {
       ...baseRoutes(),
       { method: 'POST', path: '/entities/lookup', body: { data: LOOKUP } },
     ]);
-    mount();
+    const view = mount();
     await screen.findByRole('table', { name: 'Awards' });
     fireEvent.click(screen.getByRole('button', { name: 'Look up (1 request)' }));
+    // The lookup lands on the other side, which the page asks its address for.
+    await waitFor(() =>
+      expect(routerMock.replace).toHaveBeenLastCalledWith('/intel?tab=entities', { scroll: false }),
+    );
+    followAddress();
+    view.rerender(page());
     const registrants = await screen.findByRole('table', { name: 'Registrants' });
     expect(within(registrants).getByText('excluded')).toBeTruthy();
     const looked = fetchMock.mock.calls.find((call) =>
@@ -116,5 +128,38 @@ describe('IntelClient', () => {
     mount();
     expect((await screen.findByRole('alert')).textContent).toBe('the store is down');
     expect(await screen.findByText('$156,000')).toBeTruthy();
+  });
+
+  it('[GOVU-23] opens on the side, the filters and the page its address names, and keeps the reading by name as that address', async () => {
+    const { calls, fetchMock } = stubApi([
+      ...baseRoutes().filter((route) => route.path !== '/profiles/enfav/views'),
+      { path: '/profiles/enfav/views', body: { data: [] } },
+      { method: 'PUT', path: '/profiles/enfav/views', body: { data: { id: 'v-1' } } },
+    ]);
+    setMockSearchParams('naics=5415&source=usaspending&offset=50');
+    mount();
+    await screen.findByRole('table', { name: 'Awards' });
+    expect(calls.map((call) => call.url)).toEqual(
+      expect.arrayContaining([
+        '/awards?naics=5415&source=usaspending&limit=50&offset=50',
+        '/awards/summary?naics=5415&source=usaspending',
+      ]),
+    );
+    expect((screen.getByLabelText('Source') as HTMLSelectElement).value).toBe('usaspending');
+
+    fireEvent.change(await screen.findByLabelText('Save this view as'), {
+      target: { value: 'Software awards' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save view' }));
+    await waitFor(() =>
+      expect(calls.map((call) => `${call.method} ${call.url}`)).toContain(
+        'PUT /profiles/enfav/views',
+      ),
+    );
+    const put = fetchMock.mock.calls.find((call) => (call[1] as RequestInit).method === 'PUT');
+    expect(JSON.parse(String((put?.[1] as RequestInit).body))).toEqual({
+      name: 'Software awards',
+      href: '/intel?naics=5415&source=usaspending&offset=50',
+    });
   });
 });

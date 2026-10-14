@@ -13,6 +13,7 @@ import {
 } from '@sysdesign/contracts';
 
 import { codesOf } from '../codes';
+import { choose, type AddressParams } from '../use-address-view';
 import type { ScopeDraft } from './scope';
 import { SPENDING_TABS, type SpendingTab } from './tabs';
 
@@ -51,20 +52,14 @@ export const defaultView = (profileNaics: readonly string[]): SpendingView => ({
   months: DEFAULT_HORIZON_MONTHS,
 });
 
-type Params = Pick<URLSearchParams, 'get' | 'getAll'>;
-
-/** One of the declared choices, or the fallback. */
-const choose = <T extends string | number>(
-  choices: readonly T[],
-  raw: string | null,
-  fallback: T,
-): T => choices.find((choice) => String(choice) === raw) ?? fallback;
-
 /** A code list parameter: absent is the fallback, one empty value is none, else the codes it names. */
 const codesParam = (values: readonly string[], fallback: string): string =>
   values.length === 0 ? fallback : codesOf(values.join(',')).join(', ');
 
-export function parseSpendingView(params: Params, profileNaics: readonly string[]): SpendingView {
+export function parseSpendingView(
+  params: AddressParams,
+  profileNaics: readonly string[],
+): SpendingView {
   const base = defaultView(profileNaics);
   return {
     scope: {
@@ -126,10 +121,3 @@ export function spendingHref(
   const query = search.toString();
   return query.length > 0 ? `${SPENDING_ROUTE}?${query}` : SPENDING_ROUTE;
 }
-
-/** Two views that spell the same address are the same view. */
-export const sameView = (
-  a: SpendingView,
-  b: SpendingView,
-  profileNaics: readonly string[],
-): boolean => spendingHref(a, profileNaics) === spendingHref(b, profileNaics);
