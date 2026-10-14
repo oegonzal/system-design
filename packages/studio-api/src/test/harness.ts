@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { Test } from '@nestjs/testing';
 import type { INestApplication } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
+import { afterAll, beforeAll, beforeEach } from 'vitest';
 import type { ExperienceProfileDto } from '@sysdesign/contracts';
 import {
   ensureDatabase,
@@ -37,7 +38,7 @@ export interface Harness {
  * request through the real HTTP stack — pipes, request-scoped MikroORM
  * context included.
  */
-export async function createHarness(): Promise<Harness> {
+async function createHarness(): Promise<Harness> {
   // The suite's database (the test database by default — vite.config.ts) is
   // created and migrated on first use, and any other is refused here, so
   // `nx test` never needs the dev database and can never truncate it.
@@ -63,6 +64,54 @@ export async function createHarness(): Promise<Harness> {
     close: () => app.close(),
   };
 }
+
+/**
+ * The harness for one spec file's suite: booted before its first test,
+ * emptied before each, closed after its last. Call it inside the file's
+ * `describe`. What it returns reads through to the booted harness at the
+ * moment of use, so helpers and tests written against `h.url` or `h.loop`
+ * work as they are; reading it before the suite boots is a mistake, and says so.
+ */
+export function useHarness(): Harness {
+  let booted: Harness | undefined;
+  const current = (): Harness => {
+    if (booted === undefined) {
+      throw new Error('the harness boots in beforeAll: read it from a hook or a test');
+    }
+    return booted;
+  };
+  beforeAll(async () => {
+    booted = await createHarness();
+  });
+  afterAll(async () => {
+    await booted?.close();
+  });
+  beforeEach(async () => {
+    await resetDesignData(current().em, current().loop);
+  });
+  return {
+    get app() {
+      return current().app;
+    },
+    get em() {
+      return current().em;
+    },
+    get loop() {
+      return current().loop;
+    },
+    get url() {
+      return current().url;
+    },
+    close: () => current().close(),
+  };
+}
+
+/** Two of the experiences the harness seeds, by the fixture's ids. */
+export const TICKETING_ID = 'e1000000-0000-4000-8000-000000000001';
+export const MEDIA_ID = 'e1000000-0000-4000-8000-000000000002';
+
+/** An id no row has: what a spec asks for when it expects a 404. */
+export const UNKNOWN_UUID = '11111111-1111-4111-8111-111111111111';
 
 /**
  * Self-sufficient: seed the experience fixture if this database never was.
@@ -94,10 +143,7 @@ async function ensureSeeded(em: EntityManager): Promise<void> {
  * story are truncated in their own right. The seeded experiences deliberately
  * survive, and the fake grader forgets.
  */
-export async function resetDesignData(
-  em: EntityManager,
-  loop?: FakeQualityLoopClient,
-): Promise<void> {
+async function resetDesignData(em: EntityManager, loop?: FakeQualityLoopClient): Promise<void> {
   await truncateTestTables(em, [Prompt, PromptGeneration, StarStory]);
   loop?.reset();
 }

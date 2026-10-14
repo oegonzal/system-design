@@ -1,24 +1,14 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import type {
   ApiErrorResponse,
   GetExperienceResponse,
   ListExperiencesResponse,
 } from '@sysdesign/contracts';
 
-import { call, createHarness, type Harness } from '../../test/harness';
-
-const TICKETING_ID = 'e1000000-0000-4000-8000-000000000001';
-const UNKNOWN_UUID = '11111111-1111-4111-8111-111111111111';
+import { call, TICKETING_ID, UNKNOWN_UUID, useHarness } from '../../test/harness';
 
 describe('experiences', () => {
-  let h: Harness;
-
-  beforeAll(async () => {
-    h = await createHarness();
-  });
-  afterAll(async () => {
-    await h.close();
-  });
+  const h = useHarness();
 
   describe('GET /api/experiences', () => {
     it('lists all 6 seeded experiences with meta', async () => {
