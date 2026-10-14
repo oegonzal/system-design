@@ -22,9 +22,9 @@ test.describe('the design narrative', () => {
     const rationale = 'The Database is the system of record for every order and its line items.';
     const narration = 'Client → Service → Database, newest first, with line items joined in.';
 
-    await canvas.setOverview(overview);
-    await canvas.explainComponent('n-3', rationale);
-    await canvas.narrateCriterion('c1', narration);
+    await canvas.narrative.setOverview(overview);
+    await canvas.narrative.explainComponent('n-3', rationale);
+    await canvas.narrative.narrateCriterion('c1', narration);
 
     // The editor says which components are still unexplained — the two
     // without a rationale — before the grader would.
@@ -33,15 +33,15 @@ test.describe('the design narrative', () => {
     await expect(page.getByTestId('narrative-unexplained')).not.toContainText('Database');
 
     await canvas.submit();
-    await canvas.expectEvaluationComplete(1);
+    await canvas.feedback.expectComplete(1);
 
     await page.reload();
     await canvas.ready();
-    await canvas.narrativeTab.click();
+    await canvas.narrative.tab.click();
 
-    await expect(canvas.narrativeOverview).toHaveValue(overview);
-    await expect(canvas.componentRationale('n-3')).toHaveValue(rationale);
-    await expect(canvas.criterionNarration('c1')).toHaveValue(narration);
-    await expect(canvas.componentRationale('n-2')).toHaveValue('');
+    await expect(canvas.narrative.overview).toHaveValue(overview);
+    await expect(canvas.narrative.rationale('n-3')).toHaveValue(rationale);
+    await expect(canvas.narrative.narration('c1')).toHaveValue(narration);
+    await expect(canvas.narrative.rationale('n-2')).toHaveValue('');
   });
 });

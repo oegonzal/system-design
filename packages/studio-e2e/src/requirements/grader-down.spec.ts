@@ -35,7 +35,7 @@ test.describe('the grader, unreachable', () => {
     await page.goto(`/practice/${session.id}`);
     const canvas = new CanvasPage(page);
     await canvas.ready();
-    await canvas.expectCoachDisabled(/cannot reach/);
+    await canvas.coach.expectDisabled(/cannot reach/);
 
     await buildNaiveDesign(canvas);
     await canvas.submit();
@@ -48,13 +48,13 @@ test.describe('the grader, unreachable', () => {
     await setGraderUnreachable(request, false);
     await page.reload();
     await canvas.ready();
-    await canvas.coachTab.click();
+    await canvas.coach.tab.click();
     await expect(page.getByTestId('improve-run')).toBeEnabled();
-    await expect(canvas.coachUnavailable).toHaveCount(0);
+    await expect(canvas.coach.unavailable).toHaveCount(0);
 
     await canvas.expectNodeCount(3);
     await canvas.submit();
-    await canvas.expectEvaluationComplete(1);
+    await canvas.feedback.expectComplete(1);
     expect(await listRevisions(request, session.id)).toHaveLength(1);
   });
 });

@@ -32,30 +32,33 @@ test.describe('the grading feedback', () => {
     await canvas.ready();
     await buildNaiveDesign(canvas);
     await canvas.submit();
-    await canvas.expectEvaluationComplete(1);
+    await canvas.feedback.expectComplete(1);
 
-    await canvas.expectOverall(NAIVE_DESIGN_SCORE);
-    await canvas.expectDecision('revise');
+    await canvas.feedback.expectOverall(NAIVE_DESIGN_SCORE);
+    await canvas.feedback.expectDecision('revise');
     // One judgement ends on its one iteration: that is a grade finishing,
     // not a stop worth telling, so nothing stands beside the decision.
     await expect(page.getByTestId('stop-reason')).toHaveCount(0);
 
     // One meter per dimension the pipeline declared, none "not assessed".
     for (const dimension of ['coverage', 'quality_attributes', 'compliance']) {
-      await canvas.expectDimensionScored(dimension);
+      await canvas.feedback.expectDimensionScored(dimension);
     }
-    await expect(canvas.dimensionMeter('coverage')).toHaveAttribute(
+    await expect(canvas.feedback.dimensionMeter('coverage')).toHaveAttribute(
       'aria-valuenow',
       String(NAIVE_DESIGN_SCORE),
     );
-    await expect(canvas.dimensionMeter('compliance')).toHaveAttribute('aria-valuenow', '100');
+    await expect(canvas.feedback.dimensionMeter('compliance')).toHaveAttribute(
+      'aria-valuenow',
+      '100',
+    );
 
     // A row per criterion of the prompt's rubric, reading as a statement.
-    await canvas.expectCriterionResult('c1', 'pass');
+    await canvas.feedback.expectCriterionResult('c1', 'pass');
     for (const criterionId of ['c2', 'c3', 'c4', 'c5']) {
-      await canvas.expectCriterionResult(criterionId, 'partial');
+      await canvas.feedback.expectCriterionResult(criterionId, 'partial');
     }
-    await expect(canvas.criterionResult('c1')).toContainText('past orders newest first');
+    await expect(canvas.feedback.criterionResult('c1')).toContainText('past orders newest first');
   });
 
   test('[EVAL-2] a finding names its places by label, carries its rationale, and highlights the node or edge it names when selected; the verdict carries its reason', async ({
@@ -65,10 +68,12 @@ test.describe('the grading feedback', () => {
     const { canvas } = await openPracticeSession(page, request);
     await buildNaiveDesign(canvas);
     await canvas.submit();
-    await canvas.expectEvaluationComplete(1);
+    await canvas.feedback.expectComplete(1);
 
     // The controller's own sentence, under the score.
-    await expect(canvas.decisionReason).toHaveText(`stub: 3 nodes → ${NAIVE_DESIGN_SCORE}`);
+    await expect(canvas.feedback.decisionReason).toHaveText(
+      `stub: 3 nodes → ${NAIVE_DESIGN_SCORE}`,
+    );
 
     // Grouped by severity, in urgency order.
     await expect(page.getByTestId('findings-group-high')).toBeVisible();
@@ -76,17 +81,17 @@ test.describe('the grading feedback', () => {
 
     // Every place a finding names is labelled from the graded revision — the
     // author's id, the kind, the label — with the loop's own ref as its title.
-    const failureLocations = canvas.findingLocations('unhandled_failure|node.3');
+    const failureLocations = canvas.feedback.findingLocations('unhandled_failure|node.3');
     await expect(failureLocations).toHaveText(['n-3 · database · Database']);
     await expect(failureLocations.first()).toHaveAttribute('title', 'node.3');
-    await expect(canvas.findingLocations('unbacked_claim|edge.1')).toHaveText([
+    await expect(canvas.feedback.findingLocations('unbacked_claim|edge.1')).toHaveText([
       'e-1 · n-1 → n-2 (sync)',
     ]);
 
     // The lens's own words, the criterion it cites, and every lens that
     // confirmed it — in words, the lens id kept as the chip's title; the type
     // is the finding's title, never a wire token.
-    const failure = canvas.finding('unhandled_failure|node.3');
+    const failure = canvas.feedback.finding('unhandled_failure|node.3');
     await expect(failure).toBeVisible();
     await expect(failure).toContainText('a restart drops the target');
     await expect(failure.getByTestId('finding-criterion')).toHaveText('c2');
@@ -104,15 +109,15 @@ test.describe('the grading feedback', () => {
     await expect(failure).not.toContainText('unhandled_failure');
 
     // `node.3` resolved by position to the author's own id: the database.
-    await canvas.clickFinding('unhandled_failure|node.3');
+    await canvas.feedback.clickFinding('unhandled_failure|node.3');
     await canvas.expectNodeHighlighted('n-3', 'high');
     await expect(canvas.node('n-2')).not.toHaveAttribute('data-severity', /.+/);
 
     // `edge.1` likewise: the client → service connection.
-    await canvas.clickFinding('unbacked_claim|edge.1');
+    await canvas.feedback.clickFinding('unbacked_claim|edge.1');
     await canvas.expectEdgeHighlighted('e-1', 'medium');
     await expect(
-      canvas.finding('unbacked_claim|edge.1').getByTestId('finding-explanation'),
+      canvas.feedback.finding('unbacked_claim|edge.1').getByTestId('finding-explanation'),
     ).toBeVisible();
   });
 
@@ -132,20 +137,20 @@ test.describe('the grading feedback', () => {
     const { canvas } = await openPracticeSession(page, request, prompt);
     await buildNaiveDesign(canvas);
     await canvas.submit();
-    await canvas.expectEvaluationFailed(1, 'the model went away');
+    await canvas.feedback.expectFailed(1, 'the model went away');
 
     // The way back is the same revision, graded again where it stands: a
     // fresh run of the stored design, and no second copy of it in the timeline.
-    await canvas.retryEvaluation();
-    await canvas.expectEvaluationComplete(1);
-    await canvas.expectOverall(NAIVE_DESIGN_SCORE);
+    await canvas.feedback.retry();
+    await canvas.feedback.expectComplete(1);
+    await canvas.feedback.expectOverall(NAIVE_DESIGN_SCORE);
 
-    await canvas.revisionsTab.click();
-    await expect(canvas.revisionChip(1).getByTestId('revision-score')).toHaveText(
+    await canvas.revisions.tab.click();
+    await expect(canvas.revisions.chip(1).getByTestId('revision-score')).toHaveText(
       String(NAIVE_DESIGN_SCORE),
     );
-    await expect(canvas.revisionChip(1)).not.toContainText('failed');
-    await expect(canvas.revisionChip(2)).toHaveCount(0);
+    await expect(canvas.revisions.chip(1)).not.toContainText('failed');
+    await expect(canvas.revisions.chip(2)).toHaveCount(0);
   });
 
   test('[UX-18] a grade the lenses could not settle is no verdict — no score, no escalation — the coach refuses it, and grading it again in place gives one', async ({
@@ -179,29 +184,32 @@ test.describe('the grading feedback', () => {
     const { canvas } = await openPracticeSession(page, request, prompt);
     await buildNaiveDesign(canvas);
     await canvas.submit();
-    await canvas.expectEvaluationUnscored(1);
-    await expect(canvas.unscoredGrade).toContainText('This revision couldn’t be graded');
-    await expect(canvas.unscoredGrade).toContainText('The lenses assessed 0 of 5 criteria');
-    await expect(canvas.criterionResult('c1')).toHaveAttribute('data-result', 'unassessed');
+    await canvas.feedback.expectUnscored(1);
+    await expect(canvas.feedback.unscored).toContainText('This revision couldn’t be graded');
+    await expect(canvas.feedback.unscored).toContainText('The lenses assessed 0 of 5 criteria');
+    await expect(canvas.feedback.criterionResult('c1')).toHaveAttribute(
+      'data-result',
+      'unassessed',
+    );
 
-    await canvas.revisionsTab.click();
-    await expect(canvas.revisionChip(1)).toContainText('not assessed');
-    await expect(canvas.revisionChip(1)).not.toContainText('escalate');
-    await expect(canvas.revisionChip(1).getByTestId('revision-score')).toHaveCount(0);
+    await canvas.revisions.tab.click();
+    await expect(canvas.revisions.chip(1)).toContainText('not assessed');
+    await expect(canvas.revisions.chip(1)).not.toContainText('escalate');
+    await expect(canvas.revisions.chip(1).getByTestId('revision-score')).toHaveCount(0);
 
     // No grade for the coach to measure its revisions against.
-    await canvas.coachTab.click();
+    await canvas.coach.tab.click();
     await expect(page.getByTestId('improve-run')).toBeDisabled();
-    await expect(canvas.coachUnavailable).toHaveText(describeUnassessedBase(1));
+    await expect(canvas.coach.unavailable).toHaveText(describeUnassessedBase(1));
 
     // The way back is the same one a failed grade has: the revision, graded again in place.
-    await canvas.retryEvaluation();
-    await canvas.expectEvaluationComplete(1);
-    await canvas.expectOverall(NAIVE_DESIGN_SCORE);
-    await canvas.revisionsTab.click();
-    await expect(canvas.revisionChip(1).getByTestId('revision-score')).toHaveText(
+    await canvas.feedback.retry();
+    await canvas.feedback.expectComplete(1);
+    await canvas.feedback.expectOverall(NAIVE_DESIGN_SCORE);
+    await canvas.revisions.tab.click();
+    await expect(canvas.revisions.chip(1).getByTestId('revision-score')).toHaveText(
       String(NAIVE_DESIGN_SCORE),
     );
-    await expect(canvas.revisionChip(2)).toHaveCount(0);
+    await expect(canvas.revisions.chip(2)).toHaveCount(0);
   });
 });

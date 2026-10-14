@@ -20,11 +20,11 @@ test.describe('an archived prompt', () => {
     await page.reload();
     await canvas.ready();
 
-    await canvas.promptTab.click();
-    await expect(canvas.promptArchivedBadge).toHaveText('Archived');
+    await canvas.prompt.tab.click();
+    await expect(canvas.prompt.archivedBadge).toHaveText('Archived');
     await buildNaiveDesign(canvas);
     await canvas.expectSubmitDisabled();
-    await canvas.expectCoachDisabled(/archived/);
+    await canvas.coach.expectDisabled(/archived/);
     expect(await listRevisions(request, sessionId)).toEqual([]);
     // Editing stays free: the sketch is saved as the session's draft meanwhile.
     await canvas.expectDraftStatus('saved');
@@ -32,12 +32,12 @@ test.describe('an archived prompt', () => {
     await reactivatePrompt(request, prompt.id);
     await page.reload();
     await canvas.ready();
-    await expect(canvas.promptArchivedBadge).toHaveCount(0);
+    await expect(canvas.prompt.archivedBadge).toHaveCount(0);
     // The sketch came back as the session's draft; it grades like any other.
     await canvas.expectNodeCount(3);
     await canvas.submit();
-    await canvas.expectEvaluationComplete(1);
-    await canvas.coachTab.click();
+    await canvas.feedback.expectComplete(1);
+    await canvas.coach.tab.click();
     await expect(page.getByTestId('improve-run')).toBeEnabled();
   });
 });

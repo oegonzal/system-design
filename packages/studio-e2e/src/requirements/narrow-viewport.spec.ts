@@ -35,18 +35,18 @@ test.describe('the workspace at a narrow width', () => {
 
     await buildNaiveDesign(canvas);
     await canvas.submit();
-    await canvas.expectEvaluationComplete(1);
+    await canvas.feedback.expectComplete(1);
 
     const results = page.getByTestId('criterion-results');
     await expect(results).toBeVisible();
     for (const criterionId of ['c1', 'c2', 'c3', 'c4', 'c5']) {
-      const box = await canvas.criterionResult(criterionId).boundingBox();
+      const box = await canvas.feedback.criterionResult(criterionId).boundingBox();
       expect(box?.width ?? Number.POSITIVE_INFINITY).toBeLessThanOrEqual(dockBox.width);
     }
     await expect(page.getByTestId('findings-list')).toBeVisible();
     expect(await noSidewaysScroll(page)).toBe(true);
 
-    await canvas.promptTab.click();
+    await canvas.prompt.tab.click();
     await expect(page.getByTestId('prompt-markdown')).toBeVisible();
     expect(await noSidewaysScroll(page)).toBe(true);
   });

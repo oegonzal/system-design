@@ -48,7 +48,7 @@ test.describe('the canvas toolbar at a laptop width', () => {
     expect(await rowsOf(toolbar)).toBe(1);
 
     await canvas.submit();
-    await canvas.expectEvaluationComplete(1);
+    await canvas.feedback.expectComplete(1);
     await canvas.addFromPalette('cache');
     await canvas.expectDraftStatus('saved');
     expect(await rowsOf(toolbar)).toBe(1);

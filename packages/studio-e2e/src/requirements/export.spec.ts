@@ -18,10 +18,10 @@ test.describe('exporting a run', () => {
     const { canvas } = await openPracticeSession(page, request);
     await buildNaiveDesign(canvas);
     await canvas.submit();
-    await canvas.expectEvaluationComplete(1);
+    await canvas.feedback.expectComplete(1);
     // The export reads the timeline, which refreshes its grade asynchronously
     // after the feedback lands — wait for the chip before bundling it.
-    await expect(canvas.revisionChip(1).getByTestId('revision-score')).toHaveText(
+    await expect(canvas.revisions.chip(1).getByTestId('revision-score')).toHaveText(
       String(NAIVE_DESIGN_SCORE),
     );
 
@@ -71,11 +71,11 @@ test.describe('exporting a run', () => {
     const { canvas } = await openPracticeSession(page, request);
     await buildNaiveDesign(canvas);
     await canvas.submit();
-    await canvas.expectEvaluationComplete(1);
+    await canvas.feedback.expectComplete(1);
 
     // One edit: the canvas is a draft now, while the feedback stays revision #1's.
     await canvas.addFromPalette('cache');
-    await expect(canvas.feedbackOffCanvas).toBeVisible();
+    await expect(canvas.feedback.offCanvas).toBeVisible();
 
     const { path, filename } = await canvas.exportRun();
     expect(filename).toMatch(/-draft\.zip$/);

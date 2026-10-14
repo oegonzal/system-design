@@ -31,66 +31,66 @@ test.describe('the AI coach', () => {
     const { canvas, sessionId } = await openPracticeSession(page, request);
     await buildNaiveDesign(canvas);
 
-    await canvas.startCoach(2);
+    await canvas.coach.start(2);
     await expect(page.getByTestId('improvement-panel')).toBeVisible();
 
     // The trajectory: the author's draft as the starting point, then the
     // coach's revision — each with the controller's reason.
-    await canvas.expectCoachStopped();
-    await canvas.expectCoachOutcome(1, 'base');
-    await expect(canvas.coachIteration(1)).toContainText(String(NAIVE_DESIGN_SCORE));
-    await expect(canvas.coachIteration(1)).toContainText('starting point');
-    await expect(canvas.coachIterationReason(1)).toContainText('3 nodes');
-    await canvas.expectCoachOutcome(2, 'imported');
-    await expect(canvas.coachIteration(2)).toContainText(String(NAIVE_DESIGN_PLUS_ONE_SCORE));
+    await canvas.coach.expectStopped();
+    await canvas.coach.expectOutcome(1, 'base');
+    await expect(canvas.coach.iteration(1)).toContainText(String(NAIVE_DESIGN_SCORE));
+    await expect(canvas.coach.iteration(1)).toContainText('starting point');
+    await expect(canvas.coach.iterationReason(1)).toContainText('3 nodes');
+    await canvas.coach.expectOutcome(2, 'imported');
+    await expect(canvas.coach.iteration(2)).toContainText(String(NAIVE_DESIGN_PLUS_ONE_SCORE));
     await expect(page.getByTestId('improvement-stopped')).toContainText('iteration budget');
 
     // The run is recorded on the session: a reload finds it and shows the same rows.
     expect(await coachingRuns(request, sessionId)).toHaveLength(1);
     await page.reload();
     await canvas.ready();
-    await canvas.coachTab.click();
-    await canvas.expectCoachOutcome(2, 'imported');
+    await canvas.coach.tab.click();
+    await canvas.coach.expectOutcome(2, 'imported');
     await expect(page.getByTestId('improvement-stopped')).toBeVisible();
 
     // The imported iteration is revision #2, badged as the coach's, and the
     // timeline's scores rise strictly.
-    await canvas.expectAssistantRevisionInTimeline(2);
-    await expect(canvas.revisionChip(1).getByText('AI', { exact: true })).toHaveCount(0);
-    await canvas.expectScoreTrendIncreasing();
+    await canvas.revisions.expectAssistantRevision(2);
+    await expect(canvas.revisions.chip(1).getByText('AI', { exact: true })).toHaveCount(0);
+    await canvas.revisions.expectScoreTrendIncreasing();
 
     // The improved design loads back onto the canvas read-only — Submit and
     // the editors locked — with the coach's replica drawn under its own `ai-` id.
-    await canvas.loadBestRevision();
+    await canvas.coach.loadBestRevision();
     await expect(canvas.node('ai-replica')).toHaveAttribute('data-kind', 'replica');
     await canvas.expectNodeCount(4);
     await expect(canvas.readOnlyBanner).toContainText('revision #2');
     await canvas.expectSubmitDisabled();
     // Three places, each naming its subject: the canvas and the feedback are
     // on the coach's revision, the toolbar still reports the author's own.
-    await expect(canvas.feedbackSubject).toContainText('revision #2');
-    await expect(canvas.feedbackOffCanvas).toHaveCount(0);
+    await expect(canvas.feedback.subject).toContainText('revision #2');
+    await expect(canvas.feedback.offCanvas).toHaveCount(0);
     await expect(canvas.submissionStatus(1)).toHaveAttribute('data-status', 'complete');
-    await canvas.revisionsTab.click();
-    await expect(canvas.revisionChip(2)).toHaveAttribute('aria-current', 'true');
-    await expect(canvas.revisionChip(1)).not.toHaveAttribute('aria-current');
-    await canvas.narrativeTab.click();
-    await expect(canvas.narrativeOverview).toBeDisabled();
-    await canvas.briefTab.click();
-    await expect(canvas.bindingClaim('c1')).toBeDisabled();
+    await canvas.revisions.tab.click();
+    await expect(canvas.revisions.chip(2)).toHaveAttribute('aria-current', 'true');
+    await expect(canvas.revisions.chip(1)).not.toHaveAttribute('aria-current');
+    await canvas.narrative.tab.click();
+    await expect(canvas.narrative.overview).toBeDisabled();
+    await canvas.brief.tab.click();
+    await expect(canvas.brief.claim('c1')).toBeDisabled();
 
     // Restored as a draft, the same design is the author's to edit and submit
     // again — and the canvas no longer shows a revision: no chip is current,
     // and the feedback says it is about #2, not about what is drawn now.
     await canvas.restoreAsDraft();
     await expect(page.getByTestId('submit-revision')).toBeEnabled();
-    await canvas.narrativeTab.click();
-    await expect(canvas.narrativeOverview).toBeEnabled();
-    await canvas.revisionsTab.click();
-    await expect(canvas.revisionChip(2)).not.toHaveAttribute('aria-current');
-    await expect(canvas.revisionChip(2)).toContainText('feedback shown');
-    await canvas.feedbackTab.click();
-    await expect(canvas.feedbackOffCanvas).toBeVisible();
+    await canvas.narrative.tab.click();
+    await expect(canvas.narrative.overview).toBeEnabled();
+    await canvas.revisions.tab.click();
+    await expect(canvas.revisions.chip(2)).not.toHaveAttribute('aria-current');
+    await expect(canvas.revisions.chip(2)).toContainText('feedback shown');
+    await canvas.feedback.tab.click();
+    await expect(canvas.feedback.offCanvas).toBeVisible();
   });
 
   test('[DEL-3] coaching a graded revision adopts its grade as the starting point: no second grade, no duplicate revision, one new AI revision', async ({
@@ -99,18 +99,18 @@ test.describe('the AI coach', () => {
   }) => {
     const { canvas, sessionId } = await openPracticeSession(page, request);
     await buildNaiveDesign(canvas);
-    await canvas.startCoach(2);
-    await canvas.expectCoachStopped();
-    await canvas.expectCoachOutcome(2, 'imported');
+    await canvas.coach.start(2);
+    await canvas.coach.expectStopped();
+    await canvas.coach.expectOutcome(2, 'imported');
     const [firstRun] = await coachingRuns(request, sessionId);
 
     // The coach's revision on screen, unedited and graded: the coach starts from it as it is.
-    await canvas.loadBestRevision();
-    await canvas.startCoach(2);
+    await canvas.coach.loadBestRevision();
+    await canvas.coach.start(2);
     // The first run's stopped line stays on screen until the second run is
     // recorded, so wait for the session to list it before reading either.
     await expect.poll(async () => (await coachingRuns(request, sessionId)).length).toBe(2);
-    await canvas.expectCoachStopped();
+    await canvas.coach.expectStopped();
 
     // The stub records every run of every test; this session's newest is the one to read.
     const [secondRun] = await coachingRuns(request, sessionId);
@@ -118,18 +118,18 @@ test.describe('the AI coach', () => {
     const adopting = startRequests.find((started) => started.runId === secondRun.runId);
     expect(adopting?.adopt).toEqual({ runId: firstRun.runId, iteration: 2 });
 
-    await canvas.expectCoachOutcome(1, 'base');
-    await expect(canvas.coachIteration(1)).toContainText(String(NAIVE_DESIGN_PLUS_ONE_SCORE));
-    await expect(canvas.coachIteration(1).getByTestId('improve-iteration-adopted')).toHaveText(
+    await canvas.coach.expectOutcome(1, 'base');
+    await expect(canvas.coach.iteration(1)).toContainText(String(NAIVE_DESIGN_PLUS_ONE_SCORE));
+    await expect(canvas.coach.iteration(1).getByTestId('improve-iteration-adopted')).toHaveText(
       'grade reused',
     );
-    await canvas.expectCoachOutcome(2, 'imported');
-    await expect(canvas.coachIteration(2)).toContainText(String(ACCEPTED_SCORE));
+    await canvas.coach.expectOutcome(2, 'imported');
+    await expect(canvas.coach.iteration(2)).toContainText(String(ACCEPTED_SCORE));
     await expect(page.getByTestId('improvement-stopped')).toContainText('accepts');
 
     // Two runs on the session, the newer based on revision #2; three
     // revisions in all — the adopted one was not stored again.
-    await canvas.expectAssistantRevisionInTimeline(3);
+    await canvas.revisions.expectAssistantRevision(3);
     const revisions = await listRevisions(request, sessionId);
     expect(revisions.map((revision) => [revision.revisionNumber, revision.origin])).toEqual([
       [3, 'assistant'],
@@ -150,19 +150,19 @@ test.describe('the AI coach', () => {
     const { canvas, sessionId } = await openPracticeSession(page, request);
     await buildNaiveDesign(canvas);
     await canvas.submit();
-    await canvas.expectEvaluationComplete(1);
+    await canvas.feedback.expectComplete(1);
 
-    await canvas.startCoach(2);
-    await canvas.expectCoachStopped();
-    await expect(canvas.coachRecallSummary).toHaveText(
+    await canvas.coach.start(2);
+    await canvas.coach.expectStopped();
+    await expect(canvas.coach.recallSummary).toHaveText(
       `Recalled ${FAKE_RECALLED_LESSONS.length} lessons from earlier runs for the coach`,
     );
-    await expect(canvas.recalledLessons.first()).toBeHidden();
-    await canvas.showRecalledLessons();
-    await expect(canvas.recalledLessons).toHaveCount(FAKE_RECALLED_LESSONS.length);
+    await expect(canvas.coach.recalledLessons.first()).toBeHidden();
+    await canvas.coach.showRecalledLessons();
+    await expect(canvas.coach.recalledLessons).toHaveCount(FAKE_RECALLED_LESSONS.length);
     for (const [index, lesson] of FAKE_RECALLED_LESSONS.entries()) {
-      await expect(canvas.recalledLessons.nth(index)).toContainText(lesson.insight);
-      await expect(canvas.recalledLessons.nth(index)).toContainText(lesson.serves);
+      await expect(canvas.coach.recalledLessons.nth(index)).toContainText(lesson.insight);
+      await expect(canvas.coach.recalledLessons.nth(index)).toContainText(lesson.serves);
     }
 
     // What the studio asked the grader: the coach run recalls, the author's grade does not.
@@ -200,19 +200,19 @@ test.describe('the AI coach', () => {
     const { canvas, sessionId } = await openPracticeSession(page, request, prompt);
     await buildNaiveDesign(canvas);
 
-    await canvas.startCoach(2);
-    await canvas.expectCoachStopped();
-    await canvas.expectCoachOutcome(2, 'imported');
+    await canvas.coach.start(2);
+    await canvas.coach.expectStopped();
+    await canvas.coach.expectOutcome(2, 'imported');
 
     // On the coach's revision every word is there, and each field says where it stands.
-    await canvas.loadBestRevision();
-    await canvas.briefTab.click();
-    await expect(canvas.bindingClaim('c1')).toHaveValue(overAsk);
-    await expect(canvas.bindingRow('c1')).toContainText(
+    await canvas.coach.loadBestRevision();
+    await canvas.brief.tab.click();
+    await expect(canvas.brief.claim('c1')).toHaveValue(overAsk);
+    await expect(canvas.brief.row('c1')).toContainText(
       `58 over the ${target} asked — ${ceiling} at most`,
     );
-    await expect(canvas.bindingClaim('c2')).toHaveValue(overCeiling);
-    await expect(canvas.bindingRow('c2')).toContainText(
+    await expect(canvas.brief.claim('c2')).toHaveValue(overCeiling);
+    await expect(canvas.brief.row('c2')).toContainText(
       `${pastCeiling} characters past the ${ceiling} accepted — shorten it to submit.`,
     );
 
@@ -224,9 +224,9 @@ test.describe('the AI coach', () => {
     expect(await claims()).toEqual([overAsk, overCeiling]);
     await page.reload();
     await canvas.ready();
-    await canvas.briefTab.click();
-    await expect(canvas.bindingClaim('c1')).toHaveValue(overAsk);
-    await expect(canvas.bindingClaim('c2')).toHaveValue(overCeiling);
+    await canvas.brief.tab.click();
+    await expect(canvas.brief.claim('c1')).toHaveValue(overAsk);
+    await expect(canvas.brief.claim('c2')).toHaveValue(overCeiling);
   });
 
   test('[UX-11] a coaching run that fails is reported failed, imports nothing, and its base revision shows failed', async ({
@@ -244,15 +244,15 @@ test.describe('the AI coach', () => {
     const { canvas, sessionId } = await openPracticeSession(page, request, prompt);
     await buildNaiveDesign(canvas);
 
-    await canvas.startCoach(2);
-    await expect(canvas.coachError).toContainText('the model went away', { timeout: 30_000 });
-    await expect(canvas.coachIteration(1)).toHaveCount(0);
+    await canvas.coach.start(2);
+    await expect(canvas.coach.error).toContainText('the model went away', { timeout: 30_000 });
+    await expect(canvas.coach.iteration(1)).toHaveCount(0);
 
     await expect
       .poll(async () => (await listRevisions(request, sessionId)).map((r) => r.evaluation?.status))
       .toEqual(['failed']);
     expect(await coachingRuns(request, sessionId)).toHaveLength(1);
-    await canvas.revisionsTab.click();
-    await expect(canvas.revisionChip(1)).toContainText('failed');
+    await canvas.revisions.tab.click();
+    await expect(canvas.revisions.chip(1)).toContainText('failed');
   });
 });

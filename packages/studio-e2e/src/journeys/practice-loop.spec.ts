@@ -52,13 +52,13 @@ test(
 
     await step(page, ' 4 — Submit revision #1 for grading', async () => {
       await canvas.submit();
-      await canvas.expectEvaluationComplete(1);
-      await canvas.expectOverall(NAIVE_DESIGN_SCORE);
-      await canvas.expectDecision('revise');
+      await canvas.feedback.expectComplete(1);
+      await canvas.feedback.expectOverall(NAIVE_DESIGN_SCORE);
+      await canvas.feedback.expectDecision('revise');
     });
 
     await step(page, ' 5 — The high finding highlights the fragile database', async () => {
-      await canvas.clickFinding(DATABASE_FINDING);
+      await canvas.feedback.clickFinding(DATABASE_FINDING);
       await canvas.expectNodeHighlighted('n-3', 'high');
     });
 
@@ -75,12 +75,12 @@ test(
 
     await step(page, ' 7 — Resubmit as revision #2', async () => {
       await canvas.submit();
-      await canvas.expectEvaluationComplete(2);
-      await canvas.expectOverall(NAIVE_DESIGN_PLUS_ONE_SCORE);
+      await canvas.feedback.expectComplete(2);
+      await canvas.feedback.expectOverall(NAIVE_DESIGN_PLUS_ONE_SCORE);
     });
 
     await step(page, ' 8 — The revision timeline shows a strictly rising score', async () => {
-      await canvas.expectScoreTrendIncreasing();
+      await canvas.revisions.expectScoreTrendIncreasing();
     });
   },
 );

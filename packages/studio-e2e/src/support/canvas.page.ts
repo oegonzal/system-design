@@ -1,23 +1,13 @@
 import { expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
-import type {
-  CriterionResult,
-  Decision,
-  EdgeKind,
-  ImproveIterationOutcome,
-  NodeKind,
-  OperationKind,
-  PromptDto,
-  Severity,
-} from '@sysdesign/contracts';
+import type { EdgeKind, NodeKind, OperationKind, PromptDto, Severity } from '@sysdesign/contracts';
 
 import { createPracticeSession } from './backend';
-
-/**
- * Submit → grade is normally under three seconds (the stub grader completes
- * a run in 400 ms and the UI polls every 1.2 s), but a cold Next.js dev
- * server or a busy parallel run deserves headroom.
- */
-const EVAL_TIMEOUT = 30_000;
+import { BriefPanel } from './brief.panel';
+import { CoachPanel } from './coach.panel';
+import { FeedbackPanel, submissionStatus } from './feedback.panel';
+import { NarrativePanel } from './narrative.panel';
+import { PromptPanel } from './prompt.panel';
+import { RevisionsPanel } from './revisions.panel';
 
 /** The draft autosaves 1.5 s after the last edit; the PUT itself is quick. */
 const DRAFT_TIMEOUT = 10_000;
@@ -31,14 +21,29 @@ const DRAFT_TIMEOUT = 10_000;
 const NODE_DRAG_MIME = 'application/sysdesign-node';
 
 /**
- * The practice workspace: palette, canvas, properties panel, toolbar and the
- * dock (prompt, brief, narrative, feedback, coach, revisions). Node and edge
- * ids are deterministic (`n-1`, `n-2`, … / `e-1`, … in creation order), so
- * specs can name what they just made; criterion ids come from the prompt's
- * rubric (`c1…cN`).
+ * The practice workspace: palette, canvas, properties panel and toolbar, and
+ * the dock as one page object per panel (prompt, brief, narrative, feedback,
+ * coach, revisions), each opening its own tab. Node and edge ids are
+ * deterministic (`n-1`, `n-2`, … / `e-1`, … in creation order), so specs can
+ * name what they just made; criterion ids come from the prompt's rubric
+ * (`c1…cN`).
  */
 export class CanvasPage {
-  constructor(readonly page: Page) {}
+  readonly prompt: PromptPanel;
+  readonly brief: BriefPanel;
+  readonly narrative: NarrativePanel;
+  readonly feedback: FeedbackPanel;
+  readonly coach: CoachPanel;
+  readonly revisions: RevisionsPanel;
+
+  constructor(readonly page: Page) {
+    this.prompt = new PromptPanel(page);
+    this.brief = new BriefPanel(page);
+    this.narrative = new NarrativePanel(page);
+    this.feedback = new FeedbackPanel(page);
+    this.coach = new CoachPanel(page);
+    this.revisions = new RevisionsPanel(page);
+  }
 
   get canvas(): Locator {
     return this.page.getByTestId('sd-canvas');
@@ -353,53 +358,9 @@ export class CanvasPage {
     await expect(this.readOnlyBanner).toHaveCount(0);
   }
 
-  /**
-   * The toolbar's badge for the author's latest submission (`submitted #n ·
-   * graded`): which revision, and where its grade stands. Addressed by the
-   * revision it names, so a spec waits for *that* submission's badge — and by
-   * its status as data, never by the words.
-   */
+  /** The toolbar's badge for the author's latest submission; see `submissionStatus`. */
   submissionStatus(revisionNumber: number): Locator {
-    return this.page.locator(
-      `[data-testid="submission-status"][data-revision="${revisionNumber}"]`,
-    );
-  }
-
-  /**
-   * The toolbar's badge for a run that failed, plus the feedback dock's
-   * explanation — the author's sentence, with the run's own error folded
-   * under it — and its grade-again control. The badge is the authoritative
-   * signal that *this* revision failed.
-   */
-  async expectEvaluationFailed(revisionNumber: number, message: string): Promise<void> {
-    await expect(this.submissionStatus(revisionNumber)).toHaveAttribute('data-status', 'failed', {
-      timeout: EVAL_TIMEOUT,
-    });
-    await this.feedbackTab.click();
-    await expect(this.page.getByTestId('evaluation-error')).toContainText(message, {
-      timeout: EVAL_TIMEOUT,
-    });
-  }
-
-  /**
-   * The toolbar's badge for a grade that earned no score — "not assessed" —
-   * and the feedback dock's word on it in place of a score: never a 0, never
-   * a decision that would read as a verdict.
-   */
-  async expectEvaluationUnscored(revisionNumber: number): Promise<void> {
-    await expect(this.submissionStatus(revisionNumber)).toHaveAttribute('data-status', 'unscored', {
-      timeout: EVAL_TIMEOUT,
-    });
-    await this.feedbackTab.click();
-    await expect(this.unscoredGrade).toBeVisible({ timeout: EVAL_TIMEOUT });
-    await expect(this.page.getByTestId('overall-score')).toHaveCount(0);
-    await expect(this.page.getByTestId('decision-badge')).toHaveCount(0);
-  }
-
-  /** The feedback dock's way back from a failed grade: the same revision, graded again in place. */
-  async retryEvaluation(): Promise<void> {
-    await this.feedbackTab.click();
-    await this.page.getByTestId('retry-evaluation').click();
+    return submissionStatus(this.page, revisionNumber);
   }
 
   /** One click, one download: the run as a zip, where it landed and what it is called. */
@@ -411,349 +372,6 @@ export class CanvasPage {
     const filename = download.suggestedFilename();
     expect(filename).toMatch(/\.zip$/);
     return { path: await download.path(), filename };
-  }
-
-  // --- the dock ------------------------------------------------------------
-
-  dockTab(name: 'Prompt' | 'Brief' | 'Narrative' | 'Feedback' | 'Coach' | 'Revisions'): Locator {
-    return this.page.getByRole('tab', { name });
-  }
-
-  get promptTab(): Locator {
-    return this.dockTab('Prompt');
-  }
-
-  /** The prompt pane's badge for a prompt that was archived under the session. */
-  get promptArchivedBadge(): Locator {
-    return this.page.getByTestId('prompt-archived');
-  }
-
-  get briefTab(): Locator {
-    return this.dockTab('Brief');
-  }
-
-  get narrativeTab(): Locator {
-    return this.dockTab('Narrative');
-  }
-
-  get feedbackTab(): Locator {
-    return this.dockTab('Feedback');
-  }
-
-  get coachTab(): Locator {
-    return this.dockTab('Coach');
-  }
-
-  get revisionsTab(): Locator {
-    return this.dockTab('Revisions');
-  }
-
-  // --- the design brief ----------------------------------------------------
-
-  bindingRow(criterionId: string): Locator {
-    return this.page.getByTestId(`binding-row-${criterionId}`);
-  }
-
-  bindingClaim(criterionId: string): Locator {
-    return this.page.getByTestId(`binding-claim-${criterionId}`);
-  }
-
-  bindingNode(criterionId: string, nodeId: string): Locator {
-    return this.page.getByTestId(`binding-node-${criterionId}-${nodeId}`);
-  }
-
-  /** The claim in the author's words — creates the binding on first use. */
-  async setBindingClaim(criterionId: string, claim: string): Promise<void> {
-    await this.briefTab.click();
-    await this.bindingClaim(criterionId).fill(claim);
-  }
-
-  /** Tick one of the components on the canvas as holding the criterion. */
-  async toggleBindingNode(criterionId: string, nodeId: string): Promise<void> {
-    await this.briefTab.click();
-    await this.bindingNode(criterionId, nodeId).click();
-  }
-
-  /** The row's chip: `empty` → `incomplete` → `bound` (claim + at least one component). */
-  async expectBindingState(
-    criterionId: string,
-    state: 'empty' | 'incomplete' | 'bound',
-  ): Promise<void> {
-    await expect(this.page.getByTestId(`binding-state-${criterionId}`)).toHaveAttribute(
-      'data-state',
-      state,
-    );
-  }
-
-  /** The tracer is folded away until a path exists; open it once per binding. */
-  async openFlowTracer(criterionId: string): Promise<void> {
-    await this.briefTab.click();
-    await this.page.getByTestId(`flow-open-${criterionId}`).click();
-  }
-
-  /**
-   * Trace a request by taking the offered hops in order.
-   *
-   * Note what this does NOT do: click edges on the canvas. The tracer offers
-   * only edges that continue the walk, as buttons in the dock — so a broken
-   * path is unrepresentable, and this sidesteps the bezier hit-target problem
-   * `selectEdge` has to work around.
-   */
-  async traceFlow(criterionId: string, edgeIds: readonly string[]): Promise<void> {
-    await this.briefTab.click();
-    for (const edgeId of edgeIds) {
-      await this.page.getByTestId(`flow-hop-${criterionId}-${edgeId}`).click();
-    }
-  }
-
-  async expectFlowTraced(criterionId: string, hops: number): Promise<void> {
-    await expect(this.page.getByTestId(`flow-status-${criterionId}`)).toContainText(
-      `Traced · ${hops} ${hops === 1 ? 'hop' : 'hops'}`,
-    );
-  }
-
-  // --- the design narrative ------------------------------------------------
-
-  get narrativeOverview(): Locator {
-    return this.page.getByTestId('narrative-overview');
-  }
-
-  componentRationale(nodeId: string): Locator {
-    return this.page.getByTestId(`narrative-rationale-${nodeId}`);
-  }
-
-  criterionNarration(criterionId: string): Locator {
-    return this.page.getByTestId(`narrative-narration-${criterionId}`);
-  }
-
-  /** The big-picture overview slot. No submit — the narrative rides the next revision. */
-  async setOverview(text: string): Promise<void> {
-    await this.narrativeTab.click();
-    await this.narrativeOverview.fill(text);
-  }
-
-  /** One component's rationale, keyed to its node id. */
-  async explainComponent(nodeId: string, prose: string): Promise<void> {
-    await this.narrativeTab.click();
-    await this.componentRationale(nodeId).fill(prose);
-  }
-
-  /** One criterion's narration, keyed to its id. */
-  async narrateCriterion(criterionId: string, prose: string): Promise<void> {
-    await this.narrativeTab.click();
-    await this.criterionNarration(criterionId).fill(prose);
-  }
-
-  // --- the feedback dock ---------------------------------------------------
-
-  /**
-   * Waits until the given revision is graded and its score summary is on
-   * screen. The toolbar badge (`submitted #n · graded`) is the authoritative
-   * signal that *this* revision finished — the score summary alone could
-   * still be showing the previous one during a resubmit.
-   */
-  async expectEvaluationComplete(revisionNumber: number): Promise<void> {
-    await expect(this.submissionStatus(revisionNumber)).toHaveAttribute('data-status', 'complete', {
-      timeout: EVAL_TIMEOUT,
-    });
-    await this.feedbackTab.click();
-    await expect(this.page.getByTestId('score-summary')).toBeVisible({ timeout: EVAL_TIMEOUT });
-  }
-
-  /** Whose feedback the tab shows: the revision by number, badged when the coach wrote it. */
-  get feedbackSubject(): Locator {
-    return this.page.getByTestId('feedback-subject');
-  }
-
-  /** The feedback tab's line for a canvas that has moved on to the draft; absent while it shows the revision. */
-  get feedbackOffCanvas(): Locator {
-    return this.page.getByTestId('feedback-off-canvas');
-  }
-
-  async expectOverall(score: number): Promise<void> {
-    await expect(this.page.getByTestId('overall-score')).toHaveText(String(score));
-  }
-
-  async expectDecision(decision: Decision): Promise<void> {
-    await expect(this.page.getByTestId('decision-badge')).toHaveText(decision);
-  }
-
-  /** The meter for one of the pipeline's own dimensions, by its wire key. */
-  dimensionMeter(dimension: string): Locator {
-    return this.page.locator(`[data-dimension="${dimension}"]`).getByRole('meter');
-  }
-
-  /**
-   * A dimension the loop actually assessed. `not-assessed-<dimension>` is
-   * rendered in place of the meter when the score is null, so its absence
-   * beside a visible meter is the assertion.
-   */
-  async expectDimensionScored(dimension: string): Promise<void> {
-    await expect(this.dimensionMeter(dimension)).toBeVisible();
-    await expect(this.page.getByTestId(`not-assessed-${dimension}`)).toHaveCount(0);
-  }
-
-  criterionResult(criterionId: string): Locator {
-    return this.page.getByTestId(`criterion-result-${criterionId}`);
-  }
-
-  async expectCriterionResult(criterionId: string, result: CriterionResult): Promise<void> {
-    await expect(this.criterionResult(criterionId)).toHaveAttribute('data-result', result);
-  }
-
-  /**
-   * A grade that earned no score, said in place of the score: why, and the
-   * way to grade the revision again.
-   */
-  get unscoredGrade(): Locator {
-    return this.page.getByTestId('evaluation-unscored');
-  }
-
-  /** Why the decision was made, under the score, in the reader's words. */
-  get decisionReason(): Locator {
-    return this.page.getByTestId('decision-reason');
-  }
-
-  /** A finding by the loop's structural key — `unhandled_failure|node.3`. */
-  finding(id: string): Locator {
-    return this.page.getByTestId(`finding-${id}`);
-  }
-
-  /** The places a finding names, each labelled from the graded revision (`n-3 · database · Database`). */
-  findingLocations(id: string): Locator {
-    return this.finding(id).getByTestId('finding-location');
-  }
-
-  /** Clicking a finding's title highlights the elements it names on the canvas. */
-  async clickFinding(id: string): Promise<void> {
-    await this.feedbackTab.click();
-    await this.page.getByTestId(`finding-select-${id}`).click();
-  }
-
-  // --- the coach -----------------------------------------------------------
-
-  /**
-   * Hand the draft to the coach for up to `iterations` revise rounds. The
-   * workspace confirms through a native dialog, accepted here; the control
-   * is enabled only once the grader has reported itself available.
-   */
-  async startCoach(iterations: number): Promise<void> {
-    await this.coachTab.click();
-    const run = this.page.getByTestId('improve-run');
-    await expect(run).toBeEnabled();
-    await this.page.getByTestId('improve-iterations').selectOption(String(iterations));
-    this.page.once('dialog', (dialog) => void dialog.accept());
-    await run.click();
-  }
-
-  coachIteration(iteration: number): Locator {
-    return this.page.getByTestId(`improve-iteration-${iteration}`);
-  }
-
-  /** What became of the iteration in the studio — the row's outcome attribute. */
-  async expectCoachOutcome(iteration: number, outcome: ImproveIterationOutcome): Promise<void> {
-    await expect(this.coachIteration(iteration)).toHaveAttribute('data-outcome', outcome, {
-      timeout: EVAL_TIMEOUT,
-    });
-  }
-
-  coachIterationReason(iteration: number): Locator {
-    return this.coachIteration(iteration).getByTestId('improve-iteration-reason');
-  }
-
-  /** How many lessons from earlier runs the coach was handed, as the panel says it. */
-  get coachRecallSummary(): Locator {
-    return this.page.getByTestId('coach-recall-summary');
-  }
-
-  /** The recalled lessons, one per row — hidden until `showRecalledLessons`. */
-  get recalledLessons(): Locator {
-    return this.page.getByTestId('coach-recall-lesson');
-  }
-
-  async showRecalledLessons(): Promise<void> {
-    const toggle = this.page.getByTestId('coach-recall-toggle');
-    await toggle.click();
-    await expect(toggle).toHaveAttribute('aria-expanded', 'true');
-  }
-
-  /** The coach panel's report of a run that failed. */
-  get coachError(): Locator {
-    return this.page.getByTestId('improvement-error');
-  }
-
-  /** The coach panel's reason for a disabled control. */
-  get coachUnavailable(): Locator {
-    return this.page.getByTestId('improver-unavailable');
-  }
-
-  async expectCoachDisabled(reason: RegExp): Promise<void> {
-    await this.coachTab.click();
-    await expect(this.page.getByTestId('improve-run')).toBeDisabled();
-    await expect(this.coachUnavailable).toHaveText(reason);
-  }
-
-  async expectCoachStopped(): Promise<void> {
-    await expect(this.page.getByTestId('improvement-stopped')).toBeVisible({
-      timeout: EVAL_TIMEOUT,
-    });
-  }
-
-  /** Load the best imported iteration from the coach tab; the canvas turns read-only. */
-  async loadBestRevision(): Promise<void> {
-    await this.coachTab.click();
-    await this.page.getByTestId('load-best-revision').click();
-    await expect(this.page.getByTestId('readonly-banner')).toBeVisible();
-  }
-
-  // --- the revision timeline -----------------------------------------------
-
-  revisionChip(revisionNumber: number): Locator {
-    return this.page.getByTestId(`revision-chip-${revisionNumber}`);
-  }
-
-  /** A revision the coach wrote carries an explicit AI badge in the timeline. */
-  async expectAssistantRevisionInTimeline(revisionNumber: number): Promise<void> {
-    await this.revisionsTab.click();
-    await expect(this.revisionChip(revisionNumber).getByText('AI', { exact: true })).toBeVisible({
-      timeout: EVAL_TIMEOUT,
-    });
-  }
-
-  /**
-   * Reads every revision chip in the timeline and demands strictly rising
-   * overall scores in submission order. Polls, because the timeline refreshes
-   * its grades asynchronously after an evaluation completes.
-   */
-  async expectScoreTrendIncreasing(): Promise<void> {
-    await this.revisionsTab.click();
-    await expect
-      .poll(
-        async () => {
-          const chips = await this.page.locator('[data-testid^="revision-chip-"]').all();
-          if (chips.length < 2) return `only ${chips.length} revision(s) in the timeline`;
-
-          const scored: Array<{ revision: number; score: number }> = [];
-          for (const chip of chips) {
-            const testId = (await chip.getAttribute('data-testid')) ?? '';
-            const revision = Number(testId.replace('revision-chip-', ''));
-            // The score carries its own testid — the chip may also hold an AI
-            // origin badge, so "the only span" is not safe to assume.
-            const scoreSpan = chip.locator('[data-testid="revision-score"]');
-            if ((await scoreSpan.count()) === 0) return `revision #${revision} is not graded yet`;
-            scored.push({ revision, score: Number(await scoreSpan.first().textContent()) });
-          }
-
-          scored.sort((a, b) => a.revision - b.revision);
-          const rising = scored.every(
-            (entry, index) => index === 0 || entry.score > scored[index - 1].score,
-          );
-          const trail = scored.map((entry) => `#${entry.revision}:${entry.score}`).join(' → ');
-          return rising ? 'strictly increasing' : `not increasing: ${trail}`;
-        },
-        { timeout: EVAL_TIMEOUT },
-      )
-      .toBe('strictly increasing');
   }
 }
 

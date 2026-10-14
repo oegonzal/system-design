@@ -37,7 +37,7 @@ test.describe('the session draft', () => {
     expect((await getSession(request, sessionId)).updatedAt).toBe(saved.updatedAt);
 
     await canvas.submit();
-    await canvas.expectEvaluationComplete(1);
+    await canvas.feedback.expectComplete(1);
     await expect.poll(async () => (await getSession(request, sessionId)).draft).toBeNull();
   });
 
