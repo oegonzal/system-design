@@ -16,8 +16,11 @@ import type { ChangedFile } from './index';
  */
 export const LINE_BOUNDS = { warn: 400, max: 500 } as const;
 
-/** Every script the repository authors, whatever its module flavour. */
-export const SOURCE = /\.[cm]?[jt]sx?$/;
+/**
+ * Every source file the repository authors: a script, whatever its module
+ * flavour, or an Astro component.
+ */
+export const SOURCE = /\.(?:[cm]?[jt]sx?|astro)$/;
 
 /** Lines as an editor counts them: the last line needs no newline after it. */
 export const lineCount = (content: string): number => {

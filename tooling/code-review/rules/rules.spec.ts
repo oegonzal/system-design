@@ -30,9 +30,10 @@ describe('fileSize', () => {
     expect(found?.evidence).toContain(String(LINE_BOUNDS.max + 1));
   });
 
-  it('measures every script flavour, and nothing else', () => {
+  it('measures every script flavour and Astro component, and nothing else', () => {
     expect(fileSize([file('a.mjs', linesOf(LINE_BOUNDS.warn + 1))])).toHaveLength(1);
     expect(fileSize([file('a.cts', linesOf(LINE_BOUNDS.warn + 1))])).toHaveLength(1);
+    expect(fileSize([file('Page.astro', linesOf(LINE_BOUNDS.warn + 1))])).toHaveLength(1);
     expect(fileSize([file('data.json', linesOf(2_000))])).toEqual([]);
     expect(fileSize([file('notes.md', linesOf(2_000))])).toEqual([]);
   });
