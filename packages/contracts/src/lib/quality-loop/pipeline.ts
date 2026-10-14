@@ -5,7 +5,11 @@ import type { AxisFactorLevel, Corroboration, GoalSource, Severity } from './voc
  * What a confirmed finding does to the items it names when a reader draws on
  * a run's best iteration — a digest's memories, a recall's kept chunks.
  * `every-ref`: each item it names is withheld. `none`: it names an item
- * without faulting it, and withholds nothing.
+ * without faulting it, and withholds nothing. `every-ref-when-requires-user`:
+ * each item it names is withheld when the finding is marked `requires_user` —
+ * its judge says only the user can supply what the evidence does not — and
+ * nothing otherwise; it reads the fixability a confirmed finding carries, so
+ * a validator's problem, which has none, may not declare it.
  *
  * Declared by what storing the item as written would put in the store, never
  * by the type's name: if the item would be false or misleading there — a
@@ -31,7 +35,7 @@ import type { AxisFactorLevel, Corroboration, GoalSource, Severity } from './voc
  * rule that kept one member of a named set would need findings that name
  * exactly one duplicate set, which the normaliser does not produce.
  */
-export const WITHHOLDINGS = ['every-ref', 'none'] as const;
+export const WITHHOLDINGS = ['every-ref', 'every-ref-when-requires-user', 'none'] as const;
 export type Withholding = (typeof WITHHOLDINGS)[number];
 
 /** What named a withheld item: a confirmed finding, or a validator's problem. */

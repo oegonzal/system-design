@@ -51,6 +51,29 @@ describe('withheldItems', () => {
     ).toEqual([]);
   });
 
+  it('[QL-53] a finding declared to withhold when it requires the user withholds what it names only when its judge marks it so', () => {
+    // Measured 2026-10-13: an overstated finding marked requires_user doubted the value — a skill asked of a
+    // hedged "it or one comparable", a figure typed to answer a yes-or-no — and one marked fixable_local only
+    // its label; both withheld nothing, and the doubted values were typed into live forms.
+    const doubted = confirmed({
+      key: 'overstated|memory.1',
+      type: 'overstated',
+      locationRefs: ['memory.1'],
+      fixability: 'requires_user',
+    });
+    const relabelled = confirmed({
+      key: 'overstated|memory.2',
+      type: 'overstated',
+      locationRefs: ['memory.2'],
+      fixability: 'fixable_local',
+    });
+    const rules = declaring({ overstated: 'every-ref-when-requires-user' });
+    expect(withheldItems(ledger({ findings: [doubted, relabelled] }), ITEMS, rules)).toEqual([
+      { ref: 'memory.1', source: 'finding', by: 'overstated', note: null },
+    ]);
+    expect(withheldItems(ledger({ findings: [relabelled] }), ITEMS, rules)).toEqual([]);
+  });
+
   it('[QL-53] a validator problem naming an item withholds it as its validator declares, every ref when it declares nothing', () => {
     const warned = ledger({
       validation: [

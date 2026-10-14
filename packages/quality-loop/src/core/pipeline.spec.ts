@@ -248,14 +248,24 @@ describe('validatePipeline', () => {
       withholds: withholds as never,
       validate: () => ({ validatorId: 'own', gate, problems: [] }),
     });
-    for (const withholds of WITHHOLDINGS) {
+    for (const withholds of WITHHOLDINGS.filter(
+      (each) => each !== 'every-ref-when-requires-user',
+    )) {
       expect(() =>
         validatePipeline(asAny(tinyPipeline({ validators: [declaring('warn', withholds)] }))),
       ).not.toThrow();
     }
     expect(() =>
       validatePipeline(asAny(tinyPipeline({ validators: [declaring('warn', 'some-refs')] }))),
-    ).toThrow(/validator own withholds some-refs, not one of every-ref, none/);
+    ).toThrow(
+      /validator own withholds some-refs, not one of every-ref, every-ref-when-requires-user, none/,
+    );
+    // A validator's problem carries no fixability, so a withholding that reads one is refused on it.
+    expect(() =>
+      validatePipeline(
+        asAny(tinyPipeline({ validators: [declaring('warn', 'every-ref-when-requires-user')] })),
+      ),
+    ).toThrow(/reads a finding's fixability, and a validator's problem has none/);
     // A failing blocking validator closes admission, so no reader ever sees its
     // problems: what it would withhold is a declaration about nothing.
     for (const withholds of WITHHOLDINGS) {

@@ -163,8 +163,9 @@ function checkCorroboration(definition: Definition, fail: Fail): void {
 /**
  * Every validator: a unique id the engine does not run itself, and what its
  * problems withhold — when it says — a declared withholding on a `warn`
- * validator. A failing `block` validator closes admission, so no reader ever
- * sees its problems: what one would withhold is a declaration about nothing.
+ * validator, never one that reads a finding's fixability. A failing `block`
+ * validator closes admission, so no reader ever sees its problems: what one
+ * would withhold is a declaration about nothing.
  */
 function checkValidators(definition: Definition, fail: Fail): void {
   const validatorIds = definition.validators.map((validator) => validator.id);
@@ -180,6 +181,11 @@ function checkValidators(definition: Definition, fail: Fail): void {
     if (gate === 'block') {
       fail(
         `validator ${id} blocks, so no reader sees its problems and it may not declare withholds`,
+      );
+    }
+    if (withholds === 'every-ref-when-requires-user') {
+      fail(
+        `validator ${id} withholds ${withholds}, which reads a finding's fixability, and a validator's problem has none`,
       );
     }
   }

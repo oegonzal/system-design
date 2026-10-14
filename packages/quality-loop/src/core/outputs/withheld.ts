@@ -14,6 +14,7 @@
 import type {
   DecisionPolicy,
   EvidenceLedger,
+  Fixability,
   Withholding,
   WithholdingSource,
 } from '@sysdesign/contracts';
@@ -88,6 +89,8 @@ interface Naming {
   by: string;
   note: string | null;
   withholds: Withholding;
+  /** How the finding says it can be fixed; a validator's problem says nothing. */
+  fixability: Fixability | null;
   /** The items it names, in the reader's order. */
   refs: string[];
 }
@@ -104,6 +107,7 @@ function namingsOf(
       by: finding.type,
       note: finding.rationale ?? null,
       withholds: rules.findingTypes[finding.type]?.withholds ?? UNDECLARED_WITHHOLDING,
+      fixability: finding.fixability,
       refs: among(finding.locationRefs),
     })),
     ...ledger.validation.flatMap((report) =>
@@ -112,16 +116,24 @@ function namingsOf(
         by: report.validatorId,
         note: problem.message,
         withholds: rules.validators[report.validatorId] ?? UNDECLARED_WITHHOLDING,
+        fixability: null,
         refs: among(problem.locationRefs),
       })),
     ),
   ].filter((naming) => naming.refs.length > 0);
 }
 
+/** Whether a naming withholds the items it names: always, or only where its judge says the user must settle them. */
+const withholdsItsRefs = (naming: Naming): boolean =>
+  naming.withholds === 'every-ref' ||
+  (naming.withholds === 'every-ref-when-requires-user' && naming.fixability === 'requires_user');
+
 /**
  * The items of `items` — location ids, in the artifact's order — that a
  * reader of this ledger withholds, each with what withheld it: every item a
- * naming that withholds `every-ref` names, once per naming.
+ * naming that withholds `every-ref` names, and every item a naming that
+ * withholds `every-ref-when-requires-user` names when it is marked
+ * `requires_user`, once per naming.
  */
 export function withheldItems(
   ledger: EvidenceLedger,
@@ -138,9 +150,7 @@ export function withheldItems(
       if (!seen) withheld.push({ ref, source: naming.source, by: naming.by, note: naming.note });
     }
   };
-  for (const naming of namings.filter((each) => each.withholds === 'every-ref')) {
-    add(naming, naming.refs);
-  }
+  for (const naming of namings.filter(withholdsItsRefs)) add(naming, naming.refs);
   return withheld;
 }
 

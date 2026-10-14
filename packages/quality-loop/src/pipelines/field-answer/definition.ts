@@ -134,16 +134,32 @@ export const FIELD_ANSWER: PipelineDefinition<FieldAnswers> = {
     // overstated kind is a disagreement about how a true value rests, and the
     // answering settings already say which kinds fill: it is priced on the
     // grounding dimension and withholds nothing, since under a table that
-    // fills every kind no re-labelling could change the route — a session that
-    // asks on some kind must come with `overstated: every-ref`. A field asked
-    // needlessly, or left blank although required, has no value to withhold.
+    // fills every kind no re-labelling could change the route (a session that
+    // asks on some kind must come with `overstated: every-ref`). The exception
+    // is a finding its judge marks `requires_user`: that critic doubts the
+    // value, not its label, and the field is the operator's. Measured
+    // 2026-10-14 over 162 recorded field-answer ledgers: of 41 confirmed
+    // overstated findings, the 10 marked requires_user doubted a value its
+    // evidence did not give (a skill asked of a hedged "it or one comparable",
+    // a figure typed to answer a yes-or-no, one category's years given for a
+    // narrower one's, an employer read into a story that names none) and
+    // withhold 9 fields nothing else did, 6 of them in live forms (4 typed, 2
+    // kept after the page refused them); 2 of the 9 held a true value the
+    // evidence only implied, which is what the rule costs. The 31 marked
+    // fixable_local named a true value under a weaker kind, and still
+    // withhold nothing. A field asked needlessly, or left blank although
+    // required, has no value to withhold.
     // Declared here rather than left to the strict default so the read-back
     // never again demotes on "any finding".
     findingTypes: {
       // Priced, not gated: a withheld field is the operator's, and the page's
       // other fields are still worth filling.
       ungrounded: { dimension: 'grounding', gate: false, withholds: 'every-ref' },
-      overstated: { dimension: 'grounding', gate: false, withholds: 'none' },
+      overstated: {
+        dimension: 'grounding',
+        gate: false,
+        withholds: 'every-ref-when-requires-user',
+      },
       misfit_option: { dimension: 'grounding', gate: false, withholds: 'every-ref' },
       inconsistent: { dimension: 'grounding', gate: false, withholds: 'every-ref' },
       // The one defect no score can offset: a value in a trap flags the account.
