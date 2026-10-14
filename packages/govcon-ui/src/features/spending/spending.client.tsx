@@ -1,6 +1,11 @@
 'use client';
 
-import { biddableSetAsides, type ReachCut, type StoredProfile } from '@sysdesign/contracts';
+import {
+  biddableSetAsides,
+  NO_FACETS,
+  type ReachCut,
+  type StoredProfile,
+} from '@sysdesign/contracts';
 import {
   Heading,
   Spinner,
@@ -22,6 +27,7 @@ import { AgencyLens } from './agency.client';
 import { BreakdownLens } from './breakdown.client';
 import { CodeSuggestions } from './code-suggestions';
 import { HorizonLens } from './horizon.client';
+import { PrimesLens } from './primes.client';
 import { PulseLens } from './pulse.client';
 import { ReachLens } from './reach.client';
 import { scopeQueryOf, toggleCode } from './scope';
@@ -57,7 +63,7 @@ export function SpendingClient() {
  * agency lens, whose pick narrows the scope to that agency. What the
  * profile declares reaches the page as data: its NAICS as chips, the lanes
  * it may bid as one press on the set-aside facet and as what Reach counts
- * for.
+ * for, and the size of subcontract it could take as what Primes counts.
  */
 function SpendingWorkspace({ profile }: { profile: StoredProfile | null }) {
   const profileNaics = profile?.naics ?? NO_CODES;
@@ -94,6 +100,17 @@ function SpendingWorkspace({ profile }: { profile: StoredProfile | null }) {
           },
           profileNaics,
         );
+
+  /** The primes that hired one subcontractor: this tab, the scope narrowed to that firm and nothing else. */
+  const hirersOf = (uei: string): string =>
+    spendingHref(
+      {
+        ...view,
+        scope: { ...view.scope, facets: { ...NO_FACETS, recipient: [uei] } },
+        tab: 'primes',
+      },
+      profileNaics,
+    );
 
   return (
     <>
@@ -169,6 +186,19 @@ function SpendingWorkspace({ profile }: { profile: StoredProfile | null }) {
                 preset={view.preset}
                 onPresetChange={(preset) => replace({ ...view, preset })}
                 hrefOf={winnersOf}
+              />
+            ) : null}
+          </Surface>
+        </TabPanel>
+        <TabPanel value="primes">
+          <Surface as="section" aria-label="Primes">
+            {visited.has('primes') ? (
+              <PrimesLens
+                scope={query}
+                band={profile?.teaming.subcontract}
+                preset={view.preset}
+                onPresetChange={(preset) => replace({ ...view, preset })}
+                hiredHrefOf={hirersOf}
               />
             ) : null}
           </Surface>

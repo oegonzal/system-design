@@ -39,6 +39,20 @@ describe('AwardTable', () => {
     expect(screen.queryByRole('button', { name: 'Next' })).toBeNull();
   });
 
+  it('[GOVU-18] [GOVU-19] links an award stored from USAspending to its own record, never one whose id is another source’s, and an awardee with a UEI to its page', () => {
+    renderWithTheme(<Default />);
+    const rows = within(screen.getByRole('table', { name: 'Awards' }))
+      .getAllByRole('row')
+      .slice(1);
+    const hrefs = (row: HTMLElement | undefined) =>
+      within(row as HTMLElement)
+        .queryAllByRole('link')
+        .map((link) => link.getAttribute('href'));
+    // SAM.gov's id is a PIID and a modification number: no record is read by it.
+    expect(hrefs(rows[1])).toEqual(['/primes/BRK123456789']);
+    expect(hrefs(rows[2])).toEqual(['/awards/CONT_AWD_FA865021C5000', '/primes/VADFZLHBJDJ9']);
+  });
+
   it('pages when there is more than one page, and says when there is nothing', () => {
     const onPage = vi.fn();
     renderWithTheme(<Paged onPage={onPage} />);

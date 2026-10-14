@@ -59,6 +59,7 @@ export const LENS_LOADING: Record<SpendingTab, string> = {
   pulse: 'Reading obligations by period',
   where: 'Ranking the scope',
   reach: 'Counting what was within reach',
+  primes: 'Reading the subcontracts primes reported',
   horizon: 'Walking the expiring awards',
   agency: 'Reading the agency',
 };

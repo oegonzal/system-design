@@ -29,7 +29,7 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
   {
     id: 'GOVU-5',
     statement:
-      'The govcon client is seven routes under one shell: the nav is one data table the bar, the titles and the announcer all read, the current route is marked, every client-side navigation is announced, and the active profile is one choice in the header that every page scores against.',
+      'The govcon client is nine routes under one shell: the nav is one data table the bar, the titles and the announcer all read, the current route is marked, every client-side navigation is announced, and the active profile is one choice in the header that every page scores against.',
   },
   {
     id: 'GOVU-6',
@@ -85,6 +85,21 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
     id: 'GOVU-16',
     statement:
       'A page’s views are kept by name per profile: each is a link to its address with the one that is this page marked current, a save keeps the page as it stands with its codes spelled out so it opens the same whatever the profile comes to name, saving under a kept name updates it, and a removal is one click.',
+  },
+  {
+    id: 'GOVU-17',
+    statement:
+      'The Primes tab ranks the scope’s primes by the subcontracts they reported within the profile’s size of subcontract over the page’s window: it says how many the source holds, how many were read and how far back, how many repeated, and when older ones were left unread; each prime shows its subcontracts, its different firms, its dollars, its share under service codes and what it holds itself, links to its own page when the source gave it a UEI, and lists the firms it reported most, each a link to the primes that hire that firm.',
+  },
+  {
+    id: 'GOVU-18',
+    statement:
+      'An award opens at /awards/<id> from every table that lists one by the id its record is read by: who holds it and who owns the holder, the buyer, the vehicle it sits under as a link, what is obligated against what it can reach, its end beside its end with every option — saying when options remain — how it was competed with uncounted offers said so, the largest subcontracts reported under it, and the open stored notices from the same buyer and code; an id the source does not have is a dead end with a way back.',
+  },
+  {
+    id: 'GOVU-19',
+    statement:
+      'A firm opens at /primes/<uei> from every table that names one with a UEI: its registration as stored, with a lookup that states its cost, and the spending lenses narrowed to it in the profile’s codes — the awards it holds that are ending, who buys from it, the firms it reported hiring and the primes that reported hiring it — each read only once its tab is opened; a value that is not a UEI is a dead end that reads nothing.',
   },
   // Government contracting: SAM.gov opportunities (packages/govcon)
   {

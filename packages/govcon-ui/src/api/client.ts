@@ -1,11 +1,17 @@
 import {
+  formatAmountRange,
   withFacetParams,
+  type AwardDetail,
   type FacetQuery,
+  type GetAwardDetailResponse,
+  type GetSpendingPrimesResponse,
   type GetSpendingReachResponse,
   type ListSavedViewsResponse,
   type SavedView,
   type SaveSavedViewRequest,
   type SaveSavedViewResponse,
+  type SpendingPrimes,
+  type SpendingPrimesQuery,
   type SpendingReach,
   type SpendingReachQuery,
 } from '@sysdesign/contracts';
@@ -291,6 +297,25 @@ export const api = {
       ),
     );
   },
+  async getSpendingPrimes(
+    { band, ...query }: SpendingPrimesQuery,
+    opts: GetOptions = {},
+  ): Promise<SpendingPrimes> {
+    return unwrap(
+      await request<GetSpendingPrimesResponse>(
+        `/spending/primes${toQueryString({
+          ...scopeParams(query),
+          band: band === undefined ? undefined : formatAmountRange(band),
+        })}`,
+        opts,
+      ),
+    );
+  },
+  async getAward(externalId: string, opts: GetOptions = {}): Promise<AwardDetail> {
+    return unwrap(
+      await request<GetAwardDetailResponse>(`/spending/awards/${encode(externalId)}`, opts),
+    );
+  },
   async listAgencies(opts: GetOptions = {}): Promise<AgencyDirectory> {
     return unwrap(await request<GetAgenciesResponse>('/spending/agencies', opts));
   },
@@ -308,6 +333,10 @@ export const api = {
   },
 
   // Registrants.
+  /** The registrant as stored — null until it has been looked up. Never a request to SAM.gov. */
+  async getEntity(uei: string, opts: GetOptions = {}): Promise<Entity | null> {
+    return unwrap(await request<GetEntityResponse>(`/entities/${encode(uei)}`, opts));
+  },
   async getOwnEntity(profile?: string, opts: GetOptions = {}): Promise<Entity | null> {
     return unwrap(
       await request<GetEntityResponse>(`/entities/own${toQueryString({ profile })}`, opts),

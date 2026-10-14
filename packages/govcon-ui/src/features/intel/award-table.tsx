@@ -1,7 +1,12 @@
 import { agencyOf, type Award, clip, money, rangeLabel } from '@sysdesign/contracts';
 import { Badge, Button, Heading, Stack, Table, Text } from '@sysdesign/design-system';
 
+import { useLink } from '../../components/link-context';
+import { awardHref, primeHref } from '../award-href';
 import { AWARD_SOURCE_TONE } from '../tones';
+
+/** The source whose id is the one an award's own record is read by. */
+const RECORD_SOURCE: Award['source'] = 'usaspending';
 
 export interface AwardTableProps {
   awards: readonly Award[];
@@ -11,8 +16,9 @@ export interface AwardTableProps {
   onPage?: (offset: number) => void;
 }
 
-/** The stored awards over the filters, newest signed first, one page at a time. */
+/** The stored awards over the filters, newest signed first, one page at a time; an award stored from USAspending links to its own record, an awardee with a UEI to its page. */
 export function AwardTable({ awards, total, limit, offset, onPage }: AwardTableProps) {
+  const Link = useLink();
   return (
     <Stack gap={3}>
       <Stack direction="row" gap={4} align="center" wrap justify="between">
@@ -47,8 +53,24 @@ export function AwardTable({ awards, total, limit, offset, onPage }: AwardTableP
             {awards.map((award) => (
               <tr key={`${award.source}:${award.externalId}`}>
                 <td>{award.signedAt}</td>
-                <td>{award.piid ?? '—'}</td>
-                <td>{clip(award.awardeeName, 40)}</td>
+                <td>
+                  {award.source === RECORD_SOURCE ? (
+                    <Link href={awardHref(award.externalId)} $variant="inline">
+                      {award.piid ?? award.externalId}
+                    </Link>
+                  ) : (
+                    (award.piid ?? '—')
+                  )}
+                </td>
+                <td>
+                  {award.awardeeUei === null ? (
+                    clip(award.awardeeName, 40)
+                  ) : (
+                    <Link href={primeHref(award.awardeeUei)} $variant="inline">
+                      {clip(award.awardeeName, 40)}
+                    </Link>
+                  )}
+                </td>
                 <td>{money(award.amount)}</td>
                 <td>{award.offersReceived ?? '—'}</td>
                 <td>{award.setAsideCode ?? 'open'}</td>

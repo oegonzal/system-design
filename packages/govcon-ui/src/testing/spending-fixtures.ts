@@ -1,11 +1,13 @@
 import {
   agencyDirectoryOf,
   agencyOutlookOf,
+  awardDetailOf,
   fiscalPeriodEnd,
   projectedPeriodOf,
   publicationDelayOf,
   spendingBreakdownOf,
   spendingHorizonOf,
+  spendingPrimesOf,
   spendingPulseOf,
   spendingReachOf,
 } from '@sysdesign/contracts';
@@ -36,6 +38,8 @@ export const PULSE_DELAYED = spendingPulseOf({
 });
 export const BREAKDOWN = spendingBreakdownOf();
 export const REACH = spendingReachOf();
+export const PRIMES = spendingPrimesOf();
+export const AWARD_DETAIL = awardDetailOf();
 export const HORIZON = spendingHorizonOf();
 export const AGENCIES = agencyDirectoryOf();
 export const AGENCY_OUTLOOK = agencyOutlookOf();

@@ -21,6 +21,7 @@ import {
   AGENCY_OUTLOOK,
   BREAKDOWN,
   HORIZON,
+  PRIMES,
   PULSE,
   REACH,
   SPENDING_NOW_MS,
@@ -36,6 +37,7 @@ const routes = (): StubRoute[] => [
   { path: '/profiles', body: { data: [PROFILE] } },
   { path: '/profiles/enfav/views', body: { data: [] } },
   { path: '/spending/reach', body: { data: REACH } },
+  { path: '/spending/primes', body: { data: PRIMES } },
   { path: '/spending/agencies', body: { data: AGENCIES } },
   { path: '/spending/pulse', body: { data: PULSE } },
   { path: '/spending/breakdown', body: { data: BREAKDOWN } },
@@ -230,6 +232,21 @@ describe('SpendingClient', () => {
     expect(lastReplace()).toBe(
       '/spending?naics=541511&psc=DOD&setAside=NONE%2CSBA%2CSBP&tab=reach',
     );
+  });
+
+  it('[GOVU-17] ranks the scope’s primes over the page’s window at the profile’s size of subcontract, and a firm they reported links to the primes that hire it — this tab, the scope narrowed to that firm alone', async () => {
+    const { calls } = stubApi(routes());
+    setMockSearchParams('naics=541511&tab=primes&placement=order');
+    mount();
+    await screen.findByRole('table', { name: 'Primes' });
+    expect(urls(calls)).toContain(
+      '/spending/primes?naics=541511&awardFamily=both&from=2025-06-15&to=2026-06-15&placement=order&band=50000-2000000',
+    );
+    expect(urls(calls).some((url) => url.startsWith('/spending/pulse'))).toBe(false);
+    fireEvent.click(screen.getByRole('button', { name: '2 most reported' }));
+    expect(
+      screen.getByRole('link', { name: 'Who hires TELOS CORPORATION' }).getAttribute('href'),
+    ).toBe('/spending?naics=541511&recipient=JLW7WAKPEKD4&tab=primes');
   });
 
   it('[GOVU-16] lists the profile’s views of this page, keeps the page as it stands under a name with its codes spelled out, reads the list again, and removes one', async () => {

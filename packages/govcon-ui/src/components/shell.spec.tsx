@@ -56,6 +56,10 @@ describe('the shell', () => {
     });
     expect(pageTitle('%s')).toBe('%s · Govcon');
     expect(navItemFor('/notices/abc')?.label).toBe('Notice');
+    // Nine routes in all: the six in the bar, and one notice, one award and one firm by their ids.
+    expect(navItemFor('/awards/CONT_AWD_1')?.label).toBe('Award');
+    expect(navItemFor('/primes/JCBMLGPE6Z71')?.label).toBe('Firm');
+    expect(NAV_ITEMS).toHaveLength(6);
     expect(navItemFor('/nowhere')).toBeNull();
 
     // The profile choice: the default first, then the one chosen, remembered across a reload.

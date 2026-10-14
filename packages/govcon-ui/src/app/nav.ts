@@ -47,6 +47,18 @@ const EXTRA_PAGES: readonly NavItem[] = [
     label: 'Notice',
     description: 'One notice: the facts, the score, the attachments, the awards and its bid.',
   },
+  {
+    href: '/awards',
+    label: 'Award',
+    description:
+      'One award: who holds it, what it can reach, when it ends with and without options, how it was bought, and who works under it.',
+  },
+  {
+    href: '/primes',
+    label: 'Firm',
+    description:
+      'One firm: its registration, the awards it holds that are ending, who buys from it, and who it hires and is hired by.',
+  },
 ];
 
 export const {

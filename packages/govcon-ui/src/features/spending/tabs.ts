@@ -3,6 +3,7 @@ export const SPENDING_TABS = [
   { id: 'pulse', label: 'Pulse' },
   { id: 'where', label: 'Where' },
   { id: 'reach', label: 'Reach' },
+  { id: 'primes', label: 'Primes' },
   { id: 'horizon', label: 'Horizon' },
   { id: 'agency', label: 'Agency' },
 ] as const;

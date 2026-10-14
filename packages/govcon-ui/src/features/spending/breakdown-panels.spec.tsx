@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { BreakdownControls } from './breakdown-panels';
 import * as stories from './breakdown-panels.stories';
 
-const { Delayed, List, Truncated, Empty } = composeStories(stories);
+const { Delayed, List, Recipients, Truncated, Empty } = composeStories(stories);
 
 describe('the breakdown panels', () => {
   it('[GOVU-11] ranks the rows as shares of the scope’s whole, with the window and the total above', () => {
@@ -34,6 +34,16 @@ describe('the breakdown panels', () => {
         /Department of Defense awards are published 90 days after they are signed.*the total and every row those awards belong to are short/,
       ),
     ).toBeTruthy();
+  });
+
+  it('[GOVU-19] links a recipient ranked under its UEI to its own page, and names one without a link', () => {
+    renderWithTheme(<Recipients />);
+    const list = screen.getByRole('list', { name: 'Obligations by recipient' });
+    const links = within(list).getAllByRole('link');
+    expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+      ['BOOZ ALLEN HAMILTON INC', '/primes/JCBMLGPE6Z71'],
+    ]);
+    expect(within(list).getByText('(unnamed)')).toBeTruthy();
   });
 
   it('[GOVU-11] offers every category and window preset', () => {

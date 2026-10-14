@@ -21,6 +21,26 @@ export const Truncated: Story = { args: { breakdown: { ...BREAKDOWN, truncated: 
 
 export const Empty: Story = { args: { breakdown: { ...BREAKDOWN, total: 0, rows: [] } } };
 
+/** Ranked by recipient: a firm the source ranks under its UEI links to its own page, one it does not is named. */
+export const Recipients: Story = {
+  args: {
+    breakdown: {
+      ...BREAKDOWN,
+      category: 'recipient',
+      rows: [
+        {
+          id: null,
+          code: 'JCBMLGPE6Z71',
+          name: 'BOOZ ALLEN HAMILTON INC',
+          amount: 5_000_000,
+          share: 0.625,
+        },
+        { id: null, code: null, name: '(unnamed)', amount: 1_000_000, share: 0.125 },
+      ],
+    },
+  },
+};
+
 /** The window reaches past what a late agency has published: the note says the total and its rows are short. */
 export const Delayed: Story = { args: { breakdown: { ...BREAKDOWN, delay: DELAY } } };
 

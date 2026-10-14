@@ -1,14 +1,13 @@
+import { UEI_SHAPE } from '@sysdesign/contracts';
 import { Button, Heading, Stack, Text, TextAreaField } from '@sysdesign/design-system';
 import { useState } from 'react';
 
-import { lookupCost } from './costs';
+import { lookupCost } from '../entities/lookup-cost';
 
 export interface EntityLookupFormProps {
   onLookup(ueis: string[]): void;
   pending?: boolean;
 }
-
-const UEI = /^[A-Z0-9]{12}$/;
 
 /** UEIs from free text — one per line, comma- or space-separated — upper-cased, deduplicated, the malformed ones set aside. */
 export function parseUeis(text: string): { ueis: string[]; rejected: string[] } {
@@ -17,7 +16,7 @@ export function parseUeis(text: string): { ueis: string[]; rejected: string[] } 
   for (const token of text.split(/[\s,;]+/)) {
     const candidate = token.trim().toUpperCase();
     if (candidate.length === 0) continue;
-    if (!UEI.test(candidate)) rejected.push(candidate);
+    if (!UEI_SHAPE.test(candidate)) rejected.push(candidate);
     else if (!ueis.includes(candidate)) ueis.push(candidate);
   }
   return { ueis, rejected };

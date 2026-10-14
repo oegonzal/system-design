@@ -43,6 +43,18 @@ describe('the horizon panels', () => {
     const rows = within(table).getAllByRole('row').slice(1);
     expect(rows).toHaveLength(2);
     expect(within(rows[0] as HTMLElement).getByText('N6660426P0205')).toBeTruthy();
+    // An award opens its own record, and its holder its own page.
+    expect(
+      within(rows[0] as HTMLElement)
+        .getByRole('link', { name: 'N6660426P0205' })
+        .getAttribute('href'),
+    ).toBe('/awards/CONT_AWD_N6660426P0205_9700_-NONE-_-NONE-');
+    expect(
+      within(rows[0] as HTMLElement)
+        .getAllByRole('link')
+        .map((link) => link.getAttribute('href'))
+        .filter((href) => href?.startsWith('/primes/')),
+    ).toHaveLength(1);
     expect(within(rows[0] as HTMLElement).getByText('Contracts')).toBeTruthy();
     expect(within(rows[1] as HTMLElement).getByText('IDVs')).toBeTruthy();
     expect(within(rows[0] as HTMLElement).getByText('Department of the Navy')).toBeTruthy();

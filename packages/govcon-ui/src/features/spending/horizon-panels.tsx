@@ -29,6 +29,7 @@ import {
 } from '@sysdesign/design-system';
 
 import { useLink } from '../../components/link-context';
+import { awardHref, primeHref } from '../award-href';
 import { noticeHref } from '../notice-href';
 import { Pager } from '../search/pager';
 import { AWARD_FAMILY_TONE } from '../tones';
@@ -180,8 +181,9 @@ function OpenNotices({
   );
 }
 
-/** The soonest-ending awards, paged on the client — the lens already bounded them — each with the open notices already stored for its work and buyer. */
+/** The soonest-ending awards, paged on the client — the lens already bounded them — each a link to its own record and its holder's page, with the open notices already stored for its work and buyer. */
 export function HorizonTable({ rows, openNotices, offset, limit, onPage }: HorizonTableProps) {
+  const Link = useLink();
   const noticesOf = new Map(openNotices.map((match) => [match.externalId, match.notices]));
   if (rows.length === 0) {
     return (
@@ -210,11 +212,23 @@ export function HorizonTable({ rows, openNotices, offset, limit, onPage }: Horiz
           {rows.slice(offset, offset + limit).map((row) => (
             <tr key={row.externalId}>
               <td>{row.endsAt}</td>
-              <td>{row.piid ?? DASH}</td>
+              <td>
+                <Link href={awardHref(row.externalId)} $variant="inline">
+                  {row.piid ?? row.externalId}
+                </Link>
+              </td>
               <td>
                 <Badge tone={AWARD_FAMILY_TONE[row.family]}>{AWARD_FAMILY_LABEL[row.family]}</Badge>
               </td>
-              <td title={row.description ?? undefined}>{clip(row.recipientName, 40)}</td>
+              <td title={row.description ?? undefined}>
+                {row.recipientUei === null ? (
+                  clip(row.recipientName, 40)
+                ) : (
+                  <Link href={primeHref(row.recipientUei)} $variant="inline">
+                    {clip(row.recipientName, 40)}
+                  </Link>
+                )}
+              </td>
               <td>{money(row.amount)}</td>
               <td>{clip(agencyOf(row.agencyPath), 36)}</td>
               <td>
