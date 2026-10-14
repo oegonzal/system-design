@@ -336,8 +336,9 @@ store: one adapter set, two port shapes, because `support` belongs to one orches
 
 Seven routes. `POST /memory/:id/reindex` re-embeds a finished memory run's lessons. `DELETE /memory/:id`
 retracts every point a digest run stored, for a document taught or ingested again;
-`DELETE /memory/:id/:ref` retracts one of them, for a fact since corrected, and answers the text, kind
-and scope it held — the only record of it once the point is gone.
+`DELETE /memory/:id/points/:ref` retracts one of them, for a fact since corrected, and answers the text,
+kind and scope it held — the only record of it once the point is gone; under `points`, an empty ref
+matches no route rather than the run's own address.
 `POST /memory/form-retrieval-report` answers what a form page's recall would retrieve for a list of
 fields — each field's probe, both named vectors' rankings with cosines, its fused list and the dealt
 evidence — the form path's own measurement seam, as `retrieval-report` is the curated path's.

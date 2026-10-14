@@ -166,7 +166,7 @@ describe('the document-memory HTTP surface', () => {
     ).toBe(true);
   });
 
-  it('[QL-70] one stored memory is retracted by its run id and ref, answering what it held, beside the retraction of its whole run', async () => {
+  it('[QL-70] one stored memory is retracted by its run id and ref, answering what it held, beside the retraction of its whole run; a point address with no ref matches no route', async () => {
     // The two facts the digest above stored, under its run.
     const held = [...store.points.values()];
     expect(held).toHaveLength(2);
@@ -178,16 +178,22 @@ describe('the document-memory HTTP surface', () => {
       return { status: answer.status, data: ((await answer.json()) as Envelope<T>).data };
     };
 
-    expect(await retract<RetractedMemoryPointDto>(`/memory/${runId}/${ref}`)).toEqual({
+    // A ref that came out empty, or was left off, is no address at all — never the run's.
+    for (const path of [`/memory/${runId}/points/`, `/memory/${runId}/points`]) {
+      expect((await retract<unknown>(path)).status, path).toBe(404);
+    }
+    expect([...store.points.values()]).toEqual(held);
+
+    expect(await retract<RetractedMemoryPointDto>(`/memory/${runId}/points/${ref}`)).toEqual({
       status: 200,
       data: { runId, ref, removed: { text: first.text, kind: 'profile_fact', scope: 'subject' } },
     });
     expect([...store.points.values()]).toEqual([second]);
-    expect(await retract<RetractedMemoryPointDto>(`/memory/${runId}/${ref}`)).toEqual({
+    expect(await retract<RetractedMemoryPointDto>(`/memory/${runId}/points/${ref}`)).toEqual({
       status: 200,
       data: { runId, ref, removed: null },
     });
-    // One segment is still the run: the point retraction never answers for it.
+    // The run's own address is its id alone, and removes what the point route left.
     expect(await retract<RetractedMemoryRunDto>(`/memory/${runId}`)).toEqual({
       status: 200,
       data: { runId, removed: 1 },

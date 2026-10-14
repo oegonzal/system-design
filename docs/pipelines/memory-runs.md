@@ -384,7 +384,7 @@ that need them without a run.
 | `GET`    | `/orchestrations/:id`                    | 200  | —                                                     | `{ data: OrchestrationRunDto }`, 404 otherwise |
 | `POST`   | `/memory/:id/reindex`                    | 200  | —                                                     | `{ data: OrchestrationStepDto }`               |
 | `DELETE` | `/memory/:id`                            | 200  | —                                                     | `{ data: { runId, removed } }`                 |
-| `DELETE` | `/memory/:id/:ref`                       | 200  | —                                                     | `{ data: { runId, ref, removed } }`            |
+| `DELETE` | `/memory/:id/points/:ref`                | 200  | —                                                     | `{ data: { runId, ref, removed } }`            |
 | `POST`   | `/memory/retrieval-report`               | 200  | `{ goal }`, up to 64,000 B                            | `{ data: RetrievalReportDto }`                 |
 | `POST`   | `/memory/form-retrieval-report`          | 200  | `{ fields: [{ name, context?, role?, inputType? }] }` | `{ data: FormRetrievalReportDto }`             |
 
@@ -403,12 +403,14 @@ writer per digest run — which is how a document taught or ingested again close
 behind itself (`memory-ingest ingest` once the store holds every fact of a
 document's current text, `memory-ingest retract` retiring one,
 `browser-session teach-again`); a run the store never held removes nothing and
-is no error. `DELETE /memory/:id/:ref`
-retracts one point of such a run — the memory it stored under that ref — for a
-fact since corrected while the rest of its digest still holds, and answers the
-text, kind and scope it held, the only record of it once the point is gone; a
-point the store never held answers `removed: null`. It is the operator's: no
-client calls it.
+is no error. `DELETE /memory/:id/points/:ref` retracts one point of such a
+run — the memory it stored under that ref — for a fact since corrected while
+the rest of its digest still holds, and answers the text, kind and scope it
+held, the only record of it once the point is gone; a point the store never
+held answers `removed: null`. The literal `points` is what keeps an empty ref
+from retracting the whole run: Express leaves `strict routing` off, so
+`/memory/<run>/` is the run's own address, while `/memory/<run>/points/`
+matches no route and answers 404. It is the operator's: no client calls it.
 
 Guards, before any row exists: an unknown orchestrator is a 404; a pipeline
 not in `RunsService.list()` is a 404, the same as `POST /runs`; whatever the

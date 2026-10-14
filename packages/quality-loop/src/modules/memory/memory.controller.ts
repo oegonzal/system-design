@@ -47,10 +47,14 @@ export class MemoryController {
    * Retract one memory a digest run stored, by the run's id and the memory's
    * ref — a fact since corrected, when the rest of its run still holds. Answers
    * the text, kind and scope that went; a point the store never held removes
-   * nothing and answers `removed: null`. Two segments, where the run's own
-   * retraction above takes one, so neither route ever answers for the other.
+   * nothing and answers `removed: null`. `:ref` is required after the literal
+   * `points`, so an address whose ref is empty or missing —
+   * `/memory/<run>/points/` or `/memory/<run>/points` — matches neither route
+   * here and answers 404. Without the segment it would not: Express leaves
+   * `strict routing` off, which reads `/memory/<run>/` as `/memory/<run>`, the
+   * run's own retraction above.
    */
-  @Delete(':id/:ref')
+  @Delete(':id/points/:ref')
   @HttpCode(200)
   async retractPoint(
     @Param('id') id: string,
