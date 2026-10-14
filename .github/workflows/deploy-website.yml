@@ -253,8 +253,11 @@ jobs:
       - name: Install Playwright chromium
         run: pnpm exec playwright install --with-deps chromium
 
-      # Its first check waits up to two minutes for production to serve this build
-      # byte for byte; a zone feature that rewrites responses fails it.
+      # Its first checks wait up to two minutes for production to serve this build
+      # byte for byte, to a plain HTTP client and to a browser opening each page. A
+      # zone feature that changes the status or bytes of what they compare fails the
+      # check that sees it; setup step 2 in docs/enfav/website.md says what can still
+      # pass.
       - name: End-to-end against production
         env:
           WEBSITE_E2E_BASE_URL: ${{ needs.build.outputs.site_url }}

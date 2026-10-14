@@ -24,7 +24,9 @@ const PRINT = /print\.spec\.ts$/;
 export default defineConfig({
   ...nxE2EPreset(__filename, { testDir: './src' }),
 
+  // One browser for every project, so the check the others wait for asks as they do.
   use: {
+    ...devices['Desktop Chrome'],
     baseURL: BASE_URL ?? `http://127.0.0.1:${PORT}`,
     contextOptions: { reducedMotion: 'reduce' },
     trace: 'on-first-retry',
@@ -47,17 +49,12 @@ export default defineConfig({
    * the server to answer with this build.
    */
   projects: [
-    // toPass is this check's retry; a Playwright retry (CI gets two) would repeat the whole wait.
+    // toPass is these checks' retry; a Playwright retry (CI gets two) would repeat the whole wait.
     { name: 'build-served', testMatch: BUILD_SERVED, retries: 0 },
-    {
-      name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
-      dependencies: ['build-served'],
-      testIgnore: BUILD_SERVED,
-    },
+    { name: 'chromium', dependencies: ['build-served'], testIgnore: BUILD_SERVED },
     {
       name: 'narrow',
-      use: { ...devices['Desktop Chrome'], viewport: NARROW_VIEWPORT },
+      use: { viewport: NARROW_VIEWPORT },
       dependencies: ['build-served'],
       testIgnore: [BUILD_SERVED, PRINT],
     },

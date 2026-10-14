@@ -13,7 +13,7 @@ export const MISSING = '/this-page-does-not-exist/';
 const CONFIGURATION = new Set(['_headers', '_redirects', '.assetsignore']);
 
 /** A file the build wrote, and how the site answers for it. */
-interface ServedFile {
+export interface ServedFile {
   file: string;
   /** A page, the page for paths nothing answers, or any other file. */
   kind: 'page' | 'not-found' | 'asset';

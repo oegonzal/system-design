@@ -11,7 +11,25 @@ const recommended = playwright.configs['flat/recommended'];
 
 export default [
   ...workspace,
-  { ...recommended, files: ['**/*.ts'] },
+  {
+    ...recommended,
+    files: ['**/*.ts'],
+    rules: {
+      ...recommended.rules,
+      // `expect-expect` matches called names exactly, so an assertion helper
+      // is listed by name, under the spec that defines it.
+      'playwright/expect-expect': [
+        'warn',
+        {
+          assertFunctionNames: [
+            'expect',
+            // build-served.spec.ts
+            'expectServedAsBuilt',
+          ],
+        },
+      ],
+    },
+  },
   {
     // The suite compares the built pages with the company facts the site
     // declares: its one import from the site, and only of that data. An allow

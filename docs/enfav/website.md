@@ -106,8 +106,9 @@ and telemetry. What `preview` shows is what a deploy of the same build serves.
 Locally, the e2e suite always tests a preview, never `serve`. Playwright starts its own on port 4205
 with `reuseExistingServer: false`, so it tests the build it has just made rather than whatever
 happens to be listening, and a preview you left running on 4204 does not collide with it. Its first
-check, which every other one waits for, is that the server answers with that build byte for byte;
-then it runs every page in desktop Chromium and at 320 × 640 px. Install the browser once with
+checks, which every other one waits for, are that the server answers with that build byte for byte,
+both to a plain HTTP client and to a browser opening each page; then it runs every page in desktop
+Chromium and at 320 × 640 px. Install the browser once with
 `pnpm exec playwright install chromium` (CI adds `--with-deps`); a failed run leaves its report in
 `dist/.playwright/packages/website-e2e/playwright-report`.
 
@@ -248,15 +249,21 @@ with no DS record and nothing at the apex or www.
 - SSL/TLS › Edge Certificates › Always Use HTTPS: on. It redirects http to https for every hostname
   in the zone, requests to the Worker included.
 - Minimum TLS Version 1.2 (Cloudflare's default is 1.0), and TLS 1.3 on.
-- Turn off Bot Fight Mode, Rocket Loader, Zaraz, automatic Web Analytics injection and Email Address
-  Obfuscation. Each injects script into, or rewrites, the HTML Cloudflare serves. The CSP admits the
-  site's own files only, so an injected inline script is blocked and logged as a console error, and
-  the e2e fails any page with a console error or with a `<script>` that is neither external nor
-  JSON-LD: every deploy's verification would fail, and loosening the CSP to quiet it would be the
-  wrong fix. Before any of that, `verify-production`'s first check fails on any file production
-  serves differently from the build, naming each one, so a feature that rewrites or challenges
-  responses is caught whichever it is. Email Address Obfuscation would rewrite the two addresses the
-  site publishes on purpose.
+- Turn off Bot Fight Mode, Rocket Loader, Zaraz, automatic Web Analytics injection (Web Analytics ›
+  the site › Manage site › Disable) and Email Address Obfuscation. Each injects script into, or
+  rewrites, the HTML Cloudflare serves. The CSP admits the site's own files only, so an injected
+  script, inline or from another origin, is blocked and logged as a console error, and the e2e fails
+  any page with a console error or with a `<script>` that is neither external nor JSON-LD: every
+  deploy's verification would fail, and loosening the CSP to quiet it would be the wrong fix. Before
+  any of that, `verify-production`'s first checks fail on any file production serves a plain HTTP
+  client differently from the build, and on any page it serves a browser opening it differently,
+  naming each one with the status production gave. They ask both ways because a feature can tell
+  the two apart: on 2026-10-14 automatic Web Analytics added its script to pages requested with an
+  Accept header naming `text/html`, as a browser's does, and not with the plain client's `*/*`.
+  What can still pass where the checks run: a feature that acts on some visitors only — by address,
+  country, cookie or user agent — and one that changes a file other than a page only for the
+  headers a browser sends for it, such as a page's stylesheet or images. Email Address Obfuscation
+  would rewrite the two addresses the site publishes on purpose.
 
 ### 3. Email Routing (Compute › Email Service)
 
@@ -509,9 +516,11 @@ job. Pull requests get the same checks from
 3. **`verify-production`** runs whenever `deployed` is true, even when wrangler or a later step of
    the deploy job failed. It downloads the same artifact and runs the e2e against production
    (`nx run website-e2e:e2e --excludeTaskDependencies`, with `WEBSITE_E2E_BASE_URL` set in that
-   step). The suite's first check waits up to two minutes for production to answer with the
-   artifact byte for byte — the new version reaching the edge — and fails on any file served
-   differently, which is how a zone feature that rewrites or challenges responses shows up.
+   step). The suite's first checks wait up to two minutes for production to answer with the
+   artifact byte for byte — the new version reaching the edge — both to a plain HTTP client and to
+   a browser opening each page, and fail on any file or page served differently to them, which is
+   how a zone feature that rewrites or challenges these requests shows up (setup step 2 says what
+   can still pass).
 
 **What gates what.** Nothing deploys that failed lint, type checking (`astro check`), the unit
 specs, the build or the e2e under Workers routing. The deploy job waits for the `production`
@@ -669,8 +678,11 @@ no image another commit rasterized (remove the folder before such a build); the 
 What it checks, every page at both widths
 unless noted:
 
-- `build-served.spec.ts`, first and once — production answers with every built file unchanged (the
-  404 page at an unknown path), retried for up to two minutes; every other check waits for it.
+- `build-served.spec.ts`, first and once — production answers a plain HTTP client with every built
+  file unchanged (the 404 page at an unknown path), and a browser opening each page with that page
+  unchanged, each retried for up to two minutes; every other check waits for both. The browser
+  check needs every page saved as UTF-8 without a byte-order mark, the only form a browser hands
+  back byte for byte, and fails naming any page that is not.
 - `pages.spec.ts` — axe finds no WCAG 2.2 A/AA or best-practice violation; at 320 px nothing
   scrolls sideways, and no element, line of text or element's content ends past the right edge, even
   where an overflow clip in the document hides it — fixed-position boxes as drawn, an element's
@@ -849,12 +861,14 @@ tip.
 
 **Every job was skipped.** The run was not on main, or `WEBSITE_DEPLOYS` is not `on`.
 
-**The first e2e check reports files served differently from the build.** It names each file with
-the status production gave. A 403 or 503, or HTML that differs, is a zone feature challenging or
-rewriting responses (setup step 2): turn it off, then re-run the failed job, which checks the same
-artifact again. If nothing changed on the zone, the new version had not reached the edge within two
-minutes; re-run the failed job. When validating by hand, check that `packages/website/dist` holds
-the deployed build (see Validating production).
+**The first e2e checks report files served differently from the build.** Each names the files with
+the status production gave for their URLs. A 403 or 503, a redirect, or HTML that differs is a zone
+feature challenging, redirecting or rewriting responses (setup step 2); pages that differ only when
+a browser opens them point to a feature that answers a browser's requests differently from a plain
+client's, as automatic Web Analytics did by the Accept header. Turn it off, then re-run the failed
+job, which checks the same artifact again. If nothing changed on the zone, the new version had not
+reached the edge within two minutes; re-run the failed job. When validating by hand, check that
+`packages/website/dist` holds the deployed build (see Validating production).
 
 **Astro refuses to start, or the Astro lint and format plugins fail.** Node is too old:
 `node --version` must print v24, as `.nvmrc` says. Astro 7 needs 22.12 or later and its lint and
