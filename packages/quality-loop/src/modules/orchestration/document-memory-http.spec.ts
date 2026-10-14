@@ -1,6 +1,7 @@
 import type { INestApplication } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type {
+  FormRetrievalReportDto,
   OrchestrationRunDto,
   QualityRunDto,
   RetractedMemoryPointDto,
@@ -19,9 +20,11 @@ import { rmSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { fakeLlm } from '../../core/testing';
+import type { MemoryHit } from '../../orchestrators/memory/ports';
+import { hitOf } from '../../orchestrators/memory/testing';
 import { sampleDocumentDigest } from '../../pipelines/document-digest/testing';
 import { bootApp, claimDumpDir, getJson, postJson, type Envelope } from '../http/testing';
-import { fakeEmbeddings, InMemoryMemoryStore } from '../memory/testing';
+import { fakeEmbeddings, InMemoryMemoryStore, storedChunkOf } from '../memory/testing';
 import { EMBEDDING_CLIENT, MEMORY_STORE } from '../memory/tokens';
 import { QUALITY_LOOP_LLM } from '../runs/tokens';
 import { settledOrchestration } from './testing';
@@ -199,5 +202,35 @@ describe('the document-memory HTTP surface', () => {
       data: { runId, removed: 1 },
     });
     expect(store.points.size).toBe(0);
+  });
+
+  it('[QL-71] the form retrieval report reads, of what was recorded for one unit of work, only the unit its request names', async () => {
+    const taught = (text: string, ref: string, held: Pick<MemoryHit, 'scope' | 'unitKey'>) => {
+      const hit = hitOf(text, 'run-u', ref);
+      const source = { ...hit.source, pipeline: 'document-digest', kind: 'profile_fact' as const };
+      return storedChunkOf({ ...hit, source, ...held });
+    };
+    await store.replaceRunChunks('run-u', [
+      taught('Alex Example has worked only for Acme', 'memory.1', { scope: 'subject' }),
+      taught('Alex Example knows no one at Acme', 'memory.2', {
+        scope: 'unit',
+        unitKey: 'company=acme',
+      }),
+      taught('Alex Example heard of Globex from a recruiter', 'memory.3', {
+        scope: 'unit',
+        unitKey: 'company=globex',
+      }),
+    ]);
+    const evidenceFor = async (unitKey?: string): Promise<string[]> => {
+      const answer = await postJson(url, '/memory/form-retrieval-report', {
+        fields: [{ name: 'Do you know anyone who works here?', inputType: 'textarea' }],
+        ...(unitKey === undefined ? {} : { unitKey }),
+      });
+      expect(answer.status).toBe(200);
+      const { data } = (await answer.json()) as Envelope<FormRetrievalReportDto>;
+      return data.evidence.map((item) => item.source.ref).sort();
+    };
+    expect(await evidenceFor('company=acme')).toEqual(['memory.1', 'memory.2']);
+    expect(await evidenceFor(undefined)).toEqual(['memory.1']);
   });
 });

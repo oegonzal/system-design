@@ -8,6 +8,7 @@ import {
   DOCUMENT_PART_MAX_LENGTH,
   declaredScopeLimit,
   documentChunkSchema,
+  isUnitBound,
   MEMORY_SCOPES,
   readDocumentIndex,
   renderDocumentGoal,
@@ -15,8 +16,10 @@ import {
   DOCUMENT_RULES,
   DOCUMENT_MAX_MEMORIES,
   SCOPE_RULE,
+  UNIT_BOUND_SCOPES,
   type DocumentChunk,
 } from './document-digest';
+import { documentDigestReportSchema } from './document-memory';
 import {
   GOAL_BUDGET_BYTES,
   readFencedIndex,
@@ -187,6 +190,39 @@ describe('renderDocumentGoal', () => {
     );
     // Absent is the only way to declare nothing: a null is refused, not read as undeclared.
     expect(documentChunkSchema.safeParse({ ...UNDECLARED, scope: null }).success).toBe(false);
+  });
+
+  it('[QL-71] a document names the unit of work its unit-bound memories were recorded for in its index alone: no lens is told of it, the report carries it, and a document naming none hashes as before', () => {
+    const unitKey = 'company=acme';
+    const undeclared = renderDocumentGoal(UNDECLARED);
+    for (const scope of [undefined, ...MEMORY_SCOPES]) {
+      const head = scope === undefined ? {} : { scope };
+      const goal = renderDocumentGoal({ ...UNDECLARED, ...head, unitKey });
+      expect(readDocumentIndex(goal)?.document).toEqual({
+        ...readDocumentIndex(renderDocumentGoal({ ...UNDECLARED, ...head }))?.document,
+        unitKey,
+      });
+      // Not the head line, the rules or the limits: only the index changed.
+      expect(stripIndexSection(goal)).toBe(
+        stripIndexSection(renderDocumentGoal({ ...UNDECLARED, ...head })),
+      );
+    }
+    expect(sha256(undeclared)).toBe(UNDECLARED_GOAL_SHA256);
+    // What the digest step reports is the index's document, the unit with it.
+    const named = readDocumentIndex(renderDocumentGoal({ ...UNDECLARED, unitKey }))?.document;
+    expect(documentDigestReportSchema.safeParse(named).success).toBe(true);
+    // Absent is the only way to name none: a null or an empty key is refused.
+    expect(documentChunkSchema.safeParse({ ...UNDECLARED, unitKey: null }).success).toBe(false);
+    expect(documentChunkSchema.safeParse({ ...UNDECLARED, unitKey: '' }).success).toBe(false);
+  });
+
+  it('[QL-71] which scopes bind a memory to a unit of work is one total table: unit does, subject does not, and a memory stored with no scope is bound to none', () => {
+    expect(UNIT_BOUND_SCOPES).toEqual(['unit']);
+    expect(MEMORY_SCOPES.map((scope) => [scope, isUnitBound(scope)])).toEqual([
+      ['subject', false],
+      ['unit', true],
+    ]);
+    expect(isUnitBound(undefined)).toBe(false);
   });
 
   it('[QL-69] the scope test is left out by its constant, never by its wording: a rule that shares its words is stated', () => {

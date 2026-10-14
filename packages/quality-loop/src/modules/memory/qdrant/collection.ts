@@ -13,6 +13,7 @@ import {
   MEMORY_SCOPES,
   SEVERITIES,
   TRANSITION_KINDS,
+  unitKeySchema,
   type MemoryLineageDto,
 } from '@sysdesign/contracts';
 import { z } from 'zod';
@@ -74,12 +75,16 @@ export type PayloadIndexSchema = (typeof PAYLOAD_INDEX_SCHEMAS)[number];
  * after fusion, never in a store filter.
  *
  * A nested field is written as Qdrant addresses it, dotted (`a.b`); `rootOf`
- * gives the key the payload itself carries.
+ * gives the key the payload itself carries. A document memory's `scope` and
+ * the `unitKey` of one bound to a unit of work are what every search leaves
+ * other units' memories out by.
  */
 export const INDEXED_FIELDS: Readonly<Record<string, PayloadIndexSchema>> = {
   runId: 'keyword',
   pipeline: 'keyword',
   kind: 'keyword',
+  scope: 'keyword',
+  unitKey: 'keyword',
   dimension: 'keyword',
   polarity: 'keyword',
   transition: 'keyword',
@@ -155,6 +160,8 @@ const payloadSchema = chunkSourceSchema.extend({
   storedAt: z.string(),
   /** Where a document memory holds; absent on a point written before scopes, which a reader defaults. */
   scope: z.enum(MEMORY_SCOPES).optional(),
+  /** The unit of work a memory bound to one was recorded for; absent on every other point. */
+  unitKey: unitKeySchema.optional(),
   ...facetFields,
 });
 
@@ -172,6 +179,7 @@ export function toPayload(chunk: IndexedChunk, storedAt: string): ChunkPayload {
     lineage: chunk.lineage,
     storedAt,
     ...(chunk.scope === undefined ? {} : { scope: chunk.scope }),
+    ...(chunk.unitKey === undefined ? {} : { unitKey: chunk.unitKey }),
     ...(chunk.facets ?? {}),
   };
 }
@@ -210,12 +218,14 @@ export function fromPayload(payload: unknown): MemoryChunk | null {
     severity,
     support,
     scope,
+    unitKey,
     ...source
   } = parsed.data;
   // Neither is a fact about the memory: one is when it was written, the other
   // is what it was indexed by, and a reader judges the lesson, not its key. The
-  // facets are destructured out of `source` and handed back under one key, so
-  // a chunk source stays exactly the recall pipeline's own shape.
+  // facets, the scope and the unit are destructured out of `source` and handed
+  // back beside it, so a chunk source stays exactly the recall pipeline's own
+  // shape — a key left in it would fail its strict schema.
   void storedAt;
   void keys;
   void polarity;
@@ -238,5 +248,6 @@ export function fromPayload(payload: unknown): MemoryChunk | null {
     source,
     ...(facets === undefined ? {} : { facets }),
     ...(scope === undefined ? {} : { scope }),
+    ...(unitKey === undefined ? {} : { unitKey }),
   };
 }

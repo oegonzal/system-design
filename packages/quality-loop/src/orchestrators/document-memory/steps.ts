@@ -25,7 +25,7 @@ import { indexMemories } from '../memory/store/index-memories';
 import { UNADMITTED_REASON } from '../memory/unadmitted';
 import type { StepContext, StepResult } from '../runner/definition';
 import type { DocumentMemoryPorts } from './ports';
-import { readDocumentDigest } from './read-document-digest';
+import { readDocumentDigest, UNIT_UNNAMED } from './read-document-digest';
 import { DEFAULT_CHUNK_KIND, type OwnedKinds } from '../memory/store/chunks';
 
 /** What each step hands on. The digest run is its own source, so `store` needs nothing else. */
@@ -57,12 +57,20 @@ const contextOf = (ctx: Ctx): MemoryContextDto => ctx.context as unknown as Memo
  */
 export const DOCUMENT_MEMORY_ADMITS: readonly Admission[] = ['admitted', 'fell-short'];
 
+/** What the step says of the memories it withheld as bound to a unit of work the document names none of. */
+const unnamedNote = (withheld: number): string =>
+  `${withheld} withheld: bound to a unit of work, in a document that names none`;
+
 /**
  * Digest the chunk; yields the digest run and what it endorsed, or nothing
  * with the reason — and a digest that was never judged (no rubric derived,
- * nothing produced) says that, never `not-accepted`. The report names the
- * document, read from the goal's own index, so a ledger of runs reads which
- * chunk of which document each one digested.
+ * nothing produced) says that, never `not-accepted`. Memories bound to a unit
+ * of work in a document that names none are counted and give the step its
+ * reason (`unit-unnamed`) whether or not the rest are stored: the chunk's facts
+ * are not all in the store, and a reader that would replace what an earlier
+ * digest of it stored must not read it as though they were. The report names
+ * the document, read from the goal's own index, so a ledger of runs reads
+ * which chunk of which document each one digested.
  */
 export async function digest(ctx: Ctx): Promise<StepResult<DocumentMemoryOutputs['digest']>> {
   if (!ctx.ports.embeddings.enabled) {
@@ -80,22 +88,36 @@ export async function digest(ctx: Ctx): Promise<StepResult<DocumentMemoryOutputs
     maxIterations: ctx.request.maxIterations ?? DEFAULT_QUALITY_RUN_ITERATIONS,
   });
   if (!completed(child)) return runFailed(child);
-  const { admission, proposed, memories } = readDocumentDigest(
+  const { admission, proposed, memories, withheld } = readDocumentDigest(
     outputsOf(child.trace),
     acceptAt,
     DOCUMENT_MEMORY_ADMITS,
   );
-  const counts = { memories: proposed, kept: memories.length };
-  // Not drawn on at all — or drawn on below the bar and nothing survived the engine's gates.
-  if (admission !== 'admitted' && memories.length === 0) {
-    return { status: 'complete', reason: UNADMITTED_REASON[admission], counts, report };
+  const unnamed = withheld.filter((item) => item.by === UNIT_UNNAMED.by).length;
+  const counts = {
+    memories: proposed,
+    kept: memories.length,
+    ...(unnamed === 0 ? {} : { [UNIT_UNNAMED.by]: unnamed }),
+  };
+  const leftOut = unnamed === 0 ? null : { reason: UNIT_UNNAMED.by, note: unnamedNote(unnamed) };
+  if (memories.length === 0) {
+    if (leftOut !== null) return { status: 'complete', ...leftOut, counts, report };
+    // Not drawn on at all — or drawn on below the bar and nothing survived the engine's gates.
+    if (admission !== 'admitted') {
+      return { status: 'complete', reason: UNADMITTED_REASON[admission], counts, report };
+    }
+    return { status: 'complete', reason: 'no-memories', counts, report };
   }
-  if (memories.length === 0) return { status: 'complete', reason: 'no-memories', counts, report };
+  const notes = [
+    ...(admission === 'admitted' ? [] : ['judged below the bar, not refuted: stored']),
+    ...(leftOut === null ? [] : [leftOut.note]),
+  ];
   return {
     status: 'complete',
     counts,
     report,
-    ...(admission === 'admitted' ? {} : { note: 'judged below the bar, not refuted: stored' }),
+    ...(leftOut === null ? {} : { reason: leftOut.reason }),
+    ...(notes.length === 0 ? {} : { note: notes.join('; ') }),
     output: { source: child, digested: { digestRunId: child.runId, memories } },
   };
 }

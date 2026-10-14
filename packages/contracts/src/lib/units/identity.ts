@@ -2,7 +2,8 @@
  * A unit's identity as declared facts, and the one key every process compares
  * them by. The validator that cuts a forbidden taskStart and the domain that
  * keeps the record both call these, so the two can never disagree on whether
- * two values name the same thing.
+ * two values name the same thing; and the key a memory recorded for one unit
+ * of work is read back by (`unitKeyOf`) is that same identity.
  */
 import { z } from 'zod';
 
@@ -52,6 +53,49 @@ export const identityKey = (facets: readonly UnitFacet[]): string =>
     .sort(byName)
     .map((facet) => `${facet.name}=${facetKey(facet.value)}`)
     .join('\n');
+
+/**
+ * The most `facetKey` grows a value: keyed, one code point becomes at most
+ * eighteen UTF-16 code units (U+FDFA, under NFKC), so a value keys to at most
+ * eighteen times its length. Measured 2026-10-14 over every code point.
+ */
+const FACET_KEY_GROWTH = 18;
+
+/**
+ * The longest key `unitKeyOf` composes: every facet a plan may carry, each
+ * its name, an `=` and its value keyed at the most keying grows it, with a
+ * newline between facets. A unit that carries no facets is keyed by its own
+ * id, far shorter. Derived from the facets' own bounds, so the schema never
+ * refuses a key the engine composed.
+ */
+const UNIT_KEY_MAX_LENGTH =
+  UNIT_FACETS_BOUND.ceiling *
+    (UNIT_FACET_NAME_MAX_LENGTH + 1 + FACET_KEY_GROWTH * UNIT_FACET_VALUE_MAX_LENGTH) +
+  UNIT_FACETS_BOUND.ceiling -
+  1;
+
+/**
+ * A unit of work as its composer names it (`unitKeyOf`): an opaque key that
+ * whatever is recorded of one unit carries, and that is compared, never read
+ * for what it says.
+ */
+export const unitKeySchema = bounded.id(UNIT_KEY_MAX_LENGTH, { min: 1 });
+
+/**
+ * The key of a unit of work: its identity key when it carries the facets its
+ * mission declares — the sameness the advisor, the plan validator and the
+ * record already compare units by, so two units of one identity are one unit
+ * here too — and its own id when it carries none. What is recorded of one
+ * unit is recorded under this key and read back only for a unit of the same
+ * key; a mission that needs two units of one identity kept apart declares a
+ * finer identity. The key names no mission, as the identity the advisor and
+ * the record compare by names none: two missions declaring the same facets
+ * read one another's unit memories for units of the same values, so a
+ * mission whose units must stay apart from another's declares facets of its
+ * own.
+ */
+export const unitKeyOf = (unit: { id: string; facets: readonly UnitFacet[] }): string =>
+  unit.facets.length > 0 ? identityKey(unit.facets) : unit.id;
 
 /** Whether a claim's facets match a record's identity: every facet the record names has the same key on the claim. */
 export function matchesRecord(

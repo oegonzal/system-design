@@ -3,10 +3,11 @@
  * pure of every port. What a field asks (`fieldQuestionOf`) is the probe: a
  * taught answer's condition is written as that very text, so the stored
  * condition and the next probe are one, and no model is asked to derive one.
- * The search reads only what documents taught about the subject. Each field's
- * hits are fused on their own, then dealt out by rank under one cap — every
- * field's best before any field's second — so neither the first fields nor
- * the last are crowded out by a long page.
+ * The search reads only what documents taught about the subject, and of what
+ * was recorded for one unit of work, only the unit the page names. Each
+ * field's hits are fused on their own, then dealt out by rank under one cap —
+ * every field's best before any field's second — so neither the first fields
+ * nor the last are crowded out by a long page.
  */
 import {
   DEFAULT_MEMORY_SCOPE,
@@ -88,23 +89,31 @@ export function fieldProbes(fields: readonly FieldSpec[]): FieldProbeSet {
 
 /**
  * What a form's answer may rest on: what a document taught about the subject
- * — facts, stories and the bounds on claiming them. Never a design lesson: a
- * probe for this person's career must not return engineering knowledge.
- * Measured 2026-10-10: a page asking "Do you reside in CST or EST?" spent two
- * of its evidence slots on time-zone lessons from design runs.
+ * — facts, stories and the bounds on claiming them — and, of what was
+ * recorded for one unit of work, only what was recorded for the unit the page
+ * names (`unitKey`; none when it names none). Never a design lesson: a probe
+ * for this person's career must not return engineering knowledge. Measured
+ * 2026-10-10: a page asking "Do you reside in CST or EST?" spent two of its
+ * evidence slots on time-zone lessons from design runs.
  */
-export const FORM_EVIDENCE_FILTER: ProbeFilter = { kinds: DOCUMENT_MEMORY_KINDS };
+const formEvidenceFilter = (unitKey: string | undefined): ProbeFilter => ({
+  kinds: DOCUMENT_MEMORY_KINDS,
+  ...(unitKey === undefined ? {} : { unitKey }),
+});
 
-/** Every named vector asked of every probe, as one batch, each under its probe's budget and the one filter. */
+/** Every named vector asked of every probe, as one batch, each under its probe's budget and the page's one filter. */
 export const searchProbes = (
   vectors: readonly (readonly number[])[],
   limits: readonly number[],
-): MemoryProbe[] =>
-  vectors.flatMap((vector, index) => {
+  unitKey: string | undefined,
+): MemoryProbe[] => {
+  const filter = formEvidenceFilter(unitKey);
+  return vectors.flatMap((vector, index) => {
     const limit = limits[index];
     if (limit === undefined) throw new Error(`probe ${index} has no budget`);
-    return VECTOR_NAMES.map((using) => ({ vector, using, limit, filter: FORM_EVIDENCE_FILTER }));
+    return VECTOR_NAMES.map((using) => ({ vector, using, limit, filter }));
   });
+};
 
 /** The ranked lists that answer probe `index`: one per named vector, as `searchProbes` asked them. */
 export const probeLists = (

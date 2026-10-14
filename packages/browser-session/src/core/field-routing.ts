@@ -15,11 +15,12 @@ import type { BrainFaulted } from './ports';
 /**
  * The contracts' route table, with the one thing only a running session
  * knows: what the operator already answered. A field the operator settled
- * earlier in the session — the same question on a later form, told apart by
- * `fieldQuestionOf` — is filled with that answer rather than asked again, and
- * the row says so. The precedence
- * the contracts declare is untouched: a hidden field stays blank before the
- * cache is consulted, because the cache only ever stands in for an ask.
+ * earlier in the same unit of work — the same question on a later form, told
+ * apart by `fieldQuestionOf` — is filled with that answer rather than asked
+ * again, and the row says so; the session hands in the open unit's answers
+ * alone (`openUnitAnswers`). The precedence the contracts declare is
+ * untouched: a hidden field stays blank before the cache is consulted,
+ * because the cache only ever stands in for an ask.
  */
 export interface RoutedField extends FieldReadout {
   /** True when the operator's earlier answer filled the field. */

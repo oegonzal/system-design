@@ -182,7 +182,8 @@ describe('the document-memory steps', () => {
     const artifact = sampleDocumentDigest({ memories: [{ ...role, scope: 'unit' }, home] });
     const faulted = [faulting(SCOPE_FINDING_TYPE, ['memory.1'])];
     for (const scope of MEMORY_SCOPES) {
-      const goal = renderDocumentGoal({ ...resumeChunk(), scope });
+      // Naming its unit of work, as a document declaring a scope bound to one must.
+      const goal = renderDocumentGoal({ ...resumeChunk(), scope, unitKey: 'U' });
       const digested = await digest(
         ctx(child(digestTrace('accept', { goal, artifact, findings: faulted })), { goal }),
       );
@@ -221,19 +222,43 @@ describe('the document-memory steps', () => {
       }
     }
 
-    // A document that declares nothing keeps the scopes its digest wrote, and
-    // there the same finding withholds the memory it names.
-    const own = await digest(ctx(child(digestTrace('accept', { artifact }))));
+    // A document that declares nothing keeps the scopes its digest wrote — the
+    // unit one for the unit of work it names — and there the same finding
+    // withholds the memory it names.
+    const named = renderDocumentGoal({ ...resumeChunk(), unitKey: 'U' });
+    const own = await digest(
+      ctx(child(digestTrace('accept', { goal: named, artifact })), { goal: named }),
+    );
     expect(own.report).not.toHaveProperty('scope');
     expect(own.output?.digested.memories.map((memory) => memory.scope)).toEqual([
       'unit',
       'subject',
     ]);
     const withheld = await digest(
-      ctx(child(digestTrace('accept', { artifact, findings: faulted }))),
+      ctx(child(digestTrace('accept', { goal: named, artifact, findings: faulted })), {
+        goal: named,
+      }),
     );
     expect(withheld).toMatchObject({ status: 'complete', counts: { memories: 2, kept: 1 } });
     expect(withheld.output?.digested.memories.map((memory) => memory.position)).toEqual([2]);
+  });
+
+  it('[QL-71] a document naming no unit of work withholds each memory bound to one, counted and given as the reason beside what it stores — never read as a chunk holding no fact', async () => {
+    const [role, home] = sampleDocumentDigest().memories;
+    const bound = { ...role, scope: 'unit' as const };
+    const unnamed = '1 withheld: bound to a unit of work, in a document that names none';
+    const mixed = sampleDocumentDigest({ memories: [bound, home] });
+    const some = await digest(ctx(child(digestTrace('revise', { artifact: mixed }))));
+    expect(some).toMatchObject({
+      reason: 'unit-unnamed',
+      note: `judged below the bar, not refuted: stored; ${unnamed}`,
+      counts: { memories: 2, kept: 1, 'unit-unnamed': 1 },
+    });
+    expect(some.output?.digested.memories.map((memory) => memory.position)).toEqual([2]);
+    const artifact = sampleDocumentDigest({ memories: [bound, { ...home, scope: 'unit' }] });
+    const none = await digest(ctx(child(digestTrace('accept', { artifact }))));
+    expect(none).toMatchObject({ reason: 'unit-unnamed', counts: { kept: 0, 'unit-unnamed': 2 } });
+    expect(none.output).toBeUndefined();
   });
 
   it('[QL-40] digest says why it endorsed nothing, and never calls an unjudged digest a shortfall', async () => {

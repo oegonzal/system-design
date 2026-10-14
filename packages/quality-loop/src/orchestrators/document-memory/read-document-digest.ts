@@ -11,10 +11,19 @@
  * goal's index is an engine fact, the digest's scope a model's — and what
  * withholds is the table the pipeline declares for that case, under which a
  * scope finding withholds nothing (`WITHHOLDING_UNDER_DECLARED_SCOPE`).
+ *
+ * A document that names a unit of work settles which unit every memory of
+ * it bound to one was recorded for: each such memory carries the unit's key,
+ * so a search names the unit to read it. One that names none has no unit to
+ * give such a memory, and no search would ever read it: the memory is
+ * withheld, named by the index (`UNIT_UNNAMED`), and stays in the run's
+ * record rather than standing in the store unread — and the digest step
+ * counts what it withheld so, and gives its reason, so the chunk is never
+ * read as one whose facts are all stored.
  */
-import type { Admission } from '@sysdesign/contracts';
+import { isUnitBound, type Admission, type DocumentMemoryStepReason } from '@sysdesign/contracts';
 
-import { withholdingOf, type RunOutputs } from '../../core/outputs';
+import { withholdingOf, type RunOutputs, type WithheldItem } from '../../core/outputs';
 import {
   DOCUMENT_DIGEST,
   WITHHOLDING_UNDER_DECLARED_SCOPE,
@@ -25,13 +34,25 @@ import { ADMITTED_ONLY, endorsedMemories, type DigestReadout } from '../memory/d
 
 const WITHHOLDING = withholdingOf(DOCUMENT_DIGEST);
 
+/**
+ * Why a memory bound to a unit of work, of a document that names none, is
+ * withheld: by the index, under the orchestrator's declared reason, which the
+ * digest step gives and counts its memories under.
+ */
+export const UNIT_UNNAMED = {
+  source: 'index',
+  by: 'unit-unnamed',
+  note: 'bound to a unit of work, in a document that names none: no search would read it',
+} as const satisfies Omit<WithheldItem, 'ref'> & { by: DocumentMemoryStepReason };
+
 export const readDocumentDigest = (
   outputs: RunOutputs,
   acceptAt: number,
   /** The admissions drawn on; the digest step passes the orchestrator's own declaration. */
   admits: readonly Admission[] = ADMITTED_ONLY,
 ): DigestReadout => {
-  const declared = readIndex(outputs.trace.contract.goal)?.document.scope;
+  const document = readIndex(outputs.trace.contract.goal)?.document;
+  const declared = document?.scope;
   const readout = endorsedMemories(
     outputs,
     acceptAt,
@@ -42,9 +63,27 @@ export const readDocumentDigest = (
     },
     admits,
   );
-  if (declared === undefined) return readout;
+  const scoped =
+    declared === undefined
+      ? readout.memories
+      : readout.memories.map((memory) => ({ ...memory, scope: declared }));
+  const unitKey = document?.unitKey;
+  if (unitKey !== undefined) {
+    return {
+      ...readout,
+      memories: scoped.map((memory) =>
+        isUnitBound(memory.scope) ? { ...memory, unitKey } : memory,
+      ),
+    };
+  }
   return {
     ...readout,
-    memories: readout.memories.map((memory) => ({ ...memory, scope: declared })),
+    memories: scoped.filter((memory) => !isUnitBound(memory.scope)),
+    withheld: [
+      ...readout.withheld,
+      ...scoped
+        .filter((memory) => isUnitBound(memory.scope))
+        .map((memory) => ({ ref: `memory.${memory.position}`, ...UNIT_UNNAMED })),
+    ],
   };
 };

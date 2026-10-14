@@ -1,12 +1,13 @@
 /**
  * The goal codec of the `document-digest` pipeline. A document chunk — a
- * résumé page, a notes file, the operator's answers from one session — is
+ * résumé page, a notes file, the operator's answers in one unit of work — is
  * rendered by the program that owns the document (the ingester, the browser
  * session) as the goal every stage reads: numbered sections the model cites
  * by alias, the rules, and the index the validators read back.
  */
 import { z } from 'zod';
 
+import { unitKeySchema } from '../units/identity';
 import { readFencedIndex, renderIndexSection, withinBudget } from './goal-index';
 
 export const DOCUMENT_DIGEST_ID = 'document-digest';
@@ -75,6 +76,30 @@ export const MEMORY_SCOPE_USES: Readonly<Record<MemoryScope, string>> = {
 /** Every document memory written before scopes were declared was a document's fact about the subject. */
 export const DEFAULT_MEMORY_SCOPE: MemoryScope = 'subject';
 
+/**
+ * Which scopes bind a memory to the one unit of work it was recorded for — a
+ * total table, so a new scope is classified or the build refuses. A memory of
+ * a bound scope is stored with its unit's key and read only by a search that
+ * names that unit; every other memory is read by any search.
+ */
+const SCOPE_BOUND_TO_UNIT: Readonly<Record<MemoryScope, boolean>> = {
+  subject: false,
+  unit: true,
+};
+
+/** The scopes bound to a unit of work, as the store's filter names them. */
+export const UNIT_BOUND_SCOPES: readonly MemoryScope[] = MEMORY_SCOPES.filter(
+  (scope) => SCOPE_BOUND_TO_UNIT[scope],
+);
+
+/**
+ * Whether a memory of this scope is bound to a unit of work. One stored with
+ * no scope is not: the store's filter reads a missing scope as matching no
+ * bound one, and every reader of a memory reads it the same way.
+ */
+export const isUnitBound = (scope: MemoryScope | undefined): boolean =>
+  scope !== undefined && UNIT_BOUND_SCOPES.includes(scope);
+
 /** Engine-assigned: the part's position, never anything the model wrote. */
 export const sectionAlias = (position: number): string => `section.${position + 1}`;
 export const SECTION_ALIAS = /^section\.\d+$/;
@@ -98,6 +123,15 @@ const documentHeadShape = {
    * declare one: the ingester names a chunk by its goal's hash.
    */
   scope: z.enum(MEMORY_SCOPES).optional(),
+  /**
+   * The unit of work the document's memories bound to one were recorded for,
+   * as its composer names it (`unitKeyOf`): an operator's answers given in one
+   * unit. Written to the index only — never to the head line, the rules or
+   * the limits, so no lens is told of it — and stamped by the document reader
+   * on each such memory. Absent when the document names none, as no document
+   * the ingester renders does, so its goal renders as before a document could.
+   */
+  unitKey: unitKeySchema.optional(),
   chunk: z.strictObject({ index: z.number().int().min(1), of: z.number().int().min(1) }),
 };
 
@@ -157,6 +191,7 @@ const indexOf = (chunk: DocumentChunk): DocumentIndex => ({
     subject: chunk.subject,
     date: chunk.date,
     ...(chunk.scope === undefined ? {} : { scope: chunk.scope }),
+    ...(chunk.unitKey === undefined ? {} : { unitKey: chunk.unitKey }),
     chunk: chunk.chunk,
   },
   evidence: chunk.parts.map((_, position) => ({

@@ -89,6 +89,8 @@ export function chunksOf(
       model,
       // Where the fact holds, when its digest or document declared it; a reader defaults the rest.
       ...(memory.scope === undefined ? {} : { scope: memory.scope }),
+      // The unit a fact bound to one was recorded for, as its document named it.
+      ...(memory.unitKey === undefined ? {} : { unitKey: memory.unitKey }),
     };
   });
 }

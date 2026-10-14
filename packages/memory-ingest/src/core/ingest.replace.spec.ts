@@ -3,6 +3,7 @@ import { LoopRefused } from '@sysdesign/loop-client';
 import { FIXED_NOW, manifestEntry, scriptedReader, type InMemoryLedger } from '../test/fakes';
 import {
   bullet,
+  FACTS_LEFT_OUT,
   harness,
   LOOP_URL,
   NO_FACTS,
@@ -187,7 +188,7 @@ describe('ingest, replacing a document', () => {
     expect(standing(ledger)).toEqual(['digest-run-4', 'digest-run-5', 'digest-run-6']);
   });
 
-  it('[ING-3] a chunk settled with no fact to store covers it, so its document is replaced; one settled with its facts out of the store holds the replacement back, the report naming the chunk and the earlier runs that still stand', async () => {
+  it('[ING-3] a chunk settled with no fact to store covers it, so its document is replaced; one settled with its facts out of the store — none stored, or the rest stored with some withheld — holds the replacement back, the report naming the chunk and the earlier runs that still stand', async () => {
     const { deps, loop, ledger, script } = harness();
     await ingest(['notes.md'], options(), deps);
     deps.reader = scriptedReader({ 'notes.md': EDITED });
@@ -200,14 +201,19 @@ describe('ingest, replacing a document', () => {
       replaced: null,
       heldBack: { chunk: 2, outcome: 'unstored', earlierRuns: 1 },
     });
+    // Stored, a fact of the chunk withheld: not covered either, so posted again and held back.
+    script(FACTS_LEFT_OUT);
+    const partial = await ingest(['notes.md'], options(), deps);
+    expect(outcomes(partial)).toEqual(['skipped', 'unstored', 'skipped']);
+    expect(partial.files[0]).toMatchObject({ replaced: null, heldBack: { chunk: 2 } });
     expect(loop.retracted).toEqual([]);
 
     script(NO_FACTS);
     const replaced = await ingest(['notes.md'], options(), deps);
     expect(outcomes(replaced)).toEqual(['skipped', 'no-facts', 'skipped']);
     expect(replaced.files[0]?.heldBack).toBeNull();
-    // The edit's earlier digest goes, and so does the run that judged the chunk and stored nothing.
-    expect(loop.retracted).toEqual(['digest-run-2', 'not-accepted-run']);
+    // The edit's earlier digest goes, and so do the runs that judged the chunk and left its facts out.
+    expect(loop.retracted).toEqual(['digest-run-2', 'not-accepted-run', 'left-out-run']);
     expect(standing(ledger)).toEqual(['digest-run-1', 'digest-run-3', 'no-facts-run']);
   });
 

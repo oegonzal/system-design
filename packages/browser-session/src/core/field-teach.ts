@@ -4,7 +4,7 @@ import {
   GUIDANCE_ANSWER_MAX_LENGTH,
   GUIDANCE_PAGE_MAX_LENGTH,
   GUIDANCE_QUESTION_MAX_LENGTH,
-  guidanceDocument,
+  guidanceDocuments,
   operatorGuidanceSchema,
   OPTIONS_SHOWN,
   SUGGESTION_BASES,
@@ -21,11 +21,13 @@ import { settled } from './field-fill';
 import type { AnswerSource } from './operator-interaction';
 import { BrainFaulted } from './ports';
 import { stepJsonFile } from './session-dump';
+import { openUnitAnswers, openUnitFilled, openUnitKeyOf } from './session-state';
 
 /**
  * What the operator answered, kept for this session and taught to the memory:
- * `remember` caches an answer for the next form that asks the same and shapes
- * it as the item the guidance document carries, keyed by what the field asks;
+ * `remember` caches an answer for the next form of the same unit of work that
+ * asks the same and shapes it as the item the guidance document carries,
+ * keyed by what the field asks and recorded for the unit it was given in;
  * `teach` hands one item to the memory as its own document the moment it is
  * given.
  */
@@ -40,10 +42,10 @@ const suggestionBasisOf = (chosen: AnswerSource | null): SuggestionBasis | null 
     : null;
 
 /**
- * Keep what the operator said for the next form that asks the same, and shape
- * it as the item taught back at once — or null for a field that asks nothing
- * it can be told by, which no probe could ever find again: kept for the
- * session, taught to nobody, and said so.
+ * Keep what the operator said for the next form of the same unit of work
+ * that asks the same, and shape it as the item taught back at once — or null
+ * for a field that asks nothing it can be told by, which no probe could ever
+ * find again: kept for the session, taught to nobody, and said so.
  */
 export function remember(
   ctx: EngineContext,
@@ -53,8 +55,8 @@ export function remember(
   chosen: AnswerSource | null,
 ): OperatorGuidanceDto | null {
   const { state, deps } = ctx;
-  settled(state.operatorAnswers, field, answer);
-  settled(state.filled, field, answer);
+  settled(openUnitAnswers(state), field, answer);
+  settled(openUnitFilled(state), field, answer);
   const question = fieldQuestionOf(field);
   if (question === null) {
     deps.warn(
@@ -72,20 +74,23 @@ export function remember(
       // What the step goal would show of them: a list of hundreds is no fact worth storing.
       options: field.options === null ? null : field.options.slice(0, OPTIONS_SHOWN),
     },
-    context: { taskLabel: state.tasks.open?.label ?? null, page: page === '' ? null : page },
+    context: {
+      taskLabel: state.tasks.open?.label ?? null,
+      unitKey: openUnitKeyOf(state),
+      page: page === '' ? null : page,
+    },
     answer: excerpt(answer, GUIDANCE_ANSWER_MAX_LENGTH),
     chosen: suggestionBasisOf(chosen),
   }) as OperatorGuidanceDto;
 }
 
-const day = (at: Date): string => at.toISOString().slice(0, 10);
-
 /**
  * One operator answer handed to the memory as soon as it is given, as its
- * own guidance document, the orchestration id written onto the decision row
- * it came from. At once rather than when the unit of work closes: measured
- * 2026-10-07, a unit that never closed taught nothing, and the one answer
- * the memory lacked would have been asked again the next session.
+ * own guidance document — naming the unit of work it was given in — the
+ * orchestration id written onto the decision row it came from. At once
+ * rather than when the unit of work closes: measured 2026-10-07, a unit that
+ * never closed taught nothing, and the one answer the memory lacked would
+ * have been asked again the next session.
  */
 export async function teach(
   ctx: EngineContext,
@@ -93,11 +98,11 @@ export async function teach(
   item: OperatorGuidanceDto,
 ): Promise<void> {
   const { state, deps, queue } = ctx;
-  const document = guidanceDocument(
+  const [{ document }] = guidanceDocuments(
     state.sessionId,
     ctx.options.subject,
     [item],
-    day(deps.clock.now()),
+    (one) => one,
   );
   const question = quoted(excerpt(item.field.question, TAUGHT_QUESTION_QUOTED));
   try {

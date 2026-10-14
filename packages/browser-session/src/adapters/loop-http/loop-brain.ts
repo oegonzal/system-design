@@ -173,9 +173,10 @@ export class LoopBrain implements BrainPort {
 
   /**
    * One form pipeline over the fields, through the form-memory orchestration:
-   * the goal composed for the pipeline named, the run it opened read back, and
-   * what the orchestration reported of it — its admission, and the locations
-   * a reader withholds.
+   * the goal composed for the pipeline named — its index naming the open unit
+   * of work, whose memories alone of those bound to a unit the recall reads —
+   * the run it opened read back, and what the orchestration reported of it:
+   * its admission, and the locations a reader withholds.
    */
   private formRun<T>(
     input: FieldsInput,
@@ -188,6 +189,7 @@ export class LoopBrain implements BrainPort {
         prose: renderFieldProse(input),
         fields: input.fields,
         evidence: [],
+        ...(input.task === null ? {} : { unitKey: input.task.unitKey }),
       });
       const { orchestrationRunId } = await this.client.startOrchestration(
         FORM_MEMORY_ORCHESTRATOR_ID,

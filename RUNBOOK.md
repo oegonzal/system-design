@@ -253,10 +253,14 @@ list of what the store has yet to learn.
 stop conditions and never-do rules — and decides nothing itself. Each page is
 a `browser-step` run that returns a bounded plan; each form page is a
 `form-memory` orchestration that recalls facts about you from the memory
-store without a model call and runs `field-answer` over them; a field the
-loop could not settle is put to you at the terminal and, with the
-notifications service running, on Telegram at once — the first answer is
-taken — and what you answer is taught back as a `guidance` document. The
+store without a model call — of what was recorded for one application, only
+what was recorded for an application of the same identity as the page's:
+with the Easy Apply mission, which declares the company as a unit's
+identity, any application at that company — and runs `field-answer` over
+them; a field the loop could not settle is put to you at the terminal and,
+with the notifications service running, on Telegram at once — the first
+answer is taken — and what you answer is taught back as a `guidance`
+document naming the unit of work it was given in by that identity. The
 LinkedIn Easy Apply flow is `packages/browser-session/goals/linkedin-easy-apply.md`;
 the same program runs any goal.
 
@@ -298,8 +302,8 @@ is gitignored, as are the traces and the ingest manifest.
 Before any of this is useful, give the store facts about you:
 
 ```bash
-pnpm memory-ingest ingest docs/ingestion/Resume_2026_c.pdf --kind resume --subject "Your Name" --dry-run   # what would be posted
-pnpm memory-ingest ingest docs/ingestion/Resume_2026_c.pdf notes.md --kind notes --subject "Your Name"    # posts, one chunk at a time
+pnpm memory-ingest ingest docs/ingestion/Resume_2026_c.pdf --kind resume --scope subject --subject "Your Name" --dry-run   # what would be posted
+pnpm memory-ingest ingest docs/ingestion/Resume_2026_c.pdf notes.md --kind notes --scope subject --subject "Your Name"    # posts, one chunk at a time
 pnpm memory-ingest export-studio --out docs/ingestion/studio                             # your own experience profiles and STAR stories, as documents; practice withheld
 pnpm memory-ingest ingest docs/ingestion/studio/studio-experiences.md --kind notes --scope subject --date <the day you exported>   # … ingested like any notes
 pnpm memory-ingest status                                                                # how each chunk's digest went
@@ -325,11 +329,20 @@ whole again.
 Each chunk is one `document-memory` orchestration: a `document-digest` run
 turns the chunk into facts a form field could take, with grounding critics
 in front of the store, and the manifest at `static/memory-ingest/manifest.json`
-skips what was already ingested unless `--force`. Reading it back the way a
-form page would — the field's own words as the probe, both named vectors, the
-hits per field type, the dealt evidence:
+skips what was already ingested unless `--force`. Declare `--scope subject`
+for a document about you: a file names no application, so a fact its digest
+would scope to one is withheld rather than stored where no search reads it,
+and `--scope unit` is refused. A chunk whose digest withheld one reads
+`unstored` (`unit-unnamed`), and the document's earlier digests stand beside
+what it did store until a run with `--scope subject` stores it whole and
+retracts both. Reading it back the way a form page would —
+the field's own words as the probe, both named vectors, the hits per field
+type, the dealt evidence:
 `POST :3003/memory/form-retrieval-report {"fields": [{"name": "How many years of TypeScript?"}]}`
-should rank the fact first for that field.
+should rank the fact first for that field. Add `"unitKey": "company=acme"` —
+the key a page of an application at that company names in its goal's index —
+to read what was recorded for applications at that company too; every hit
+lists its kind, scope and unit.
 
 ### Standing answers: what every form asks and no résumé states
 
@@ -393,10 +406,12 @@ sentence. A fact about one employer belongs under
 that you answer No to having worked for, been referred to, or knowing anyone
 at any organization other than those employers: that is what settles such a
 question for an employer you never applied to, since an answer given about
-another application settles nothing for this one. The standing answers are
-yours wherever asked, so the document declares it with `--scope subject` —
-the scope test would otherwise file "working or knowing someone there" under
-one application. Then:
+another application settles nothing for this one — a page is never even
+shown the answers given for an application at another company. The standing
+answers are yours wherever asked, so the document declares it with
+`--scope subject` — the scope test would otherwise bind "working or knowing
+someone there" to one application, which a file never names, and withhold
+it. Then:
 
 ```bash
 pnpm memory-ingest ingest docs/ingestion/standing-answers.md --kind notes --scope subject --subject "Your Name" --date 2026-10-12
@@ -407,7 +422,9 @@ pnpm memory-ingest ingest docs/ingestion/standing-answers.md --kind notes --scop
 A measured note: a plan costs four model calls and an answer page four more,
 about 45 s each on the subscription login, so one application with three
 form pages is roughly ten to twenty minutes of model time plus whatever you
-type. Operator answers are cached for the session by field label.
+type. Operator answers, and every value the session settled into a field, are
+cached for the unit of work they were given in — with Easy Apply, every
+application at the same company — by what the field asks.
 
 ## Scattering applications across companies
 

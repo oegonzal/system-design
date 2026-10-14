@@ -26,6 +26,7 @@ import {
   type OperatorReply,
 } from './operator-interaction';
 import { OperatorInterrupted, QuestionWithdrawn, type Withdrawal } from './ports';
+import { formTaskOf } from './session-state';
 
 /**
  * Putting a field to the operator, with the suggested answers readied for it.
@@ -114,14 +115,7 @@ export class SuggestionsPrefetch {
       .suggestAnswers({
         session: { sessionId: state.sessionId, step },
         mission: ctx.mission,
-        task:
-          state.tasks.open === null
-            ? null
-            : {
-                label: state.tasks.open.label,
-                url: state.tasks.open.url,
-                facets: [...state.tasks.open.facets],
-              },
+        task: formTaskOf(state),
         fields,
         criteria: ctx.criteria.suggest,
       })

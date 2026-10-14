@@ -94,13 +94,14 @@ describe('the form recall’s probes', () => {
     });
   });
 
-  it('[QL-38] every probe is asked of every named vector in one batch, each under its own budget, and only of what documents taught about the subject', () => {
+  it('[QL-38] [QL-71] every probe is asked of every named vector in one batch, each under its own budget, and only of what documents taught about the subject — of what was recorded for one unit of work, only the unit the page names', () => {
     const probes = searchProbes(
       [
         [1, 0],
         [0, 1],
       ],
       [3, 6],
+      'company=acme',
     );
     expect(probes.map((probe) => [probe.using, probe.limit])).toEqual([
       ['condition', 3],
@@ -108,10 +109,15 @@ describe('the form recall’s probes', () => {
       ['condition', 6],
       ['lesson', 6],
     ]);
-    expect(() => searchProbes([[1, 0]], [])).toThrow('probe 0 has no budget');
+    expect(() => searchProbes([[1, 0]], [], undefined)).toThrow('probe 0 has no budget');
     // Never a design lesson: a probe for this person's career reads the kinds a document teaches.
     expect(probes.every((probe) => probe.filter?.kinds === DOCUMENT_MEMORY_KINDS)).toBe(true);
     expect(DOCUMENT_MEMORY_KINDS).not.toContain('lesson');
+    // Every probe names the page's unit; a page naming none names none, and reads no unit's memories.
+    expect(probes.every((probe) => probe.filter?.unitKey === 'company=acme')).toBe(true);
+    expect(
+      searchProbes([[1, 0]], [3], undefined).every((probe) => probe.filter?.unitKey === undefined),
+    ).toBe(true);
     expect(probes.map((probe) => probe.vector)).toEqual([
       [1, 0],
       [1, 0],

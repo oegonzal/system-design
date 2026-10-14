@@ -1,34 +1,23 @@
 import { QdrantClient } from '@qdrant/js-client-rest';
+import type { MemoryScope } from '@sysdesign/contracts';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { collectionName, INDEXED_FIELDS, pointId, toPayload } from './collection';
 import { DEFAULT_QDRANT_URL, QdrantMemoryStore } from './qdrant-memory-store';
+import type { MemoryHit, MemoryProbe } from '../../../orchestrators/memory/ports';
 import { hitOf } from '../../../orchestrators/memory/testing';
-import { InMemoryMemoryStore, vectorOf } from '../testing';
+import { chunkSourceSchema } from '../../../pipelines/memory-recall/input';
+import { InMemoryMemoryStore, storedChunkOf } from '../testing';
 
 const url = process.env['QDRANT_URL'] || DEFAULT_QDRANT_URL;
 const model = `spec-${crypto.randomUUID().slice(0, 8)}`;
+/** A second throwaway collection, holding only what the unit-of-work case seeds. */
+const unitsModel = `${model}-units`;
 const DIMENSIONS = 4;
 
 /** A lesson indexed both ways, as `chunksOf` produces it. */
-const chunk = (text: string, runId: string, ref: string) => {
-  const hit = hitOf(text, runId, ref);
-  const keys = { condition: `when ${text}`, lesson: text };
-  return {
-    text: hit.text,
-    keys,
-    contentHash: hit.contentHash,
-    source: hit.source,
-    evidence: hit.evidence,
-    digestRunId: hit.digestRunId,
-    lineage: hit.lineage,
-    model,
-    vectors: {
-      condition: vectorOf(keys.condition, DIMENSIONS),
-      lesson: vectorOf(keys.lesson, DIMENSIONS),
-    },
-  };
-};
+const chunk = (text: string, runId: string, ref: string) =>
+  storedChunkOf({ ...hitOf(text, runId, ref), model }, DIMENSIONS);
 
 describe('the Qdrant memory store', () => {
   const client = new QdrantClient({ url, checkCompatibility: false });
@@ -47,7 +36,9 @@ describe('the Qdrant memory store', () => {
   });
 
   afterAll(async () => {
-    await client.deleteCollection(collectionName(model, DIMENSIONS));
+    for (const name of [model, unitsModel].map((each) => collectionName(each, DIMENSIONS))) {
+      if ((await client.collectionExists(name)).exists) await client.deleteCollection(name);
+    }
   });
 
   it('[QL-17] binds a collection to the model and width, replaces a run idempotently, and searches with payload round trip', async () => {
@@ -285,7 +276,7 @@ describe('the Qdrant memory store', () => {
     expect(await store.retractRun('run-u1')).toBe(1);
     expect((await store.verify()).chunks).toBe(before);
   });
-  it('[QL-69] [QL-70] the in-memory store answers a search and a retraction as this adapter does: the memory without its keys or vectors, with its scope and facets', async () => {
+  it('[QL-69] [QL-70] [QL-71] the in-memory store answers a search and a retraction as this adapter does: the memory without its keys or vectors, with its scope, its unit and its facets', async () => {
     const fake = new InMemoryMemoryStore(model, DIMENSIONS);
     const written = chunk('the subject works on the orders team', 'run-f1', 'memory.1');
     const fact = {
@@ -294,20 +285,26 @@ describe('the Qdrant memory store', () => {
       evidence: [{ kind: 'section' as const, ref: 'section.1' }],
       digestRunId: 'run-f1',
       scope: 'unit' as const,
+      unitKey: 'U',
       facets: { topics: ['employment'] },
     };
     for (const each of [store, fake]) await each.replaceRunChunks('run-f1', [fact]);
 
-    // A search: the same hit from both, but for each store's own cosine.
+    // A search naming the fact's unit: the same hit from both, but for each store's own cosine.
     const probe = {
       vector: fact.vectors.lesson,
       using: 'lesson' as const,
       limit: 1,
-      filter: { kinds: ['profile_fact' as const] },
+      filter: { kinds: ['profile_fact' as const], unitKey: 'U' },
     };
     const adapted = (await store.searchMany([probe]))[0].at(0);
     const faked = (await fake.searchMany([probe]))[0].at(0);
-    expect(adapted).toMatchObject({ text: fact.text, scope: 'unit', facets: fact.facets });
+    expect(adapted).toMatchObject({
+      text: fact.text,
+      scope: 'unit',
+      unitKey: 'U',
+      facets: fact.facets,
+    });
     expect({ ...faked, score: 0 }).toStrictEqual({ ...adapted, score: 0 });
     expect(faked?.score).toBeCloseTo(adapted?.score ?? Number.NaN, 5);
 
@@ -317,5 +314,85 @@ describe('the Qdrant memory store', () => {
     expect(removed.status).toBe('removed');
     expect(await fake.retractPoint(point)).toStrictEqual(removed);
     expect(await fake.retractPoint(point)).toStrictEqual(await store.retractPoint(point));
+  });
+
+  it('[QL-71] reads a memory bound to a unit of work only for a search naming its unit, refilling the slots it leaves inside the filter, and the in-memory store answers each such search with the same whole hits', async () => {
+    const units = new QdrantMemoryStore(client, unitsModel, DIMENSIONS);
+    const fake = new InMemoryMemoryStore(unitsModel, DIMENSIONS);
+    // The three memories no search naming none may read sit closest to the probe, so a
+    // filter applied after the fetch would leave a one-hit search with nothing.
+    const probe = [1, 0, 0, 0];
+    const at = (vector: number[]) => ({ condition: vector, lesson: vector });
+    const fact = (
+      runId: string,
+      ref: string,
+      vector: number[],
+      held: { scope: MemoryScope; unitKey?: string },
+    ) => {
+      const written = chunk(`fact ${runId} ${ref}`, runId, ref);
+      return {
+        ...written,
+        source: { ...written.source, pipeline: 'document-digest', kind: 'profile_fact' as const },
+        evidence: [{ kind: 'section' as const, ref: 'section.1' }],
+        digestRunId: runId,
+        vectors: at(vector),
+        ...held,
+      };
+    };
+    const lesson = chunk('page the listing by its last key', 'run-l', 'memory.1');
+    const seeded = {
+      'run-l': [{ ...lesson, vectors: at([0.1, 1, 0, 0]) }],
+      'run-s': [fact('run-s', 'memory.1', [0.05, 0, 1, 0], { scope: 'subject' })],
+      'run-u': [
+        fact('run-u', 'memory.1', [1, 0, 0, 0], { scope: 'unit', unitKey: 'U' }),
+        fact('run-u', 'memory.2', [0.99, 0.1, 0, 0], { scope: 'unit', unitKey: 'V' }),
+        fact('run-u', 'memory.3', [0.98, 0, 0.2, 0], { scope: 'unit' }),
+      ],
+    };
+    for (const each of [units, fake]) {
+      for (const [runId, chunks] of Object.entries(seeded)) {
+        await each.replaceRunChunks(runId, chunks);
+      }
+    }
+    const search = (limit: number, filter?: MemoryProbe['filter']): MemoryProbe => ({
+      vector: probe,
+      using: 'lesson',
+      limit,
+      ...(filter === undefined ? {} : { filter }),
+    });
+    const probes = [
+      search(10, { unitKey: 'U' }),
+      search(10),
+      search(10, { unitKey: 'U', notRunIds: ['run-s'] }),
+      search(1),
+    ];
+    const adapted = await units.searchMany(probes);
+    const faked = await fake.searchMany(probes);
+    const named = (hits: readonly MemoryHit[]) =>
+      hits.map((hit) => `${hit.source.runId}|${hit.source.ref}`).sort();
+    expect(adapted.slice(0, 3).map(named)).toEqual([
+      ['run-l|memory.1', 'run-s|memory.1', 'run-u|memory.1'],
+      ['run-l|memory.1', 'run-s|memory.1'],
+      ['run-l|memory.1', 'run-u|memory.1'],
+    ]);
+    // A one-hit search naming none is answered with one hit, though three it may not read rank above it.
+    expect(named(adapted[3] ?? [])).toEqual(['run-l|memory.1']);
+    // Whole hits, the score aside: the fake mirrors the adapter on every search.
+    const whole = (hits: readonly MemoryHit[]) =>
+      [...hits]
+        .sort(
+          (a, b) =>
+            a.source.ref.localeCompare(b.source.ref) ||
+            a.source.runId.localeCompare(b.source.runId),
+        )
+        .map(({ score, ...hit }) => {
+          void score;
+          return hit;
+        });
+    expect(faked.map(whole)).toStrictEqual(adapted.map(whole));
+    // A hit's source is exactly the recall pipeline's own shape: the unit rides beside it.
+    for (const hit of adapted.flat()) {
+      expect(Object.keys(hit.source).sort()).toEqual(Object.keys(chunkSourceSchema.shape).sort());
+    }
   });
 });

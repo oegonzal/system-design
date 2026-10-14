@@ -13,6 +13,7 @@ import {
   listingObservation,
   MISSION_FIXTURE,
   NO_UNITS_ON_RECORD,
+  readFieldIndex,
   renderDocumentGoal,
   resumeChunk,
   routePlan,
@@ -164,18 +165,19 @@ describe('the loop brain', () => {
     });
   });
 
-  it('[BRW-3] answers fields through the form-memory orchestration, reading the target run and the admission the server reports', async () => {
+  it('[BRW-3] [QL-71] answers fields through the form-memory orchestration — the goal’s index naming the open unit of work — reading the target run and the admission the server reports', async () => {
     const fields = formObservation().elements.slice(0, 2).map(fieldSpecOf);
     const input = {
       session: SESSION,
       mission: MISSION_FIXTURE,
-      task: { label: 'Acme', url: 'https://x.test/1', facets: [] },
+      task: { label: 'Acme', url: 'https://x.test/1', facets: [], unitKey: 'u-1' },
       fields,
       criteria: CRITERIA,
     };
     const admitted = harness(completeFormMemory(ANSWERS));
     const decided = await admitted.brain.answerFields(input);
     const started = admitted.core.orchestrations.startRequests[0];
+    expect(readFieldIndex(started?.request.goal ?? '')?.unitKey).toBe('u-1');
     expect(started?.orchestrator).toBe(FORM_MEMORY_ORCHESTRATOR_ID);
     expect(started?.request).toMatchObject({
       criteria: CRITERIA,

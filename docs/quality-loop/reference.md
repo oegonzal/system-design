@@ -342,8 +342,11 @@ kind and scope it held — the only record of it once the point is gone; under `
 matches no route rather than the run's own address. No retraction is recorded, so a re-index of a
 memory run stores again a lesson retracted from it.
 `POST /memory/form-retrieval-report` answers what a form page's recall would retrieve for a list of
-fields — each field's probe, both named vectors' rankings with cosines, its fused list and the dealt
-evidence — the form path's own measurement seam, as `retrieval-report` is the curated path's.
+fields under the unit of work the body names (`unitKey`; absent, the memories bound to a unit are
+read for none, as a page naming none reads them) — each field's probe, both named vectors' rankings
+with cosines, its fused list and the dealt evidence, every hit with the kind, scope and unit the
+store holds it under — the form path's own measurement seam, as `retrieval-report` is the curated
+path's.
 `POST /memory/retrieval-report` shows store availability, each probe's own ranking and the fused
 candidate list, without running a pipeline. `GET /memory/effectiveness` joins each recalling run's
 lessons to what the engine said changed in its next iteration — attributed at run level, which the

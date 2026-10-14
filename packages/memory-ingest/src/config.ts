@@ -1,6 +1,7 @@
 import {
   DOCUMENT_SUBJECT_MAX_LENGTH,
   GOAL_BUDGET_BYTES,
+  isUnitBound,
   MEMORY_SCOPES,
   type DocumentKind,
   type MemoryScope,
@@ -22,6 +23,14 @@ import { MAX_PARTS_PER_CHUNK, PARTS_PER_CHUNK } from './core/chunk';
 export const INGEST_KINDS = ['resume', 'notes'] as const satisfies readonly DocumentKind[];
 export type IngestKind = (typeof INGEST_KINDS)[number];
 export const DEFAULT_KIND: IngestKind = 'notes';
+
+/**
+ * The scopes a file may declare for every memory it states: those not bound
+ * to a unit of work. A file names no unit of work, and a memory bound to one
+ * is read only for the unit it was recorded for, so a document declaring such
+ * a scope could teach nothing any search reads.
+ */
+const INGEST_SCOPES: readonly MemoryScope[] = MEMORY_SCOPES.filter((scope) => !isUnitBound(scope));
 
 /** How large a rendered chunk goal may grow; well under the engine's budget so a digest reads one screen of facts. */
 export const DEFAULT_CHUNK_BYTES = 6000;
@@ -61,7 +70,7 @@ export const INGEST_FLAGS = {
   date: { type: 'string', describe: 'the day the documents speak for, as YYYY-MM-DD' },
   scope: {
     type: 'string',
-    describe: `the scope every memory of the documents takes, declared: ${MEMORY_SCOPES.join('|')} (default: each memory scoped by the scope test)`,
+    describe: `the scope every memory of the documents takes, declared: ${INGEST_SCOPES.join('|')} — none bound to a unit of work, which a file never names (default: each memory scoped by the scope test, one it binds to a unit withheld and its chunk left unstored)`,
   },
   limit: { type: 'string', describe: 'post at most this many chunks, then halt, the rest pending' },
   'parts-per-chunk': {
@@ -207,8 +216,10 @@ export function postLimit(raw: string | undefined): number | null {
 /** The scope the documents declare for every memory they state, null when they declare none, or a refusal naming the choices. */
 export function documentScope(raw: string | undefined): MemoryScope | null {
   if (raw === undefined) return null;
-  if (!(MEMORY_SCOPES as readonly string[]).includes(raw)) {
-    throw new IngestConfigError(`--scope must be one of ${MEMORY_SCOPES.join(', ')}, got ${raw}`);
+  if (!(INGEST_SCOPES as readonly string[]).includes(raw)) {
+    throw new IngestConfigError(
+      `--scope must be one of ${INGEST_SCOPES.join(', ')} — a file names no unit of work — got ${raw}`,
+    );
   }
   return raw as MemoryScope;
 }

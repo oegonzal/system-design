@@ -24,9 +24,11 @@ import {
   excerpt,
   quoted,
   ranActionOf,
+  unitKeyOf,
 } from '@sysdesign/contracts';
 
 import type { PendingExpectation } from './expectations';
+import type { FieldsInput } from './ports';
 import { remainingTasks, type RailState } from './rails';
 import type { CaptureRecord } from './session-dump';
 
@@ -45,6 +47,9 @@ export interface OpenTask {
   facets: readonly UnitFacet[];
   startStep: number;
 }
+
+/** A record kept per unit of work (`unitKeyOf`; null outside any), then by what each field asks (`fieldQuestionOf`). */
+type ByUnit = Map<string | null, Map<string, string>>;
 
 /** One operator answer handed to the memory, as the step's dump records it. */
 export interface Teaching {
@@ -107,16 +112,22 @@ export interface SessionState {
   pendingPass: { ids: readonly string[]; scope: 'session' | 'unit' } | null;
   /** What the last step did, as the next goal tells it; null before the first plan. */
   lastStep: LastStep | null;
-  /** The operator's answers this session, by what each field asks (`fieldQuestionOf`). */
-  operatorAnswers: Map<string, string>;
   /**
-   * What this session settled into fields, by what each asks — filled, kept, or
-   * answered by the operator — so a field that still holds one of these
-   * values is kept without a run. Measured 2026-10-07: three fields the site
-   * had filled were sent to the answerer thirty-two times, every fill
-   * writing the value the page already showed.
+   * The operator's answers this session: one stands in for an ask only in its
+   * own unit (`openUnitAnswers`). Measured 2026-10-14 over 61 session dumps,
+   * of 75 fields an earlier answer filled 72 were in its own unit, 3 had no
+   * recorded answer and none was in another: keeping them apart cost no fill.
    */
-  filled: Map<string, string>;
+  operatorAnswers: ByUnit;
+  /**
+   * What this session settled into fields — filled, kept, or answered by the
+   * operator — so a field still holding one of these values in its unit is
+   * kept without a run (`openUnitFilled`). Measured 2026-10-07: three fields
+   * the site had filled went to the answerer thirty-two times. Per unit, since
+   * a site may show one unit's answer in the next unit's form; over 71 dumps
+   * (2026-10-14) one field was ever kept so, in its own unit.
+   */
+  filled: ByUnit;
   /** What this step taught the memory, one record per operator answer, for the step's dump. */
   teachings: Teaching[];
   /** What this step captured after its actions, in order, for the step's dump. */
@@ -218,6 +229,41 @@ export const progressOf = (state: SessionState): { settled: string[]; done: stri
   settled: [...state.reached.session],
   done: [...state.reached.unit],
 });
+
+/** The key of the unit of work open now (`unitKeyOf`), or null when none is. */
+export const openUnitKeyOf = (state: SessionState): string | null =>
+  state.tasks.open === null ? null : unitKeyOf(state.tasks.open);
+
+/** The open unit of work's own entries of a per-unit record, made on first use. */
+function openUnitEntries(state: SessionState, byUnit: ByUnit): Map<string, string> {
+  const unit = openUnitKeyOf(state);
+  const entries = byUnit.get(unit) ?? new Map<string, string>();
+  byUnit.set(unit, entries);
+  return entries;
+}
+
+/** The operator's answers given in the unit of work open now, by what each field asks: the only ones an ask here is filled from. */
+export const openUnitAnswers = (state: SessionState): Map<string, string> =>
+  openUnitEntries(state, state.operatorAnswers);
+
+/** What this session settled into fields in the unit of work open now, by what each field asks: the only values a field here is kept for holding. */
+export const openUnitFilled = (state: SessionState): Map<string, string> =>
+  openUnitEntries(state, state.filled);
+
+/**
+ * The open unit of work as a form goal is composed for it: the label, url
+ * and identity the prose states, and the key the recall reads its unit-bound
+ * memories by — the same key the answers given in it are taught under.
+ */
+export const formTaskOf = (state: SessionState): FieldsInput['task'] =>
+  state.tasks.open === null
+    ? null
+    : {
+        label: state.tasks.open.label,
+        url: state.tasks.open.url,
+        facets: [...state.tasks.open.facets],
+        unitKey: unitKeyOf(state.tasks.open),
+      };
 
 /** The units of work as the next goal is told them. */
 export const ledgerSummaryOf = (

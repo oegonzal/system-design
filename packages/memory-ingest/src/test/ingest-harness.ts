@@ -35,6 +35,24 @@ export const NOT_ACCEPTED: SettleScript = {
   },
 };
 
+/**
+ * Judged and stored, a memory bound to a unit of work withheld because the
+ * document names none: what the digest endorsed is in the store, and the
+ * chunk's facts are not all there.
+ */
+export const FACTS_LEFT_OUT: SettleScript = {
+  steps: {
+    digest: {
+      status: 'complete',
+      reason: 'unit-unnamed',
+      note: '1 withheld: bound to a unit of work, in a document that names none',
+      runIds: ['left-out-run'],
+      counts: { memories: 4, kept: 3, 'unit-unnamed': 1 },
+    },
+    store: { status: 'complete', counts: { chunks: 3 } },
+  },
+};
+
 /** Judged, accepted, and nothing endorsed: the loop's verdict that the chunk holds no fact to store. */
 export const NO_FACTS: SettleScript = {
   steps: {

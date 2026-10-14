@@ -2,18 +2,20 @@
  * What a form page's recall would retrieve for its fields, and why — the
  * form path's measurement seam. It runs exactly what the `form-memory`
  * orchestrator's recall step runs (the fields' own questions as probes, both
- * named vectors, the budget the field's kind of control takes, each field
- * fused on its own, the evidence dealt out under the cap) and reports every
- * intermediate the step keeps to itself: each vector's ranking with its
- * cosines, each field's fused list, and which of it the page would carry.
- * No pipeline runs. Null when embeddings are unavailable, for the service to
- * refuse by name.
+ * named vectors, the budget the field's kind of control takes, the unit of
+ * work the page names, each field fused on its own, the evidence dealt out
+ * under the cap) and reports every intermediate the step keeps to itself:
+ * each vector's ranking with its cosines, each field's fused list, and which
+ * of it the page would carry — every hit with the kind, scope and unit the
+ * store holds it under. No pipeline runs. Null when embeddings are
+ * unavailable, for the service to refuse by name.
  */
 import {
   fieldTypeOf,
   reportFieldSpec,
   type FormRetrievalField,
   type FormRetrievalFieldDto,
+  type FormRetrievalHitDto,
   type FormRetrievalReportDto,
   type RetrievalHitDto,
 } from '@sysdesign/contracts';
@@ -41,11 +43,21 @@ export const asHit = (hit: MemoryHit): RetrievalHitDto => ({
   text: hit.text,
 });
 
+/** A hit as the form report lists it: as any report does, with the kind, scope and unit the store holds it under. */
+const asFormHit = (hit: MemoryHit): FormRetrievalHitDto => ({
+  ...asHit(hit),
+  kind: hit.source.kind,
+  scope: hit.scope ?? null,
+  unitKey: hit.unitKey ?? null,
+});
+
 const pointKey = (point: { runId: string; ref: string }): string => `${point.runId}|${point.ref}`;
 
 export async function formRetrievalReport(
   ports: Pick<MemoryPorts, 'embeddings' | 'store'>,
   given: readonly FormRetrievalField[],
+  /** The unit of work the page names, as a form goal's index would; absent for a page naming none. */
+  unitKey: string | undefined,
 ): Promise<FormRetrievalReportDto | null> {
   const store = await ports.store.verify();
   const fields = given.map(reportFieldSpec);
@@ -62,7 +74,9 @@ export async function formRetrievalReport(
 
   const embedded = await ports.embeddings.embed(probes.texts);
   if (embedded === null) return null;
-  const ranked = await ports.store.searchMany(searchProbes(embedded.vectors, probes.limits));
+  const ranked = await ports.store.searchMany(
+    searchProbes(embedded.vectors, probes.limits, unitKey),
+  );
   const evidence = evidenceItems(fieldEvidence(probes, ranked));
   const aliases = new Map(evidence.map((item) => [pointKey(item.source), item.alias]));
   return {
@@ -80,10 +94,10 @@ export async function formRetrievalReport(
         limit,
         ranked: VECTOR_NAMES.map((using, index) => ({
           using,
-          hits: (lists[index] ?? []).map(asHit),
+          hits: (lists[index] ?? []).map(asFormHit),
         })),
         fused: fuse(lists, limit).map((hit) => ({
-          ...asHit(hit),
+          ...asFormHit(hit),
           alias: aliases.get(pointKey(hit.source)) ?? null,
         })),
       };

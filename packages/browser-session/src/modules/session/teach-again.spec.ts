@@ -2,7 +2,11 @@ import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import type { OrchestrationRunDto } from '@sysdesign/contracts';
+import {
+  readDocumentIndex,
+  type OrchestrationRunDto,
+  type OrchestrationStepDto,
+} from '@sysdesign/contracts';
 import { FakeLoop, FakeLoopClient } from '@sysdesign/studio-testing';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -30,12 +34,17 @@ const older = (
   answer,
 });
 
-/** An item as a session writes it today. */
-const newer = (question: string, answer: string, chosen: string | null) => ({
+/** An item as a session writes it today, given in the unit of work named — null outside any. */
+const newer = (
+  question: string,
+  answer: string,
+  chosen: string | null,
+  unitKey: string | null = null,
+) => ({
   sessionId: SESSION_A,
   capturedAt: AT,
   field: { question, type: 'radio', options: ['Yes', 'No'] },
-  context: CONTEXT,
+  context: { ...CONTEXT, unitKey },
   answer,
   chosen,
 });
@@ -65,8 +74,8 @@ async function writeStep(dump: string, step: string, fields: unknown[], teaching
 const running = (loop: FakeLoop): OrchestrationRunDto[] =>
   [...loop.orchestrations.records.values()].filter((record) => record.status === 'running');
 
-/** The fake loop whose every awaited orchestration settles stored on the first poll's sleep, plus the deps over it. */
-function harness() {
+/** The fake loop whose every awaited orchestration settles stored on the first poll's sleep — its digest step as given — plus the deps over it. */
+function harness(digest: Partial<OrchestrationStepDto> = {}) {
   const loop = new FakeLoop();
   const client = new FakeLoopClient(loop);
   const taught: { decisionIds: string[]; orchestrationRunId: string }[] = [];
@@ -90,7 +99,7 @@ function harness() {
         if (latest === undefined) return;
         digests += 1;
         loop.orchestrations.complete(latest.orchestrationRunId, {
-          digest: { runIds: [`d-new-${digests}`], counts: { memories: 3, kept: 3 } },
+          digest: { runIds: [`d-new-${digests}`], counts: { memories: 3, kept: 3 }, ...digest },
           store: { counts: { chunks: 3 } },
         });
       },
@@ -112,6 +121,7 @@ describe('teach-again over a folder of session dumps', () => {
     const old = guidanceItemOf(
       older('', 'Are you available for an Onsite job?', 'Yes', ['Yes', 'No']),
       'option',
+      null,
     );
     expect(old).toMatchObject({
       field: {
@@ -123,16 +133,120 @@ describe('teach-again over a folder of session dumps', () => {
       chosen: null,
     });
     expect(
-      guidanceItemOf(older('Phone', 'Where can we reach you?', '555', null), null)?.field.question,
+      guidanceItemOf(older('Phone', 'Where can we reach you?', '555', null), null, null)?.field
+        .question,
     ).toBe('Phone. Where can we reach you?');
     // A pick from the drafts is the item's own say; a letter the page's options lettered is none.
     expect(
-      guidanceItemOf(newer('Will you require sponsorship?', 'No', 'record'), 'option')?.chosen,
+      guidanceItemOf(newer('Will you require sponsorship?', 'No', 'record'), 'option', null)
+        ?.chosen,
     ).toBe('record');
-    expect(guidanceItemOf(older('Notes', null, 'typed', null), 'transfer')?.chosen).toBe(
+    expect(guidanceItemOf(older('Notes', null, 'typed', null), 'transfer', null)?.chosen).toBe(
       'transfer',
     );
-    expect(guidanceItemOf(older('', null, 'Yes', ['Yes']), 'option')).toBeNull();
+    expect(guidanceItemOf(older('', null, 'Yes', ['Yes']), 'option', null)).toBeNull();
+    // An item recorded before answers named their unit of work is given the unit open at its
+    // step; a newer one keeps its own, none included.
+    const unitOf = (raw: Record<string, unknown>) =>
+      guidanceItemOf(raw, null, 'company=acme')?.context.unitKey;
+    expect(unitOf(older('Phone', null, '555', null))).toBe('company=acme');
+    expect(unitOf(newer('Sponsorship?', 'No', null, 'company=globex'))).toBe('company=globex');
+    expect(unitOf(newer('Sponsorship?', 'No', null))).toBeNull();
+  });
+
+  it('[BRW-17] [QL-71] teaches one document per unit of work a dump’s answers were given in, and one for those given outside any, each linking its own answers’ rows', async () => {
+    const { loop, deps, taught } = harness();
+    const dump = join(dumps, '2026-10-13T09-00-00-000-dddddd-session');
+    await writeStep(
+      dump,
+      '02',
+      [
+        withResult(newer('Do you know anyone at this organization?', 'No', null, 'company=acme')),
+        withResult(newer('Will you require sponsorship?', 'No', null)),
+        withResult(older('', 'Are you available for an Onsite job?', 'Yes', ['Yes', 'No'])),
+        withResult(newer('How did you hear of this opening?', 'A friend', null, 'company=globex')),
+        withResult(newer('Would you relocate for this role?', 'Yes', null, 'company=acme')),
+      ],
+      ['d-1', 'd-2', 'd-3', 'd-4', 'd-5'].map((id) => teaching(id, null)),
+    );
+
+    expect((await teachAgain(deps, dumps, false)).documents).toBe(3);
+    const goals = loop.orchestrations.startRequests.map((posted) => posted.request.goal);
+    expect(goals.map((goal) => readDocumentIndex(goal)?.document.unitKey)).toEqual([
+      'company=acme',
+      undefined,
+      'company=globex',
+    ]);
+    expect(goals[0]).toContain('Asked "Would you relocate for this role?"');
+    expect(goals[1]).toContain('Asked "Are you available for an Onsite job?"');
+    expect(goals[2]).toContain('Asked "How did you hear of this opening?"');
+    expect(taught.map((linked) => linked.decisionIds)).toEqual([
+      ['d-1', 'd-5'],
+      ['d-2', 'd-3'],
+      ['d-4'],
+    ]);
+  });
+
+  it('[BRW-17] gives an older answer the unit of work its dump records open at its step — by the identity declared, else the task’s own id — and none outside every unit', async () => {
+    const { loop, deps } = harness();
+    const dump = join(dumps, '2026-10-12T09-00-00-000-eeeeee-session');
+    const answer = (question: string, id: string, step: string) =>
+      writeStep(
+        dump,
+        step,
+        [withResult(older('', question, 'No', ['Yes', 'No']))],
+        [teaching(id, null)],
+      );
+    await answer('Do you know anyone here?', 'd-1', '03');
+    await answer('Will you require sponsorship?', 'd-2', '04');
+    await answer('Would you relocate for this role?', 'd-3', '07');
+    const acme = { id: 'task-acme', facets: [{ name: 'company', value: 'Acme' }] };
+    await writeFile(
+      join(dump, '02-tasks.json'),
+      JSON.stringify([
+        { ...acme, startStep: 2, endStep: 3 },
+        { id: 'task-before-facets', startStep: 5, endStep: null },
+      ]),
+    );
+
+    expect((await teachAgain(deps, dumps, false)).documents).toBe(3);
+    const goals = loop.orchestrations.startRequests.map((posted) => posted.request.goal);
+    expect(goals.map((goal) => readDocumentIndex(goal)?.document.unitKey)).toEqual([
+      'company=acme',
+      undefined,
+      'task-before-facets',
+    ]);
+  });
+
+  it('[BRW-17] keeps every earlier digest of a batch whose new digest left facts out of the store, its rows linked, and says why', async () => {
+    const note = '1 withheld: bound to a unit of work, in a document that names none';
+    const { loop, deps, taught } = harness({
+      reason: 'unit-unnamed',
+      note,
+      counts: { memories: 3, kept: 2, 'unit-unnamed': 1 },
+    });
+    const earlier = loop.orchestrations.start('document-memory', { goal: 'earlier' });
+    loop.orchestrations.complete(earlier.orchestrationRunId, {
+      digest: { runIds: ['d-old'] },
+      store: {},
+    });
+    const dump = join(dumps, '2026-10-10T12-00-00-000-ffffff-session');
+    await writeStep(
+      dump,
+      '03',
+      [withResult(older('', 'Do you know anyone here?', 'No', ['Yes', 'No']))],
+      [teaching('dec-1', earlier.orchestrationRunId)],
+    );
+
+    const report = await teachAgain(deps, dumps, false);
+    expect(report).toMatchObject({ stored: 2, retracted: 0 });
+    expect(report.skipped).toEqual([
+      expect.stringContaining(
+        `left facts out of the store (unit-unnamed — ${note}); its earlier digests kept`,
+      ),
+    ]);
+    expect(loop.retracted).toEqual([]);
+    expect(taught.map((linked) => linked.decisionIds)).toEqual([['dec-1']]);
   });
 
   it('[BRW-17] teaches every recorded answer again in today’s shape, batched per session, links the rows and retracts each earlier digest once the new facts stand', async () => {

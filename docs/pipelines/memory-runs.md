@@ -376,19 +376,19 @@ query probes — binds them into the memory orchestrator's ports for the
 orchestration module (which never imports Qdrant), and serves the `/memory`
 routes, the tools that need no run.
 
-| Verb     | Path                                     | Code | Body / query                                          | Answers                                        |
-| -------- | ---------------------------------------- | ---- | ----------------------------------------------------- | ---------------------------------------------- |
-| `POST`   | `/orchestrations/:orchestrator`          | 202  | the shared `runRequestSchema`                         | `{ data: { orchestrationRunId, status } }`     |
-| `POST`   | `/orchestrations/:orchestrator/from-run` | 202  | `{ runId }`                                           | the same; steps with a stand-in are provided   |
-| `GET`    | `/orchestrations`                        | 200  | `orchestrator`, `pipeline`, `status`, list paging     | `{ data, meta }`, newest first                 |
-| `GET`    | `/orchestrations/:id`                    | 200  | —                                                     | `{ data: OrchestrationRunDto }`, 404 otherwise |
-| `POST`   | `/memory/:id/reindex`                    | 200  | —                                                     | `{ data: OrchestrationStepDto }`               |
-| `DELETE` | `/memory/:id`                            | 200  | —                                                     | `{ data: { runId, removed } }`                 |
-| `DELETE` | `/memory/:id/points/:ref`                | 200  | —                                                     | `{ data: { runId, ref, removed } }`            |
-| `POST`   | `/memory/retrieval-report`               | 200  | `{ goal }`, up to 64,000 B                            | `{ data: RetrievalReportDto }`                 |
-| `POST`   | `/memory/form-retrieval-report`          | 200  | `{ fields: [{ name, context?, role?, inputType? }] }` | `{ data: FormRetrievalReportDto }`             |
-| `GET`    | `/memory/effectiveness`                  | 200  | `pipeline`, `limit`                                   | `{ data: RecallEffectivenessDto }`             |
-| `GET`    | `/memory/gaps`                           | 200  | `runId` or `goalHash`, `limit`                        | `{ data: StandingGapsDto }`                    |
+| Verb     | Path                                     | Code | Body / query                                                    | Answers                                        |
+| -------- | ---------------------------------------- | ---- | --------------------------------------------------------------- | ---------------------------------------------- |
+| `POST`   | `/orchestrations/:orchestrator`          | 202  | the shared `runRequestSchema`                                   | `{ data: { orchestrationRunId, status } }`     |
+| `POST`   | `/orchestrations/:orchestrator/from-run` | 202  | `{ runId }`                                                     | the same; steps with a stand-in are provided   |
+| `GET`    | `/orchestrations`                        | 200  | `orchestrator`, `pipeline`, `status`, list paging               | `{ data, meta }`, newest first                 |
+| `GET`    | `/orchestrations/:id`                    | 200  | —                                                               | `{ data: OrchestrationRunDto }`, 404 otherwise |
+| `POST`   | `/memory/:id/reindex`                    | 200  | —                                                               | `{ data: OrchestrationStepDto }`               |
+| `DELETE` | `/memory/:id`                            | 200  | —                                                               | `{ data: { runId, removed } }`                 |
+| `DELETE` | `/memory/:id/points/:ref`                | 200  | —                                                               | `{ data: { runId, ref, removed } }`            |
+| `POST`   | `/memory/retrieval-report`               | 200  | `{ goal }`, up to 64,000 B                                      | `{ data: RetrievalReportDto }`                 |
+| `POST`   | `/memory/form-retrieval-report`          | 200  | `{ fields: [{ name, context?, role?, inputType? }], unitKey? }` | `{ data: FormRetrievalReportDto }`             |
+| `GET`    | `/memory/effectiveness`                  | 200  | `pipeline`, `limit`                                             | `{ data: RecallEffectivenessDto }`             |
+| `GET`    | `/memory/gaps`                           | 200  | `runId` or `goalHash`, `limit`                                  | `{ data: StandingGapsDto }`                    |
 
 `/memory-runs` is retired, not aliased. The body of a memory orchestration is
 **exactly** the body of a quality run; `output` and `maxIterations` reach the
@@ -398,8 +398,10 @@ which is what makes a generation bump survivable (§6); `retrieval-report`
 answers what a recall _would_ retrieve for a goal without running one, and
 `form-retrieval-report` the same for a form page's fields — each field's own
 probe, both named vectors' rankings, the hits its field type takes and the
-dealt evidence, as the `form-memory` orchestrator's recall step would compose
-them; `effectiveness` and `gaps` read the runs already recorded — whether a
+dealt evidence, under the unit of work the body names (`unitKey`, absent for a
+page naming none) and each hit with the kind, scope and unit the store holds it
+under, as the `form-memory` orchestrator's recall step would compose them;
+`effectiveness` and `gaps` read the runs already recorded — whether a
 recalled lesson's run saw its defects resolve, and what no recall could serve,
 by brief — and write nothing; `DELETE
 /memory/:id` retracts every point a digest run stored, by the run's id — one
@@ -884,14 +886,17 @@ run-specific memory reaching the store (§1).
 Notes, not fixes. None affects behaviour.
 
 - `qdrant/collection.ts` declares `INDEXED_FIELDS`, each field with the index
-  type its value needs — `runId`, `pipeline`, `kind`, the flat facets, and the
-  lineage fields `lineage.judged.runId`, `lineage.adoptedFrom.runId` and
-  `lineage.goalHash` (keyword, at their dotted paths) — and `ensure()` asks for
-  every one on every boot, warning on a refusal, so a collection built before
-  them gains them too. `searchMany` filters only by a probe's declared
-  `ProbeFilter` (kinds, pipelines, runs to leave out), and the coach recall's
-  novelty screen reads `lineage` off the hits after fusion, so the lineage
-  indexes are prepared for a filtered search that does not exist yet.
+  type its value needs — `runId`, `pipeline`, `kind`, a document memory's
+  `scope` and `unitKey`, the flat facets, and the lineage fields
+  `lineage.judged.runId`, `lineage.adoptedFrom.runId` and `lineage.goalHash`
+  (keyword, at their dotted paths) — and `ensure()` asks for every one on every
+  boot, warning on a refusal, so a collection built before them gains them too.
+  `searchMany` filters only by a probe's declared `ProbeFilter` (kinds,
+  pipelines, runs to leave out, and the unit of work it names) — every search
+  leaving out each memory of a scope bound to a unit (`UNIT_BOUND_SCOPES`) but
+  those of the unit it names, all of them when it names none — and the coach
+  recall's novelty screen reads `lineage` off the hits after fusion, so the
+  lineage indexes are prepared for a filtered search that does not exist yet.
 - Every payload carries `storedAt` and `keys`; `fromPayload` destructures both
   and discards them. Nothing reads either back.
 - `MemoryStepDto.counts` is an open `Record<string, number>`. The keys
@@ -948,7 +953,7 @@ retired gap analysis (§2.7) recorded as a missing memory tier — is what this
 work built. The incident loop that section also asked for, where a production
 failure becomes a regression fixture, is not (STUDIO-7).
 
-Not built yet, by choice: filtered or per-project search, pruning and expiry,
+Not built yet, by choice: per-project search, pruning and expiry,
 storing findings and sections as chunks rather than only lessons (the kinds
 are already in the vocabulary), a web-client control for memory runs, a score
 floor on retrieval, and any movement of the two memory pipelines' thresholds
@@ -1589,7 +1594,15 @@ each memory's scope over the judges' verdict, so a scope finding
 (`misscoped_fact`) withholds nothing, and every other type withholds as the
 policy declares. Each readout carries `withheld`, one entry per item with what
 withheld it (`finding` or `validator`, and the type or id), so a reader counts
-what it withheld by source and type.
+what it withheld by source and type. One reader adds a rule of its own, over
+the goal's index rather than the ledger: the document digest's
+(`readDocumentDigest`) withholds a memory bound to a unit of work, of a
+document whose head names no unit — no search would ever read it — as
+`index`, by `unit-unnamed` (`UNIT_UNNAMED`). Its digest step counts those
+under the same word and gives it as the step's reason beside whatever else it
+stored, so the orchestration record says why `kept` fell short of `memories`,
+and memory-ingest reads the chunk as one whose facts are not all in the store,
+replacing none of the document's earlier digests on its strength.
 
 **A duplicate set withholds nothing.** Every duplicate type — `duplicate_fact`,
 `duplicate_memory`, `duplicate_item`, `redundant_chunk` — declares `none`. A

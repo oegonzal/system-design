@@ -1,4 +1,4 @@
-import type { PipelineSummary } from '@sysdesign/contracts';
+import type { DocumentChunk, PipelineSummary } from '@sysdesign/contracts';
 import {
   DOCUMENT_MEMORY_STEP_REASONS,
   renderDocumentGoal,
@@ -40,6 +40,18 @@ describe('the document-memory orchestrator', () => {
     expect(
       DOCUMENT_MEMORY.refuse?.({ goal: GOAL, output: sampleDocumentDigest() }, registry),
     ).toBeNull();
+  });
+
+  it('[QL-71] refuses, before a row exists, a document declaring every memory bound to a unit of work that names no unit — and takes one that names its unit, or declares a scope bound to none', () => {
+    const goalOf = (head: Partial<DocumentChunk>) =>
+      renderDocumentGoal({ ...resumeChunk(), ...head });
+    expect(DOCUMENT_MEMORY.refuse?.({ goal: goalOf({ scope: 'unit' }) }, registry)).toMatch(
+      /declares every memory bound to one and names none/,
+    );
+    expect(
+      DOCUMENT_MEMORY.refuse?.({ goal: goalOf({ scope: 'unit', unitKey: 'U' }) }, registry),
+    ).toBeNull();
+    expect(DOCUMENT_MEMORY.refuse?.({ goal: goalOf({ scope: 'subject' }) }, registry)).toBeNull();
   });
 
   it('[QL-40] run over the runner, a chunk becomes stored facts: the digest run is recorded, reported and stamped as every point’s source', async () => {

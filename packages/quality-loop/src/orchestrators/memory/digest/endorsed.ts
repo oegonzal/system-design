@@ -65,6 +65,12 @@ export interface MemoryToStore {
    * (`readDocumentDigest`); absent from a digest that declares no scope.
    */
   scope?: MemoryScope;
+  /**
+   * The unit of work a fact bound to one was recorded for, as its document
+   * names it — stamped by a reader (`readDocumentDigest`), never written by a
+   * digest; absent from every other fact.
+   */
+  unitKey?: string;
 }
 
 export interface DigestReadout {

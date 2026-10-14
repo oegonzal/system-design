@@ -70,16 +70,17 @@ export class MemoryController {
 
   /**
    * What a form page's recall would retrieve for these fields, and why — the
-   * fields' own words as probes, the budget each kind of control takes, each
-   * named vector's ranking, the fused list per field and the dealt evidence.
-   * Runs no pipeline; the measurement seam of the form path.
+   * fields' own words as probes, the budget each kind of control takes, the
+   * unit of work the page names, each named vector's ranking, the fused list
+   * per field and the dealt evidence. Runs no pipeline; the measurement seam
+   * of the form path.
    */
   @Post('form-retrieval-report')
   @HttpCode(200)
   async formRetrievalReport(
     @Body(new ZodValidationPipe(formRetrievalRequestSchema)) body: FormRetrievalRequest,
   ): Promise<FormRetrievalReportResponse> {
-    return { data: await this.memory.formRetrievalReport(body.fields) };
+    return { data: await this.memory.formRetrievalReport(body.fields, body.unitKey) };
   }
 
   /**

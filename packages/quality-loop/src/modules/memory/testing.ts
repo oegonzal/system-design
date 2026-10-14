@@ -5,7 +5,7 @@
  */
 import { createHash } from 'node:crypto';
 
-import type { MemoryStoreAvailabilityDto } from '@sysdesign/contracts';
+import { isUnitBound, type MemoryStoreAvailabilityDto } from '@sysdesign/contracts';
 import type { EmbeddingClient } from '@sysdesign/llm';
 
 import { CachedEmbeddings } from '../../orchestrators/memory/embeddings';
@@ -52,6 +52,24 @@ export function vectorOf(text: string, dimensions = 8): number[] {
   return raw.map((value) => value / norm);
 }
 
+/**
+ * A memory as a store keeps it: indexed by both halves the way a digest's are
+ * — the condition it applies when, and the lesson itself — each embedded as
+ * `fakeEmbeddings` would embed it, with every optional field it carries.
+ */
+export const storedChunkOf = ({ score, ...memory }: MemoryHit, dimensions = 8): StoredChunk => {
+  void score;
+  const keys = { condition: `when ${memory.text}`, lesson: memory.text };
+  return {
+    ...memory,
+    keys,
+    vectors: {
+      condition: vectorOf(keys.condition, dimensions),
+      lesson: vectorOf(keys.lesson, dimensions),
+    },
+  };
+};
+
 /** Embeddings whose provider answers nothing — the `embedding-failed` path. */
 export const mutedEmbeddings = (): CachedEmbeddings =>
   new CachedEmbeddings(
@@ -61,18 +79,22 @@ export const mutedEmbeddings = (): CachedEmbeddings =>
 
 /**
  * The adapter's declared filter, applied the way Qdrant applies it: each field
- * narrows, an empty list narrows nothing. This fake is a hand-written mirror of
- * the adapter, so a rule added to one and not the other passes every fast spec
- * and diverges only in production — which is why it lives beside the cosine.
+ * narrows, an empty list narrows nothing, and a memory bound to a unit of work
+ * passes only a search naming the unit it was recorded for — whatever else the
+ * search narrows by, or with no filter at all. This fake is a hand-written
+ * mirror of the adapter, so a rule added to one and not the other passes every
+ * fast spec and diverges only in production — which is why it lives beside the
+ * cosine, and why a spec holds the two to the same hits on a real Qdrant.
  */
 const passes = (chunk: StoredChunk, filter: ProbeFilter | undefined): boolean => {
-  if (filter === undefined) return true;
   const within = (values: readonly string[] | undefined, value: string): boolean =>
     values === undefined || values.length === 0 || values.includes(value);
   return (
-    within(filter.kinds, chunk.source.kind) &&
-    within(filter.pipelines, chunk.source.pipeline) &&
-    !(filter.notRunIds ?? []).includes(chunk.source.runId)
+    within(filter?.kinds, chunk.source.kind) &&
+    within(filter?.pipelines, chunk.source.pipeline) &&
+    !(filter?.notRunIds ?? []).includes(chunk.source.runId) &&
+    (!isUnitBound(chunk.scope) ||
+      (filter?.unitKey !== undefined && chunk.unitKey === filter.unitKey))
   );
 };
 

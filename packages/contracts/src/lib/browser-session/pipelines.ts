@@ -36,7 +36,9 @@ export const FORM_MEMORY_TARGET_STEP = 'target';
  * One location a reader of the run withholds, with what withheld it — a
  * finding's type or a validator's id — and why, in the judge's own words, for
  * the operator's eye and never for a route: the session routes by the ref
- * alone.
+ * alone. The source is the shared vocabulary's, whose `index` only a
+ * document digest's reader gives; a form run's reader withholds by findings
+ * and validators.
  */
 export const withheldRefSchema = z.strictObject({
   ref: z.string().min(1),

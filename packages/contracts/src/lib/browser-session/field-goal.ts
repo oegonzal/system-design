@@ -1,10 +1,12 @@
 /**
  * The goal codec of the form pipelines — `field-answer` and
  * `answer-suggestions`. The session composes the prose — the mission and the
- * unit of work — and lists the fields; the form-memory orchestrator splits
- * that goal, recalls evidence for the fields and composes it again with the
- * evidence listed, for the pipeline the index names. Every stage reads the
- * evidence; the validators read the index.
+ * unit of work — lists the fields and names in the index the unit the page is
+ * for; the form-memory orchestrator splits that goal, recalls evidence for
+ * the fields — of what was recorded for one unit of work, only the unit the
+ * index names — and composes it again with the evidence listed, for the
+ * pipeline the index names. Every stage reads the evidence; the validators
+ * read the index.
  */
 import { z } from 'zod';
 
@@ -15,6 +17,8 @@ import {
   DOCUMENT_MEMORY_KINDS,
   MEMORY_SCOPE_USES,
   MEMORY_SCOPES,
+  UNIT_BOUND_SCOPES,
+  type MemoryScope,
 } from '../quality-loop/document-digest';
 import {
   GOAL_BUDGET_BYTES,
@@ -23,6 +27,7 @@ import {
   withinBudget,
 } from '../quality-loop/goal-index';
 import type { Severity } from '../quality-loop/vocab';
+import { unitKeySchema } from '../units/identity';
 import { SUGGESTIONS_BOUND } from './answer-suggestions.schema';
 import { EVIDENCE_ALIAS, FIELDS_BOUND } from './field-answers.schema';
 import {
@@ -232,12 +237,20 @@ export interface FieldGoalInput {
   prose: string;
   fields: readonly FieldSpec[];
   evidence: readonly EvidenceItem[];
+  /**
+   * The unit of work the page is for, as its composer names it
+   * (`unitKeyOf`); absent when none is open. The recall searches what was
+   * recorded for one unit of work only for this one.
+   */
+  unitKey?: string;
 }
 
 const fieldIndexShape = {
   pipeline: z.enum(FORM_PIPELINES),
   fields: bounded.list(FIELDS_BOUND, fieldSpecSchema, { min: 1 }),
   evidence: z.array(z.strictObject({ alias: z.string().regex(EVIDENCE_ALIAS) })).max(MAX_EVIDENCE),
+  /** Written only when the page names its unit, so a goal that names none reads as before one could. */
+  unitKey: unitKeySchema.optional(),
 };
 export const fieldIndexSchema = z.strictObject(fieldIndexShape);
 export type FieldIndex = z.infer<typeof fieldIndexSchema>;
@@ -253,6 +266,29 @@ export const FIELD_EVIDENCE_HEADING = '## Evidence about the subject';
 const KIND_LEGEND = `Kinds: ${DOCUMENT_MEMORY_KINDS.map((kind) => `${kind} — ${DOCUMENT_MEMORY_KIND_USES[kind]}`).join('; ')}.`;
 /** Where each item holds, said once beside the kinds: a unit item is no evidence for another unit of work. */
 const SCOPE_LEGEND = `Scopes: ${MEMORY_SCOPES.map((scope) => `${scope} — ${MEMORY_SCOPE_USES[scope]}`).join('; ')}. A unit item settles only a field about the unit of work this goal names.`;
+
+/**
+ * Said after the scopes when the goal names its unit, of the scopes bound to
+ * a unit of work: the recall searched what was recorded for one unit only
+ * under the key the index names — the unit's declared identity, else its own
+ * id (`unitKeyOf`) — so every item of those scopes listed was recorded for a
+ * unit its mission identifies as this one, which need not be this very unit.
+ * Built from the table the recall's filter reads (`UNIT_BOUND_SCOPES`) and
+ * said only when the index names the key the filter searched under, so the
+ * sentence and the search cannot disagree — an item's text often names no
+ * unit at all ("this organization"). Null when no scope is bound: the search
+ * then leaves nothing out, and there is nothing to say.
+ */
+export const unitNamedLegend = (bound: readonly MemoryScope[]): string | null =>
+  bound.length === 0
+    ? null
+    : `Every ${bound.join(' or ')} item listed was recorded for a unit of work its mission identifies as the one this goal names.`;
+
+/** The scope legend this goal states. */
+const scopeLegend = (input: FieldGoalInput): string => {
+  const named = input.unitKey === undefined ? null : unitNamedLegend(UNIT_BOUND_SCOPES);
+  return named === null ? SCOPE_LEGEND : `${SCOPE_LEGEND} ${named}`;
+};
 
 /** Each form pipeline's words for an empty evidence list, and its limits. */
 const FORM_GOAL_TERMS: Readonly<
@@ -306,6 +342,7 @@ const indexOf = (input: FieldGoalInput): FieldIndex => ({
   pipeline: input.pipeline,
   fields: [...input.fields],
   evidence: input.evidence.map((item) => ({ alias: item.alias })),
+  ...(input.unitKey === undefined ? {} : { unitKey: input.unitKey }),
 });
 
 /** The goal, or a refusal when it would not fit the engine's budget. */
@@ -321,7 +358,7 @@ export function composeFieldGoal(input: FieldGoalInput, budget = GOAL_BUDGET_BYT
     FIELD_EVIDENCE_HEADING,
     '',
     ...(input.evidence.length > 0
-      ? [KIND_LEGEND, SCOPE_LEGEND, '', ...input.evidence.map(evidenceLine)]
+      ? [KIND_LEGEND, scopeLegend(input), '', ...input.evidence.map(evidenceLine)]
       : [terms.noEvidence]),
     '',
     '## Limits',
@@ -339,18 +376,21 @@ export const readFieldIndex = (goal: string): FieldIndex | null =>
 
 /**
  * A composed goal taken apart so it can be composed again with evidence: the
- * form pipeline it is for, the prose the session wrote and the fields from the
- * index. Null for a goal this codec did not write. The fields heading is
- * searched from the end, so a mission that happens to contain the same words
- * is not mistaken for it.
+ * form pipeline it is for, the prose the session wrote, and the fields and
+ * the unit of work from the index. Null for a goal this codec did not write.
+ * The fields heading is searched from the end, so a mission that happens to
+ * contain the same words is not mistaken for it.
  */
-export function splitFieldGoal(
-  goal: string,
-): { pipeline: FormPipeline; prose: string; fields: FieldSpec[] } | null {
+export function splitFieldGoal(goal: string): Omit<FieldGoalInput, 'evidence'> | null {
   const index = readFieldIndex(goal);
   if (index === null) return null;
   const marker = `\n${FIELDS_HEADING}\n`;
   const at = goal.lastIndexOf(marker);
   if (at < 0) return null;
-  return { pipeline: index.pipeline, prose: goal.slice(0, at).trim(), fields: index.fields };
+  return {
+    pipeline: index.pipeline,
+    prose: goal.slice(0, at).trim(),
+    fields: index.fields,
+    ...(index.unitKey === undefined ? {} : { unitKey: index.unitKey }),
+  };
 }

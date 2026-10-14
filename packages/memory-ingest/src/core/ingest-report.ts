@@ -1,5 +1,5 @@
 import type { IngestStatus, ManifestEntry, PlannedChunk } from './ports';
-import { holdsNoFacts } from './record';
+import { holdsNoFacts, leftFactsOut } from './record';
 import type { Retraction } from './retract';
 
 /**
@@ -32,9 +32,13 @@ const OUTCOME_OF: Record<IngestStatus, ChunkOutcome> = {
   refused: 'refused',
 };
 
-/** A posting's outcome in the report: its status's, an `unstored` one whose chunk holds no fact to store read as `no-facts`. */
+/**
+ * A posting's outcome in the report: its status's — an `unstored` one whose
+ * chunk holds no fact to store read as `no-facts`, and a stored one that left
+ * facts of its chunk out of the store read as `unstored`.
+ */
 export const outcomeOf = (entry: ManifestEntry): ChunkOutcome =>
-  holdsNoFacts(entry) ? 'no-facts' : OUTCOME_OF[entry.status];
+  holdsNoFacts(entry) ? 'no-facts' : leftFactsOut(entry) ? 'unstored' : OUTCOME_OF[entry.status];
 
 export interface ChunkReport {
   index: number;
@@ -46,7 +50,9 @@ export interface ChunkReport {
   /**
    * `pending` is a chunk not posted: a dry run, or one after the run stopped;
    * `no-facts` a posting the loop settled with nothing stored because the
-   * chunk holds no fact to store, which covers the chunk as `posted` does.
+   * chunk holds no fact to store, which covers the chunk as `posted` does;
+   * `unstored` one that left facts of the chunk out of the store — nothing
+   * stored, or the rest stored and these withheld — which covers nothing.
    */
   outcome: ChunkOutcome;
   orchestrationRunId: string | null;

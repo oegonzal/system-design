@@ -96,6 +96,13 @@ export interface MemoryChunk {
    * and on one whose digest declares none; a reader takes the contracts' default.
    */
   scope?: MemoryScope;
+  /**
+   * The unit of work a memory bound to one (`isUnitBound`) was recorded for,
+   * as its composer names it (`unitKeyOf`) — what a search names to read it.
+   * Absent on every other memory, and on a bound one recorded before units
+   * were named, which no search reads.
+   */
+  unitKey?: string;
 }
 
 /** A chunk with the texts it is indexed by — one per name in the collection. */
@@ -115,8 +122,13 @@ export interface MemoryHit extends MemoryChunk {
 /**
  * What a probe will consider, declared rather than passed through: an
  * adapter's own filter language would leak into every caller and every fake.
- * Each field narrows, and an absent one does not: `{}` and `undefined` search
- * the whole store, which is what every probe did before this existed.
+ * Each field narrows, and an absent one does not — except where a memory is
+ * bound to a unit of work: such a memory is read only by a search naming its
+ * unit, so `{}` and `undefined` search every memory bound to none. Measured
+ * 2026-10-14 over 15 questions about the organisation a unit of work was for:
+ * answers given in other units held 29 of their 45 evidence slots, and with
+ * them left out the sentence settling the question was among its evidence
+ * for 14, against 12.
  */
 export interface ProbeFilter {
   /** Only these chunk kinds — a search for knowledge need not read episodic precedent. */
@@ -125,6 +137,8 @@ export interface ProbeFilter {
   pipelines?: readonly string[];
   /** Never these source runs — a run asking what is known must not be told its own items. */
   notRunIds?: readonly string[];
+  /** The unit of work the search is for (`unitKeyOf`): of the memories bound to one, only its. Absent, none of them. */
+  unitKey?: string;
 }
 
 /** The chunk kinds one writer owns under a source run: what a replace of its own points may delete. */

@@ -1,7 +1,9 @@
 import { z } from 'zod';
 
 import type { ApiResponse } from '../envelope';
+import type { MemoryScope } from '../quality-loop/document-digest';
 import type { MemoryStoreAvailabilityDto, RetrievalHitDto } from '../quality-loop/memory';
+import { unitKeySchema } from '../units/identity';
 import { FIELDS_BOUND } from './field-answers.schema';
 import { fieldSpecSchema, type EvidenceItem, type FieldSpec } from './field-goal';
 import type { FieldType } from './vocab';
@@ -12,7 +14,9 @@ import type { FieldType } from './vocab';
  * the retrieval report. A field is given by what the recall reads of it: what
  * it asks (`name`, `context`) and what kind of control asks (`role`,
  * `inputType`); the rest of a field spec is the answerer's concern and is
- * filled in here as a field no page has touched.
+ * filled in here as a field no page has touched. The page is given by the
+ * unit of work it is for, as a form goal's index names it — absent for a page
+ * naming none, which, as in the recall, reads no memory bound to a unit.
  */
 export const formRetrievalFieldSchema = fieldSpecSchema
   .pick({ ref: true, role: true, name: true, inputType: true, context: true })
@@ -21,6 +25,7 @@ export type FormRetrievalField = z.infer<typeof formRetrievalFieldSchema>;
 
 export const formRetrievalRequestSchema = z.strictObject({
   fields: z.array(formRetrievalFieldSchema).min(1).max(FIELDS_BOUND.ceiling),
+  unitKey: unitKeySchema.optional(),
 });
 export type FormRetrievalRequest = z.infer<typeof formRetrievalRequestSchema>;
 
@@ -40,6 +45,19 @@ export const reportFieldSpec = (field: FormRetrievalField, position: number): Fi
   context: field.context ?? null,
 });
 
+/**
+ * A hit as the form report lists it: a retrieval hit with what the store
+ * holds it as — its chunk kind, its scope (null on a memory stored without
+ * one) and the unit of work it was recorded for (null on any memory not bound
+ * to one) — so a reader checks what the search let through without reading
+ * the store beside it.
+ */
+export interface FormRetrievalHitDto extends RetrievalHitDto {
+  kind: string;
+  scope: MemoryScope | null;
+  unitKey: string | null;
+}
+
 export interface FormRetrievalFieldDto {
   ref: string;
   type: FieldType;
@@ -48,9 +66,9 @@ export interface FormRetrievalFieldDto {
   /** The hits each named vector contributes for this field's kind of control. */
   limit: number;
   /** Each named vector's own ranking of the probe, cosines comparable within one list. */
-  ranked: { using: string; hits: RetrievalHitDto[] }[];
+  ranked: { using: string; hits: FormRetrievalHitDto[] }[];
   /** The field's fused list; `alias` names the hit as the page's evidence would, null for one the cap dealt out. */
-  fused: (RetrievalHitDto & { alias: string | null })[];
+  fused: (FormRetrievalHitDto & { alias: string | null })[];
 }
 
 export interface FormRetrievalReportDto {

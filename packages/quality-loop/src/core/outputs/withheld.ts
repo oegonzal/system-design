@@ -12,7 +12,10 @@
  * the document-digest pipeline's `WITHHOLDING_UNDER_DECLARED_SCOPE`. Written
  * once, so no two readers can withhold differently, and over engine facts only
  * — the ledger's findings, its validation reports and its criteria's citations
- * — never over what any of them says in prose.
+ * — never over what any of them says in prose. Beside these, a reader may
+ * withhold an item the goal's own index leaves no place to store, naming the
+ * index as its source: a memory bound to a unit of work, of a document that
+ * names none (`readDocumentDigest`).
  */
 import type {
   DecisionPolicy,
@@ -72,9 +75,9 @@ export interface WithheldItem {
   /** The item's location id, as the reader listed it. */
   ref: string;
   source: WithholdingSource;
-  /** The finding's type, or the validator's id. */
+  /** The finding's type, the validator's id, or the reason a reader declares for what the goal's index holds an item to. */
   by: string;
-  /** Why, in the judge's own words — the finding's rationale or the problem's message; for a reader's eye, never a route. */
+  /** Why, in the judge's own words — the finding's rationale or the problem's message — or the reader's declared words; for a reader's eye, never a route. */
   note: string | null;
 }
 

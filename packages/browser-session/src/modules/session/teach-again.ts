@@ -2,13 +2,14 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 import {
-  DOCUMENT_MAX_MEMORIES,
   DOCUMENT_MEMORY_ORCHESTRATOR_ID,
   fieldQuestionOf,
-  guidanceDocument,
+  guidanceDocuments,
   operatorGuidanceSchema,
   renderDocumentGoal,
   SUGGESTION_BASES,
+  unitKeyOf,
+  type BrowserTaskDto,
   type OperatorGuidanceDto,
   type SuggestionBasis,
 } from '@sysdesign/contracts';
@@ -17,19 +18,26 @@ import { awaitOrchestration, type AwaitOptions, type LoopClient } from '@sysdesi
 import { TEACH_ITERATIONS } from '../../adapters/loop-http/loop-brain';
 import { SESSION_ENV, SESSION_FLAGS } from '../../config';
 import type { LedgerPort } from '../../core/ports';
+import { STEPS_DIR, TASKS_FILE } from '../../core/session-dump';
 import { SessionRefused } from '../../core/unit-advice';
 
 /**
  * The operator answers a folder of session dumps recorded, taught again in
  * the canonical shape — the question as the key, the answer as the subject's,
  * the provenance kept apart — and the points their earlier digests stored
- * retracted once the new ones land. Everything read is declared data the
+ * retracted once the new ones land whole. Everything read is declared data the
  * session wrote: each step's `fields.json` carries the guidance item as it was
  * taught (an older item under its label and context, a newer one under its
- * question) and `teach.json` the decision row and the orchestration each went
- * through, cumulative over the session. Answers are batched per session, as
- * many as one document may carry, so a record of a hundred answers is a
- * handful of digests, not a hundred.
+ * question), `teach.json` the decision row and the orchestration each went
+ * through, cumulative over the session, and `02-tasks.json` the units of work
+ * and the steps each was open for — the unit an older item, recorded before
+ * answers named theirs, was given in. Answers are batched per session and per
+ * unit of work they were given in (`guidanceDocuments`), as many as one
+ * document may carry, so a record of a hundred answers is a handful of
+ * digests, not a hundred, and each names the unit its answers were given in.
+ * A new digest that left facts out of the store — memories bound to a unit of
+ * work, of answers given outside any — retracts nothing: the earlier digests
+ * stand beside it, and the dump is named in `skipped`.
  */
 export interface TeachAgainReport {
   dryRun: boolean;
@@ -42,7 +50,7 @@ export interface TeachAgainReport {
   retracted: number;
   /** Dump folders that recorded no operator answer: nothing to teach. */
   unanswered: number;
-  /** Dumps taught without their rows linked, or whose document stored nothing, with why. */
+  /** Dumps taught without their rows linked, whose document stored nothing, or left facts out and retracted nothing, with why. */
   skipped: string[];
 }
 
@@ -99,23 +107,28 @@ const suggestionBasisOf = (chosen: unknown): SuggestionBasis | null =>
  * A recorded guidance item in today's shape. An older item carried `label`
  * (the field's name) and `question` (its context) and no `chosen`; the key is
  * what the field asked, as `fieldQuestionOf` reads both, and the basis the
- * answer was chosen from is the item's own, else the result's. Null for an
- * item that asked nothing it can be told by, which no probe could find again.
+ * answer was chosen from is the item's own, else the result's. An item
+ * recorded before answers named their unit of work is given in the unit the
+ * dump records open at its step (`openUnit`, null outside any); a newer one
+ * names its own. Null for an item that asked nothing it can be told by, which
+ * no probe could find again.
  */
 export function guidanceItemOf(
   raw: Record<string, unknown>,
   chosen: unknown,
+  openUnit: string | null,
 ): OperatorGuidanceDto | null {
   const field = (raw['field'] ?? {}) as Record<string, unknown>;
   const label = typeof field['label'] === 'string' ? field['label'] : '';
   const context = typeof field['question'] === 'string' ? field['question'] : null;
   const question = fieldQuestionOf({ name: label, context });
   if (question === null) return null;
+  const given = (raw['context'] ?? {}) as Record<string, unknown>;
   const parsed = operatorGuidanceSchema.safeParse({
     sessionId: raw['sessionId'],
     capturedAt: raw['capturedAt'],
     field: { question, type: field['type'], options: field['options'] ?? null },
-    context: raw['context'],
+    context: { ...given, unitKey: Object.hasOwn(given, 'unitKey') ? given['unitKey'] : openUnit },
     answer: raw['answer'],
     chosen: suggestionBasisOf(raw['chosen'] ?? chosen),
   });
@@ -143,23 +156,42 @@ interface DumpRecord {
   subject: string | null;
 }
 
+/** A unit of work as the dump's tasks file records it: an older one carries no facets. */
+type DumpTask = Pick<BrowserTaskDto, 'id' | 'startStep' | 'endStep'> &
+  Partial<Pick<BrowserTaskDto, 'facets'>>;
+
+/**
+ * The unit of work the dump records open at a step, keyed as the session keys
+ * one (`unitKeyOf`): the task whose steps cover it — null when none does, as
+ * outside any unit or in a dump whose session never closed and wrote no tasks.
+ */
+function unitOpenAt(tasks: readonly DumpTask[], step: number): string | null {
+  const task = tasks.find(
+    (candidate) => candidate.startStep <= step && (candidate.endStep ?? Infinity) >= step,
+  );
+  return task === undefined ? null : unitKeyOf({ id: task.id, facets: task.facets ?? [] });
+}
+
 /**
  * Read one dump. A session taught one document per guidance item, in the
  * order the items settled, and `teach.json` is cumulative — so the teachings
  * are the union over every step's file by decision id, in first-seen order,
- * and the i-th guidance item is the i-th teaching.
+ * and the i-th guidance item is the i-th teaching. A step's folder is named
+ * by its number (`stepDir`), which the tasks file's steps are counted in.
  */
 async function readDump(dump: string): Promise<DumpRecord> {
-  const stepsDir = join(dump, '01-steps');
+  const stepsDir = join(dump, STEPS_DIR);
+  const tasks = (await readJson<DumpTask[]>(join(dump, TASKS_FILE))) ?? [];
   const items: DumpRecord['items'] = [];
   const teachings = new Map<string, StepTeaching>();
   for (const step of await subdirectories(stepsDir)) {
     const fields = await readJson<StepFields>(join(stepsDir, step, 'fields.json'));
+    const openUnit = unitOpenAt(tasks, Number(step));
     for (const field of fields?.fields ?? []) {
       const guidance = field.result?.guidance;
       if (guidance == null) continue;
       // A keyless item still counts toward the order: the session taught it too.
-      items.push(guidanceItemOf(guidance, field.result?.chosen));
+      items.push(guidanceItemOf(guidance, field.result?.chosen, openUnit));
     }
     for (const teaching of (await readJson<StepTeaching[]>(join(stepsDir, step, 'teach.json'))) ??
       []) {
@@ -188,11 +220,6 @@ function answersOf(record: DumpRecord): { answers: RecordedAnswer[]; linked: boo
   });
   return { answers, linked };
 }
-
-const batches = <T>(items: readonly T[], size: number): T[][] =>
-  Array.from({ length: Math.ceil(items.length / size) }, (_, index) =>
-    items.slice(index * size, (index + 1) * size),
-  );
 
 /** The digest run an earlier teaching stored through, read off its orchestration; null when the loop no longer has it or it never digested. */
 async function digestRunOf(client: LoopClient, orchestrationId: string): Promise<string | null> {
@@ -230,14 +257,12 @@ export async function teachAgain(
     report.sessions += 1;
     report.answers += answers.length;
     const sessionId = answers[0]?.item.sessionId ?? name;
-    for (const batch of batches(answers, DOCUMENT_MAX_MEMORIES)) {
-      const day = batch[0]?.item.capturedAt.slice(0, 10) ?? null;
-      const document = guidanceDocument(
-        sessionId,
-        record.subject ?? deps.subject,
-        batch.map((answer) => answer.item),
-        day,
-      );
+    for (const { document, answers: batch } of guidanceDocuments(
+      sessionId,
+      record.subject ?? deps.subject,
+      answers,
+      (answer) => answer.item,
+    )) {
       report.documents += 1;
       if (dryRun) continue;
       const { orchestrationRunId } = await deps.client.startOrchestration(
@@ -249,7 +274,8 @@ export async function teachAgain(
         },
       );
       const settled = await awaitOrchestration(deps.client, orchestrationRunId, deps.awaiting);
-      const kept = settled.steps['digest']?.counts['kept'] ?? 0;
+      const digested = settled.steps['digest'];
+      const kept = digested?.counts['kept'] ?? 0;
       if (settled.steps['store']?.status !== 'complete' || kept === 0) {
         report.skipped.push(`${name}: document ${orchestrationRunId} stored nothing`);
         continue;
@@ -259,7 +285,16 @@ export async function teachAgain(
         answer.decisionId === null ? [] : [answer.decisionId],
       );
       if (decisionIds.length > 0) await deps.ledger.recordTeaching(decisionIds, orchestrationRunId);
-      // The new facts stand; only now do the earlier digests' points go.
+      // A digest that stored and gave a reason left facts out: what the earlier digests stored stays.
+      if (digested?.reason != null) {
+        const why =
+          digested.note === null ? digested.reason : `${digested.reason} — ${digested.note}`;
+        report.skipped.push(
+          `${name}: document ${orchestrationRunId} left facts out of the store (${why}); its earlier digests kept`,
+        );
+        continue;
+      }
+      // The new facts stand whole; only now do the earlier digests' points go.
       const earlier = new Set(
         batch.flatMap((answer) =>
           answer.earlierOrchestrationId === null ? [] : [answer.earlierOrchestrationId],

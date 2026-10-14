@@ -4,7 +4,11 @@
  * the next one. `verify` never throws: the store's state is reported as data.
  */
 import type { QdrantClient } from '@qdrant/js-client-rest';
-import type { MemoryStoreAvailabilityDto } from '@sysdesign/contracts';
+import {
+  UNIT_BOUND_SCOPES,
+  type MemoryScope,
+  type MemoryStoreAvailabilityDto,
+} from '@sysdesign/contracts';
 import { describeError } from '@sysdesign/run-dump';
 
 import {
@@ -30,15 +34,32 @@ const anyOf = (key: string, values: readonly string[] | undefined) =>
   values === undefined || values.length === 0 ? [] : [{ key, match: { any: [...values] } }];
 
 /**
- * A probe's declared filter as Qdrant states one, or undefined when it narrows
- * nothing — in which case the search is exactly the unfiltered search it was
- * before filters existed.
+ * What every search leaves out: a memory of a scope bound to a unit of work
+ * (`bound`) — every such memory when the search names no unit, and every one
+ * recorded for another unit, or for none, when it names `unitKey`. A memory
+ * of any other scope, or of none (a lesson, a fact stored before scopes),
+ * matches no clause here and is always read. Inside the filter, so a slot an
+ * excluded memory would have taken is refilled from below. With no bound
+ * scope there is nothing to leave out, and no clause: an empty `must` nested
+ * in a `must_not` would leave out every memory but the named unit's.
  */
-function filterOf(filter: ProbeFilter | undefined): Record<string, unknown> | undefined {
-  if (filter === undefined) return undefined;
-  const must = [...anyOf('kind', filter.kinds), ...anyOf('pipeline', filter.pipelines)];
-  const mustNot = anyOf('runId', filter.notRunIds);
-  if (must.length === 0 && mustNot.length === 0) return undefined;
+export function unitExclusion(
+  bound: readonly MemoryScope[],
+  unitKey: string | undefined,
+): Record<string, unknown>[] {
+  const boundScope = anyOf('scope', bound);
+  if (boundScope.length === 0) return [];
+  if (unitKey === undefined) return boundScope;
+  return [{ must: boundScope, must_not: [{ key: 'unitKey', match: { value: unitKey } }] }];
+}
+
+/** A probe's declared filter as Qdrant states one: what it narrows to, and what every search leaves out. */
+function filterOf(filter: ProbeFilter | undefined): Record<string, unknown> {
+  const must = [...anyOf('kind', filter?.kinds), ...anyOf('pipeline', filter?.pipelines)];
+  const mustNot = [
+    ...anyOf('runId', filter?.notRunIds),
+    ...unitExclusion(UNIT_BOUND_SCOPES, filter?.unitKey),
+  ];
   return {
     ...(must.length === 0 ? {} : { must }),
     ...(mustNot.length === 0 ? {} : { must_not: mustNot }),
@@ -85,16 +106,13 @@ export class QdrantMemoryStore implements MemoryStore {
     if (probes.length === 0) return [];
     const collection = await this.bound();
     const responses = await this.client.queryBatch(collection, {
-      searches: probes.map((probe) => {
-        const filter = filterOf(probe.filter);
-        return {
-          query: [...probe.vector],
-          using: probe.using,
-          limit: probe.limit * DEDUPE_FACTOR,
-          with_payload: true,
-          ...(filter === undefined ? {} : { filter }),
-        };
-      }),
+      searches: probes.map((probe) => ({
+        query: [...probe.vector],
+        using: probe.using,
+        limit: probe.limit * DEDUPE_FACTOR,
+        with_payload: true,
+        filter: filterOf(probe.filter),
+      })),
     });
     return responses.map((response, index) => {
       const seen = new Set<string>();

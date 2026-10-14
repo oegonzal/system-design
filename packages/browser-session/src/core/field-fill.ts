@@ -14,12 +14,12 @@ import type { EngineContext } from './engine-context';
 import type { RoutedField } from './field-routing';
 import type { AnswerSource, OperatorReply } from './operator-interaction';
 import { ActionFailed, type BrowserAction } from './ports';
-import { describeAction } from './session-state';
+import { describeAction, openUnitFilled } from './session-state';
 
 /**
  * Putting one value into one field, and what came of it: the action that
  * takes it — an option for a selectable field, text otherwise — taken and
- * imaged, the value kept for the session as what this field now holds, and
+ * imaged, the value kept for the open unit of work as what this field now holds, and
  * the result a field's decision row is written from. A fill the page refuses
  * is a result, never a throw; what follows a refusal is the flow's to decide.
  */
@@ -111,6 +111,6 @@ export async function fill(
     return result(field, 'fill', source, value, reply, 'failed', error.message);
   }
   await captureAfter(ctx, action, entry, 'ok');
-  settled(ctx.state.filled, field.field, value);
+  settled(openUnitFilled(ctx.state), field.field, value);
   return result(field, 'fill', source, value, reply);
 }

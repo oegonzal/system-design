@@ -12,11 +12,12 @@ import {
   fieldTypeOf,
   readFieldIndex,
   splitFieldGoal,
+  unitNamedLegend,
   valueFaults,
   type EvidenceItem,
 } from './field-goal';
 import { formObservation } from './fixtures';
-import { readFencedIndex } from '../quality-loop/goal-index';
+import { readFencedIndex, stripIndexSection } from '../quality-loop/goal-index';
 
 const fields = () =>
   formObservation()
@@ -80,6 +81,43 @@ describe('composeFieldGoal', () => {
     // Each pipeline's own index reader takes its own goals only.
     expect(readFencedIndex(recalled, fieldIndexSchemaFor('answer-suggestions'))).not.toBeNull();
     expect(readFencedIndex(recalled, fieldIndexSchemaFor('field-answer'))).toBeNull();
+  });
+
+  it('[QL-71] names the unit of work the page is for in its index, kept through a split and a recompose, and says every unit item listed is that unit’s only when it names one', () => {
+    const unitKey = 'company=acme';
+    const named = composeFieldGoal({
+      pipeline: 'field-answer',
+      prose: PROSE,
+      fields: fields(),
+      evidence: [],
+      unitKey,
+    });
+    expect(readFieldIndex(named)?.unitKey).toBe(unitKey);
+    const split = splitFieldGoal(named);
+    expect(split?.unitKey).toBe(unitKey);
+    if (split === null) throw new Error('the composed goal must split');
+    const recalled = composeFieldGoal({ ...split, evidence: evidence() });
+    expect(splitFieldGoal(recalled)).toEqual(split);
+    const sentence =
+      'Every unit item listed was recorded for a unit of work its mission identifies as the one this goal names.';
+    expect(unitNamedLegend(['unit'])).toBe(sentence);
+    expect(recalled).toContain(`unit of work this goal names. ${sentence}\n`);
+    // Nothing to say when no scope binds to a unit: the search then leaves nothing out.
+    expect(unitNamedLegend([])).toBeNull();
+    // Written nowhere but the index: every stage reads the sentence, none the key.
+    expect(stripIndexSection(recalled)).not.toContain(unitKey);
+    // A goal naming no unit has no key and no sentence, and reads as before one could be named.
+    const unnamed = composeFieldGoal({ ...split, unitKey: undefined, evidence: evidence() });
+    expect(readFieldIndex(unnamed)).not.toHaveProperty('unitKey');
+    expect(splitFieldGoal(unnamed)).not.toHaveProperty('unitKey');
+    expect(unnamed).not.toContain(sentence);
+    expect(recalled.replace(` ${sentence}`, '').replace(`,"unitKey":"${unitKey}"`, '')).toBe(
+      unnamed,
+    );
+    // Only a key the engine composes is read: an empty one is no index at all.
+    expect(
+      readFencedIndex(named.replace(unitKey, ''), fieldIndexSchemaFor('field-answer')),
+    ).toBeNull();
   });
 
   it('[QL-39] states once what a value does that its field cannot take, whoever writes it', () => {

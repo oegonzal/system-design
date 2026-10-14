@@ -25,8 +25,8 @@ migration this checkout carries — exit 2, naming each one and the
 
 ```bash
 printf '# Notes\n\nYour Name — your@email.test — City, Country.\n\nSix years of professional TypeScript, 2020–2026, at Acme and Globex.\n' > /tmp/notes.md
-pnpm memory-ingest ingest /tmp/notes.md --kind notes --subject "Your Name" --dry-run   # one chunk, N sections, nothing posted
-pnpm memory-ingest ingest /tmp/notes.md --kind notes --subject "Your Name"             # 202 → polled → complete
+pnpm memory-ingest ingest /tmp/notes.md --kind notes --scope subject --subject "Your Name" --dry-run   # one chunk, N sections, nothing posted
+pnpm memory-ingest ingest /tmp/notes.md --kind notes --scope subject --subject "Your Name"             # 202 → polled → complete
 pnpm memory-ingest status
 ```
 
@@ -41,10 +41,13 @@ curl -s -X POST localhost:3003/memory/form-retrieval-report -H 'content-type: ap
 ```
 
 names the TypeScript fact first for that field, with `runId` the digest run's
-id and `pipeline` `document-digest` — the form path's own recall (the field's
-words as the probe, both named vectors, the hits its field type takes), not
-the curated recall's `retrieval-report`, which derives probes with a model and
-searches every kind. Then `ingest docs/ingestion/Resume_2026_c.pdf --kind resume`.
+id, `kind` `profile_fact` and `scope` `subject` — the form path's own recall
+(the field's words as the probe, both named vectors, the hits its field type
+takes), not the curated recall's `retrieval-report`, which derives probes with
+a model and searches every kind. Then
+`ingest docs/ingestion/Resume_2026_c.pdf --kind resume --scope subject` — a
+file names no unit of work, so a document about you declares its facts the
+subject's.
 
 ## 2. A benign session
 
@@ -81,16 +84,20 @@ facts they teach are self-contained. To run until a number of applications are
 submitted, add `--target-done n` (with `--max-tasks` at least n): the session
 ends `complete`, reason `target-reached`, once n units have closed `done`.
 
-Read, per form page: one `form-memory` orchestration whose `recall` step
-counts `{probes, candidates, evidence}` and whose `target` step reports
-`admission` and what it withheld; an operator prompt only for a field the
-report withheld, the model routed to you, or whose value rests on a kind the
-answering settings do not fill — and none when the record's own suggestion
-fills it (the answering settings' `drafts`); for each answer you give, one
-`document-memory` orchestration at once, whose id lands on the decision row
-it came from — the step's `teach.json` lists them. The dump's `fields.json`
-per step names the route and source of every field, and what became of its
-suggestions.
+Read, per form page: one `form-memory` orchestration whose goal's index names
+the open unit of work by its key (`unitKey`: the identity the mission
+declares, or the task row's id when it declares none), whose `recall` step
+counts `{probes, candidates, evidence}` — of the memories bound to a unit of
+work, only that unit's — and whose `target` step reports `admission` and what
+it withheld; an operator prompt only for a field the report withheld, the
+model routed to you, or whose value rests on a kind the answering settings do
+not fill — and none when the record's own suggestion fills it (the answering
+settings' `drafts`), or when you answered the same question earlier in the
+same unit; for each answer you give, one `document-memory` orchestration at
+once, its document naming the unit the answer was given in, whose id lands on
+the decision row it came from — the step's `teach.json` lists them. The
+dump's `fields.json` per step names the route and source of every field, and
+what became of its suggestions.
 
 To read why a step did what it did, walk its debate from the dump: the step's
 `plan.json` names the loop run, and

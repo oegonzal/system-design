@@ -38,8 +38,12 @@ import type { AxisFactorLevel, Corroboration, GoalSource, Severity } from './voc
 export const WITHHOLDINGS = ['every-ref', 'every-ref-when-requires-user', 'none'] as const;
 export type Withholding = (typeof WITHHOLDINGS)[number];
 
-/** What named a withheld item: a confirmed finding, or a validator's problem. */
-export const WITHHOLDING_SOURCES = ['finding', 'validator'] as const;
+/**
+ * What named a withheld item: a confirmed finding, a validator's problem, or
+ * the goal's own index — a fact its composer declared that no item can be
+ * stored against, as a reader holds every item to it.
+ */
+export const WITHHOLDING_SOURCES = ['finding', 'validator', 'index'] as const;
 export type WithholdingSource = (typeof WITHHOLDING_SOURCES)[number];
 
 /**

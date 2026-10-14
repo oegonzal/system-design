@@ -1,13 +1,14 @@
 /**
  * The form-memory orchestrator's two steps, as adapters over its ports.
  * `recall` turns the page's own field labels into probes, searches the store
- * once and composes what came back into the goal every stage of the form
- * pipeline reads — a fact is evidence a value must rest on, so the judges see
- * it, unlike a coach's lessons. `target` runs the form pipeline the request
- * names over that goal and reports the run's admission and what a reader of
- * it withholds, each read off that pipeline's own definition, so the caller
- * never recomputes either. Recall never blocks the target: a page with no
- * evidence is still run, and its facts route to the operator.
+ * once — of what was recorded for one unit of work, only for the unit the
+ * goal's index names — and composes what came back into the goal every stage
+ * of the form pipeline reads: a fact is evidence a value must rest on, so the
+ * judges see it, unlike a coach's lessons. `target` runs the form pipeline
+ * the request names over that goal and reports the run's admission and what a
+ * reader of it withholds, each read off that pipeline's own definition, so
+ * the caller never recomputes either. Recall never blocks the target: a page
+ * with no evidence is still run, and its facts route to the operator.
  */
 import {
   ANSWER_SUGGESTIONS_PIPELINE_ID,
@@ -17,7 +18,7 @@ import {
   GoalBudgetExceeded,
   parseLenient,
   splitFieldGoal,
-  type FieldSpec,
+  type FieldGoalInput,
   type FormMemoryStepReason,
   type FormPipeline,
   type MemoryContextDto,
@@ -90,20 +91,16 @@ export function withheldOf<T>(
 /**
  * The goal with as much of the evidence as fits the engine's budget, the
  * lowest-ranked items dropped first; null when not even one fits. Aliases
- * are positional, so a prefix keeps every alias the way it would have read.
+ * are positional, so a prefix keeps every alias the way it would have read;
+ * the split is composed whole, so the goal still names its unit of work.
  */
 function composeWithinBudget(
-  split: { pipeline: FormPipeline; prose: string; fields: readonly FieldSpec[] },
+  split: Omit<FieldGoalInput, 'evidence'>,
   hits: readonly MemoryHit[],
 ): { goal: string; evidence: number } | null {
   for (let count = hits.length; count > 0; count -= 1) {
     try {
-      const goal = composeFieldGoal({
-        pipeline: split.pipeline,
-        prose: split.prose,
-        fields: split.fields,
-        evidence: evidenceItems(hits.slice(0, count)),
-      });
+      const goal = composeFieldGoal({ ...split, evidence: evidenceItems(hits.slice(0, count)) });
       return { goal, evidence: count };
     } catch (error) {
       if (!(error instanceof GoalBudgetExceeded)) throw error;
@@ -130,7 +127,9 @@ export async function recall(ctx: Ctx): Promise<StepResult<{ goal: string }>> {
   if (embedded === null) return { status: 'failed', reason: 'embedding-failed', counts: counted };
   let ranked: MemoryHit[][];
   try {
-    ranked = await ctx.ports.store.searchMany(searchProbes(embedded.vectors, probes.limits));
+    ranked = await ctx.ports.store.searchMany(
+      searchProbes(embedded.vectors, probes.limits, split.unitKey),
+    );
   } catch (error) {
     return {
       status: 'failed',

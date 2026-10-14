@@ -194,7 +194,8 @@ export interface FormReport {
 export interface FieldsInput {
   session: SessionStepRef;
   mission: string;
-  task: { label: string; url: string; facets: readonly UnitFacet[] } | null;
+  /** The open unit of work, as `formTaskOf` composes it for the form goal. */
+  task: { label: string; url: string; facets: readonly UnitFacet[]; unitKey: string } | null;
   fields: readonly FieldSpec[];
   criteria: readonly SuccessCriterion[];
 }

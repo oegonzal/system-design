@@ -11,7 +11,7 @@ import {
   fakeEmbeddings,
   InMemoryEmbeddingCache,
   InMemoryMemoryStore,
-  vectorOf,
+  storedChunkOf,
 } from '../../modules/memory/testing';
 import type { StepContext } from '../runner/definition';
 import { fakeStepContext } from '../runner/testing';
@@ -70,11 +70,14 @@ export const memoryContext = (overrides: Partial<MemoryContextDto> = {}): Memory
   ...overrides,
 });
 
-/** Ports over an in-memory store seeded with the sample hits. */
 /** Derives nothing; recall falls back to the goal — the default probes a spec runs over. */
 export const noQueryProbes: QueryProbes = { derive: () => Promise.resolve([]) };
 
-/** The memory ports over a store seeded with `seeded` — design lessons unless a spec says otherwise. */
+/**
+ * The memory ports over a store seeded with `seeded` — design lessons unless a
+ * spec says otherwise — each hit stored with everything it carries, its scope
+ * and unit among them, so a search reads it as the store would.
+ */
 export function memoryPorts(
   overrides: Partial<MemoryPorts> = {},
   seeded: readonly MemoryHit[] = sampleHits,
@@ -82,20 +85,7 @@ export function memoryPorts(
   const store = new InMemoryMemoryStore();
   void store.replaceRunChunks(
     'run-a',
-    seeded.map((hit) => {
-      const keys = { condition: `when ${hit.text}`, lesson: hit.text };
-      return {
-        text: hit.text,
-        keys,
-        contentHash: hit.contentHash,
-        source: hit.source,
-        evidence: hit.evidence,
-        digestRunId: hit.digestRunId,
-        lineage: hit.lineage,
-        model: hit.model,
-        vectors: { condition: vectorOf(keys.condition), lesson: vectorOf(keys.lesson) },
-      };
-    }),
+    seeded.map((hit) => storedChunkOf(hit)),
   );
   return {
     embedding: { enabled: true, model: 'fake-embedding', reason: null },

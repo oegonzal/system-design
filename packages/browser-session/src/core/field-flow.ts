@@ -17,6 +17,7 @@ import { remember, teach } from './field-teach';
 import { askOperator, SuggestionsPrefetch, type SuggestionsRecord } from './operator-ask';
 import { BrainFaulted, type Decided, type FormReport } from './ports';
 import { stepJsonFile } from './session-dump';
+import { formTaskOf, openUnitAnswers, openUnitFilled } from './session-state';
 
 /**
  * A plan's `askFields`: the fields go to the form-memory orchestration as
@@ -24,8 +25,9 @@ import { stepJsonFile } from './session-dump';
  * them, which are kept without a run — the answers come back as one run, and
  * each field is routed by the declared table: filled, kept, left blank, or
  * put to the operator with the model's value as a suggestion and the reason
- * it was not trusted. The operator's answers are cached for the session and
- * taught back the moment they are given. One decision row per field settled.
+ * it was not trusted. The operator's answers are cached for the unit of work
+ * they were given in and taught back the moment they are given. One decision
+ * row per field settled.
  * A fill the page refuses stops the flow where it is — the page may have
  * moved on — so the fields after it are not attempted, and the plan stops
  * with it; the failure is counted once, by the step. The operator's own
@@ -140,7 +142,7 @@ async function ask(
   }
 }
 
-/** A field that still holds what this session settled for it: kept, with no run and no touch. */
+/** A field that still holds what this session settled for it in this unit of work: kept, with no run and no touch. */
 const keptReadout = (field: FieldSpec, position: number): RoutedField => ({
   position,
   field,
@@ -163,7 +165,7 @@ const settle = (
     case 'leave-blank':
       return Promise.resolve(result(field, 'leave-blank', field.source, null, null));
     case 'keep':
-      if (field.value !== null) settled(ctx.state.filled, field.field, field.value);
+      if (field.value !== null) settled(openUnitFilled(ctx.state), field.field, field.value);
       return Promise.resolve(result(field, 'keep', field.source, field.value, null));
     case 'fill':
       return fill(ctx, field, field.value ?? '', field.source, null, observation);
@@ -238,7 +240,7 @@ const fieldsOf = (refs: readonly string[], observation: PageObservation): FieldS
     return element === undefined ? [] : [fieldSpecOf(element)];
   });
 
-/** The fields still open: one that holds what this session settled for it is not a question. */
+/** The fields still open: one that holds what this session settled for it in this unit of work is not a question. */
 const openOf = (fields: readonly FieldSpec[], filled: ReadonlyMap<string, string>): FieldSpec[] =>
   fields.filter((field) => {
     const key = fieldQuestionOf(field);
@@ -264,14 +266,7 @@ async function decideFields(
       decided = await deps.brain.answerFields({
         session: { sessionId: state.sessionId, step: state.step },
         mission: ctx.mission,
-        task:
-          state.tasks.open === null
-            ? null
-            : {
-                label: state.tasks.open.label,
-                url: state.tasks.open.url,
-                facets: [...state.tasks.open.facets],
-              },
+        task: formTaskOf(state),
         fields: open,
         criteria: ctx.criteria.answer,
       });
@@ -347,11 +342,11 @@ export async function askFields(
   const fields = fieldsOf(refs, observation);
   if (fields.length === 0)
     return { stopped: false, failed: false, note: 'no listed field matched' };
-  const open = openOf(fields, ctx.state.filled);
+  const open = openOf(fields, openUnitFilled(ctx.state));
   const { decided, fault, durationMs } = await decideFields(ctx, open);
   const routed = routedOf(
     fields,
-    routeFieldsInSession(decided, fault, open, ctx.state.operatorAnswers, ctx.options.answering),
+    routeFieldsInSession(decided, fault, open, openUnitAnswers(ctx.state), ctx.options.answering),
   );
   const prefetch = SuggestionsPrefetch.for(ctx, routed);
   const { results, stopped } = await settleAll(

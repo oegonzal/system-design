@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { EVIDENCE_KINDS, contentHash } from '../../../orchestrators/memory/ports';
+import { chunkSourceSchema } from '../../../pipelines/memory-recall/input';
 import { INDEXED_FIELDS, fromPayload, rootOf, toPayload } from './collection';
 
 /** A fact digested from a document, as `chunksOf` shapes it: its evidence is a section, not a run's rows. */
@@ -99,6 +100,25 @@ describe('the memory point payload', () => {
     expect('scope' in (fromPayload(payload) ?? {})).toBe(false);
   });
 
+  it('[QL-71] carries the unit of work a unit-bound memory was recorded for beside its scope, never inside its source, and a point stored without one reads without one', () => {
+    const chunk = { ...factChunk(), scope: 'unit' as const, unitKey: 'company=acme' };
+    const payload = toPayload(chunk, '2026-10-14T00:00:00.000Z');
+    expect(payload).toMatchObject({ scope: 'unit', unitKey: 'company=acme' });
+    const memory = fromPayload(payload);
+    expect(memory).toMatchObject({ scope: 'unit', unitKey: 'company=acme', source: chunk.source });
+    // The source is exactly the recall pipeline's own shape, which a coach's recall parses strictly.
+    expect(Object.keys(memory?.source ?? {}).sort()).toEqual(
+      Object.keys(chunkSourceSchema.shape).sort(),
+    );
+    expect(chunkSourceSchema.safeParse(memory?.source).success).toBe(true);
+    const unnamed = fromPayload(toPayload({ ...chunk, unitKey: undefined }, '2026-10-14'));
+    expect(unnamed === null ? null : 'unitKey' in unnamed).toBe(false);
+    // An empty key is one this module never writes: the point is not its memory.
+    expect(fromPayload({ ...payload, unitKey: '' })).toBeNull();
+    // Both are indexed, as keywords: every search filters by them.
+    expect(INDEXED_FIELDS).toMatchObject({ scope: 'keyword', unitKey: 'keyword' });
+  });
+
   it('[QL-60] carries the lineage of the cited iteration, reads a point written before it as null, and refuses a malformed one', () => {
     const adopted = { ...factChunk(), lineage: ADOPTED_LINEAGE };
     const payload = toPayload(adopted, '2026-10-02T00:00:00.000Z');
@@ -129,9 +149,10 @@ describe('the memory point payload', () => {
       severity: 'high' as const,
       support: { confirms: 2, contradicts: 0 },
     };
-    // Lineage that names an adopted run, so every indexed lineage path holds a value to check.
+    // Lineage that names an adopted run, and a unit-bound scope with its unit, so every
+    // indexed path holds a value to check.
     const payload = toPayload(
-      { ...chunk, lineage: ADOPTED_LINEAGE, facets },
+      { ...chunk, lineage: ADOPTED_LINEAGE, facets, scope: 'unit', unitKey: 'company=acme' },
       '2026-10-03T00:00:00.000Z',
     );
 

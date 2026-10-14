@@ -1,4 +1,4 @@
-import type { ConfirmedFinding } from '@sysdesign/contracts';
+import { resumeChunk, type ConfirmedFinding, type DocumentChunk } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { outputsOf } from '../../core/outputs';
@@ -12,14 +12,18 @@ import {
 import { childRun, memoryPorts } from '../memory/steps.testing';
 import { indexMemories } from '../memory/store/index-memories';
 import { ACCEPT_AT, FAKE_MODEL, faulting, passed, readoutTrace } from '../memory/testing';
-import { readDocumentDigest } from './read-document-digest';
+import { readDocumentDigest, UNIT_UNNAMED } from './read-document-digest';
 import { DOCUMENT_MEMORY_OWNED } from './steps';
 
 /** A judged document-digest run over the digest given, with these findings confirmed against it. */
-const judged = (digest: DocumentDigest, findings: ConfirmedFinding[]) => {
+const judged = (
+  digest: DocumentDigest,
+  findings: ConfirmedFinding[],
+  chunk: DocumentChunk = resumeChunk(),
+) => {
   const trace = readoutTrace({
     pipeline: 'document-digest',
-    goal: documentGoal(),
+    goal: documentGoal(chunk),
     artifact: digest,
     locations: ['summary', ...digest.memories.map((_, position) => `memory.${position + 1}`)],
     criteria: documentCriteria(),
@@ -89,5 +93,53 @@ describe('what a document digest endorses', () => {
       ['memory.1', 'profile_fact', role.insight],
       ['memory.3', 'profile_story', `${role.insight} The move took a year.`],
     ]);
+  });
+
+  it('[QL-71] a document that names its unit of work stamps it on each memory bound to one, and on no other — whether the digest or the document scoped it — and the store keeps it', async () => {
+    const digest = sampleDocumentDigest({ memories: [role, { ...home, scope: 'unit' }] });
+    const named = { ...resumeChunk(), unitKey: 'U' };
+    const readout = readDocumentDigest(judged(digest, [], named).outputs, ACCEPT_AT);
+    expect(readout.memories.map((memory) => [memory.scope, memory.unitKey])).toEqual([
+      ['subject', undefined],
+      ['unit', 'U'],
+    ]);
+    expect(readout.memories[0]).not.toHaveProperty('unitKey');
+    expect(readout.withheld).toEqual([]);
+    // A document declaring every memory bound to the unit it names: every memory carries it.
+    const declared = readDocumentDigest(
+      judged(digest, [], { ...named, scope: 'unit' }).outputs,
+      ACCEPT_AT,
+    );
+    expect(declared.memories.map((memory) => [memory.scope, memory.unitKey])).toEqual([
+      ['unit', 'U'],
+      ['unit', 'U'],
+    ]);
+
+    const { trace } = judged(digest, [], named);
+    const ports = memoryPorts();
+    const source = { ...childRun('document-digest', trace), trace };
+    await indexMemories(
+      ports,
+      source,
+      { digestRunId: source.runId, memories: readout.memories },
+      FAKE_MODEL,
+      DOCUMENT_MEMORY_OWNED,
+    );
+    const stored = [...(ports.store as InMemoryMemoryStore).points.values()]
+      .filter((chunk) => chunk.source.runId === source.runId)
+      .map((chunk) => [chunk.source.ref, chunk.scope, chunk.unitKey])
+      .sort();
+    expect(stored).toEqual([
+      ['memory.1', 'subject', undefined],
+      ['memory.2', 'unit', 'U'],
+    ]);
+  });
+
+  it('[QL-71] a memory bound to a unit of work, of a document that names none, is withheld by the index — never stored where no search reads it — and every other memory is kept', () => {
+    const digest = sampleDocumentDigest({ memories: [role, { ...home, scope: 'unit' }] });
+    const readout = readDocumentDigest(judged(digest, []).outputs, ACCEPT_AT);
+    expect(readout.memories.map((memory) => memory.position)).toEqual([1]);
+    expect(readout.withheld).toEqual([{ ref: 'memory.2', ...UNIT_UNNAMED }]);
+    expect(UNIT_UNNAMED.source).toBe('index');
   });
 });

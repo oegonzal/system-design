@@ -101,7 +101,7 @@ describe('parseOptions', () => {
     [['ingest', 'a.md', '--kind', 'poems'], '--kind must be one of resume, notes'],
     [['ingest', 'a.md', '--date', 'last tuesday'], '--date must be a day as YYYY-MM-DD'],
     [['ingest', 'a.md', '--limit', '0'], '--limit must be a positive integer'],
-    [['ingest', 'a.md', '--scope', 'everywhere'], '--scope must be one of subject, unit'],
+    [['ingest', 'a.md', '--scope', 'everywhere'], '--scope must be one of subject —'],
     [['ingest', 'a.md', '--parts-per-chunk', '99'], '--parts-per-chunk must be a positive integer'],
     [['ingest', 'a.md', '--chunk-bytes', 'lots'], '--chunk-bytes must be a positive integer'],
     [
@@ -123,6 +123,14 @@ describe('parseOptions', () => {
     const result = parseOptions(argv);
     expect(result).toBeInstanceOf(Error);
     expect((result as Error).message).toContain(message);
+  });
+
+  it('[ING-1] a file declares only a scope bound to no unit of work: a unit-bound one is refused by name, since a file names no unit', () => {
+    const result = parseOptions(['ingest', 'a.md', '--scope', 'unit']);
+    expect(result).toBeInstanceOf(Error);
+    expect((result as Error).message).toBe(
+      '--scope must be one of subject — a file names no unit of work — got unit',
+    );
   });
 });
 

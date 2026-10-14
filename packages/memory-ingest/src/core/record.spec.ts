@@ -1,8 +1,9 @@
 import { DOCUMENT_MEMORY_STEP_REASONS } from '@sysdesign/contracts';
 
 import { manifestEntry, settledOrchestration, stepOf } from '../test/fakes';
+import { outcomeOf } from './ingest-report';
 import type { ManifestEntry } from './ports';
-import { covers, HOLDS_NO_FACTS, statusOf, unstoredBy, whyNotStored } from './record';
+import { covers, HOLDS_NO_FACTS, leftFactsOut, statusOf, unstoredBy, whyNotStored } from './record';
 
 describe('statusOf', () => {
   it('[ING-1] is earned by the store step, not read off the orchestration: complete only when the facts were stored', () => {
@@ -142,5 +143,28 @@ describe('covers', () => {
     expect(covers(manifestEntry(marked))).toBe(false);
     expect(covers(unstored('no-memories', marked))).toBe(false);
     expect(covers(manifestEntry({ status: 'failed' }))).toBe(false);
+  });
+
+  it('[ING-3] holds a stored posting whose digest gave a reason as one that left facts of its chunk out of the store: it covers nothing, reads unstored, and says why', () => {
+    const note = '1 withheld: bound to a unit of work, in a document that names none';
+    const partial = manifestEntry({
+      steps: {
+        digest: {
+          status: 'complete',
+          reason: 'unit-unnamed',
+          note,
+          counts: { memories: 2, kept: 1, 'unit-unnamed': 1 },
+        },
+        store: { status: 'complete', reason: null, note: null, counts: { chunks: 1 } },
+      },
+    });
+    expect([leftFactsOut(partial), covers(partial), outcomeOf(partial)]).toEqual([
+      true,
+      false,
+      'unstored',
+    ]);
+    expect(whyNotStored(partial)).toBe(`digest complete: unit-unnamed — ${note}`);
+    expect([leftFactsOut(manifestEntry()), outcomeOf(manifestEntry())]).toEqual([false, 'posted']);
+    expect(leftFactsOut(unstored('unit-unnamed'))).toBe(false);
   });
 });

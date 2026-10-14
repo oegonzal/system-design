@@ -218,14 +218,16 @@ export class MemoryService implements OnModuleInit {
 
   /**
    * What a form page's recall would retrieve for its fields, without running a
-   * pipeline: the fields' own questions as probes, each named vector's ranking,
-   * each field's fused list and the dealt evidence — the form path's own
-   * measurement, as `retrievalReport` is the curated path's.
+   * pipeline: the fields' own questions as probes, under the unit of work the
+   * page names, each named vector's ranking, each field's fused list and the
+   * dealt evidence — the form path's own measurement, as `retrievalReport` is
+   * the curated path's.
    */
   async formRetrievalReport(
     fields: readonly FormRetrievalField[],
+    unitKey: string | undefined,
   ): Promise<FormRetrievalReportDto> {
-    const report = await formRetrievalReport(this.ports, fields);
+    const report = await formRetrievalReport(this.ports, fields, unitKey);
     if (report === null) throw new BadRequestException('embeddings are unavailable');
     return report;
   }

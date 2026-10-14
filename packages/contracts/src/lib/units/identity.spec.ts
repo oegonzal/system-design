@@ -6,8 +6,14 @@ import {
   matchesRecord,
   unitFacetSchema,
   unitFacetsSchema,
+  unitKeyOf,
+  unitKeySchema,
 } from './identity';
-import { UNIT_FACET_VALUE_MAX_LENGTH } from './vocab';
+import {
+  UNIT_FACET_NAME_MAX_LENGTH,
+  UNIT_FACET_VALUE_MAX_LENGTH,
+  UNIT_FACETS_BOUND,
+} from './vocab';
 
 describe('a unit’s identity as declared facets', () => {
   it('[BRW-13] keys a value by trimming, Unicode-normalising and lower-casing under one fixed locale — never by collation or the runtime’s locale', () => {
@@ -49,6 +55,29 @@ describe('a unit’s identity as declared facets', () => {
     ).toBe(false);
     expect(matchesRecord(claim, [{ name: 'notice', value: '42' }])).toBe(false);
     expect(matchesRecord(claim, [])).toBe(false);
+  });
+
+  it('[QL-71] keys a unit by its declared identity, so two units of one identity are one key, and by its own id when it declares none', () => {
+    const acme = [{ name: 'company', value: 'Acme' }];
+    const first = unitKeyOf({ id: 'a1b2', facets: acme });
+    expect(first).toBe(identityKey(acme));
+    expect(unitKeyOf({ id: 'c3d4', facets: [{ name: 'company', value: ' ACME' }] })).toBe(first);
+    expect(unitKeyOf({ id: 'c3d4', facets: [{ name: 'company', value: 'Globex' }] })).not.toBe(
+      first,
+    );
+    expect(unitKeyOf({ id: 'a1b2', facets: [] })).toBe('a1b2');
+  });
+
+  it('[QL-71] the key’s schema takes the longest key a plan’s facets can compose — every facet at its bound, each value keyed at the most keying grows it — and refuses an empty one', () => {
+    // U+FDFA is the one code point NFKC grows the most: one becomes eighteen.
+    expect(facetKey('\uFDFA')).toHaveLength(18);
+    const longest = Array.from({ length: UNIT_FACETS_BOUND.ceiling }, (_, index) => ({
+      name: `${index}`.padStart(UNIT_FACET_NAME_MAX_LENGTH, 'f'),
+      value: '\uFDFA'.repeat(UNIT_FACET_VALUE_MAX_LENGTH),
+    }));
+    expect(unitFacetsSchema.safeParse(longest).success).toBe(true);
+    expect(unitKeySchema.safeParse(unitKeyOf({ id: 'u', facets: longest })).success).toBe(true);
+    expect(unitKeySchema.safeParse('').success).toBe(false);
   });
 
   it('[BRW-13] a facet is an exact id: an overlong or empty value is a structural fault, never kept, and a plan may carry none', () => {

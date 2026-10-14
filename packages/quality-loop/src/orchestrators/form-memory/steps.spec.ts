@@ -5,6 +5,7 @@ import type {
   SuccessCriterion,
 } from '@sysdesign/contracts';
 import {
+  composeFieldGoal,
   FIELD_EVIDENCE_HEADING,
   finding,
   readFieldIndex,
@@ -31,7 +32,7 @@ import {
 import { CachedEmbeddings } from '../memory/embeddings';
 import type { MemoryPorts } from '../memory/ports';
 import { childRun, memoryContext, memoryPorts, sampleFacts } from '../memory/steps.testing';
-import { passed, readoutTrace } from '../memory/testing';
+import { hitOf, passed, readoutTrace } from '../memory/testing';
 import { fakeStepContext } from '../runner/testing';
 import type { FormMemoryPorts } from './ports';
 import { recall, target, type FormMemoryOutputs } from './steps';
@@ -131,6 +132,46 @@ describe('the form-memory steps', () => {
       prose: ANSWERING_PROSE,
       fields: sampleFields(),
     });
+  });
+
+  it('[QL-71] recall reads, of what was recorded for one unit of work, only what was recorded for the unit the page names — none when it names none — and the goal it composes still names its unit', async () => {
+    const unitFact = (text: string, ref: string, unitKey: string) => {
+      const hit = hitOf(text, 'run-a', ref);
+      return {
+        ...hit,
+        source: { ...hit.source, kind: 'profile_fact' as const },
+        scope: 'unit' as const,
+        unitKey,
+      };
+    };
+    const { store } = memoryPorts({}, [
+      ...sampleFacts,
+      unitFact('Alex Example answered No to knowing anyone at this organization', 'memory.3', 'U'),
+      unitFact('Alex Example heard of this opening from a friend', 'memory.4', 'V'),
+    ]);
+    const recalledFor = async (unitKey: string | undefined) => {
+      const goal = composeFieldGoal({
+        pipeline: 'field-answer',
+        prose: ANSWERING_PROSE,
+        fields: sampleFields(),
+        evidence: [],
+        ...(unitKey === undefined ? {} : { unitKey }),
+      });
+      const composed = (await recall(ctx(null, { goal, ports: { store } }))).output?.goal ?? '';
+      return {
+        composed,
+        refs: [...composed.matchAll(/system-design (memory\.\d)/g)].map((m) => m[1]),
+      };
+    };
+    const named = await recalledFor('U');
+    expect(named.refs.sort()).toEqual(['memory.1', 'memory.2', 'memory.3']);
+    expect(readFieldIndex(named.composed)?.unitKey).toBe('U');
+    expect(named.composed).toContain(
+      'Every unit item listed was recorded for a unit of work its mission identifies as the one this goal names.',
+    );
+    const unnamed = await recalledFor(undefined);
+    expect(unnamed.refs.sort()).toEqual(['memory.1', 'memory.2']);
+    expect(readFieldIndex(unnamed.composed)).not.toHaveProperty('unitKey');
   });
 
   it('[QL-38] an empty store is store-empty, and the target still runs over the goal as composed', async () => {

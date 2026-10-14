@@ -71,12 +71,13 @@ export class IngestWaitFailed extends Error {
 }
 
 /**
- * How a chunk's posting ended. `complete` is earned by the store step: the
- * chunk's facts are in the store. `unstored` is an orchestration that settled
- * without storing any — embeddings disabled, the store unavailable, the digest
- * judged and not accepted or finding nothing — which the runner still marks
- * complete, since no step failed. `failed` never settled or settled failed;
- * `refused` never started.
+ * How a chunk's posting ended. `complete` is earned by the store step: what
+ * the digest endorsed is in the store — every fact of the chunk, unless a
+ * step's reason says some were left out (`leftFactsOut`). `unstored` is an
+ * orchestration that settled without storing any — embeddings disabled, the
+ * store unavailable, the digest judged and not accepted or finding nothing —
+ * which the runner still marks complete, since no step failed. `failed` never
+ * settled or settled failed; `refused` never started.
  */
 export const INGEST_STATUSES = ['complete', 'unstored', 'failed', 'refused'] as const;
 export type IngestStatus = (typeof INGEST_STATUSES)[number];
