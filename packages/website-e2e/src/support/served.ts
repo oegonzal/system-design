@@ -24,6 +24,8 @@ export function declaredHeaders(pattern: string): Map<string, string> {
     const separator = line.indexOf(':');
     headers.set(line.slice(0, separator).trim().toLowerCase(), line.slice(separator + 1).trim());
   }
+  // A rule that declares nothing would make every check against it pass vacuously.
+  if (headers.size === 0) throw new Error(`_headers declares no headers for ${pattern}`);
   return headers;
 }
 

@@ -47,7 +47,8 @@ export default defineConfig({
    * the server to answer with this build.
    */
   projects: [
-    { name: 'build-served', testMatch: BUILD_SERVED },
+    // toPass is this check's retry; a Playwright retry (CI gets two) would repeat the whole wait.
+    { name: 'build-served', testMatch: BUILD_SERVED, retries: 0 },
     {
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },

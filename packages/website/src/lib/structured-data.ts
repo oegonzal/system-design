@@ -78,7 +78,8 @@ export function organizationGraph(
  * carry organizationGraph's mark, checked here too, so a cast cannot pass off
  * one written by hand; a fact found anywhere in it fails the build, since only
  * a confirmed value is data; and `<` is escaped so no value can close the
- * element early. A copy of a built graph keeps the mark.
+ * element early. A copy of a built graph keeps the mark, so what a shipped
+ * graph holds is checked on the built pages, whose JSON-LD website-e2e reads.
  */
 export function serializeJsonLd(data: StructuredData): string {
   if (!(GRAPH in data)) throw new Error('Structured data must be a graph organizationGraph built.');

@@ -22,6 +22,55 @@ export const unusedBindings = [
   { ignoreRestSiblings: true, argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
 ];
 
+/**
+ * The module-boundary rule's options, shared with the packages that own a
+ * config of their own and declare an exception to it (packages/website-e2e).
+ * Two constraint dimensions:
+ *   type:*  — the ownership rule: the design system may never reach into an
+ *             app, which is what stops it drifting into a dumping ground for
+ *             domain components.
+ *   scope:* — the runtime rule: browser code may never import the ORM layer,
+ *             and node code may never import the design system.
+ *             `scope:universal` (contracts, criteria) is the only vocabulary
+ *             both sides share.
+ */
+export const moduleBoundaries = {
+  enforceBuildableLibDependency: true,
+  allow: [],
+  depConstraints: [
+    {
+      sourceTag: 'type:app',
+      onlyDependOnLibsWithTags: ['type:ui', 'type:shared'],
+    },
+    {
+      sourceTag: 'type:ui',
+      onlyDependOnLibsWithTags: ['type:ui', 'type:shared'],
+    },
+    {
+      sourceTag: 'type:shared',
+      onlyDependOnLibsWithTags: ['type:shared'],
+    },
+    {
+      // Storybook and the e2e suite are the projects that legitimately see
+      // both sides.
+      sourceTag: 'type:tooling',
+      onlyDependOnLibsWithTags: ['*'],
+    },
+    {
+      sourceTag: 'scope:web',
+      onlyDependOnLibsWithTags: ['scope:web', 'scope:universal'],
+    },
+    {
+      sourceTag: 'scope:node',
+      onlyDependOnLibsWithTags: ['scope:node', 'scope:universal'],
+    },
+    {
+      sourceTag: 'scope:universal',
+      onlyDependOnLibsWithTags: ['scope:universal'],
+    },
+  ],
+};
+
 export default [
   {
     ignores: [
@@ -47,53 +96,7 @@ export default [
     files: ['**/*.ts', '**/*.tsx', '**/*.js', '**/*.jsx'],
     rules: {
       '@typescript-eslint/no-unused-vars': unusedBindings,
-      '@nx/enforce-module-boundaries': [
-        'error',
-        {
-          enforceBuildableLibDependency: true,
-          allow: [],
-          // Two constraint dimensions:
-          //   type:*  — the ownership rule: the design system may never reach
-          //             into an app, which is what stops it drifting into a
-          //             dumping ground for domain components.
-          //   scope:* — the runtime rule: browser code may never import the
-          //             ORM layer, and node code may never import the design
-          //             system. `scope:universal` (contracts, criteria) is the
-          //             only vocabulary both sides share.
-          depConstraints: [
-            {
-              sourceTag: 'type:app',
-              onlyDependOnLibsWithTags: ['type:ui', 'type:shared'],
-            },
-            {
-              sourceTag: 'type:ui',
-              onlyDependOnLibsWithTags: ['type:ui', 'type:shared'],
-            },
-            {
-              sourceTag: 'type:shared',
-              onlyDependOnLibsWithTags: ['type:shared'],
-            },
-            {
-              // Storybook and the e2e suite are the projects that legitimately
-              // see both sides.
-              sourceTag: 'type:tooling',
-              onlyDependOnLibsWithTags: ['*'],
-            },
-            {
-              sourceTag: 'scope:web',
-              onlyDependOnLibsWithTags: ['scope:web', 'scope:universal'],
-            },
-            {
-              sourceTag: 'scope:node',
-              onlyDependOnLibsWithTags: ['scope:node', 'scope:universal'],
-            },
-            {
-              sourceTag: 'scope:universal',
-              onlyDependOnLibsWithTags: ['scope:universal'],
-            },
-          ],
-        },
-      ],
+      '@nx/enforce-module-boundaries': ['error', moduleBoundaries],
     },
   },
   ...compat.config({ extends: ['plugin:@nx/typescript'] }).map((config) => ({

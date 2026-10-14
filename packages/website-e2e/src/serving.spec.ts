@@ -2,7 +2,7 @@ import { expect, test } from '@playwright/test';
 import sharp from 'sharp';
 
 import { declaredHeaders, sitemapLocations } from './support/served';
-import { builtPages, MISSING } from './support/site';
+import { builtPages, MISSING, servedFiles } from './support/site';
 
 test('[SITE-2] the sitemap lists exactly the pages the build produced', async ({ page }) => {
   const locations = await sitemapLocations(page);
@@ -115,27 +115,38 @@ test('[SITE-5] a page asked for without its trailing slash is redirected to it',
   }
 });
 
-test('[SITE-5] every response carries the headers _headers declares, the 404 included', async ({
+test('[SITE-5] every response carries the headers _headers declares: each built file, the 404 page and each trailing-slash redirect', async ({
   request,
 }) => {
   const declared = declaredHeaders('/*');
-  expect(declared.size).toBeGreaterThan(0);
+  // Every built file at the URL it answers on (the 404 page at MISSING), and every 307 to a page.
+  const paths = [
+    ...servedFiles().map(({ url }) => url),
+    ...builtPages()
+      .filter((path) => path !== '/')
+      .map((path) => path.slice(0, -1)),
+  ];
 
-  for (const path of ['/', MISSING]) {
-    const served = (await request.get(path)).headers();
+  for (const path of paths) {
+    const served = (await request.get(path, { maxRedirects: 0 })).headers();
     for (const [name, value] of declared) expect(served[name], `${name} on ${path}`).toBe(value);
   }
 });
 
-test('[SITE-5] hashed build assets carry the caching _headers declares', async ({ page }) => {
-  await page.goto('/');
-  const stylesheet =
-    (await page.locator('link[rel="stylesheet"]').first().getAttribute('href')) ?? '';
+test('[SITE-5] every built file the /_astro/* rule names carries the caching headers it declares', async ({
+  request,
+}) => {
   const declared = declaredHeaders('/_astro/*');
+  // URLPattern reads the rule's `*` as _headers does: any run of characters.
+  const rule = new URLPattern({ pathname: '/_astro/*' });
+  const assets = servedFiles().filter(({ url }) => rule.test({ pathname: url }));
 
-  expect(stylesheet.startsWith('/_astro/')).toBe(true);
-  const served = (await page.request.get(stylesheet)).headers();
-  for (const [name, value] of declared) expect(served[name], name).toBe(value);
+  expect(declared.has('cache-control'), '/_astro/* declares Cache-Control').toBe(true);
+  expect(assets.length).toBeGreaterThan(0);
+  for (const { url } of assets) {
+    const served = (await request.get(url)).headers();
+    for (const [name, value] of declared) expect(served[name], `${name} on ${url}`).toBe(value);
+  }
 });
 
 test('[SITE-5] the headers file itself is never served', async ({ request }) => {

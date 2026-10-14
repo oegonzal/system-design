@@ -1,7 +1,8 @@
 import { type APIRequestContext, expect, type Page, test } from '@playwright/test';
 
 import { axeViolations } from './support/axe';
-import { restrictedClaimsIn } from './support/claims';
+import { cspViolations, inlineAttributeAllowances, recordCspViolations } from './support/csp';
+import { overflowPastRightEdge } from './support/reflow';
 import { sitemapLocations } from './support/served';
 import { builtPages, MISSING } from './support/site';
 
@@ -52,21 +53,17 @@ for (const path of PAGES) {
       await visit(page, path);
 
       expect(await axeViolations(page)).toEqual([]);
-      // overflow-x on html or body would hide the overflow rather than prevent it.
-      const reflow = await page.evaluate(() => ({
-        overflow: document.documentElement.scrollWidth - document.documentElement.clientWidth,
-        html: getComputedStyle(document.documentElement).overflowX,
-        body: getComputedStyle(document.body).overflowX,
-      }));
-      expect(reflow).toEqual({ overflow: 0, html: 'visible', body: 'visible' });
+      expect(await overflowPastRightEdge(page)).toEqual({ scroll: 0, past: [] });
     });
 
     test(`[SITE-5] ${path} loads cleanly, with nothing inline for the CSP to allow`, async ({
       page,
     }) => {
+      await recordCspViolations(page);
       const problems = await visit(page, path);
 
       expect(problems).toEqual([]);
+      expect(await cspViolations(page)).toEqual([]);
       const inline = await page.evaluate(() => ({
         scripts: [...document.scripts].filter((s) => !s.src && s.type !== 'application/ld+json')
           .length,
@@ -85,9 +82,8 @@ for (const path of PAGES) {
       const hrefs = await page
         .locator('a[href]')
         .evaluateAll((anchors) => anchors.map((anchor) => (anchor as HTMLAnchorElement).href));
-      const internal = [...new Set(hrefs)]
-        .map((href) => new URL(href))
-        .filter((url) => url.origin === here.origin);
+      const urls = [...new Set(hrefs)].map((href) => new URL(href));
+      const internal = urls.filter((url) => url.origin === here.origin);
 
       for (const url of internal.filter((candidate) => !isSameDocument(candidate, here))) {
         // No redirects followed: every href must already be the URL that answers.
@@ -103,17 +99,6 @@ for (const path of PAGES) {
         );
         expect(found, url.href).toBe(true);
       }
-    });
-
-    test(`[SITE-4] ${path} claims no credential outside a verified fact`, async ({ page }) => {
-      await visit(page, path);
-
-      const copy = await page.evaluate(() => {
-        const body = document.body.cloneNode(true) as HTMLElement;
-        body.querySelectorAll('[data-fact]').forEach((fact) => fact.remove());
-        return body.textContent ?? '';
-      });
-      expect(restrictedClaimsIn(copy)).toEqual([]);
     });
   });
 }
@@ -147,4 +132,24 @@ test('[SITE-2] the 404 page is kept out of search: noindex, and no canonical URL
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex');
   await expect(page.locator('link[rel="canonical"]')).toHaveCount(0);
   await expect(page.locator('meta[property="og:url"]')).toHaveCount(0);
+});
+
+test('[SITE-5] the served policy refuses an inline handler and an inline style, which is what lets the checks above see one', async ({
+  page,
+}) => {
+  await recordCspViolations(page);
+  await visit(page, '/');
+  const policy = (await page.request.get('/')).headers()['content-security-policy'] ?? '';
+  await page.evaluate(() => {
+    const probe = document.createElement('p');
+    probe.setAttribute('onclick', 'void 0');
+    probe.setAttribute('style', 'color: red');
+    document.body.append(probe);
+  });
+
+  // Refused, not merely reported, and no hash or keyword in the policy lets one particular attribute run.
+  expect(await cspViolations(page)).toEqual(
+    expect.arrayContaining(['enforce script-src-attr inline', 'enforce style-src-attr inline']),
+  );
+  expect(inlineAttributeAllowances(policy)).toEqual([]);
 });

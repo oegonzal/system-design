@@ -50,8 +50,10 @@ const description = `Enfav LLC is an AI-focused software engineering company fou
   <Section id="founder" title="Founder" tone="muted">
     <div class="grid gap-10 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
       <div>
-        <p class="text-xl font-semibold"><FactValue fact={COMPANY.founder.name} /></p>
-        <p class="text-ink-soft"><FactValue fact={COMPANY.founder.title} /></p>
+        <div data-person="founder">
+          <p class="text-xl font-semibold"><FactValue fact={COMPANY.founder.name} /></p>
+          <p class="text-ink-soft"><FactValue fact={COMPANY.founder.title} /></p>
+        </div>
         {FOUNDER.bio.map((paragraph) => <p class="mt-4 leading-7">{paragraph}</p>)}
         <p class="mt-4 text-ink-soft">{FOUNDER.education}</p>
       </div>

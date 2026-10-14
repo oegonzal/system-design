@@ -2,7 +2,9 @@
 /**
  * The visible mark of a detail the owner has not confirmed yet. It says so in
  * words (never only by colour), is kept out of search snippets, and carries
- * `data-fact` so checks can tell a stated fact from the copy around it.
+ * `data-fact="placeholder"`: the e2e finds every placeholder by it, and checks
+ * that each one shows its word on screen and, wherever it prints, on paper.
+ * Its label is copy like any other, so the credential check reads it too.
  */
 interface Props {
   label: string;

@@ -95,7 +95,7 @@ const printed = (path: string): string => {
   <Section id="contact" title="Point of contact">
     <div class="grid gap-8 sm:grid-cols-2 print:grid-cols-2 print:gap-4 print:text-xs">
       <div>
-        <p>
+        <p data-person="pointOfContact">
           <span class="font-semibold"><FactValue fact={contact.name} /></span>,
           <FactValue fact={contact.title} />
         </p>
