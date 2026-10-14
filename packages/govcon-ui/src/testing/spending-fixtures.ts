@@ -3,6 +3,7 @@ import {
   agencyOutlookOf,
   awardDetailOf,
   fiscalPeriodEnd,
+  noticeIncumbentsOf,
   projectedPeriodOf,
   publicationDelayOf,
   type RaisedAlertView,
@@ -48,3 +49,6 @@ export const AGENCY_OUTLOOK = agencyOutlookOf();
 
 /** What the warm raised: a tracked award ending, as it was published. */
 export const ALERT_VIEW: RaisedAlertView = raisedAlertViewOf();
+
+/** Who may hold the work of the client's notice. */
+export const INCUMBENTS = noticeIncumbentsOf();

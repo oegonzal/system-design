@@ -9,11 +9,14 @@ import {
   type GetAgenciesResponse,
   type GetAgencyOutlookResponse,
   type GetAwardDetailResponse,
+  type GetNoticeIncumbentsResponse,
   type GetSpendingBreakdownResponse,
   type GetSpendingHorizonResponse,
   type GetSpendingPrimesResponse,
   type GetSpendingPulseResponse,
   type GetSpendingReachResponse,
+  type NoticeIncumbents,
+  type NoticeIncumbentsQuery,
   type SpendingBreakdown,
   type SpendingBreakdownQuery,
   type SpendingHorizon,
@@ -95,6 +98,19 @@ export const spendingApi = {
           ...scopeParams(query),
           band: band === undefined ? undefined : formatAmountRange(band),
         })}`,
+        opts,
+      ),
+    );
+  },
+  /** Who may hold the work one stored notice is about; asks the award source, so a page reads it only when asked. */
+  async getIncumbents(
+    noticeId: string,
+    query: NoticeIncumbentsQuery = {},
+    opts: GetOptions = {},
+  ): Promise<NoticeIncumbents> {
+    return unwrap(
+      await request<GetNoticeIncumbentsResponse>(
+        `/spending/incumbents/${encode(noticeId)}${toQueryString({ ...query })}`,
         opts,
       ),
     );

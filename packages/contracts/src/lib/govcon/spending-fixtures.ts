@@ -1,5 +1,6 @@
 import { NO_FACETS, NO_SET_ASIDE } from './facets';
 import { FISCAL_PERIODS } from './fiscal';
+import { INCUMBENT_HORIZON_MONTHS, type NoticeIncumbents } from './incumbents';
 import type { SpendingReach } from './reach';
 import { opportunityOf } from './fixtures';
 import {
@@ -341,5 +342,39 @@ export const agencyOutlookOf = (overrides: Partial<AgencyOutlook> = {}): AgencyO
   ],
   truncated: false,
   provenance: provenanceOf({ requests: 2 }),
+  ...overrides,
+});
+
+/** Who may hold the work of the DLA bracket solicitation: two of the three awards its scope lists are at its own sub-agency. */
+export const noticeIncumbentsOf = (
+  overrides: Partial<NoticeIncumbents> = {},
+): NoticeIncumbents => ({
+  noticeId: 'n-1',
+  gap: null,
+  scope: spendingScopeOf({ naics: ['332710'], psc: ['5340'], agency: '097' }),
+  today: '2026-06-15',
+  months: INCUMBENT_HORIZON_MONTHS,
+  rows: [
+    horizonRowOf({
+      agencyPath: 'Department of Defense.Defense Logistics Agency',
+      agencyCode: '097.97AS',
+    }),
+    horizonRowOf({
+      externalId: 'CONT_IDV_SPE4A723D0042_9700',
+      piid: 'SPE4A723D0042',
+      family: 'idvs',
+      typeDescription: 'INDEFINITE DELIVERY / REQUIREMENTS',
+      recipientName: 'A HOLDER WITHOUT A UEI',
+      recipientUei: null,
+      amount: 0,
+      endsAt: '2027-03-31',
+      agencyPath: 'Department of Defense.Defense Logistics Agency',
+      agencyCode: '097.97AS',
+    }),
+  ],
+  listed: 3,
+  capped: false,
+  completeBefore: null,
+  provenance: provenanceOf({ requests: 4 }),
   ...overrides,
 });

@@ -121,6 +121,11 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
     statement:
       'The search page and the intel page are their addresses, as the spending page is: the side in front, the filters and the page travel in the URL and are read against their vocabularies, so a ranking or a reading reloads, links, and is kept by name as a saved view listed on its own page; typed text reaches the address once it pauses.',
   },
+  {
+    id: 'GOVU-24',
+    statement:
+      'A notice’s page says who may hold the work it is about, and only when asked, since the read goes to the award source: the awards in its code at its own sub-agency ending in the coming months, soonest first, each a link to its own record and its holder a link to the firm’s page, narrowed to the notice’s product service code unless unticked — which asks again — with how many the scope listed, how far the list is complete, and the fact the notice lacks when nothing could be read.',
+  },
   // Government contracting: SAM.gov opportunities (packages/govcon)
   {
     id: 'GOV-1',

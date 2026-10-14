@@ -12,6 +12,7 @@ import { AttachmentList } from './attachment-list';
 import { AwardsPanel } from './awards-panel';
 import { BidPanel } from './bid-panel';
 import { DescriptionPanel } from './description-panel';
+import { IncumbentsLens } from './incumbents.client';
 import { NoticeFacts } from './notice-facts';
 import { NoticeHeader } from './notice-header';
 import { ScoreTrace } from './score-trace';
@@ -24,7 +25,8 @@ export interface NoticeClientProps {
  * One notice in full. The notice is one resource read for the active
  * profile; every write — the description, the bid, an awardee lookup — is
  * one action that reads it again when it lands. A request that spends the
- * budget is a click that says so.
+ * budget is a click that says so, and so is the one that asks the award
+ * source who holds the work.
  */
 export function NoticeClient({ noticeId }: NoticeClientProps) {
   const { active, loading: profileLoading } = useProfile();
@@ -146,6 +148,9 @@ export function NoticeClient({ noticeId }: NoticeClientProps) {
           lookingUp={lookingUp}
           lookupError={lookup.error}
         />
+      </Surface>
+      <Surface as="section" aria-label="Who holds this work">
+        <IncumbentsLens noticeId={noticeId} noticePsc={data.opportunity.classificationCode} />
       </Surface>
       {notice.loading && <Alert tone="info">Refreshing…</Alert>}
       <LiveRegion message={message} />
