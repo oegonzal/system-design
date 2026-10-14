@@ -4,7 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { collectionName, INDEXED_FIELDS, pointId, toPayload } from './collection';
 import { DEFAULT_QDRANT_URL, QdrantMemoryStore } from './qdrant-memory-store';
 import { hitOf } from '../../../orchestrators/memory/testing';
-import { vectorOf } from '../testing';
+import { InMemoryMemoryStore, vectorOf } from '../testing';
 
 const url = process.env['QDRANT_URL'] || DEFAULT_QDRANT_URL;
 const model = `spec-${crypto.randomUUID().slice(0, 8)}`;
@@ -284,5 +284,38 @@ describe('the Qdrant memory store', () => {
 
     expect(await store.retractRun('run-u1')).toBe(1);
     expect((await store.verify()).chunks).toBe(before);
+  });
+  it('[QL-69] [QL-70] the in-memory store answers a search and a retraction as this adapter does: the memory without its keys or vectors, with its scope and facets', async () => {
+    const fake = new InMemoryMemoryStore(model, DIMENSIONS);
+    const written = chunk('the subject works on the orders team', 'run-f1', 'memory.1');
+    const fact = {
+      ...written,
+      source: { ...written.source, pipeline: 'document-digest', kind: 'profile_fact' as const },
+      evidence: [{ kind: 'section' as const, ref: 'section.1' }],
+      digestRunId: 'run-f1',
+      scope: 'unit' as const,
+      facets: { topics: ['employment'] },
+    };
+    for (const each of [store, fake]) await each.replaceRunChunks('run-f1', [fact]);
+
+    // A search: the same hit from both, but for each store's own cosine.
+    const probe = {
+      vector: fact.vectors.lesson,
+      using: 'lesson' as const,
+      limit: 1,
+      filter: { kinds: ['profile_fact' as const] },
+    };
+    const adapted = (await store.searchMany([probe]))[0].at(0);
+    const faked = (await fake.searchMany([probe]))[0].at(0);
+    expect(adapted).toMatchObject({ text: fact.text, scope: 'unit', facets: fact.facets });
+    expect({ ...faked, score: 0 }).toStrictEqual({ ...adapted, score: 0 });
+    expect(faked?.score).toBeCloseTo(adapted?.score ?? Number.NaN, 5);
+
+    // A retraction: the same answer from both, then the same miss.
+    const point = { runId: 'run-f1', ref: 'memory.1' };
+    const removed = await store.retractPoint(point);
+    expect(removed.status).toBe('removed');
+    expect(await fake.retractPoint(point)).toStrictEqual(removed);
+    expect(await fake.retractPoint(point)).toStrictEqual(await store.retractPoint(point));
   });
 });

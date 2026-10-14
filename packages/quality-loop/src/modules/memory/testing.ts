@@ -12,6 +12,7 @@ import { CachedEmbeddings } from '../../orchestrators/memory/embeddings';
 import type {
   ChunkKindScope,
   EmbeddingCache,
+  MemoryChunk,
   MemoryHit,
   MemoryProbe,
   MemoryStore,
@@ -79,6 +80,18 @@ const cosine = (a: readonly number[], b: readonly number[]): number =>
   a.reduce((sum, value, index) => sum + value * (b[index] ?? 0), 0) /
   ((Math.hypot(...a) || 1) * (Math.hypot(...b) || 1));
 
+/**
+ * A stored chunk as the adapter reads one back: the memory without what it is
+ * indexed by — its keys and its vectors — and with every optional field it was
+ * stored with, its scope and facets among them. One projection for a search's
+ * hits and a retraction's answer, as the adapter has one payload reader.
+ */
+const memoryOf = ({ keys, vectors, ...memory }: StoredChunk): MemoryChunk => {
+  void keys;
+  void vectors;
+  return memory;
+};
+
 export class InMemoryMemoryStore implements MemoryStore {
   readonly points = new Map<string, StoredChunk>();
   unreachable = false;
@@ -138,17 +151,7 @@ export class InMemoryMemoryStore implements MemoryStore {
       seen.add(chunk.contentHash);
       return true;
     });
-    return distinct.slice(0, limit).map(({ chunk, score }) => ({
-      text: chunk.text,
-      contentHash: chunk.contentHash,
-      source: chunk.source,
-      evidence: chunk.evidence,
-      digestRunId: chunk.digestRunId,
-      lineage: chunk.lineage,
-      model: chunk.model,
-      score,
-      ...(chunk.facets === undefined ? {} : { facets: chunk.facets }),
-    }));
+    return distinct.slice(0, limit).map(({ chunk, score }) => ({ ...memoryOf(chunk), score }));
   }
 
   replaceRunChunks(
@@ -187,7 +190,7 @@ export class InMemoryMemoryStore implements MemoryStore {
     const held = this.points.get(id);
     if (held === undefined) return Promise.resolve({ status: 'not-held' });
     this.points.delete(id);
-    return Promise.resolve({ status: 'removed', memory: held });
+    return Promise.resolve({ status: 'removed', memory: memoryOf(held) });
   }
 
   /** As the adapter does: the counts are set on points that stand, and an unknown point is left alone. */
