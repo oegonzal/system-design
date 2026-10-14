@@ -7,17 +7,15 @@ import { STOPPED_COPY } from '../evaluation/stop-reason';
 import { humanizeKind } from '../prompts/criteria';
 
 import {
-  makeBrief,
   makeCriteria,
   makeCriterionResult,
   makeEvaluation,
   makeFinding,
-  makeGraph,
-  makeNarrative,
   makePrompt,
   makeRevisionSummary,
   PROMPT_MARKDOWN,
 } from '../../testing/fixtures';
+import { makeBrief, makeGraph, makeNarrative } from '../../testing/canvas-fixtures';
 import {
   briefMarkdown,
   feedbackMarkdown,

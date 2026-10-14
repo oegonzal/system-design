@@ -2,7 +2,7 @@ import { stubApi } from '@sysdesign/web-testing';
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { makeGraph } from '../../testing/fixtures';
+import { makeGraph } from '../../testing/canvas-fixtures';
 import { createCanvasStore } from '../canvas/canvas-store';
 import { DRAFT_AUTOSAVE_DELAY_MS, useDraftAutosave } from './use-draft-autosave';
 

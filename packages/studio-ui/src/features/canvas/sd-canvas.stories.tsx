@@ -5,7 +5,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useState, type ReactNode } from 'react';
 
-import { makeGraph } from '../../testing/fixtures';
+import { makeGraph } from '../../testing/canvas-fixtures';
 import { withCanvasStore } from '../../testing/story-decorators';
 import { useCanvasStoreApi } from './canvas-store-context';
 import { SdCanvas } from './sd-canvas';

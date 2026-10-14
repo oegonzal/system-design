@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
-import { makeGraph, makeInterfaceGraph } from '../../../testing/fixtures';
+import { makeGraph, makeInterfaceGraph } from '../../../testing/canvas-fixtures';
 import { withCanvasStore } from '../../../testing/story-decorators';
 import { PropertiesPanel } from './properties-panel';
 

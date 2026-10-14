@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { makeGraph } from '../../testing/fixtures';
+import { makeGraph } from '../../testing/canvas-fixtures';
 import { createCanvasStore } from './canvas-store';
 import { selectCanUndo } from './store/state';
 

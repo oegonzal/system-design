@@ -4,7 +4,8 @@ import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 
-import { makeCriteria, makeGraph } from '../../testing/fixtures';
+import { makeCriteria } from '../../testing/fixtures';
+import { makeGraph } from '../../testing/canvas-fixtures';
 import { createCanvasStore } from '../canvas/canvas-store';
 import { CanvasStoreProvider } from '../canvas/canvas-store-context';
 import { NarrativeEditor } from './narrative-editor';

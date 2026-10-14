@@ -1,7 +1,7 @@
 import { act, fireEvent, render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { makeGraph } from '../../testing/fixtures';
+import { makeGraph } from '../../testing/canvas-fixtures';
 import { createCanvasStore, type CanvasStore } from './canvas-store';
 import { CanvasStoreProvider } from './canvas-store-context';
 import { useCanvasShortcuts } from './use-canvas-shortcuts';

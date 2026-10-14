@@ -12,7 +12,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { makeGraph, makeInterfaceGraph } from '../../../testing/fixtures';
+import { makeGraph, makeInterfaceGraph } from '../../../testing/canvas-fixtures';
 import { createCanvasStore, type CanvasStore } from '../canvas-store';
 import { CanvasStoreProvider } from '../canvas-store-context';
 import { CANVAS_COPY } from '../copy';

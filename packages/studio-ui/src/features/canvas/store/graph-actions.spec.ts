@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { makeGraph, makeInterfaceGraph } from '../../../testing/fixtures';
+import { makeGraph, makeInterfaceGraph } from '../../../testing/canvas-fixtures';
 import { createCanvasStore, type CanvasStore } from '../canvas-store';
 import { viewArea } from '../framing';
 import {

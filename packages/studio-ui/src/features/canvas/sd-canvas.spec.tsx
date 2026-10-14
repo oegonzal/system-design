@@ -5,7 +5,7 @@ import { act, createEvent, fireEvent, screen } from '@testing-library/react';
 import { ReactFlowProvider, useStoreApi } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
-import { makeGraph } from '../../testing/fixtures';
+import { makeGraph } from '../../testing/canvas-fixtures';
 import { createCanvasStore, type CanvasStore } from './canvas-store';
 import { CanvasStoreProvider } from './canvas-store-context';
 import { FIT_ZOOM, viewArea } from './framing';

@@ -1,9 +1,5 @@
 import type {
-  Binding,
-  CanvasGraph,
   CriterionResultDto,
-  DesignBrief,
-  DesignNarrative,
   DesignRevisionDto,
   DesignRevisionSummaryDto,
   DesignSessionDetailDto,
@@ -21,6 +17,8 @@ import type {
   StarStoryDto,
   SuccessCriterion,
 } from '@sysdesign/contracts';
+
+import { makeBrief, makeGraph, makeNarrative } from './canvas-fixtures';
 
 /**
  * Deterministic fixtures — no randomness, no clocks. Overrides merge shallow,
@@ -107,142 +105,6 @@ export function makeLibraryDocument(
     id: 'order-history',
     title: 'Order history integration',
     markdown: PROMPT_MARKDOWN,
-    ...overrides,
-  };
-}
-
-/** client → service → database; the database carries one typed config entry. */
-export function makeGraph(overrides: Partial<CanvasGraph> = {}): CanvasGraph {
-  return {
-    nodes: [
-      { id: 'n-1', kind: 'client', label: 'Client', position: { x: 40, y: 40 } },
-      { id: 'n-2', kind: 'service', label: 'Order Service', position: { x: 40, y: 200 } },
-      {
-        id: 'n-3',
-        kind: 'database',
-        label: 'Orders DB',
-        config: [{ key: 'replicas', value: 1 }],
-        position: { x: 40, y: 360 },
-      },
-    ],
-    edges: [
-      { id: 'e-1', source: 'n-1', target: 'n-2', kind: 'sync' },
-      { id: 'e-2', source: 'n-2', target: 'n-3', kind: 'sync', label: 'writes' },
-    ],
-    ...overrides,
-  };
-}
-
-/**
- * A graph exercising the interface layer: declared operations on the
- * gateway/service, responsibilities on the service, an event on the queue,
- * and carries on the call and produce/consume edges.
- */
-export function makeInterfaceGraph(overrides: Partial<CanvasGraph> = {}): CanvasGraph {
-  return {
-    nodes: [
-      { id: 'n-1', kind: 'client', label: 'Client', position: { x: 40, y: 40 } },
-      {
-        id: 'n-2',
-        kind: 'gateway',
-        label: 'API Gateway',
-        config: [{ key: 'rateLimit', value: true }],
-        operations: [
-          { name: 'PlaceOrder', kind: 'command' },
-          { name: 'GetOrder', kind: 'query', idempotent: true },
-        ],
-        position: { x: 40, y: 200 },
-      },
-      {
-        id: 'n-3',
-        kind: 'service',
-        label: 'Order Service',
-        responsibilities: ['Owns the order lifecycle', 'Publishes order events'],
-        operations: [
-          { name: 'PlaceOrder', kind: 'command', notes: 'Validates inventory first' },
-          { name: 'GetOrder', kind: 'query', idempotent: true },
-        ],
-        position: { x: 40, y: 360 },
-      },
-      {
-        id: 'n-4',
-        kind: 'queue',
-        label: 'Order Queue',
-        operations: [{ name: 'OrderPlaced', kind: 'event' }],
-        position: { x: 40, y: 520 },
-      },
-      { id: 'n-5', kind: 'worker', label: 'Fulfillment Worker', position: { x: 40, y: 680 } },
-    ],
-    edges: [
-      { id: 'e-1', source: 'n-1', target: 'n-2', kind: 'sync', carries: ['PlaceOrder'] },
-      {
-        id: 'e-2',
-        source: 'n-2',
-        target: 'n-3',
-        kind: 'sync',
-        carries: ['PlaceOrder', 'GetOrder'],
-      },
-      {
-        id: 'e-3',
-        source: 'n-3',
-        target: 'n-4',
-        kind: 'async',
-        label: 'produce',
-        carries: ['OrderPlaced'],
-      },
-      {
-        id: 'e-4',
-        source: 'n-4',
-        target: 'n-5',
-        kind: 'async',
-        label: 'consume',
-        carries: ['OrderPlaced'],
-      },
-    ],
-    ...overrides,
-  };
-}
-
-export function makeBinding(overrides: Partial<Binding> = {}): Binding {
-  return {
-    criterionId: 'c1',
-    nodeIds: ['n-2', 'n-3'],
-    path: ['e-1', 'e-2'],
-    claim: 'The service reads the history from the orders database',
-    ...overrides,
-  };
-}
-
-/** Against `makeGraph`: c1 traced end to end, c3 held by the database. */
-export function makeBrief(overrides: Partial<DesignBrief> = {}): DesignBrief {
-  return {
-    version: 1,
-    bindings: [
-      makeBinding(),
-      makeBinding({
-        criterionId: 'c3',
-        nodeIds: ['n-3'],
-        path: undefined,
-        claim: 'A replica keeps point reads under the budget',
-      }),
-    ],
-    ...overrides,
-  };
-}
-
-export function makeNarrative(overrides: Partial<DesignNarrative> = {}): DesignNarrative {
-  return {
-    version: 1,
-    overview: 'A read/write split keeps order lookups fast while writes stay strongly ordered.',
-    componentRationales: [
-      {
-        nodeId: 'n-3',
-        prose: 'The Orders DB is the source of truth every read reconciles against.',
-      },
-    ],
-    criterionNarrations: [
-      { criterionId: 'c1', prose: 'The client asks the service, which reads the orders database.' },
-    ],
     ...overrides,
   };
 }

@@ -4,7 +4,7 @@ import { act, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-import { makeGraph } from '../../../testing/fixtures';
+import { makeGraph } from '../../../testing/canvas-fixtures';
 import { createCanvasStore, type CanvasStore } from '../canvas-store';
 import { CanvasStoreProvider } from '../canvas-store-context';
 import { DRAFT_SAVE_STATUSES } from '../draft-status';

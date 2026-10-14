@@ -1,7 +1,7 @@
 import { canvasGraphSchema, LAYOUT_BLOCK, layoutGraph } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { makeGraph, makeInterfaceGraph } from '../../testing/fixtures';
+import { makeGraph, makeInterfaceGraph } from '../../testing/canvas-fixtures';
 import { grown, NODE_FOOTPRINT, NODE_GAP, overlaps } from './geometry';
 import { fromCanvasGraph, toCanvasGraph } from './graph-io';
 import { boxOf } from './placement';

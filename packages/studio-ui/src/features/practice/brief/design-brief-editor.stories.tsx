@@ -1,6 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
-import { makeBrief, makeCriteria, makeGraph } from '../../../testing/fixtures';
+import { makeCriteria } from '../../../testing/fixtures';
+import { makeBrief, makeGraph } from '../../../testing/canvas-fixtures';
 import { withCanvasStore } from '../../../testing/story-decorators';
 import { DesignBriefEditor } from './design-brief-editor';
 
