@@ -15,7 +15,8 @@ const ask: StructuredRequest<{ answer: string }> = {
 /** A client with no record of its own — every hand-rolled double, and any adapter yet to be written. */
 const plain = (answer: { answer: string } | null): LlmClient => ({
   model: 'some/model',
-  completeStructured: () => Promise.resolve(answer),
+  // A double answers its one fixed reply whatever the call asks it to parse.
+  completeStructured: <T>() => Promise.resolve(answer as T | null),
 });
 
 describe('recording is the seam’s, not the adapter’s', () => {

@@ -4,6 +4,15 @@
   "sourceRoot": "packages/web-kit/src",
   "projectType": "library",
   "tags": ["type:ui", "scope:web"],
-  "// targets": "test and typecheck are inferred from vite.config.ts by @nx/vite/plugin",
-  "targets": {}
+  "// targets": "test is inferred from vite.config.ts by @nx/vite/plugin; typecheck is declared here, since the inferred one checks the lib config alone and never the specs or stories",
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "cwd": "packages/web-kit",
+        "commands": ["tsc --noEmit -p tsconfig.lib.json", "tsc --noEmit -p tsconfig.spec.json"]
+      }
+    }
+  }
 }

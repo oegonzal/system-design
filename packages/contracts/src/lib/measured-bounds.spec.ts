@@ -52,7 +52,7 @@ describe('boundsAgainstMeasured', () => {
 
   it('[QL-49] never holds an exact list, which its caller slices to, and holds an exempt bound to nothing, with its reason', () => {
     // A lens's findings ran to twelve against a cap of ten: the engine kept ten.
-    const fields = { ...within(), findings: field(12) };
+    const fields: Record<string, MeasuredField> = { ...within(), findings: field(12) };
     expect(boundsAgainstMeasured(schema, fields)).toEqual([]);
     const { tags: _tags, ...rest } = fields;
     expect(boundsAgainstMeasured(schema, { ...rest, tags: field(10) })).toEqual([

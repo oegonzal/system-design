@@ -205,7 +205,8 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable, LlmDetail
     this.clock = options.clock ?? {};
   }
 
-  withRecorder(sink: LlmCallSink): LlmClient {
+  /** The same client recording to `sink`: every capability it has, the detailed call among them, kept. */
+  withRecorder(sink: LlmCallSink): ClaudeAgentLlmClient {
     return new ClaudeAgentLlmClient({
       model: this.requestedModel,
       sink,

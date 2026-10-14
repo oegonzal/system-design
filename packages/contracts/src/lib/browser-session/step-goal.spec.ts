@@ -20,10 +20,11 @@ import {
   OPTIONS_SHOWN,
   type PageObservation,
   pageObservationSchema,
+  type StepHistoryEntry,
   type StepObjection,
   TASK_LABEL_BOUND,
 } from './observation.schema';
-import { composeStepGoal, renderElementLine } from './step-goal';
+import { composeStepGoal, renderElementLine, type StepGoalInput } from './step-goal';
 import { readStepIndex } from './step-index';
 import { ACTIONS_BOUND } from './step-plan.schema';
 
@@ -39,7 +40,7 @@ const between = (goal: string, heading: string, next: string): string => {
 
 const goalOf = (
   observation: PageObservation,
-  history = [],
+  history: readonly StepHistoryEntry[] = [],
   ledger = emptyLedger(),
   objections: readonly StepObjection[] = [],
 ) =>
