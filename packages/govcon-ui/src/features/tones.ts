@@ -1,4 +1,5 @@
 import type {
+  AlertKind,
   AwardFamily,
   AwardSource,
   BidStage,
@@ -6,6 +7,8 @@ import type {
   SliceOutcome,
   SourceCallOutcome,
   SourceOperation,
+  TargetKind,
+  TargetStage,
 } from '@sysdesign/contracts';
 import type { BadgeTone, MeterTone } from '@sysdesign/design-system';
 
@@ -75,6 +78,28 @@ export const BID_STAGE_TONE: Record<BidStage, BadgeTone> = {
   won: 'success',
   lost: 'critical',
   passed: 'neutral',
+};
+
+/** A target's stage, of either kind: quiet while it is only known of, warmer as the pursuit moves, done when it lands. */
+export const TARGET_STAGE_TONE: Record<TargetStage, BadgeTone> = {
+  identified: 'neutral',
+  contacted: 'accent',
+  talking: 'medium',
+  teamed: 'success',
+  watching: 'neutral',
+  researching: 'accent',
+  positioning: 'medium',
+  pursuing: 'high',
+  passed: 'neutral',
+};
+
+export const TARGET_KIND_TONE: Record<TargetKind, BadgeTone> = { firm: 'accent', award: 'medium' };
+
+export const ALERT_KIND_TONE: Record<AlertKind, BadgeTone> = {
+  'award-ending': 'medium',
+  'award-end-moved': 'high',
+  'award-notice': 'success',
+  'pulse-above-band': 'accent',
 };
 
 export const AWARD_SOURCE_TONE: Record<AwardSource, BadgeTone> = {

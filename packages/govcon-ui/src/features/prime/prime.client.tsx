@@ -33,6 +33,7 @@ import { BreakdownLens } from '../spending/breakdown.client';
 import { HorizonLens } from '../spending/horizon.client';
 import { PrimesLens } from '../spending/primes.client';
 import { defaultView, spendingHref } from '../spending/spending-link';
+import { TrackTarget } from '../targets/track-target.client';
 import { FirmHeader } from './firm-header';
 import { PRIME_TABS, type PrimeTab } from './prime-tabs';
 import { RegistrationPanel } from './registration-panel';
@@ -113,6 +114,7 @@ function PrimeWorkspace({ uei, profile }: { uei: string; profile: StoredProfile 
     [uei, naics.join(','), from, to],
   );
   const named = held.data?.rows.find((row) => row.code === uei)?.name ?? null;
+  const name = stored.data?.legalName ?? named;
   /** The profile's codes with no firm named: the ranking this firm's own row is read from. */
   const asPrime: ScopeQuery = { naics: [...naics], awardFamily: 'contracts' };
   const band = profile?.teaming.subcontract;
@@ -136,9 +138,10 @@ function PrimeWorkspace({ uei, profile }: { uei: string; profile: StoredProfile 
     <>
       <FirmHeader
         uei={uei}
-        name={stored.data?.legalName ?? named}
+        name={name}
         holdings={held.data ? { amount: held.data.total, from, to } : null}
       />
+      <TrackTarget kind="firm" subject={uei} label={name ?? uei} />
       <Surface as="section" aria-label="Registration">
         <RegistrationPanel
           uei={uei}

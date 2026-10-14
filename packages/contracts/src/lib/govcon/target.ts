@@ -43,6 +43,13 @@ export interface TargetSummary {
   total: number;
 }
 
+export interface ListTargetsQuery {
+  kind?: TargetKind;
+  stage?: TargetStage;
+  limit?: number;
+  offset?: number;
+}
+
 /** Null when nothing of that kind and subject is tracked. */
 export type GetTargetResponse = ApiResponse<Target | null>;
 export type SaveTargetResponse = ApiResponse<Target>;

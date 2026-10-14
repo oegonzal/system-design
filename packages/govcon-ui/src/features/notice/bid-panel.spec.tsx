@@ -4,7 +4,7 @@ import { fireEvent, screen } from '@testing-library/react';
 import { fn } from 'storybook/test';
 import { describe, expect, it } from 'vitest';
 
-import { fromReminderInput, toReminderInput } from './bid-panel';
+import { fromReminderInput, toReminderInput } from '../reminder-input';
 import * as stories from './bid-panel.stories';
 
 const { Untracked, Tracked, Saving, Failed } = composeStories(stories);

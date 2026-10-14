@@ -1,10 +1,23 @@
 import type * as WebTesting from '@sysdesign/web-testing';
-import { renderWithTheme, resetNavigationMock, stubApi } from '@sysdesign/web-testing';
+import {
+  renderWithTheme,
+  resetNavigationMock,
+  routerMock,
+  setMockSearchParams,
+  stubApi,
+} from '@sysdesign/web-testing';
 import { fireEvent, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ProfileProvider } from '../../providers/profile-context';
-import { BID, PIPELINE_ROWS, PIPELINE_SUMMARY, PROFILE } from '../../testing/fixtures';
+import {
+  BID,
+  PIPELINE_ROWS,
+  PIPELINE_SUMMARY,
+  PROFILE,
+  TARGET_SUMMARY,
+  TARGETS,
+} from '../../testing/fixtures';
 import { PipelineClient } from './pipeline.client';
 
 vi.mock('next/navigation', async () => {
@@ -23,6 +36,41 @@ beforeEach(() => resetNavigationMock());
 afterEach(() => vi.unstubAllGlobals());
 
 describe('PipelineClient', () => {
+  it('[GOVU-20] opens on the tracked notices and reads nothing of the targets; the address names the other view, which then reads nothing of the notices; and choosing a view puts it in the address', async () => {
+    const routes = [
+      { path: '/profiles', body: { data: [PROFILE] } },
+      { path: '/pipeline/summary', body: { data: PIPELINE_SUMMARY } },
+      {
+        path: '/pipeline',
+        body: { data: PIPELINE_ROWS, meta: { total: 3, limit: 50, offset: 0 } },
+      },
+      { path: '/targets/summary', body: { data: TARGET_SUMMARY } },
+      { path: '/targets', body: { data: TARGETS, meta: { total: 2, limit: 50, offset: 0 } } },
+    ];
+    const first = stubApi(routes);
+    const bids = mount();
+    await screen.findByRole('table', { name: 'Pipeline' });
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Pipeline');
+    expect(screen.getByRole('tab', { name: 'Notices' }).getAttribute('aria-selected')).toBe('true');
+    expect(first.calls.some((call) => call.url.startsWith('/targets'))).toBe(false);
+
+    fireEvent.click(screen.getByRole('tab', { name: 'Firms and awards' }));
+    expect(routerMock.replace).toHaveBeenLastCalledWith('/pipeline?view=targets');
+    bids.unmount();
+    vi.unstubAllGlobals();
+
+    const second = stubApi(routes);
+    setMockSearchParams('view=targets');
+    mount();
+    await screen.findByRole('table', { name: 'Tracked firms and awards' });
+    expect(
+      screen.getByRole('tab', { name: 'Firms and awards' }).getAttribute('aria-selected'),
+    ).toBe('true');
+    expect(second.calls.some((call) => call.url.startsWith('/pipeline'))).toBe(false);
+    fireEvent.click(screen.getByRole('tab', { name: 'Notices' }));
+    expect(routerMock.replace).toHaveBeenLastCalledWith('/pipeline');
+  });
+
   it('[GOVU-7] lists the tracked notices for the active profile with the counts, filters by stage tab, and writes a stage change back', async () => {
     const { calls, fetchMock } = stubApi([
       { path: '/profiles', body: { data: [PROFILE] } },

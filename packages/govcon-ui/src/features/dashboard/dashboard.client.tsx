@@ -19,6 +19,7 @@ import { useState } from 'react';
 
 import { api } from '../../api/client';
 import { useProfile } from '../../providers/profile-context';
+import { AlertsPanel } from '../alerts/alerts-panel.client';
 import { sourceDisabledReason } from '../source/source-availability';
 import { EntityCard } from '../entities/entity-card';
 import { LeadTable } from '../leads/lead-table';
@@ -31,8 +32,8 @@ const NEW_LEADS = 10;
 const PIPELINE_PAGE = 50;
 
 /**
- * The first page: the buckets, a pull, what is due this week, the ten best
- * leads, and the company's own registration. Every read is one resource;
+ * The first page: the buckets, a pull, what is due this week, what the daily
+ * warm raised, the ten best leads, and the company's own registration. Every read is one resource;
  * the pull is the one write, and every resource that could have changed is
  * read again once it lands.
  */
@@ -118,6 +119,10 @@ export function DashboardClient() {
         ) : (
           <Spinner label="Loading the pipeline" />
         )}
+      </Surface>
+
+      <Surface as="section" aria-label="Alerts">
+        <AlertsPanel />
       </Surface>
 
       <Surface as="section" aria-label="New leads">

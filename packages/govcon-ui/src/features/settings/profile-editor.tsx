@@ -1,6 +1,8 @@
 import {
+  ALERT_AUDIENCES,
   MAX_ALERT_ENDING_DAYS,
   MAX_PAGE_SIZE,
+  type AlertAudience,
   type ScoringPolicy,
   type SearchProfile,
 } from '@sysdesign/contracts';
@@ -9,6 +11,7 @@ import {
   Button,
   CheckboxField,
   Heading,
+  SelectField,
   Stack,
   Text,
   TextField,
@@ -37,6 +40,11 @@ export interface ProfileEditorProps {
   onCancel?: () => void;
   saving?: boolean;
 }
+
+const ALERT_AUDIENCE_LABEL: Record<AlertAudience, string> = {
+  scope: 'Awards in these codes, and tracked awards',
+  watched: 'Tracked awards only',
+};
 
 const upperNoSpace = (code: string): string => code.trim().toUpperCase();
 const digits = (code: string): string => code.replace(/\D/g, '');
@@ -225,8 +233,32 @@ export function ProfileEditor({
 
       <Section
         title="Alerts"
-        hint="What the daily spending digest flags for this profile: an award in its codes ending inside this many days, and the fiscal period in progress obligating above every prior year's."
+        hint="What the daily digest flags for this profile: an award ending inside this many days — one in its codes with at least the floor obligated on it, or one that is tracked, whatever is on it — and the fiscal period in progress obligating above every prior year's. A tracked award also says when its end moves and when a stored notice may follow it."
       >
+        <Stack direction="row" gap={4} align="end" wrap>
+          <SelectField
+            label="Ending awards raised"
+            value={value.alerts.audience}
+            disabled={saving}
+            onChange={(event) =>
+              patch({ alerts: { ...value.alerts, audience: event.target.value as AlertAudience } })
+            }
+          >
+            {ALERT_AUDIENCES.map((audience) => (
+              <option key={audience} value={audience}>
+                {ALERT_AUDIENCE_LABEL[audience]}
+              </option>
+            ))}
+          </SelectField>
+          <NumberField
+            label="Least obligated (USD)"
+            value={value.alerts.minObligated}
+            min={0}
+            step={10000}
+            disabled={saving}
+            onChange={(minObligated) => patch({ alerts: { ...value.alerts, minObligated } })}
+          />
+        </Stack>
         <Stack direction="row" gap={4} align="center" wrap>
           <NumberField
             label="Ending within days"

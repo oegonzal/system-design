@@ -213,4 +213,9 @@ export interface RaisedAlertView {
   alert: GovconAlert | null;
 }
 
+export interface ListAlertsQuery {
+  limit?: number;
+  offset?: number;
+}
+
 export type ListAlertsResponse = ApiListResponse<RaisedAlertView>;

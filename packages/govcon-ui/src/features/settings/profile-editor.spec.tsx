@@ -64,6 +64,19 @@ describe('ProfileEditor', () => {
     expect(onChange).toHaveBeenLastCalledWith(
       expect.objectContaining({ alerts: { ...PROFILE.alerts, pulseAboveBand: false } }),
     );
+    // Whose ending awards are raised, and how much must be obligated on one found in the scope.
+    const audience = screen.getByLabelText('Ending awards raised') as HTMLSelectElement;
+    expect(audience.value).toBe('scope');
+    fireEvent.change(audience, { target: { value: 'watched' } });
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ alerts: { ...PROFILE.alerts, audience: 'watched' } }),
+    );
+    fireEvent.change(screen.getByLabelText('Least obligated (USD)'), {
+      target: { value: '250000' },
+    });
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ alerts: { ...PROFILE.alerts, minObligated: 250_000 } }),
+    );
     expect((screen.getByLabelText('Smallest subcontract (USD)') as HTMLInputElement).value).toBe(
       '50000',
     );

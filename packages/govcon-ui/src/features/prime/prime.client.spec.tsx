@@ -40,6 +40,7 @@ const routes = (entity: unknown = null): StubRoute[] => [
     }),
   },
   { path: '/spending/primes', body: { data: PRIMES } },
+  { path: `/targets/firm/${UEI}`, body: { data: null } },
 ];
 
 const mount = (uei = UEI) =>

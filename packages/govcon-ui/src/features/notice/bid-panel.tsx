@@ -18,6 +18,7 @@ import {
 } from '@sysdesign/design-system';
 import { useState } from 'react';
 
+import { fromReminderInput, toReminderInput } from '../reminder-input';
 import { BID_STAGE_TONE } from '../tones';
 
 export interface BidPanelProps {
@@ -36,13 +37,6 @@ interface BidForm {
   reminder: string;
   estimatedValue: string;
 }
-
-/** ISO 8601 → the datetime-local input's value, read as UTC so the page never depends on the machine's zone. */
-export const toReminderInput = (iso: string | null): string =>
-  iso === null ? '' : iso.slice(0, 16);
-/** The input's value back to ISO 8601, UTC. */
-export const fromReminderInput = (value: string): string | null =>
-  value === '' ? null : `${value}:00.000Z`;
 
 const formOf = (bid: Bid | null): BidForm => ({
   stage: bid?.stage ?? 'watching',

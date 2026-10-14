@@ -54,7 +54,7 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
   {
     id: 'GOVU-10',
     statement:
-      'The settings page edits a profile as data — codes, interests, weights with their live sum, prices, bands, tiers and the alert thresholds (the days an expiring award is flagged within, and whether a pulse above its band alerts) — creates, copies, defaults and removes profiles, shows the service issues per field, and shows the sources and the full ledger.',
+      'The settings page edits a profile as data — codes, interests, weights with their live sum, prices, bands, tiers and the alert policy (the days an expiring award is flagged within, whose ending awards are raised, the least obligated on one found in the scope, and whether a pulse above its band alerts) — creates, copies, defaults and removes profiles, shows the service issues per field, and shows the sources and the full ledger.',
   },
   {
     id: 'GOVU-11',
@@ -100,6 +100,16 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
     id: 'GOVU-19',
     statement:
       'A firm opens at /primes/<uei> from every table that names one with a UEI: its registration as stored, with a lookup that states its cost, and the spending lenses narrowed to it in the profile’s codes — the awards it holds that are ending, who buys from it, the firms it reported hiring and the primes that reported hiring it — each read only once its tab is opened; a value that is not a UEI is a dead end that reads nothing.',
+  },
+  {
+    id: 'GOVU-20',
+    statement:
+      'A firm or an award is tracked from its own page — one read of the store to say whether it is, one write to track it under the name the page gives it, from its kind’s own stages — and every tracked firm and award is listed under the pipeline’s second view, which the address names: counted by kind and stage, narrowed to one kind, its stage changed in the row, the whole of it — stage, contact, reminder and notes — opened under the row in the panel its page uses, and removed from there.',
+  },
+  {
+    id: 'GOVU-21',
+    statement:
+      'The dashboard lists what the daily warm raised, newest first and a page at a time: each alert as the line a person was sent, with its kind and the day it was raised, and links to the award or notice it names; an alert kept without what was published is named by its key. It is where a digest’s "and more" lands, and reading it asks no source anything.',
   },
   // Government contracting: SAM.gov opportunities (packages/govcon)
   {

@@ -1,36 +1,42 @@
 import {
-  awardOf,
-  awardsSummaryOf,
-  bidOf,
-  bidPipelineSummaryOf,
-  descriptionOf,
-  entityOf,
-  leadOf,
-  noticeOf,
-  opportunityOf,
-  profileOf,
-  pullReportOf,
-  savedSearchOf,
-  sliceReportOf,
-  sourceCallOf,
-  sourceStatusOf,
-  storedProfileOf,
   type Award,
+  awardOf,
   type AwardsSummary,
+  awardsSummaryOf,
   type Bid,
+  bidOf,
   type BidPipelineSummary,
+  bidPipelineSummaryOf,
   type Description,
+  descriptionOf,
   type Entity,
+  entityOf,
   type Lead,
+  leadOf,
   type LeadsReport,
   type NoticeDto,
+  noticeOf,
   type Opportunity,
+  opportunityOf,
   type PipelineRow,
+  profileOf,
   type PullReport,
+  pullReportOf,
+  type RaisedAlertView,
+  raisedAlertViewOf,
   type SavedSearch,
+  savedSearchOf,
+  sliceReportOf,
   type SourceCall,
+  sourceCallOf,
   type SourceStatus,
+  sourceStatusOf,
   type StoredProfile,
+  storedProfileOf,
+  type Target,
+  targetOf,
+  type TargetSummary,
+  targetSummaryOf,
 } from '@sysdesign/contracts';
 
 /**
@@ -416,3 +422,22 @@ export const OWN_ENTITY: Entity = entityOf({
   ],
   psc: ['7030', 'DA01'],
 });
+
+/** A tracked award and a tracked firm, the firm with a reminder two days on from 2026-09-27. */
+export const TARGET: Target = targetOf();
+export const FIRM_TARGET: Target = targetOf({
+  id: 't-2',
+  kind: 'firm',
+  subject: 'JCBMLGPE6Z71',
+  label: 'BOOZ ALLEN HAMILTON INC',
+  stage: 'contacted',
+  contact: 'teaming@example.com',
+  notes: 'Met at the industry day.',
+  reminderAt: '2026-09-29T15:00:00.000Z',
+  endsAt: null,
+});
+export const TARGETS: Target[] = [TARGET, FIRM_TARGET];
+export const TARGET_SUMMARY: TargetSummary = targetSummaryOf();
+
+/** What the warm raised: a tracked award ending, as it was published. */
+export const ALERT_VIEW: RaisedAlertView = raisedAlertViewOf();

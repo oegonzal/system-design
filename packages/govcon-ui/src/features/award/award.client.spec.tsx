@@ -8,6 +8,9 @@ import { AwardClient } from './award.client';
 
 const ID = AWARD_DETAIL.externalId;
 const PATH = `/spending/awards/${ID}`;
+const TRACKED = `/targets/award/${ID}`;
+/** Nobody tracks it yet. */
+const untracked = { path: TRACKED, body: { data: null } };
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -18,12 +21,15 @@ describe('AwardClient', () => {
         path: PATH,
         body: { data: { ...AWARD_DETAIL, openNotices: [noticeRefOf(opportunityOf())] } },
       },
+      untracked,
     ]);
     renderWithTheme(<AwardClient externalId={ID} />);
     expect((await screen.findByRole('heading', { level: 1 })).textContent).toBe(
       '89303019FET000003',
     );
-    expect(calls.map((call) => call.url)).toEqual([PATH]);
+    // One read of the source's record, and one of the store: whether the award is tracked.
+    await screen.findByRole('button', { name: 'Track this award' });
+    expect(calls.map((call) => call.url)).toEqual([PATH, TRACKED]);
     expect(screen.getByRole('table', { name: 'Award facts' })).toBeTruthy();
     expect(screen.getByRole('table', { name: 'Subcontracts under this award' })).toBeTruthy();
     expect(screen.getByRole('list', { name: 'Open notices' })).toBeTruthy();
@@ -48,6 +54,7 @@ describe('AwardClient', () => {
             ? { status: 502, body: { statusCode: 502, message: 'error: status 503' } }
             : { body: { data: AWARD_DETAIL } },
       },
+      untracked,
     ]);
     renderWithTheme(<AwardClient externalId={ID} />);
     expect((await screen.findByRole('heading', { level: 1 })).textContent).toBe(

@@ -6,6 +6,7 @@ import { readFailureOf, UNREACHABLE_COPY, useResource } from '@sysdesign/web-kit
 import { api } from '../../api/client';
 import { FullPageNotice } from '../../components/full-page-notice';
 import { ProvenanceLine } from '../spending/provenance-line';
+import { TrackTarget } from '../targets/track-target.client';
 import {
   AwardFacts,
   AwardHeader,
@@ -23,7 +24,8 @@ export interface AwardClientProps {
  * One award's record, read free from USAspending and kept for the day: who
  * holds it and for whom, what is obligated against what it can reach, when
  * it ends and when it would with every option, how it was bought, who works
- * under it, and the open notices from the same buyer and code.
+ * under it, and the open notices from the same buyer and code — and whether
+ * the company tracks it, which is the store's to say and costs nothing.
  */
 export function AwardClient({ externalId }: AwardClientProps) {
   const award = useResource((signal) => api.getAward(externalId, { signal }), [externalId]);
@@ -56,6 +58,7 @@ export function AwardClient({ externalId }: AwardClientProps) {
           <AwardMoney award={data} nowMs={Date.now()} />
         </Stack>
       </Surface>
+      <TrackTarget kind="award" subject={data.externalId} label={data.piid ?? data.externalId} />
       <Surface as="section" aria-label="How it was bought">
         <AwardFacts award={data} />
       </Surface>
