@@ -1,12 +1,10 @@
 import { INTERACTION_TOPICS, type InteractionPrompt } from '@sysdesign/contracts';
 
 import { inMemoryBus } from '../bus/testing';
-import { FakeChannel, promptOf } from '../channels/testing';
+import { FakeChannel, promptOf, SPEC_NOW as NOW } from '../channels/testing';
 import { Dispatcher } from './dispatcher';
 import { Inbound } from './inbound';
 import { InMemoryInteractionStore } from './testing';
-
-const NOW = new Date('2026-10-11T12:00:00Z');
 
 /** Prompts delivered on one fake channel, the dispatcher's consumer never started: each event handled by hand. */
 async function delivered(...prompts: InteractionPrompt[]) {

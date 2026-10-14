@@ -1,13 +1,12 @@
 import { INTERACTION_TOPICS, type InteractionPrompt } from '@sysdesign/contracts';
 
 import { inMemoryBus } from '../bus/testing';
-import { FakeChannel, promptOf } from '../channels/testing';
+import { FakeChannel, promptOf, SPEC_NOW as NOW } from '../channels/testing';
 import { DISPATCHER_SUBSCRIPTION, Dispatcher, sweepInteractions } from './dispatcher';
 import { Inbound } from './inbound';
 import type { InteractionSettings } from './settings';
 import { InMemoryInteractionStore, until } from './testing';
 
-const NOW = new Date('2026-10-11T12:00:00Z');
 const SETTINGS: InteractionSettings = {
   pullWaitMs: 50,
   eventsPerPull: 20,

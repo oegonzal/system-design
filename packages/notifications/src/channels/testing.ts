@@ -4,7 +4,16 @@ import type { InteractionPrompt } from '@sysdesign/contracts';
 
 import type { ChannelDelivery, InboundSink, InboundVerdict, NotificationChannel } from './port';
 
-/** A prompt a spec can put: a closed question with two choices and one command, its time a day away. */
+/**
+ * The instant the specs' fixtures are written against. A spec that drives the
+ * service's own clock starts it here, and the harness that boots the whole
+ * service fixes it here, so a fixture's times never fall behind the wall
+ * clock: a prompt written to expire a day on stays a day on.
+ */
+export const SPEC_NOW = new Date('2026-10-11T12:00:00Z');
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** A prompt a spec can put: a closed question with two choices and one command, expiring a day after `SPEC_NOW`. */
 export const promptOf = (overrides: Partial<InteractionPrompt> = {}): InteractionPrompt => ({
   id: randomUUID(),
   origin: { kind: 'spec', id: 'asker-1', label: 'step 3 · Acme' },
@@ -16,7 +25,7 @@ export const promptOf = (overrides: Partial<InteractionPrompt> = {}): Interactio
   ],
   freeText: null,
   commands: [{ id: 'blank', label: 'Leave it empty' }],
-  expiresAt: '2026-10-12T00:00:00.000Z',
+  expiresAt: new Date(SPEC_NOW.getTime() + DAY_MS).toISOString(),
   ...overrides,
 });
 
