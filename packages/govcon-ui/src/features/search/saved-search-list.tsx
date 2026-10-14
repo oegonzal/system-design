@@ -1,5 +1,13 @@
-import { describeQuery, minute, type SavedSearch } from '@sysdesign/contracts';
 import {
+  day,
+  describeQuery,
+  LEAD_TIERS,
+  minute,
+  type SavedSearch,
+  type SearchYield,
+} from '@sysdesign/contracts';
+import {
+  Badge,
   Button,
   CheckboxField,
   Heading,
@@ -8,6 +16,8 @@ import {
   Text,
   TextField,
 } from '@sysdesign/design-system';
+
+import { TIER_TONE } from '../tones';
 
 export interface SavedSearchListProps {
   searches: readonly SavedSearch[];
@@ -26,9 +36,42 @@ const clampOrder = (value: number): number =>
   Number.isFinite(value) ? Math.min(1000, Math.max(0, Math.round(value))) : 0;
 
 /**
+ * What a search's last read of the source brought in: the day, how many
+ * records and how many of them new, then how the profile ranked what it
+ * carried — a badge per tier that has any, and what a gate keeps off the
+ * list. The evidence a search is kept in the daily pull on.
+ */
+function LastYield({ found }: { found: SearchYield | null }) {
+  if (found === null) {
+    return (
+      <Text tone="muted" size="sm">
+        not read yet
+      </Text>
+    );
+  }
+  const ranked = LEAD_TIERS.filter((tier) => found.tiers[tier] > 0);
+  return (
+    <Stack gap={1}>
+      <Text size="sm" title={`Posted ${found.window.from} to ${found.window.to}`}>
+        {`${day(found.at)}: ${found.received} read, ${found.inserted} new${found.truncated ? ', more matched' : ''}`}
+      </Text>
+      <Stack direction="row" gap={1} align="center" wrap>
+        {ranked.map((tier) => (
+          <Badge key={tier} tone={TIER_TONE[tier]}>{`${found.tiers[tier]} ${tier}`}</Badge>
+        ))}
+        {found.unlisted > 0 ? (
+          <Text as="span" tone="muted" size="sm">{`${found.unlisted} not listed`}</Text>
+        ) : null}
+      </Stack>
+    </Stack>
+  );
+}
+
+/**
  * The profile's saved searches, in pull order: which run in the daily pull
- * and in what order, when each last ran, and what to do with each — run it
- * now (one request per page), load it back into the form, or remove it.
+ * and in what order, when each last ran and what its last read brought in,
+ * and what to do with each — run it now (one request per page), load it
+ * back into the form, or remove it.
  */
 export function SavedSearchList({
   searches,
@@ -57,6 +100,7 @@ export function SavedSearchList({
               <th>In daily pull</th>
               <th>Order</th>
               <th>Last run</th>
+              <th>Last read brought</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -92,6 +136,9 @@ export function SavedSearchList({
                     />
                   </td>
                   <td>{search.lastRunAt === null ? 'never' : minute(search.lastRunAt)}</td>
+                  <td>
+                    <LastYield found={search.lastYield} />
+                  </td>
                   <td>
                     <Stack direction="row" gap={2} wrap>
                       <Button

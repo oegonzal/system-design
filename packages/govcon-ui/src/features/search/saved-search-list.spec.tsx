@@ -60,6 +60,42 @@ describe('SavedSearchList', () => {
     expect(onDelete).toHaveBeenLastCalledWith(SAVED_SEARCHES[1]);
   });
 
+  it('[GOVU-25] says what each search’s last read of the source brought in — the day, how many records and how many new, a badge per tier the profile ranked any of them in, and what a gate keeps off the list — or that it has not read the source yet', () => {
+    renderWithTheme(<Default />);
+    const [never, ranked, noisy] = within(screen.getByRole('table', { name: 'Saved searches' }))
+      .getAllByRole('row')
+      .slice(1)
+      .map((row) => within(row).getAllByRole('cell')[6] as HTMLElement);
+    expect(
+      within(screen.getByRole('table', { name: 'Saved searches' }))
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent),
+    ).toEqual([
+      'Name',
+      'Filters',
+      'Days',
+      'In daily pull',
+      'Order',
+      'Last run',
+      'Last read brought',
+      'Actions',
+    ]);
+    expect(never?.textContent).toBe('not read yet');
+
+    expect(ranked?.textContent).toContain('2026-09-26: 37 read, 5 new');
+    expect(ranked?.textContent).toContain('1 high');
+    expect(ranked?.textContent).toContain('3 medium');
+    expect(ranked?.textContent).toContain('20 low');
+    expect(ranked?.textContent).toContain('13 not listed');
+    // The days it asked for are a hover away.
+    expect(
+      within(ranked as HTMLElement).getByTitle('Posted 2026-09-23 to 2026-09-26'),
+    ).toBeTruthy();
+
+    // A read cut short that the profile ranked none of: no tier is named, and the cut is said.
+    expect(noisy?.textContent).toBe('2026-09-25: 1000 read, 0 new, more matched1000 not listed');
+  });
+
   it('waits on the busy row, keeps runs off without a source, and says when there is nothing', () => {
     renderWithTheme(<Busy />);
     expect(

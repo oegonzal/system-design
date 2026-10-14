@@ -20,7 +20,7 @@ export default meta;
 
 type Story = StoryObj<typeof SavedSearchList>;
 
-/** Three searches: two in the daily pull, one kept for hand runs. */
+/** Three searches: two in the daily pull, one kept for hand runs — one never read, one whose read ranked well, one whose read brought nothing the profile lists. */
 export const Default: Story = {};
 
 /** A write in flight for the first row: its controls wait. */

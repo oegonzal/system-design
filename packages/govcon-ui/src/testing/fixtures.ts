@@ -19,6 +19,7 @@ import {
   pullReportOf,
   type SavedSearch,
   savedSearchOf,
+  searchYieldOf,
   sliceReportOf,
   type SourceCall,
   sourceCallOf,
@@ -325,7 +326,9 @@ export const SAVED_SEARCHES: SavedSearch[] = [
     filter: { naics: '541511', status: 'active' },
     pullOrder: 1,
     lastRunAt: '2026-09-26T19:10:37.782Z',
+    lastYield: searchYieldOf(),
   }),
+  // A wide search whose read was cut short and brought nothing the profile ranks.
   savedSearchOf({
     id: 's-3',
     profileId: 'enfav',
@@ -334,6 +337,16 @@ export const SAVED_SEARCHES: SavedSearch[] = [
     days: 30,
     includedInPull: false,
     pullOrder: 2,
+    lastRunAt: '2026-09-25T08:00:00.000Z',
+    lastYield: searchYieldOf({
+      at: '2026-09-25T08:00:00.000Z',
+      window: { from: '2026-08-26', to: '2026-09-25' },
+      received: 1000,
+      inserted: 0,
+      truncated: true,
+      tiers: { high: 0, medium: 0, low: 0 },
+      unlisted: 1000,
+    }),
   }),
 ];
 

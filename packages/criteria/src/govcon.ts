@@ -126,6 +126,11 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
     statement:
       'A notice’s page says who may hold the work it is about, and only when asked, since the read goes to the award source: the awards in its code at its own sub-agency ending in the coming months, soonest first, each a link to its own record and its holder a link to the firm’s page, narrowed to the notice’s product service code unless unticked — which asks again — with how many the scope listed, how far the list is complete, and the fact the notice lacks when nothing could be read.',
   },
+  {
+    id: 'GOVU-25',
+    statement:
+      'The saved-search list says what each search’s last read of the source brought in, beside when it last ran: the day, how many records and how many of them new, how the profile ranked what it carried by tier, and what a gate keeps off the list — so a search is kept in the daily pull or dropped from it on evidence; a search that has not read the source says so.',
+  },
   // Government contracting: SAM.gov opportunities (packages/govcon)
   {
     id: 'GOV-1',

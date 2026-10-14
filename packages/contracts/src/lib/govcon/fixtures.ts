@@ -11,7 +11,7 @@ import {
   type StoredProfile,
 } from './profile';
 import type { PullReport, SliceReport } from './pull';
-import type { SavedSearch } from './search';
+import type { SavedSearch, SearchYield } from './search';
 import type { Description, SourceCall, SourceStatus } from './source';
 import type { SavedView } from './view';
 
@@ -252,6 +252,18 @@ export const savedSearchOf = (overrides: Partial<SavedSearch> = {}): SavedSearch
   lastYield: null,
   createdAt: '2026-09-27T00:00:00.000Z',
   updatedAt: '2026-09-27T00:00:00.000Z',
+  ...overrides,
+});
+
+/** What a search's read brought in: thirty-seven records, five of them new, most of what it carried ranked low. */
+export const searchYieldOf = (overrides: Partial<SearchYield> = {}): SearchYield => ({
+  at: '2026-09-26T19:10:37.782Z',
+  window: { from: '2026-09-23', to: '2026-09-26' },
+  received: 37,
+  inserted: 5,
+  truncated: false,
+  tiers: { high: 1, medium: 3, low: 20 },
+  unlisted: 13,
   ...overrides,
 });
 
