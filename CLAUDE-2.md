@@ -19,7 +19,7 @@
 
 ## PROJECT
 
-- System Design application with interactive diagraming UX to practice distribited system, backend systems, full stack systems software engineering. Use /Users/oscargonzalez/Dev/interview-prep/system-design-prep/Resume_a2.pdf for generating system design prompts based on users relevant professional experience. Should also use a dedicated background process that is a critic/eval pipeline to give feedback and grade users response to each prompt.
+- System Design application with interactive diagraming UX to practice distribited system, backend systems, full stack systems software engineering. Use /Users/oscargonzalez/Dev/interview-prep/system-design-prep/docs/ingestion/Resume_2026_c.pdf for generating system design prompts based on users relevant professional experience. Should also use a dedicated background process that is a critic/eval pipeline to give feedback and grade users response to each prompt.
 
 ## REQUIREMENTS
 
