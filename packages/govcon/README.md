@@ -1,6 +1,6 @@
 # govcon
 
-SAM.gov contract opportunities for one company, as a NestJS service with a command line and an HTTP surface: pull the profile's saved searches inside a daily request budget, store what normalizes in Postgres, rank the store against a declarative profile, keep bids per notice, read the awards and registrants the same key reaches, and research where and when the government spends, how much of it was open to the profile and which primes pass work down, through USAspending lenses over one scope, snapshotted for the cache window, refreshed daily for the default profile with the alerts it finds put to a person through the notifications bus.
+SAM.gov contract opportunities for one company, as a NestJS service with a command line and an HTTP surface: pull the profile's saved searches inside a daily request budget, store what normalizes in Postgres, rank the store against a declarative profile, keep bids per notice and targets per firm or award, read the awards and registrants the same key reaches, and research where and when the government spends, how much of it was open to the profile and which primes pass work down, through USAspending lenses over one scope, snapshotted for the cache window, refreshed daily for the default profile and the awards it tracks, with the alerts it finds put to a person through the notifications bus and read back on the dashboard.
 
 ```bash
 pnpm govcon search --days 3                 # pull, then rank — the daily routine (8 requests with the shipped searches)

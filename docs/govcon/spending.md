@@ -325,7 +325,8 @@ lens, the reach count taken for the lanes the profile may bid, then, for
 each of the top three agencies
 the rolling-year breakdown names, the horizon narrowed to that agency (the
 scope a directory pick opens, and the one whose walk reaches today) and its
-outlook, and logs one line per lens:
+outlook, then the own record of every award you track (see "Tracked
+awards" below), and logs one line per lens:
 
 ```
 spending warm every 24 h
@@ -336,27 +337,63 @@ warm horizon source 7 req 9870 ms
 warm agencies source 1 req 310 ms
 warm horizon 097 source 9 req 6210 ms
 warm agency 097 source 2 req 1105 ms
+warm award CONT_AWD_W912DY23F0468_9700_W912DY20D0079_9700 snapshot 1 req 6 ms
 warm alerts: 3 found, 2 new, 2 published, digest sent
 ```
 
 Then the alert rules run over what was read. They are declared on the
 profile and edited in Settings → Alerts:
 
-| Rule                            | Profile field             | What it raises                                                                                         |
-| ------------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------ |
-| An award in the scope is ending | `alerts.endingWithinDays` | One alert per listed award ending within this many days of today (default 90; `0` raises none)         |
-| The pulse runs above its band   | `alerts.pulseAboveBand`   | One alert when the period in progress has already obligated more than every prior year's amount for it |
+| Rule                              | Profile field             | What it raises                                                                                                               |
+| --------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| An award is ending                | `alerts.endingWithinDays` | One alert per award ending within this many days of today (default 90; `0` raises none)                                      |
+| Whose ending awards               | `alerts.audience`         | `scope`: every award the horizons list, and every tracked award. `watched`: tracked awards only                              |
+| How much must be obligated on one | `alerts.minObligated`     | An award found in the scope is raised only with at least this many dollars obligated on it (default 0). A tracked one always |
+| The pulse runs above its band     | `alerts.pulseAboveBand`   | One alert when the period in progress has already obligated more than every prior year's amount for it                       |
 
 Each alert is raised once per kind and subject — the same expiring award
-seen through the profile's horizon and an agency's is one alert: a ninth
-table, `govcon_alert`, remembers what was raised, so tomorrow's warm raises
+seen through the profile's horizon and an agency's is one alert: the
+`govcon_alert` table remembers what was raised, so tomorrow's warm raises
 only what is new. Each new alert is published on its declared topic
-(`govcon.award.ending`, `govcon.pulse.above-band`) on the notifications bus
-at `NOTIFICATIONS_URL`, and one digest per warm — "N spending alerts for
-Enfav LLC", at most ten lines and a count of the rest, one "Noted" button,
-expiring after seven days — is published as a prompt, which is what the
-Telegram channel renders. Only what was published is recorded, so a bus that
-cannot be reached is one warning and the same alerts are raised next warm.
+(`govcon.award.ending`, `govcon.award.end-moved`, `govcon.award.notice`,
+`govcon.pulse.above-band`) on the notifications bus at `NOTIFICATIONS_URL`,
+and one digest per warm — "N spending alerts for Enfav LLC", at most ten
+lines and a count of the rest, one "Noted" button, expiring after seven
+days — is published as a prompt, which is what the Telegram channel
+renders. Only what was published is recorded, so a bus that cannot be
+reached is one warning and the same alerts are raised next warm.
+
+**Where the rest are.** The table keeps what was published with each alert,
+so the dashboard's Alerts panel reads them back as the lines that were
+sent, newest warm first and, within a warm, in the digest's order: a
+tracked award's news, then a finding about the whole scope, then the ending
+awards with the most obligated first. Each line links to the award or the
+notice it names. `GET /alerts?limit&offset` is the same list. An alert
+raised before 2026-10-14 kept no payload, and is listed by its key with a
+link to the award when it is an ending one.
+
+**Tracked awards.** Track an award from its page and the warm reads its own
+record every day, through the award lens, so it costs one to three free
+requests on a scheduled warm and nothing on a restart. Up to
+`MAX_WATCHED_AWARDS` are read, the ones never read first and then the
+soonest to end; an award passed on is no longer read. Three things are
+raised about a tracked award, whatever the profile's audience and floor:
+
+| What                          | When                                                                                                                     | Raised once per       |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------------------ | --------------------- |
+| It is ending                  | Its end falls inside `alerts.endingWithinDays`                                                                           | Award                 |
+| Its end moved                 | Its end is not the one the last warm read: an option was exercised, it was extended, or it was cut short                 | Award and the new end |
+| A notice may be its follow-on | A stored open notice shares its exact NAICS code and its buyer's sub-agency, the join the Horizon and the award page use | Award and notice      |
+
+The end a warm reads is kept on the target, and is what the next warm
+compares against; the pipeline shows it. It is written only once the alert
+that says it moved is on the ledger, so a bus that was down loses nothing:
+the next warm finds the same move again.
+
+**Quieter digests.** The two levers the measurements below asked for are
+now on the profile. Set `alerts.minObligated` to drop the small orders that
+fill a dense scope's list, or set `alerts.audience` to `watched` so only the
+awards you chose to follow are raised as ending.
 
 **How many to expect.** The ending rule reads the rows each horizon lists —
 the 200 soonest-ending awards of its scope (`MAX_HORIZON_ROWS`), for the
@@ -371,7 +408,8 @@ award is raised once, on the day it first shows in a list inside the window:
 a day's count is roughly the awards ending per day in the scope, whatever
 the window, and the window sets how many days ahead a sparse list tells you.
 The digest shows the ten with the most obligated and counts the rest. Fewer
-codes on the profile shorten it; `0` turns the rule off.
+codes on the profile shorten it, a floor on obligated dollars or the
+`watched` audience shortens it more, and `0` turns the rule off.
 
 ## How it works
 
