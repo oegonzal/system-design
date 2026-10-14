@@ -56,127 +56,115 @@ const arr1 = [1, 5, 9, 10, 15, 20, 0, 0, 0, 0, 0, 0];
 const arr2 = [2, 3, 8, 13];
 mergeArrays(arr1, arr2);
 
-
-
-
-
-
 interface PriorityQueueInterface<T> {
-    push(priority: number, payload: T): void;
-    peek(): Promise<T>;
-    pop(): Promise<T>;
+  push(priority: number, payload: T): void;
+  peek(): Promise<T>;
+  pop(): Promise<T>;
 }
-
 
 class Deferred<T> {
-    promise: Promise<T>;
-    resolve!: (value: T) => void;
+  promise: Promise<T>;
+  resolve!: (value: T) => void;
 
-    constructor() {
-        this.promise = new Promise((resolve) => {
-            this.resolve = resolve; 
-        });
-    }
+  constructor() {
+    this.promise = new Promise((resolve) => {
+      this.resolve = resolve;
+    });
+  }
 }
-
-
 
 interface QueueItem<T> {
-    priority: number;
-    payload: T;
+  priority: number;
+  payload: T;
 }
 class PriorityQueue<T> implements PriorityQueueInterface<T> {
-    private queue: QueueItem<T>[] = [];
-    private waiters: Deferred<void>[] = [];
+  private queue: QueueItem<T>[] = [];
+  private waiters: Deferred<void>[] = [];
 
-    // private firstResolve!: (value: T) => void;;
-    // private firstItem: Promise<T> = new Promise((resolve: (value:T) => void) => this.firstResolve = resolve);
+  // private firstResolve!: (value: T) => void;;
+  // private firstItem: Promise<T> = new Promise((resolve: (value:T) => void) => this.firstResolve = resolve);
 
-    push(priority: number, payload: T) {
-        const newItem = { priority, payload };
+  push(priority: number, payload: T) {
+    const newItem = { priority, payload };
 
-        if (this.queue.length === 0) {
-            this.queue.push( newItem );
-            
-            // this.waiters.push( new Deferred() );
+    if (this.queue.length === 0) {
+      this.queue.push(newItem);
 
-            // this.firstResolve(payload);
-        } else {
-            let prev = newItem;
+      // this.waiters.push( new Deferred() );
 
-            for ( let idx = 0; idx < this.queue.length; idx++ ) {
-                const item = this.queue[idx];
-                if ( priority >= item.priority ) {
-                    const curr = prev;
-                    prev = item;
-                    this.queue[idx] = curr;
-                }
-            }
-            this.queue.push(prev);
+      // this.firstResolve(payload);
+    } else {
+      let prev = newItem;
 
-            // const idx = this.queue.findIndex((item) => item.priority <= priority);
-            // if (idx !== -1) this.queue.push( newItem );
-            // else this.queue.splice(idx, 0, newItem);
-
-            // for ( let i = 0; i < this.waiters.length; i++ ) {
-            //     this.waiters.pop()!.resolve();
-            // }
+      for (let idx = 0; idx < this.queue.length; idx++) {
+        const item = this.queue[idx];
+        if (priority >= item.priority) {
+          const curr = prev;
+          prev = item;
+          this.queue[idx] = curr;
         }
+      }
+      this.queue.push(prev);
 
-        if ( this.waiters.length > 0 ) {
-            const oldestWaiter = this.waiters.shift()!;
-            oldestWaiter.resolve()
-        }
-        return;
+      // const idx = this.queue.findIndex((item) => item.priority <= priority);
+      // if (idx !== -1) this.queue.push( newItem );
+      // else this.queue.splice(idx, 0, newItem);
+
+      // for ( let i = 0; i < this.waiters.length; i++ ) {
+      //     this.waiters.pop()!.resolve();
+      // }
     }
 
-    async peek() {
+    if (this.waiters.length > 0) {
+      const oldestWaiter = this.waiters.shift()!;
+      oldestWaiter.resolve();
+    }
+    return;
+  }
 
-        while( this.queue.length === 0 ) {
-            const deferred = new Deferred<void>();
-            this.waiters.push( deferred );
-            await deferred.promise;
-        }
-
-        return this.queue[this.queue.length - 1].payload;
-
-        // if ( this.queue.length > 0 ) {
-        //     return new Promise(
-        //         (resolve: (value:T) => void) => resolve( this.queue[this.queue.length - 1].payload )
-        //     );
-        // } else {
-        //     await this.waiters[this.waiters.length - 1];
-        //     return this.queue[this.queue.length - 1].payload;
-
-        //     // return await this.firstItem;
-        // }
+  async peek() {
+    while (this.queue.length === 0) {
+      const deferred = new Deferred<void>();
+      this.waiters.push(deferred);
+      await deferred.promise;
     }
 
-    async pop() {
+    return this.queue[this.queue.length - 1].payload;
 
-        while (this.queue.length == 0) {
-            const deferred = new Deferred<void>();
-            this.waiters.push( deferred );
-            await deferred.promise;
-        }
+    // if ( this.queue.length > 0 ) {
+    //     return new Promise(
+    //         (resolve: (value:T) => void) => resolve( this.queue[this.queue.length - 1].payload )
+    //     );
+    // } else {
+    //     await this.waiters[this.waiters.length - 1];
+    //     return this.queue[this.queue.length - 1].payload;
 
-        const item = this.queue.pop();
-        return item!.payload;
+    //     // return await this.firstItem;
+    // }
+  }
 
-        // if ( this.queue.length > 0 ) {
-        //     const item = this.queue.pop();
-        //     return new Promise(
-        //         (resolve: (value:T) => void) => resolve( item!.payload )
-        //     );
-        // } else {
-        //     await this.waiters[this.waiters.length - 1];
-        //     return this.queue.pop()!.payload;
-        //     // return await this.firstItem;
-        // }
+  async pop() {
+    while (this.queue.length == 0) {
+      const deferred = new Deferred<void>();
+      this.waiters.push(deferred);
+      await deferred.promise;
     }
+
+    const item = this.queue.pop();
+    return item!.payload;
+
+    // if ( this.queue.length > 0 ) {
+    //     const item = this.queue.pop();
+    //     return new Promise(
+    //         (resolve: (value:T) => void) => resolve( item!.payload )
+    //     );
+    // } else {
+    //     await this.waiters[this.waiters.length - 1];
+    //     return this.queue.pop()!.payload;
+    //     // return await this.firstItem;
+    // }
+  }
 }
-
-
 
 /*
 
@@ -273,21 +261,6 @@ private queue: QueueItem<T>[] = [];
 
 */
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 /*
 
 
@@ -382,11 +355,3 @@ class PriorityQueue<T> implements PriorityQueueInterface<T> {
 
 
 */
-
-
-
-
-
-
-
-

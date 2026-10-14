@@ -624,17 +624,16 @@ A validator refusal decides before any veto is even considered.
 
 One naming trap: "blocking" is used in both senses. A block validator is one gate kind, while a "blocking finding" or "blocking criterion" is a veto blocker. The decision's blocking field lists everything that refused — validators, findings and criteria — together.
 
-
-
-
 Per run, never per iteration. And in a browser session it isn't even per step run: it's once per pipeline per session.
 
 Inside the engine:
+
 - runLoop calls deriveOrAdopt once, before the iteration loop starts (packages/quality-loop/src/core/loop/run-pipeline.ts:117).
 - The result becomes the run's contract, and every iteration of that run (a revise, a retry, up to maxIterations) is judged against the same criteria. Only the producer's artifact changes between iterations.
 - If the run request already carries criteria, the deriver isn't called at all. The supplied rubric is adopted as given, and is only measured against the deriver's bounds (run-pipeline.ts:186-198).
 
 In a browser session:
+
 - session-engine.ts:38-44 (called at :81) derives two rubrics once, at session start, before the browser opens:
   - one for browser-step;
   - one for field-answer.
@@ -643,7 +642,6 @@ In a browser session:
 - The same holds for form pages. The form-memory orchestration passes the session's field-answer rubric to its field-answer run.
 
 So round 2 had exactly two derivations: browser-step with 28 criteria and field-answer with 10, recorded in 00-rubrics.json. All 17 step runs and both field-answer runs reused them.
-
 
 ## Pre-note that made me take all the extra notes in this file
 
