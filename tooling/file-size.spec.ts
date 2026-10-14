@@ -4,7 +4,8 @@ import { join } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { LINE_BOUNDS, lineCount, SOURCE } from './code-review/rules/file-size';
+import { SOURCE } from './code-review/diff-pack';
+import { LINE_BOUNDS, lineCount } from './code-review/rules/file-size';
 
 /**
  * No source file in the repository is longer than the bound the review

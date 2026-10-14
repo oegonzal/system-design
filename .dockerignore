@@ -6,7 +6,6 @@ node_modules
 **/.next-e2e
 .nx
 .git
-.env
 **/storybook-static
 **/test-output
 **/playwright-report
@@ -17,5 +16,6 @@ CLAUDE.md
 Resume_a2.pdf
 **/.astro
 **/.env*
+**/.*.env
 **/.wrangler
 **/.dev.vars*

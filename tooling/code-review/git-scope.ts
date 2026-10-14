@@ -24,15 +24,12 @@ export const git = (args: string[]): string =>
   });
 
 /**
- * Paths worth an LLM's attention.
- *
- * Lockfiles, generated output and binary assets produce enormous diffs with no
- * reviewable design content, so they are filtered before anything is priced.
- * The rules engine sees a wider set — `IGNORED` still applies, but the
- * extension filter does not, because the branding tripwire must scan markdown
- * and config too.
+ * Paths no review reads. Lockfiles and generated output produce enormous diffs
+ * with no reviewable design content, so they are filtered before anything is
+ * priced. Every other changed file reaches the rules engine, because the
+ * branding tripwire must scan markdown and config too; the critics then read
+ * only source files (`SOURCE`, in diff-pack.ts).
  */
-export const REVIEWABLE = /\.(ts|tsx|js|jsx|mjs|cjs)$/;
 const IGNORED = [
   /(^|\/)node_modules\//,
   /(^|\/)dist\//,

@@ -1,3 +1,8 @@
+import { join } from 'node:path';
+
+import ts from 'typescript';
+
+import { REPO_ROOT } from '../git-scope';
 import type { Finding } from '../policy';
 import type { ChangedFile } from './index';
 import { ALLOWED, ALIAS_SCOPE, importsOf, packageOf, resolveRelative } from './boundaries';
@@ -12,6 +17,30 @@ import { ALLOWED, ALIAS_SCOPE, importsOf, packageOf, resolveRelative } from './b
  * grab-bag", not on "this is more than I would have exported".
  */
 export const MAX_BARREL_EXPORTS = 40;
+
+/**
+ * The packages the workspace reaches by alias, as tsconfig.base.json's `paths`
+ * declares them: the only ones with a public surface a relative path could
+ * bypass. An app has no alias, so whether a project may reach one at all is
+ * the boundaries rule's question alone.
+ */
+const ALIASED: ReadonlySet<string> = (() => {
+  const { config, error } = ts.readConfigFile(
+    join(REPO_ROOT, 'tsconfig.base.json'),
+    ts.sys.readFile,
+  );
+  if (error !== undefined) {
+    throw new Error(
+      `tsconfig.base.json: ${ts.flattenDiagnosticMessageText(error.messageText, '\n')}`,
+    );
+  }
+  const { compilerOptions } = config as { compilerOptions?: { paths?: Record<string, unknown> } };
+  return new Set(
+    Object.keys(compilerOptions?.paths ?? {})
+      .filter((alias) => alias.startsWith(ALIAS_SCOPE))
+      .map((alias) => alias.slice(ALIAS_SCOPE.length).split('/')[0] ?? ''),
+  );
+})();
 
 const BARREL = /^packages\/[^/]+\/src\/index\.ts$/;
 const SOURCE = /\.(ts|tsx)$/;
@@ -29,11 +58,11 @@ export function countReExports(content: string): number {
  *
  * - a changed barrel re-exporting more than `MAX_BARREL_EXPORTS` modules is
  *   `medium` — the surface has stopped meaning anything;
- * - a changed file that reaches an *allowed* dependency by relative path is
- *   `low` (the barrel) or `medium` (past the barrel, into internals) — the
- *   direction is legal, but the spelling bypasses the public surface and the
- *   lint rule that watches the alias. Disallowed directions are boundaries'
- *   finding, at `high`; one rule per problem.
+ * - a changed file that reaches an *allowed*, aliased dependency by relative
+ *   path is `low` (the barrel) or `medium` (past the barrel, into internals) —
+ *   the direction is legal, but the spelling bypasses the public surface and
+ *   the lint rule that watches the alias. Disallowed directions are
+ *   boundaries' finding, at `high`; one rule per problem.
  */
 export const exportSurface = (files: readonly ChangedFile[]): Finding[] => {
   const findings: Finding[] = [];
@@ -67,6 +96,7 @@ export const exportSurface = (files: readonly ChangedFile[]): Finding[] => {
       const resolved = resolveRelative(file, ref.specifier);
       const targetPackage = packageOf(`${resolved}/`);
       if (targetPackage === undefined || targetPackage === ownPackage) continue;
+      if (!ALIASED.has(targetPackage)) continue;
       // Disallowed directions belong to boundaries, at high.
       if (allowed !== null && !(allowed ?? []).includes(targetPackage)) continue;
 

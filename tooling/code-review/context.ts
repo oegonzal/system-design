@@ -2,8 +2,14 @@ import { existsSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { codeReviewExpectations } from './conventions';
-import { packDiff, splitDiffByFile, SPEC, STORIES, type PackedDiff } from './diff-pack';
-import { changedFiles, git, mergeBase, REPO_ROOT, REVIEWABLE, type Scope } from './git-scope';
+import {
+  criticFiles,
+  hasColocatedSpec,
+  packDiff,
+  splitDiffByFile,
+  type PackedDiff,
+} from './diff-pack';
+import { changedFiles, git, mergeBase, REPO_ROOT, type Scope } from './git-scope';
 import { deriveIntent, readCommitMessages, type Intent } from './intent';
 
 /**
@@ -50,17 +56,9 @@ function projectMetadataFor(files: string[]): string {
   return blocks.join('\n\n');
 }
 
-/**
- * Whether a colocated spec exists on disk, changed or not.
- *
- * This is what separates "the spec was omitted from the diff" from "there is no
- * spec" — the only sound basis for a missing-test finding.
- */
-const specExists = (file: string): boolean => {
-  if (SPEC.test(file) || STORIES.test(file)) return false;
-  const stem = file.replace(/\.[cm]?[jt]sx?$/, '');
-  return ['.spec.ts', '.spec.tsx'].some((suffix) => existsSync(join(REPO_ROOT, stem + suffix)));
-};
+/** Whether a file's colocated spec exists on disk, changed or not. */
+const specExists = (file: string): boolean =>
+  hasColocatedSpec(file, (path) => existsSync(join(REPO_ROOT, path)));
 
 function diffFor(scope: Scope, files: string[], base?: string): string {
   // Every flag here defends the parser against a git config that would change
@@ -95,7 +93,7 @@ export function buildReviewContext(scope: Scope, options: BuildOptions): ReviewC
   // the same range.
   const base = scope.kind === 'base' ? mergeBase(scope.ref) : undefined;
   const allFiles = changedFiles(scope, base);
-  const files = allFiles.filter((file) => REVIEWABLE.test(file));
+  const files = criticFiles(allFiles);
   const { text: conventions, warnings } = codeReviewExpectations(
     readFileSync(join(__dirname, 'review-policy.md'), 'utf8'),
   );

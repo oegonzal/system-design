@@ -24,7 +24,7 @@
     "website:serve": "nx run website:serve",
     "website:build": "nx run website:build",
     "website:preview": "nx run website:preview",
-    "website:deploy": "nx run website:build && cd packages/website && wrangler deploy --config wrangler.jsonc",
+    "website:deploy": "nx run website:build && cd packages/website && wrangler deploy --config wrangler.jsonc --message \"$(git rev-parse HEAD) local\"",
     "govcon:start": "concurrently --kill-others \"pnpm govcon:serve\" \"pnpm govcon-ui:serve\"",
     "quality:start": "concurrently --kill-others \"pnpm quality-loop:serve\" \"pnpm quality-loop-ui:serve\"",
     "start": "concurrently --kill-others \"pnpm studio-api:serve\" \"pnpm quality-loop:serve\" \"pnpm studio-ui:serve\"",

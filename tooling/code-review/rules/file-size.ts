@@ -1,3 +1,4 @@
+import { SOURCE } from '../diff-pack';
 import type { Finding } from '../policy';
 import type { ChangedFile } from './index';
 
@@ -15,12 +16,6 @@ import type { ChangedFile } from './index';
  * file that never passes through a review cannot carry it in either.
  */
 export const LINE_BOUNDS = { warn: 400, max: 500 } as const;
-
-/**
- * Every source file the repository authors: a script, whatever its module
- * flavour, or an Astro component.
- */
-export const SOURCE = /\.(?:[cm]?[jt]sx?|astro)$/;
 
 /** Lines as an editor counts them: the last line needs no newline after it. */
 export const lineCount = (content: string): number => {

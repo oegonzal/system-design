@@ -1,8 +1,8 @@
 import { defineConfig } from 'vitest/config';
 
 /**
- * The site's specs run in node: they read data modules and configuration, never
- * a DOM. Nx infers the `test` target from this file; project.json's typecheck
+ * The site's specs run in node: they read data modules, configuration and the
+ * build's integrations, never a DOM. Nx infers the `test` target from this file; project.json's typecheck
  * (astro check) replaces the tsc target it would infer beside it.
  */
 export default defineConfig({
@@ -11,7 +11,7 @@ export default defineConfig({
   test: {
     watch: false,
     environment: 'node',
-    include: ['src/**/*.spec.ts'],
+    include: ['src/**/*.spec.ts', 'integrations/**/*.spec.ts'],
     reporters: ['default'],
   },
 });

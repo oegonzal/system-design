@@ -7,17 +7,20 @@ name: Deploy website
 on:
   push:
     branches: [main]
-    # What the build reads: the site, and the root files that pin its toolchain.
-    # tooling/website-imports.spec.ts keeps this complete (the site imports
-    # nothing outside its package but root dependencies). A dependency bump made
-    # for another package also redeploys — one redundant Worker version.
+    # What the build reads: the whole site package, the root .gitignore (Tailwind's
+    # class scan honours it), and the root files that pin the toolchain and the
+    # dependencies. This list is DEPLOY_PATHS in
+    # packages/website/integrations/watched-inputs.ts, and
+    # tooling/website-imports.spec.ts fails when the two differ. The build fails
+    # on any read its tools report outside these paths, and the spec when what
+    # loads before the build lies outside them; docs/enfav/website.md lists both
+    # and the reads neither sees.
+    # An edit that cannot change the site (its README, a spec, a lint config) or a
+    # dependency bump made for another package costs one redundant Worker version,
+    # cheaper than an exclusion list that goes stale.
     paths:
       - 'packages/website/**'
-      - '!packages/website/README.md'
-      - '!packages/website/**/*.spec.ts'
-      - '!packages/website/vitest.config.ts'
-      - '!packages/website/eslint.config.mjs'
-      - '!packages/website/prettier.config.mjs'
+      - '.gitignore'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
@@ -111,7 +114,10 @@ jobs:
       name: production
       url: ${{ needs.build.outputs.site_url }}
     outputs:
-      deployed: ${{ steps.deploy.outcome == 'success' }}
+      # wrangler's success, or else Cloudflare's record: wrangler puts the new version
+      # live before it applies the routes, so a failed deploy can still have changed
+      # production, and a successful one is verified even if the read after it fails.
+      deployed: ${{ steps.deploy.outcome == 'success' || (steps.deploy.outputs.live != '' && steps.deploy.outputs.live != steps.deploy.outputs.previous) }}
     steps:
       # First attempts need no such check: concurrency already orders them. A
       # re-run keeps its original commit, so it must not deploy over a newer one.
@@ -164,17 +170,40 @@ jobs:
             exit 1
           fi
           wrangler=../../node_modules/.bin/wrangler
-          # The version serving before this deploy, by traffic: what a rollback returns to.
-          previous="$("$wrangler" deployments status --config wrangler.jsonc --json 2>/dev/null \
-            | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{const [top]=JSON.parse(s).versions.toSorted((a,b)=>b.percentage-a.percentage);process.stdout.write(top?.version_id??"")}catch{}})' || true)"
+          # The version carrying the most traffic, by Cloudflare's own record. One API
+          # call can fail, so the read is tried three times, and its errors stay in the log.
+          serving() {
+            local attempt version
+            for attempt in 1 2 3; do
+              if version="$("$wrangler" deployments status --config wrangler.jsonc --json \
+                | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const [top]=JSON.parse(s).versions.toSorted((a,b)=>b.percentage-a.percentage);if(!top?.version_id)process.exit(1);process.stdout.write(top.version_id)})')"; then
+                echo "$version"
+                return 0
+              fi
+              if [ "$attempt" -lt 3 ]; then sleep $((attempt * 5)); fi
+            done
+            return 1
+          }
+          # What a rollback returns to. The first deploy is made from a terminal, so a
+          # version always serves by now; without one to compare, nothing is deployed.
+          if ! previous="$(serving)"; then
+            echo "::error title=Serving version unknown::Cloudflare's record of what enfav-website serves could not be read, so this run deployed nothing. A Worker never deployed needs its first deploy from a terminal (docs/enfav/website.md, setup step 5). An authentication error in the log above means CLOUDFLARE_API_TOKEN is past its end date, was rolled without the secret being updated, or lost a permission; every run fails the same way until that is fixed, and each cause has its own fix (docs/enfav/website.md, Troubleshooting, Serving version unknown). Otherwise run the workflow again."
+            exit 1
+          fi
           echo "previous=$previous" >> "$GITHUB_OUTPUT"
-          "$wrangler" deploy --config wrangler.jsonc --message "$GITHUB_SHA run $GITHUB_RUN_ID"
+          status=0
+          "$wrangler" deploy --config wrangler.jsonc --message "$GITHUB_SHA run $GITHUB_RUN_ID" || status=$?
+          # Read after a failure too: the new version may be live although routing failed.
+          live="$(serving)" || live=""
+          echo "live=$live" >> "$GITHUB_OUTPUT"
+          exit "$status"
 
       - name: Summarize the deploy
         if: always() && steps.deploy.outcome != 'skipped'
         env:
           OUTCOME: ${{ steps.deploy.outcome }}
           PREVIOUS: ${{ steps.deploy.outputs.previous }}
+          LIVE: ${{ steps.deploy.outputs.live }}
           OUTPUT_FILE: ${{ runner.temp }}/wrangler-output.ndjson
         run: |
           deployed="$(node -e 'const fs=require("fs");const f=process.argv[1];if(!fs.existsSync(f))process.exit(0);const e=fs.readFileSync(f,"utf8").split("\n").filter(Boolean).map(l=>JSON.parse(l)).filter(e=>e.type==="deploy").at(-1);process.stdout.write(e?.version_id??"")' "$OUTPUT_FILE")"
@@ -182,8 +211,9 @@ jobs:
             echo "### Website deploy: $OUTCOME"
             echo ""
             echo "- Commit: \`$GITHUB_SHA\`"
-            echo "- Deployed version: \`${deployed:-none}\`"
-            echo "- Live before this run: \`${PREVIOUS:-none}\`"
+            echo "- Deployed version, as wrangler reports it: \`${deployed:-none}\`"
+            echo "- Serving now, by Cloudflare's record: \`${LIVE:-unknown}\`"
+            echo "- Serving before this run: \`${PREVIOUS:-unknown}\`"
             if [ -n "$PREVIOUS" ]; then
               echo "- Roll back (pause deploys first): \`pnpm exec wrangler rollback $PREVIOUS --config packages/website/wrangler.jsonc --message \"<reason>\"\`"
             fi
@@ -192,7 +222,8 @@ jobs:
   verify-production:
     name: Verify production
     needs: [build, deploy]
-    # Whenever a new version went live, even if a later step of the deploy job failed.
+    # Whenever wrangler succeeded or, after it failed, Cloudflare's record shows a new
+    # version serving. When that record cannot be read after a failed deploy, this is skipped.
     if: ${{ !cancelled() && needs.deploy.outputs.deployed == 'true' }}
     runs-on: ubuntu-24.04
     timeout-minutes: 15

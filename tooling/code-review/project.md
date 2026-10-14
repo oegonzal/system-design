@@ -73,6 +73,13 @@ anything the map already generates is deliberately absent, because a second copy
   spec and a browser run grade the same markdown the same way. Depends on contracts only; imported
   by specs, the API's test folder and the stub, never by a runtime file.
 - `studio-e2e` — Playwright, driving a real browser against the real API.
+- `website` — the Enfav LLC marketing site: Astro pages prerendered to static files, served by
+  Cloudflare Workers Static Assets from `wrangler.jsonc`. Its unit specs cover the static output,
+  the structured data (with made-up facts), the single origin and the build's check of its own
+  inputs; the company data in `src/data` is checked through the built pages in `website-e2e`. Astro
+  components have no stories: they are tested through the built pages in `website-e2e`.
+- `website-e2e` — Playwright and axe over every page of the built site as Workers serves it, locally
+  against `wrangler dev` and, after a deploy, against production.
 - `tooling/` — repository infrastructure, including this review pipeline. Not an Nx project, so it
   appears in no map entry and has no `project.json`.
 

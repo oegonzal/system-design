@@ -76,9 +76,11 @@ playwright-report/
 # Astro's generated types and caches (packages/website)
 .astro/
 
-# Per-target env files Nx loads into tasks — never committable, since a deploy
+# Env files Nx loads into tasks — `.env.<target>` and `.<target>.env`,
+# `.local.env` and their `.local` forms — never committable, since a deploy
 # token is exactly what someone would put there
 .env.*
+.*.env
 
 # Wrangler's local state and the secrets file it reads (packages/website)
 .wrangler/

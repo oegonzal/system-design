@@ -18,7 +18,8 @@ keeps a canary on this file: the section must exist exactly once.
 - Reuse the shared abstraction where one exists; duplicating a contract type, an envelope shape or
   a design-system primitive in an app is a defect, not a convenience.
 - New behaviour ships with a test at the right level: pure logic unit-tested where it lives,
-  component states tested through their own stories, cross-service behaviour in the browser suite.
+  component states tested through their own stories (an Astro component, which has none, through
+  the built pages its project's e2e suite visits), cross-service behaviour in the browser suite.
 - Deterministic code decides; model output informs. Anything gate-shaped — validation, scoring,
   eligibility — is written as code a test can pin down.
 - Keep responsibilities small enough to name: a module is one idea, and a function's name says what

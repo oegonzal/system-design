@@ -61,11 +61,11 @@ for file in "${staged[@]}"; do
   esac
 
   case "$file" in
-    *.ts | *.tsx | *.js | *.jsx | *.mjs | *.cjs | *.astro) code+=("$file") ;;
+    *.ts | *.tsx | *.mts | *.cts | *.js | *.jsx | *.mjs | *.cjs | *.astro) code+=("$file") ;;
   esac
 
   case "$file" in
-    *.ts | *.tsx | *.js | *.jsx | *.mjs | *.cjs | *.astro | *.json | *.jsonc | *.md | *.css)
+    *.ts | *.tsx | *.mts | *.cts | *.js | *.jsx | *.mjs | *.cjs | *.astro | *.json | *.jsonc | *.md | *.css)
       if has_unstaged_changes "$file"; then partial+=("$file"); else clean+=("$file"); fi
       ;;
   esac

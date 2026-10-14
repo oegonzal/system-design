@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import { DECLARED_ENV, loadReviewConfig, REVIEW_ENV, ReviewConfigError } from './config';
 import { PROFILES } from './critics';
+import { SOURCE_EXTENSIONS } from './diff-pack';
 import { DEFAULT_RUNS_DIR } from './persist';
 
 const HERE = __dirname;
@@ -192,6 +193,20 @@ describe('one source of truth for every knob', () => {
     const hook = readFileSync(join(REPO_ROOT, '.githooks', 'pre-commit'), 'utf8');
     const named = new Set([...hook.matchAll(/\$\{?([A-Z][A-Z0-9_]+)/g)].map((match) => match[1]));
     expect([...named].filter((name) => !DECLARED_ENV.has(name))).toEqual([]);
+  });
+
+  it('the pre-commit hook checks as code exactly what the review calls source, and formats all of it', () => {
+    const hook = readFileSync(join(REPO_ROOT, '.githooks', 'pre-commit'), 'utf8').split('\n');
+    // The hook's case arms, by what each does with a file.
+    const extensions = (marker: string): string[] => {
+      const arm = hook.find((line) => line.includes(marker)) ?? '';
+      return [...arm.matchAll(/\*\.([a-z]+)/g)].map((match) => match[1] ?? '');
+    };
+
+    expect(extensions('code+=("$file")').sort()).toEqual([...SOURCE_EXTENSIONS].sort());
+    expect(
+      SOURCE_EXTENSIONS.filter((extension) => !extensions('*.jsonc').includes(extension)),
+    ).toEqual([]);
   });
 
   it('the CI review job sets no variable the config does not declare, and no API key', () => {

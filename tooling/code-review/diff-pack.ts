@@ -52,8 +52,18 @@ export function splitDiffByFile(
   return { segments, unattributed };
 }
 
-export const SPEC = /\.spec\.[cm]?[jt]sx?$/;
-export const STORIES = /\.stories\.[cm]?[jt]sx?$/;
+/** Every module flavour a script is written in; a spec or a story is one of these too. */
+const SCRIPT_EXTENSIONS = ['ts', 'tsx', 'mts', 'cts', 'js', 'jsx', 'mjs', 'cjs'] as const;
+
+/**
+ * The extensions of every script or component the repository authors, whatever
+ * its module flavour: what the critics review, the line bound measures, a
+ * colocated spec pairs with, and the pre-commit hook formats and checks as code.
+ */
+export const SOURCE_EXTENSIONS = [...SCRIPT_EXTENSIONS, 'astro'] as const;
+export const SOURCE = new RegExp(`\\.(${SOURCE_EXTENSIONS.join('|')})$`);
+const SPEC = new RegExp(`\\.spec\\.(${SCRIPT_EXTENSIONS.join('|')})$`);
+const STORIES = new RegExp(`\\.stories\\.(${SCRIPT_EXTENSIONS.join('|')})$`);
 const CONFIG = /(^|\/)[\w.-]*\.config\.[cm]?[jt]s$/;
 
 /**
@@ -69,8 +79,23 @@ const CONFIG = /(^|\/)[\w.-]*\.config\.[cm]?[jt]s$/;
  */
 export function bundleKey(file: string): string {
   if (STORIES.test(file)) return file;
-  return file.replace(SPEC, '').replace(/\.[cm]?[jt]sx?$/, '');
+  return file.replace(SPEC, '').replace(SOURCE, '');
 }
+
+/**
+ * Whether a source file's colocated spec exists, changed or not. This is what
+ * separates "the spec was omitted from the diff" from "there is no spec", the
+ * only sound basis for a missing-test finding, and it pairs by bundleKey, as
+ * packing does.
+ */
+export function hasColocatedSpec(file: string, exists: (path: string) => boolean): boolean {
+  if (SPEC.test(file) || STORIES.test(file)) return false;
+  return SCRIPT_EXTENSIONS.some((extension) => exists(`${bundleKey(file)}.spec.${extension}`));
+}
+
+/** The changed files the critics read: source files only. The rules engine reads every changed file. */
+export const criticFiles = (files: readonly string[]): string[] =>
+  files.filter((file) => SOURCE.test(file));
 
 export type Tier = 1 | 2 | 3 | 4;
 

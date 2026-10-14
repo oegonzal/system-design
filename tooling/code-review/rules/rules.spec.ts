@@ -30,7 +30,7 @@ describe('fileSize', () => {
     expect(found?.evidence).toContain(String(LINE_BOUNDS.max + 1));
   });
 
-  it('measures every script flavour and Astro component, and nothing else', () => {
+  it('measures every script flavour and every component, and nothing else', () => {
     expect(fileSize([file('a.mjs', linesOf(LINE_BOUNDS.warn + 1))])).toHaveLength(1);
     expect(fileSize([file('a.cts', linesOf(LINE_BOUNDS.warn + 1))])).toHaveLength(1);
     expect(fileSize([file('Page.astro', linesOf(LINE_BOUNDS.warn + 1))])).toHaveLength(1);
@@ -117,6 +117,18 @@ describe('exportSurface', () => {
     ]);
 
     expect(found?.severity).toBe('medium');
+  });
+
+  /** An app has no alias to use instead; an unconstrained project may read it, and boundaries decides who may. */
+  it('leaves a relative import of a package with no alias alone', () => {
+    expect(
+      exportSurface([
+        file(
+          'packages/website-e2e/src/x.spec.ts',
+          "import { COMPANY } from '../../website/src/data/company';",
+        ),
+      ]),
+    ).toEqual([]);
   });
 
   /** Forbidden directions are boundaries' finding, at high — never doubled here. */

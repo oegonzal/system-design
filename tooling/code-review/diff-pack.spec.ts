@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   bundleKey,
+  criticFiles,
+  hasColocatedSpec,
   packDiff,
   splitDiffByFile,
   truncateAtHunkBoundary,
@@ -74,6 +76,7 @@ describe('bundleKey', () => {
   it('gives a source file and its colocated spec the same key', () => {
     expect(bundleKey('x/foo.ts')).toBe(bundleKey('x/foo.spec.ts'));
     expect(bundleKey('x/foo.tsx')).toBe(bundleKey('x/foo.spec.tsx'));
+    expect(bundleKey('x/Button.astro')).toBe(bundleKey('x/Button.spec.ts'));
   });
 
   it('keeps stories separate, because omitting one cannot invent a finding', () => {
@@ -85,15 +88,45 @@ describe('bundleKey', () => {
   });
 });
 
+describe('hasColocatedSpec', () => {
+  it('finds a source file’s spec where packing pairs it, a component’s included', () => {
+    const on = (path: string) => (candidate: string) => candidate === path;
+
+    expect(hasColocatedSpec('x/Button.astro', on('x/Button.spec.ts'))).toBe(true);
+    expect(hasColocatedSpec('x/view.tsx', on('x/view.spec.tsx'))).toBe(true);
+    expect(hasColocatedSpec('x/view.tsx', on('x/other.spec.tsx'))).toBe(false);
+    expect(hasColocatedSpec('x/view.spec.ts', () => true)).toBe(false);
+  });
+
+  it.each(['x/rate.spec.ts', 'x/rate.spec.tsx', 'x/rate.spec.mts', 'x/rate.spec.cjs'])(
+    'finds %s, which packing pairs with x/rate.ts',
+    (spec) => {
+      expect(bundleKey(spec)).toBe(bundleKey('x/rate.ts'));
+      expect(hasColocatedSpec('x/rate.ts', (candidate) => candidate === spec)).toBe(true);
+    },
+  );
+});
+
+describe('criticFiles', () => {
+  it('keeps every source file, a component and any module flavour included', () => {
+    expect(
+      criticFiles(['x/Button.astro', 'x/a.mts', 'x/b.cjs', 'x/notes.md', 'x/data.json']),
+    ).toEqual(['x/Button.astro', 'x/a.mts', 'x/b.cjs']);
+  });
+});
+
 describe('packDiff', () => {
   /**
    * The headline property. "Source before specs" applied to *files* omits every
    * spec once the budget runs out, which shows the testability critic a
    * monorepo of untested code and invites a false `missing-test` on every file.
    */
-  it('never shows a source file without its colocated spec', () => {
-    const source = segment('x/foo.ts', 4);
-    const spec = segment('x/foo.spec.ts', 4);
+  it.each([
+    ['x/foo.ts', 'x/foo.spec.ts'],
+    ['x/Button.astro', 'x/Button.spec.ts'],
+  ])('never shows %s without its colocated spec', (sourceFile, specFile) => {
+    const source = segment(sourceFile, 4);
+    const spec = segment(specFile, 4);
     const budget = source.body.length + 10; // room for the source alone, not the pair
 
     const packed = pack([source, spec], budget);
