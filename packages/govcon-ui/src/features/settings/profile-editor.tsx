@@ -1,8 +1,6 @@
 import {
-  FACTOR_IDS,
   MAX_ALERT_ENDING_DAYS,
   MAX_PAGE_SIZE,
-  type FactorId,
   type ScoringPolicy,
   type SearchProfile,
 } from '@sysdesign/contracts';
@@ -17,15 +15,14 @@ import {
 } from '@sysdesign/design-system';
 
 import {
-  BandRows,
   CodeChips,
   FieldIssues,
   InterestRows,
   NumberField,
-  PriceRows,
   Section,
   type ProfileIssue,
 } from './editor-fields';
+import { ScoringSections } from './scoring-sections';
 
 export type { ProfileIssue } from './editor-fields';
 
@@ -41,20 +38,18 @@ export interface ProfileEditorProps {
   saving?: boolean;
 }
 
-/** The weights as the profile prices them, summed live — they must reach 1. */
-export const weightSum = (weights: Record<FactorId, number>): number =>
-  Math.round(FACTOR_IDS.reduce((sum, id) => sum + (weights[id] ?? 0), 0) * 1000) / 1000;
-
 const upperNoSpace = (code: string): string => code.trim().toUpperCase();
 const digits = (code: string): string => code.replace(/\D/g, '');
 
-/**
- * The whole profile as data, one section per part the scorer reads: every
- * code, phrase, price, band and threshold is a field, and every issue the
- * service names sits beside the field it names. Nothing here decides — the
- * service validates on save and answers per path.
- */
 const NO_ISSUES: readonly ProfileIssue[] = [];
+
+/**
+ * The whole profile as data, one section per part the service reads: every
+ * code, phrase, price, band and threshold is a field, and every issue the
+ * service names sits beside the field it names. How a notice is scored is
+ * its own run of sections. Nothing here decides — the service validates on
+ * save and answers per path.
+ */
 
 export function ProfileEditor({
   value,
@@ -68,8 +63,6 @@ export function ProfileEditor({
   const patch = (next: Partial<SearchProfile>) => onChange({ ...value, ...next });
   const scoring = (next: Partial<ScoringPolicy>) =>
     patch({ scoring: { ...value.scoring, ...next } });
-  const sum = weightSum(value.scoring.weights);
-  const sumOk = Math.abs(sum - 1) < 1e-6;
   const topIssues = issues.filter((issue) => issue.path === '');
 
   return (
@@ -169,165 +162,12 @@ export function ProfileEditor({
         <FieldIssues issues={issues} path="interests" />
       </Section>
 
-      <Section
-        title="Weights"
-        hint="One per factor; they must sum to 1. A factor at 0 still shows in every trace."
-      >
-        <Stack direction="row" gap={3} align="end" wrap>
-          {FACTOR_IDS.map((id) => (
-            <NumberField
-              key={id}
-              label={`Weight ${id}`}
-              value={value.scoring.weights[id]}
-              min={0}
-              max={1}
-              step={0.05}
-              disabled={saving}
-              onChange={(weight) =>
-                scoring({ weights: { ...value.scoring.weights, [id]: weight } })
-              }
-            />
-          ))}
-        </Stack>
-        <Alert tone={sumOk ? 'success' : 'warn'}>
-          Weights sum to {sum.toFixed(2)}
-          {sumOk ? '' : ' — they must sum to 1'}
-        </Alert>
-        <FieldIssues issues={issues} path="scoring.weights" />
-      </Section>
-
-      <Section
-        title="Set-asides"
-        hint="Codes the company may bid on and how attractive each is; any other code excludes the notice."
-      >
-        <PriceRows
-          label="Set-aside price"
-          keyLabel="set-aside code"
-          prices={value.scoring.setAside.byCode}
-          disabled={saving}
-          onChange={(byCode) => scoring({ setAside: { ...value.scoring.setAside, byCode } })}
-        />
-        <NumberField
-          label="Open competition"
-          value={value.scoring.setAside.unrestricted}
-          min={0}
-          max={1}
-          step={0.05}
-          disabled={saving}
-          onChange={(unrestricted) =>
-            scoring({ setAside: { ...value.scoring.setAside, unrestricted } })
-          }
-        />
-        <FieldIssues issues={issues} path="scoring.setAside" />
-      </Section>
-
-      <Section
-        title="Notice types"
-        hint="Prices by SAM.gov's label, a default for unlisted labels, and the types that are never a lead."
-      >
-        <PriceRows
-          label="Notice type price"
-          keyLabel="notice type"
-          prices={value.scoring.noticeType.byType}
-          disabled={saving}
-          onChange={(byType) => scoring({ noticeType: { ...value.scoring.noticeType, byType } })}
-        />
-        <NumberField
-          label="Default notice type price"
-          value={value.scoring.noticeType.default}
-          min={0}
-          max={1}
-          step={0.05}
-          disabled={saving}
-          onChange={(next) =>
-            scoring({ noticeType: { ...value.scoring.noticeType, default: next } })
-          }
-        />
-        <CodeChips
-          label="Excluded notice types"
-          codes={value.scoring.noticeType.exclude}
-          onChange={(exclude) => scoring({ noticeType: { ...value.scoring.noticeType, exclude } })}
-          placeholder="Award Notice"
-          disabled={saving}
-        />
-        <FieldIssues issues={issues} path="scoring.noticeType" />
-      </Section>
-
-      <Section
-        title="Deadline"
-        hint="Ascending bands by days left, a value beyond the last band, and one for no deadline; a passed deadline excludes."
-      >
-        <BandRows
-          label="Deadline"
-          bands={value.scoring.deadline.bands}
-          disabled={saving}
-          onChange={(bands) => scoring({ deadline: { ...value.scoring.deadline, bands } })}
-        />
-        <Stack direction="row" gap={3} align="end" wrap>
-          <NumberField
-            label="Deadline beyond the last band"
-            value={value.scoring.deadline.beyond}
-            min={0}
-            max={1}
-            step={0.05}
-            disabled={saving}
-            onChange={(beyond) => scoring({ deadline: { ...value.scoring.deadline, beyond } })}
-          />
-          <NumberField
-            label="No deadline stated"
-            value={value.scoring.deadline.none}
-            min={0}
-            max={1}
-            step={0.05}
-            disabled={saving}
-            onChange={(none) => scoring({ deadline: { ...value.scoring.deadline, none } })}
-          />
-        </Stack>
-        <FieldIssues issues={issues} path="scoring.deadline" />
-      </Section>
-
-      <Section
-        title="Freshness and history"
-        hint="Days since posting, banded; and how many stored awards in the NAICS inside the window are worth a full point."
-      >
-        <BandRows
-          label="Freshness"
-          bands={value.scoring.freshness.bands}
-          disabled={saving}
-          onChange={(bands) => scoring({ freshness: { ...value.scoring.freshness, bands } })}
-        />
-        <Stack direction="row" gap={3} align="end" wrap>
-          <NumberField
-            label="Freshness beyond the last band"
-            value={value.scoring.freshness.beyond}
-            min={0}
-            max={1}
-            step={0.05}
-            disabled={saving}
-            onChange={(beyond) => scoring({ freshness: { ...value.scoring.freshness, beyond } })}
-          />
-          <NumberField
-            label="History window days"
-            value={value.scoring.history.days}
-            min={1}
-            step={1}
-            disabled={saving}
-            onChange={(days) => scoring({ history: { ...value.scoring.history, days } })}
-          />
-          <NumberField
-            label="Awards for a full point"
-            value={value.scoring.history.saturateAt}
-            min={1}
-            step={1}
-            disabled={saving}
-            onChange={(saturateAt) =>
-              scoring({ history: { ...value.scoring.history, saturateAt } })
-            }
-          />
-        </Stack>
-        <FieldIssues issues={issues} path="scoring.freshness" />
-        <FieldIssues issues={issues} path="scoring.history" />
-      </Section>
+      <ScoringSections
+        scoring={value.scoring}
+        onChange={scoring}
+        issues={issues}
+        disabled={saving}
+      />
 
       <Section
         title="Tiers, horizon and pull"

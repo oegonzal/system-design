@@ -5,8 +5,8 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { PROFILE } from '../../testing/fixtures';
 import { issuesAt } from './editor-fields';
-import { weightSum } from './profile-editor';
 import * as stories from './profile-editor.stories';
+import { weightSum } from './scoring-sections';
 
 const { Default, Creating, WithIssues, Saving } = composeStories(stories);
 
