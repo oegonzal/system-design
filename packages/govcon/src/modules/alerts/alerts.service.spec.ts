@@ -1,7 +1,7 @@
 import { awardEndingSchema, type AlertKey } from '@sysdesign/contracts';
 
-import type { RaisedAlert } from '../../../core/ports';
-import { InMemoryAlertLedger } from '../../../core/spending/testing';
+import type { RaisedAlert } from '../../core/ports';
+import { InMemoryAlertLedger } from '../../core/testing';
 import { AlertsService } from './alerts.service';
 
 const ENDING = awardEndingSchema.parse({

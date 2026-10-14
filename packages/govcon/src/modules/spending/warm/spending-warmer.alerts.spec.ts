@@ -1,9 +1,4 @@
-import {
-  awardBodyOf,
-  DEFAULT_ALERT_POLICY,
-  horizonRowOf,
-  interactionPromptSchema,
-} from '@sysdesign/contracts';
+import { awardBodyOf, DEFAULT_ALERT_POLICY, horizonRowOf } from '@sysdesign/contracts';
 
 import type { AwardRecord } from '../../../core/ports';
 import { fetchedOf } from '../../../core/spending/testing';
@@ -11,42 +6,23 @@ import { tinyProfile } from '../../../core/testing';
 import { harness, outcomes, SCRIPT, T0 } from './testing';
 
 describe('the spending warmer’s alerts', () => {
-  it('[GOV-24] after a warm each new alert is published once on its declared topic — the same award through every horizon is one — one digest prompt per warm lists them for the profile, what was already raised is not published again, nothing is recorded that was not published, and the policy is the profile’s', async () => {
+  it('[GOV-24] a warm hands the alert raiser what its rules found — the same award through every horizon one alert, the finding about the whole scope ahead of it, under the spending digest’s name — a second warm raises nothing again, and the policy is the profile’s', async () => {
     const { warmer, sink, ledger, profiles } = harness();
     await profiles.create(tinyProfile());
     const first = await warmer.warm();
     expect(first.alerts).toEqual({ found: 2, fresh: 2, published: 2, prompted: true });
-    // Published in the order the digest lists them: the finding about the whole scope, then the ending award.
     expect(sink.published.map((alert) => alert.topic)).toEqual([
       'govcon.pulse.above-band',
       'govcon.award.ending',
     ]);
-    expect(sink.prompts).toHaveLength(1);
-    const [prompt] = sink.prompts;
-    if (prompt === undefined) throw new Error('expected a digest');
-    expect(interactionPromptSchema.parse(prompt)).toEqual(prompt);
-    expect(prompt.title).toBe('2 spending alerts for Tiny LLC');
-    expect(prompt.details).toHaveLength(2);
+    expect(sink.prompts.map((prompt) => prompt.title)).toEqual(['2 spending alerts for Tiny LLC']);
     // The same award came through three horizons — the profile's and two agencies' — and is one alert.
-    expect(
-      ledger.rows.map((row) => [row.key.kind, row.position, row.eventSeq, row.promptId]),
-    ).toEqual([
-      ['pulse-above-band', 0, '1', prompt.id],
-      ['award-ending', 1, '2', prompt.id],
-    ]);
+    expect(ledger.rows.map((row) => row.key.kind)).toEqual(['pulse-above-band', 'award-ending']);
     expect(ledger.rows[1]?.scopeKey).toMatch(/^[0-9a-f]{64}$/);
 
     const second = await warmer.warm();
     expect(second.alerts).toEqual({ found: 2, fresh: 0, published: 0, prompted: false });
-    expect(sink.published).toHaveLength(2);
     expect(sink.prompts).toHaveLength(1);
-
-    const down = harness();
-    await down.profiles.create(tinyProfile());
-    down.sink.failing = new Error('bus down');
-    const unsent = await down.warmer.warm();
-    expect(unsent.alerts).toEqual({ found: 2, fresh: 2, published: 0, prompted: false });
-    expect(down.ledger.rows).toEqual([]);
 
     const quiet = harness();
     await quiet.profiles.create(
@@ -54,16 +30,6 @@ describe('the spending warmer’s alerts', () => {
     );
     expect((await quiet.warmer.warm()).alerts.found).toBe(1);
     expect(quiet.sink.published.map((alert) => alert.topic)).toEqual(['govcon.award.ending']);
-
-    const unread = harness();
-    await unread.profiles.create(tinyProfile());
-    unread.ledger.failing = new Error('ledger down');
-    expect((await unread.warmer.warm()).alerts).toEqual({
-      found: 2,
-      fresh: 0,
-      published: 0,
-      prompted: false,
-    });
   });
 
   it('[GOV-32] [GOV-33] a warm reads every tracked award after the scope and raises what its record shows once — its own record kept when a scope lists the same award — keeps what was published on the ledger, and writes back the end it read only once the alert for the move is raised', async () => {

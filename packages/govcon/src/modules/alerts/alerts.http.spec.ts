@@ -5,8 +5,8 @@ import {
   type Target,
 } from '@sysdesign/contracts';
 
-import type { AwardRecord } from '../../../core/ports';
-import { fetchedOf } from '../../../core/spending/testing';
+import type { AwardRecord } from '../../core/ports';
+import { fetchedOf } from '../../core/spending/testing';
 import {
   bootGovconHttp,
   get,
@@ -16,8 +16,8 @@ import {
   type Envelope,
   type GovconHttp,
   type Page,
-} from '../../app/testing';
-import { SpendingWarmer } from '../warm/spending-warmer';
+} from '../app/testing';
+import { SpendingWarmer } from '../spending/warm/spending-warmer';
 
 /** The harness's clock is 2026-09-26; this award ends fifty days on. */
 const {

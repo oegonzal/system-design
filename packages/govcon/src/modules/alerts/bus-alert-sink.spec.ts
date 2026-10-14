@@ -5,7 +5,8 @@ import {
   type PublishEventRequest,
 } from '@sysdesign/contracts';
 
-import { alertPromptOf, awardEndingAlerts } from '../../../core/spending/alerts';
+import { alertPromptOf } from '../../core/alerts/digest';
+import { awardEndingAlerts, SPENDING_DIGEST } from '../../core/alerts/spending';
 import { BusAlertSink, notificationsUrlFromEnv } from './bus-alert-sink';
 
 const NOW = new Date('2026-06-15T12:00:00Z');
@@ -27,6 +28,7 @@ describe('the bus alert sink', () => {
       id: crypto.randomUUID(),
       profile: { id: 'enfav', company: 'Enfav LLC' },
       alerts: [alert],
+      kind: SPENDING_DIGEST,
       now: NOW,
     });
     await sink.prompt(prompt);

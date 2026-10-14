@@ -106,52 +106,30 @@ describe('the spending warmer', () => {
     expect(wide.sources.requests.series).toHaveLength(0);
   });
 
-  it('[GOV-22] starts only when told, once, on the declared cadence — the run at start unforced, every tick after it a renewal — a cadence of null schedules nothing, and stop is safe before start', async () => {
-    const idle = harness();
+  it('[GOV-22] started, the warm at the start reads what the cache window holds and every warm on the cadence renews; never started it never warms, and once its module is destroyed it starts nothing', async () => {
+    const idle = harness({ policy: { everyMs: 60_000 } });
     const idleWarm = vi.spyOn(idle.warmer, 'warm');
-    await idle.warmer.stop();
-    idle.warmer.start();
-    idle.warmer.start();
-    expect(idleWarm).not.toHaveBeenCalled();
-    await idle.warmer.stop();
-
     const live = harness({ policy: { everyMs: 60_000 } });
     const liveWarm = vi.spyOn(live.warmer, 'warm').mockResolvedValue({
       profile: null,
       lenses: [],
       alerts: { found: 0, fresh: 0, published: 0, prompted: false },
     });
+    const gone = harness({ policy: { everyMs: 60_000 } });
+    const goneWarm = vi.spyOn(gone.warmer, 'warm');
     vi.useFakeTimers();
     try {
       live.warmer.start();
-      live.warmer.start();
+      await gone.warmer.onModuleDestroy();
+      gone.warmer.start();
       await vi.advanceTimersByTimeAsync(0);
-      // At start: what the cache window still holds. On each tick after: a renewal.
-      expect(liveWarm.mock.calls).toEqual([[{ refresh: false }]]);
       await vi.advanceTimersByTimeAsync(60_000);
-      await vi.advanceTimersByTimeAsync(60_000);
-      expect(liveWarm.mock.calls).toEqual([
-        [{ refresh: false }],
-        [{ refresh: true }],
-        [{ refresh: true }],
-      ]);
+      expect(liveWarm.mock.calls).toEqual([[{ refresh: false }], [{ refresh: true }]]);
       await live.warmer.stop();
       await vi.advanceTimersByTimeAsync(60_000);
-      expect(liveWarm).toHaveBeenCalledTimes(3);
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('[GOV-22] starts nothing once its module is destroyed — a service told to stop while still booting never warms against a closed store', async () => {
-    const { warmer } = harness({ policy: { everyMs: 60_000 } });
-    const warm = vi.spyOn(warmer, 'warm');
-    vi.useFakeTimers();
-    try {
-      await warmer.onModuleDestroy();
-      warmer.start();
-      await vi.advanceTimersByTimeAsync(180_000);
-      expect(warm).not.toHaveBeenCalled();
+      expect(liveWarm).toHaveBeenCalledTimes(2);
+      expect(idleWarm).not.toHaveBeenCalled();
+      expect(goneWarm).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();
     }

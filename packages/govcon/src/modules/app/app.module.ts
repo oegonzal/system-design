@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DbModule, HealthController } from '@sysdesign/nest-kit';
 
+import { AlertsModule } from '../alerts/alerts.module';
 import { AwardsModule } from '../awards/awards.module';
 import { BidsModule } from '../bids/bids.module';
 import { EntitiesModule } from '../entities/entities.module';
@@ -23,6 +24,7 @@ import { ViewsModule } from '../views/views.module';
     BidsModule,
     EntitiesModule,
     SpendingModule,
+    AlertsModule,
     TargetsModule,
     ViewsModule,
   ],

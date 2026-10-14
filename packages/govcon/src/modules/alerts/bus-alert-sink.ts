@@ -6,11 +6,11 @@ import {
 } from '@sysdesign/contracts';
 import type { BusClient } from '@sysdesign/notifications-client';
 
-import type { AlertSink } from '../../../core/ports';
+import type { AlertSink } from '../../core/ports';
 
 /** How govcon names itself on what it publishes. */
 export const GOVCON_SOURCE = 'govcon';
-/** A bus that cannot be reached is asked again for this long; nobody waits on a warm. */
+/** A bus that cannot be reached is asked again for this long; nobody waits on a run. */
 export const ALERT_BUS_RECOVERY: Recovery = { windowMs: 30_000, pauseMs: 2_000 };
 const DEFAULT_NOTIFICATIONS_URL = 'http://localhost:3005';
 

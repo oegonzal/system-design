@@ -19,7 +19,6 @@ import {
 
 import type { BudgetPolicy } from '../../core/budget';
 import {
-  RecordingAlertSink,
   scriptedSpendingSources,
   type ScriptedSpendingSources,
   type SpendingScript,
@@ -31,6 +30,7 @@ import {
   entityDraftOf,
   okPage,
   opportunityOf,
+  RecordingAlertSink,
   scriptedContractAwards,
   scriptedDescriptions,
   scriptedRegistry,
@@ -38,6 +38,7 @@ import {
   scriptedSpendingAwards,
   tinyProfile,
 } from '../../core/testing';
+import { ALERT_SINK } from '../alerts/tokens';
 import {
   BUDGET_POLICY,
   CLOCK,
@@ -48,7 +49,7 @@ import {
   SPENDING_AWARDS,
   SPENDING_SOURCES,
 } from '../sources/tokens';
-import { ALERT_SINK, SPENDING_WARM_POLICY } from '../spending/tokens';
+import { SPENDING_WARM_POLICY } from '../spending/tokens';
 import { AppModule } from './app.module';
 import { configureApp } from './configure-app';
 

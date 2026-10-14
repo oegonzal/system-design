@@ -10,13 +10,13 @@ import {
 } from '@sysdesign/contracts';
 
 import type { AlertLedger, TargetKey, TargetRepository } from '../../../core/ports';
-import { watchedAwardAlerts } from '../../../core/spending/alerts';
+import { watchedAwardAlerts } from '../../../core/alerts/spending';
 import type { ReadOptions } from '../../../core/spending/lens';
 import { watchedAwards } from '../../../core/targets';
+import { ALERT_LEDGER } from '../../alerts/tokens';
 import { CLOCK } from '../../sources/tokens';
 import { TARGET_REPOSITORY } from '../../targets/tokens';
 import { SpendingService } from '../spending.service';
-import { ALERT_LEDGER } from '../tokens';
 
 /** What a warm read of one tracked award's end, and the alert that says it moved when it did. */
 export interface EndObservation {

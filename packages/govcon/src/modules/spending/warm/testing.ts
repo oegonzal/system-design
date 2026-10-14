@@ -4,24 +4,25 @@ import { RequestGate, type BudgetPolicy } from '../../../core/budget';
 import type { SeriesPoint } from '../../../core/ports';
 import {
   fetchedOf,
-  InMemoryAlertLedger,
   InMemorySnapshotStore,
-  RecordingAlertSink,
   scriptedSpendingSources,
   seriesPointOf,
   type SpendingScript,
 } from '../../../core/spending/testing';
 import {
+  InMemoryAlertLedger,
   InMemoryOpportunityRepository,
   InMemoryProfileRepository,
   InMemorySavedSearchRepository,
   InMemorySourceCallLog,
   InMemoryTargetRepository,
+  RecordingAlertSink,
 } from '../../../core/testing';
+import { AlertRaiser } from '../../alerts/alert-raiser';
+import type { Cadence } from '../../app/serve-job';
 import { ProfilesService } from '../../profiles/profiles.service';
 import { SpendingService } from '../spending.service';
 import { SpendingWarmer, type WarmReport } from './spending-warmer';
-import type { SpendingWarmPolicy } from './warm-policy';
 import { WatchedAwards } from './watched-awards';
 
 /**
@@ -75,7 +76,7 @@ export const SCRIPT: SpendingScript = {
   ],
 };
 
-export function harness(options: { script?: SpendingScript; policy?: SpendingWarmPolicy } = {}) {
+export function harness(options: { script?: SpendingScript; policy?: Cadence } = {}) {
   const clock = () => T0;
   const log = new InMemorySourceCallLog();
   const budget: BudgetPolicy = { ttlMs: 60 * 60 * 1000, pullDeadlineMs: 60_000, buckets: {} };
@@ -101,8 +102,7 @@ export function harness(options: { script?: SpendingScript; policy?: SpendingWar
     spending,
     profiles,
     new WatchedAwards(spending, targets, ledger, clock),
-    ledger,
-    sink,
+    new AlertRaiser(ledger, sink, clock),
     clock,
   );
   return {

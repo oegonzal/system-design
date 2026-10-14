@@ -13,3 +13,4 @@ export * from './awards';
 export * from './entities';
 export * from './targets';
 export * from './views';
+export * from './alerts';

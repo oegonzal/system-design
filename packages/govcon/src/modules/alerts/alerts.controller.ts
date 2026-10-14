@@ -13,7 +13,7 @@ import { AlertsService } from './alerts.service';
 const listAlertsQuerySchema = z.strictObject(pageFields(MAX_ALERTS_LIMIT, DEFAULT_ALERTS_LIMIT));
 type ListAlertsQueryInput = z.output<typeof listAlertsQuerySchema>;
 
-/** What the daily warm raised, for the page a digest's "and more" points at. */
+/** What was raised, for the page a digest's "and more" points at. */
 @Controller('alerts')
 export class AlertsController {
   constructor(private readonly alerts: AlertsService) {}
