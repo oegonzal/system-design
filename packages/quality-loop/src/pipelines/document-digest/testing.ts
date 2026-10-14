@@ -68,6 +68,8 @@ export const maximalChunk = (): DocumentChunk => ({
   title: fill(200, 't'),
   subject: fill(120, 's'),
   date: '2026-10-02',
+  // The longer scope name, so the declared scope's limit renders at its longest.
+  scope: 'subject',
   chunk: { index: 99, of: 99 },
   context: fill(300, 'c'),
   parts: Array.from({ length: DOCUMENT_MAX_PARTS }, () => fill(DOCUMENT_PART_MAX_LENGTH, 'p')),

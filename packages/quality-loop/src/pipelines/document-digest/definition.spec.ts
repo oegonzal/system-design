@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 import { describePipeline } from '../../core/describe-pipeline';
 import { validatePipeline } from '../../core/validate-pipeline';
 import { capsAgainstMeasured, deriverSchema, jsonSchemaTypes } from '../../core/testing';
-import { DOCUMENT_DIGEST } from './definition';
+import { DOCUMENT_DIGEST, SCOPE_FINDING_TYPE } from './definition';
 import measured from './measured.json';
 import { documentDigestOutput } from './output';
 import { sampleDocumentDigest } from './testing';
@@ -76,11 +76,12 @@ describe('the document-digest pipeline', () => {
     const gated = Object.entries(DOCUMENT_DIGEST.policy.findingTypes)
       .filter(([, mapped]) => mapped.gate)
       .map(([type]) => type);
-    expect(gated).toEqual(['invented_fact', 'misread_section', 'misscoped_fact']);
+    expect(gated).toEqual(['invented_fact', 'misread_section', SCOPE_FINDING_TYPE]);
     // A wrong scope is a falsehood and withholds; a provenance leak is wording and withholds nothing.
-    expect(DOCUMENT_DIGEST.policy.findingTypes['misscoped_fact']?.withholds).toBe('every-ref');
+    expect(DOCUMENT_DIGEST.policy.findingTypes[SCOPE_FINDING_TYPE]?.withholds).toBe('every-ref');
     expect(DOCUMENT_DIGEST.policy.findingTypes['provenance_leak']?.withholds).toBe('none');
-    expect(DOCUMENT_DIGEST.critics[0].persona).toContain('misscoped_fact');
+    // The grounding critic reports the very type a reader lets a declared scope settle.
+    expect(DOCUMENT_DIGEST.critics[0].persona).toContain(SCOPE_FINDING_TYPE);
     expect(DOCUMENT_DIGEST.critics[2].persona).toContain('provenance_leak');
     // The producer names the kinds as the schema spells them, never a word of its own.
     for (const kind of DOCUMENT_MEMORY_KINDS) {

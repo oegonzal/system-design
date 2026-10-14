@@ -26,6 +26,15 @@ import producer from './lenses/producer.md?raw';
 import { documentDigestOutput, type DocumentDigest } from './output';
 import { limitsValidator, referencesValidator } from './validators';
 
+/**
+ * The finding type that faults a memory's scope, named because a reader of the
+ * digest asks for it: a document that declares its scope has every memory
+ * stored under the declaration whatever the digest wrote, so there this
+ * finding faults nothing the store keeps and withholds nothing
+ * (`readDocumentDigest`).
+ */
+export const SCOPE_FINDING_TYPE = 'misscoped_fact';
+
 export const DOCUMENT_DIGEST: PipelineDefinition<DocumentDigest> = {
   id: DOCUMENT_DIGEST_ID,
   version: '1.0.0',
@@ -43,7 +52,7 @@ export const DOCUMENT_DIGEST: PipelineDefinition<DocumentDigest> = {
     findingTypes: {
       invented_fact: 'An insight that states something no cited section states.',
       misread_section: 'An insight that reads a cited section as saying something it does not.',
-      misscoped_fact:
+      [SCOPE_FINDING_TYPE]:
         'A memory scoped subject whose question asks about the situation it was recorded in — the employer, the role, this application — or scoped unit when its question asks about the subject wherever asked.',
       missed_fact: 'A fact a form could ask for that the sections state and no memory holds.',
       unusable_fact:
@@ -130,8 +139,12 @@ export const DOCUMENT_DIGEST: PipelineDefinition<DocumentDigest> = {
     // fact scoped where it does not hold — one application's answer asserted
     // of the subject everywhere — is wrong: storing it would have the corpus
     // assert something about the subject that their own documents do not, so
-    // every memory such a finding names is withheld. The remaining types fault
-    // a fact that is true, and withhold nothing — a provenance leak among
+    // every memory such a finding names is withheld. The scope finding has one
+    // exception, declared by the goal rather than judged: a document that
+    // declares its scope has every memory stored under it, whatever the digest
+    // wrote, so there the finding faults nothing stored and withholds nothing
+    // (`SCOPE_FINDING_TYPE`). The remaining types fault a fact that is true,
+    // and withhold nothing — a provenance leak among
     // them: the fact holds, only its wording keeps a reworded question from
     // finding it, and a revise fixes wording where a loss fixes nothing. A duplicate's confirmed set is a component of
     // overlapping claims, not one pair, so keeping one of it may drop a
@@ -145,7 +158,7 @@ export const DOCUMENT_DIGEST: PipelineDefinition<DocumentDigest> = {
     findingTypes: {
       invented_fact: { dimension: 'fidelity', gate: true, withholds: 'every-ref' },
       misread_section: { dimension: 'fidelity', gate: true, withholds: 'every-ref' },
-      misscoped_fact: { dimension: 'fidelity', gate: true, withholds: 'every-ref' },
+      [SCOPE_FINDING_TYPE]: { dimension: 'fidelity', gate: true, withholds: 'every-ref' },
       missed_fact: { dimension: 'coverage', gate: false, withholds: 'none' },
       unusable_fact: { dimension: 'coverage', gate: false, withholds: 'none' },
       vague_condition: { dimension: 'coverage', gate: false, withholds: 'none' },

@@ -1,17 +1,28 @@
+import { createHash } from 'node:crypto';
+
 import { describe, expect, it } from 'vitest';
 
 import { resumeChunk } from '../browser-session/fixtures';
 import {
   DOCUMENT_MAX_PARTS,
   DOCUMENT_PART_MAX_LENGTH,
+  declaredScopeLimit,
   documentChunkSchema,
+  MEMORY_SCOPES,
   readDocumentIndex,
   renderDocumentGoal,
   sectionAlias,
   DOCUMENT_RULES,
   DOCUMENT_MAX_MEMORIES,
+  type DocumentChunk,
 } from './document-digest';
-import { GOAL_BUDGET_BYTES, readFencedIndex, renderIndexSection, textBytes } from './goal-index';
+import {
+  GOAL_BUDGET_BYTES,
+  readFencedIndex,
+  renderIndexSection,
+  stripIndexSection,
+  textBytes,
+} from './goal-index';
 import { z } from 'zod';
 
 /**
@@ -30,6 +41,33 @@ const FIXED_GOAL_BYTES = 2144;
  * content.
  */
 const MIN_SENSIBLE_CHUNK_BYTES = 4800;
+
+/**
+ * A chunk that declares no scope, every other head field set, and the sha256
+ * of its goal as rendered on 2026-10-13, before a document could declare one:
+ * the ingester's manifest names a chunk by exactly this hash. Built here rather
+ * than from a fixture, so editing a fixture never moves it. The rules are
+ * `DOCUMENT_RULES`, as the ingester renders them, so editing a rule moves it —
+ * and moves every recorded chunk's hash with it, which is a decision to make
+ * on purpose.
+ */
+const UNDECLARED: DocumentChunk = {
+  kind: 'notes',
+  title: 'Standing answers',
+  subject: 'Alex Example',
+  date: '2026-03-01',
+  chunk: { index: 2, of: 3 },
+  context: 'Answers',
+  parts: [
+    'Alex Example has the right to work in Portugal.',
+    'Alex Example answers No to whether he has worked for any organization other than Acme.',
+  ],
+  rules: [...DOCUMENT_RULES],
+  maxMemories: 4,
+};
+const UNDECLARED_GOAL_SHA256 = '355fc5455c8dafa9d37d38c2237b5216dc314cd9d1e7bd4fde4e40d8407f9855';
+
+const sha256 = (text: string): string => createHash('sha256').update(text, 'utf8').digest('hex');
 
 describe('renderDocumentGoal', () => {
   it('[QL-40] writes one aliased section per part and an index naming each as section evidence', () => {
@@ -92,13 +130,51 @@ describe('renderDocumentGoal', () => {
     const fixed = textBytes(renderDocumentGoal(minimal)) - 1;
     expect(fixed).toBe(FIXED_GOAL_BYTES);
     // And it stays a minority of the smallest budget worth packing to, or a chunk
-    // is mostly instructions.
+    // is mostly instructions — a document declaring its scope, one limit longer, too.
     expect(fixed).toBeLessThan(MIN_SENSIBLE_CHUNK_BYTES / 2);
+    for (const scope of MEMORY_SCOPES) {
+      expect(textBytes(renderDocumentGoal({ ...minimal, scope })) - 1).toBeLessThan(
+        MIN_SENSIBLE_CHUNK_BYTES / 2,
+      );
+    }
+  });
+
+  it('[QL-69] a document that declares no scope renders byte for byte as before one could, so no chunk the ingester recorded is named anew', () => {
+    const goal = renderDocumentGoal(UNDECLARED);
+    expect(sha256(goal)).toBe(UNDECLARED_GOAL_SHA256);
+    expect(readDocumentIndex(goal)?.document).not.toHaveProperty('scope');
+  });
+
+  it('[QL-69] a declared scope is one limit every lens reads and one fact of the index, and changes nothing else', () => {
+    const undeclared = renderDocumentGoal(UNDECLARED);
+    for (const scope of MEMORY_SCOPES) {
+      const limit = declaredScopeLimit(scope);
+      // The producer is told the scope to write; the judges, that it is not theirs to fault.
+      expect(limit).toContain(`the scope ${scope}:`);
+      expect(limit).toMatch(/the scope test does not apply/);
+      expect(limit).toMatch(/no memory is faulted for its scope/);
+      const goal = renderDocumentGoal({ ...UNDECLARED, scope });
+      expect(goal).toContain(`\n${limit}\n`);
+      // A limit, not a rule: the deriver writes no criterion from the Limits.
+      expect(goal.indexOf(limit)).toBeGreaterThan(goal.indexOf('## Limits'));
+      expect(readDocumentIndex(goal)?.document).toEqual({
+        ...readDocumentIndex(undeclared)?.document,
+        scope,
+      });
+      expect(stripIndexSection(goal).replace(`${limit}\n`, '')).toBe(stripIndexSection(undeclared));
+    }
+    expect(documentChunkSchema.safeParse({ ...UNDECLARED, scope: 'subject' }).success).toBe(true);
+    expect(documentChunkSchema.safeParse({ ...UNDECLARED, scope: 'everywhere' }).success).toBe(
+      false,
+    );
+    // Absent is the only way to declare nothing: a null is refused, not read as undeclared.
+    expect(documentChunkSchema.safeParse({ ...UNDECLARED, scope: null }).success).toBe(false);
   });
 
   it('[QL-40] renders a maximal chunk under the engine budget, and the schema refuses one past the part cap', () => {
     const maximal = {
       ...resumeChunk(),
+      scope: 'subject' as const,
       parts: Array.from({ length: DOCUMENT_MAX_PARTS }, () => 'p'.repeat(DOCUMENT_PART_MAX_LENGTH)),
       maxMemories: 16,
     };

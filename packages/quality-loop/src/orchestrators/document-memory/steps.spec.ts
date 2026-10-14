@@ -1,5 +1,11 @@
 import type { MemoryContextDto, QualityRunDto, RunTrace } from '@sysdesign/contracts';
-import { DOCUMENT_MEMORY_KINDS, renderDocumentGoal, resumeChunk } from '@sysdesign/contracts';
+import {
+  DOCUMENT_MEMORY_KINDS,
+  documentDigestReportSchema,
+  MEMORY_SCOPES,
+  renderDocumentGoal,
+  resumeChunk,
+} from '@sysdesign/contracts';
 import { DisabledEmbeddingClient } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 
@@ -9,6 +15,7 @@ import {
   InMemoryMemoryStore,
   mutedEmbeddings,
 } from '../../modules/memory/testing';
+import { SCOPE_FINDING_TYPE } from '../../pipelines/document-digest/definition';
 import { sampleDocumentDigest } from '../../pipelines/document-digest/testing';
 import { CachedEmbeddings } from '../memory/embeddings';
 import { chunkKind, DEFAULT_CHUNK_KIND } from '../memory/store/chunks';
@@ -166,6 +173,53 @@ describe('the document-memory steps', () => {
       counts: { memories: 2, kept: 0 },
     });
     expect(unvalidated.output).toBeUndefined();
+  });
+
+  it('[QL-69] a document that declares its scope has every memory stored under it, whatever the digest wrote, and a finding against a memory’s scope withholds nothing there', async () => {
+    // The digest scoped the role unit and the home subject, and both samples of
+    // a critic faulted the role's scope: the document's declaration decides.
+    const [role, home] = sampleDocumentDigest().memories;
+    const artifact = sampleDocumentDigest({ memories: [{ ...role, scope: 'unit' }, home] });
+    const faulted = [faulting(SCOPE_FINDING_TYPE, ['memory.1'])];
+    for (const scope of MEMORY_SCOPES) {
+      const goal = renderDocumentGoal({ ...resumeChunk(), scope });
+      const digested = await digest(
+        ctx(child(digestTrace('accept', { goal, artifact, findings: faulted })), { goal }),
+      );
+      expect(digested).toMatchObject({
+        status: 'complete',
+        counts: { memories: 2, kept: 2 },
+        report: { subject: 'Alex Example', scope },
+      });
+      // The report names the declaration in the shape the orchestrator declares for the step.
+      expect(documentDigestReportSchema.safeParse(digested.report).success).toBe(true);
+      const { output } = digested;
+      if (output === undefined) throw new Error('the declared digest hands on its memories');
+
+      const written = ctx(null, { outputs: { digest: output } });
+      expect(await store(written)).toMatchObject({ status: 'complete', counts: { chunks: 2 } });
+      const stored = [...(written.ports.store as InMemoryMemoryStore).points.values()]
+        .filter((chunk) => chunk.source.runId === 'document-digest-run')
+        .map((chunk) => [chunk.source.ref, chunk.scope]);
+      expect(stored).toEqual([
+        ['memory.1', scope],
+        ['memory.2', scope],
+      ]);
+    }
+
+    // A document that declares nothing keeps the scopes its digest wrote, and
+    // there the same finding withholds the memory it names.
+    const own = await digest(ctx(child(digestTrace('accept', { artifact }))));
+    expect(own.report).not.toHaveProperty('scope');
+    expect(own.output?.digested.memories.map((memory) => memory.scope)).toEqual([
+      'unit',
+      'subject',
+    ]);
+    const withheld = await digest(
+      ctx(child(digestTrace('accept', { artifact, findings: faulted }))),
+    );
+    expect(withheld).toMatchObject({ status: 'complete', counts: { memories: 2, kept: 1 } });
+    expect(withheld.output?.digested.memories.map((memory) => memory.position)).toEqual([2]);
   });
 
   it('[QL-40] digest says why it endorsed nothing, and never calls an unjudged digest a shortfall', async () => {

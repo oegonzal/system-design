@@ -11,7 +11,9 @@
  * boundary for one a careless answer would overstate — instead of reading one
  * flat register and hoping rank sorts them; and its scope, carried on the
  * chunk and rendered beside the kind, so a form's judges read where a fact
- * holds as declared data rather than arguing it from the fact's wording.
+ * holds as declared data rather than arguing it from the fact's wording. A
+ * document that declares its scope declares it for every memory, and the
+ * store carries that declaration instead.
  *
  * A location is a PLACE in the digest — the summary and each memory — never
  * a section, for the reason the experience digest learned the hard way: a

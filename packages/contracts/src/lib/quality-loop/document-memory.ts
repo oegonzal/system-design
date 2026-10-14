@@ -25,12 +25,16 @@ export const DOCUMENT_MEMORY_STEP_REASONS = [
 ] as const;
 export type DocumentMemoryStepReason = (typeof DOCUMENT_MEMORY_STEP_REASONS)[number];
 
-/** What the digest step reports: the document it digested, read from the goal's own index. */
+/**
+ * What the digest step reports: the document it digested, read from the
+ * goal's own index — with the scope it declared, when it declared one.
+ */
 export const documentDigestReportSchema = documentChunkSchema.pick({
   kind: true,
   title: true,
   subject: true,
   date: true,
+  scope: true,
   chunk: true,
 });
 export type DocumentDigestReportDto = z.infer<typeof documentDigestReportSchema>;

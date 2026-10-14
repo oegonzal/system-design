@@ -59,7 +59,11 @@ export interface MemoryToStore {
    * the one kind every memory had before any digest declared one.
    */
   kind?: string;
-  /** Where the fact holds, as the digest declared it; absent from a digest that declares no scope. */
+  /**
+   * Where the fact holds, as the digest declared it — or as its document did
+   * for every memory, which a reader stamps over the digest's
+   * (`readDocumentDigest`); absent from a digest that declares no scope.
+   */
   scope?: MemoryScope;
 }
 

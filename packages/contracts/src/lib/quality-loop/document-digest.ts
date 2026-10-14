@@ -54,7 +54,8 @@ export const DOCUMENT_MEMORY_KIND_USES: Readonly<Record<DocumentMemoryKind, stri
 /**
  * Where a document memory holds: of the subject wherever a form asks, or only
  * of the one employer, role or application it was recorded for. Declared by
- * the digest, carried on the stored chunk and rendered beside the kind, so the
+ * the digest for each memory, or by the document for all of them (its head's
+ * `scope`), carried on the stored chunk and rendered beside the kind, so the
  * form pipelines read it as data and never argue it from the wording of the
  * fact. Measured 2026-10-12: answers taught as one application's events were
  * recalled for the same question reworded, judged another application's, and
@@ -87,6 +88,16 @@ const documentHeadShape = {
   subject: z.string().min(1).max(DOCUMENT_SUBJECT_MAX_LENGTH),
   /** The day the document speaks for; null when nothing says. */
   date: z.string().regex(DAY).nullable(),
+  /**
+   * Where every memory of the document holds, when the document declares it:
+   * the goal tells every lens so, and the store keeps each memory under it
+   * whatever its digest wrote. Absent when the document declares none, and
+   * each memory is then scoped by the scope test. Absent rather than null,
+   * because the goal of a document that declares nothing must render as it
+   * did before a document could declare one: the ingester names a chunk by
+   * its goal's hash.
+   */
+  scope: z.enum(MEMORY_SCOPES).optional(),
   chunk: z.strictObject({ index: z.number().int().min(1), of: z.number().int().min(1) }),
 };
 
@@ -132,6 +143,7 @@ const indexOf = (chunk: DocumentChunk): DocumentIndex => ({
     title: chunk.title,
     subject: chunk.subject,
     date: chunk.date,
+    ...(chunk.scope === undefined ? {} : { scope: chunk.scope }),
     chunk: chunk.chunk,
   },
   evidence: chunk.parts.map((_, position) => ({
@@ -149,6 +161,15 @@ const headLine = (chunk: DocumentChunk): string =>
     `Chunk ${chunk.chunk.index} of ${chunk.chunk.of}`,
     ...(chunk.context === null || chunk.context === '' ? [] : [`Under: ${chunk.context}`]),
   ].join(' · ');
+
+/**
+ * The limit a document that declares its scope adds, where every lens reads
+ * it: the producer writes the scope given, the rules evaluator does not hold
+ * the scope test against it, and no critic faults a memory for it — it is
+ * the document's declaration, not a judgement. Rendered only when declared.
+ */
+export const declaredScopeLimit = (scope: MemoryScope): string =>
+  `- Give every memory the scope ${scope}: the document declares it for everything it states, so the scope test does not apply and no memory is faulted for its scope.`;
 
 /** The goal, or a refusal when it would not fit the engine's budget. */
 export function renderDocumentGoal(chunk: DocumentChunk): string {
@@ -173,6 +194,7 @@ export function renderDocumentGoal(chunk: DocumentChunk): string {
     '',
     `- Propose at most ${chunk.maxMemories} memories, each resting on one to four of the listed sections.`,
     `- Give each memory a kind: ${DOCUMENT_MEMORY_KINDS.map((kind) => `${kind} — ${DOCUMENT_MEMORY_KIND_USES[kind]}`).join('; ')}.`,
+    ...(chunk.scope === undefined ? [] : [declaredScopeLimit(chunk.scope)]),
     '- A section may support several memories; list every section no memory rests on under unused.',
     '- Validators check these limits; they are not criteria.',
     '',

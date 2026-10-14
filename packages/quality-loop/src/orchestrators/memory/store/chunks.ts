@@ -87,7 +87,7 @@ export function chunksOf(
       digestRunId,
       lineage: origin.lineage,
       model,
-      // Where the fact holds, when its digest declared it; a reader defaults the rest.
+      // Where the fact holds, when its digest or document declared it; a reader defaults the rest.
       ...(memory.scope === undefined ? {} : { scope: memory.scope }),
     };
   });
