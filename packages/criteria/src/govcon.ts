@@ -283,6 +283,11 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
       'The profile’s alert policy says whose ending awards are raised — the scope’s and the tracked ones, or the tracked ones alone — and the least obligated on a scope’s award for it to be raised; a stored profile from before either reads as the declared default. Every alert is ledgered with what was published and read back newest first at /alerts as the alert it was, a page at a time; a payload its kind’s schema refuses, or a row from before payloads were kept, reads as its key alone.',
   },
   {
+    id: 'GOV-34',
+    statement:
+      'Who may hold the work a stored notice is about is read through the horizon lens: the awards in the notice’s NAICS code — and its product service code, unless asked not to — ending inside INCUMBENT_HORIZON_MONTHS, kept to the notice’s own sub-agency by the join the horizon uses, with how many the scope listed and how far the list is complete. The buyer’s department narrows the read only when the source lists that code; a notice lacking a NAICS code, or a buyer named down to its sub-agency, answers that gap and asks no source anything; a notice the store does not hold is a 404.',
+  },
+  {
     id: 'GOV-21',
     statement:
       'Spending arithmetic is pure and declared: fiscal periods start in October, a series is aligned on the periods asked for with the partial month marked, the projection is the declared seasonal mean of prior years scaled by the year-to-date ratio only after the declared base, the horizon walk pages the source by number, finds the page where end dates cross today by doubling and halving, reads forward from the soonest-ending award inside a page bound and the wall-clock deadline, and says how far the window is complete, and agency periods are aligned on those present, the year asked for an agency’s offices defaulting to the one the source’s own directory reports active.',

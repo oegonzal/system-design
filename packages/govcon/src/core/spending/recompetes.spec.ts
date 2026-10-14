@@ -5,7 +5,13 @@ import {
   opportunityOf,
 } from '@sysdesign/contracts';
 
-import { horizonNaics, matchOpenNotices, openNoticesFilter } from './recompetes';
+import {
+  horizonNaics,
+  incumbentPlanOf,
+  incumbentsOf,
+  matchOpenNotices,
+  openNoticesFilter,
+} from './recompetes';
 
 const NOW = new Date('2026-06-15T12:00:00Z');
 
@@ -58,5 +64,50 @@ describe('the recompete join', () => {
       textContains: null,
       limit: MAX_RECOMPETE_NOTICES,
     });
+  });
+
+  it('[GOV-34] plans a notice’s incumbents from its code and its buyer — its product service code only when asked — names the fact it lacks, and keeps of a scope’s awards the ones its own sub-agency holds in its code', () => {
+    // DLA Aviation, NAICS 332710, PSC 5340.
+    const notice = opportunityOf();
+    expect(incumbentPlanOf(notice, true)).toEqual({
+      kind: 'read',
+      naics: '332710',
+      psc: '5340',
+      toptier: '097',
+    });
+    expect(incumbentPlanOf(notice, false)).toMatchObject({ kind: 'read', psc: null });
+    expect(incumbentPlanOf({ ...notice, classificationCode: null }, true)).toMatchObject({
+      kind: 'read',
+      psc: null,
+    });
+    expect(incumbentPlanOf({ ...notice, naicsCode: null }, true)).toEqual({
+      kind: 'gap',
+      gap: 'naics',
+    });
+    // A buyer named only as far as its department cannot be told from any other part of it.
+    for (const agencyCode of [null, '097', '097.']) {
+      expect(incumbentPlanOf({ ...notice, agencyCode }, true)).toEqual({
+        kind: 'gap',
+        gap: 'buyer',
+      });
+    }
+
+    const held = horizonRowOf({ externalId: 'held', agencyCode: '097.97AS' });
+    const later = horizonRowOf({
+      externalId: 'later',
+      agencyCode: '097.97AS',
+      endsAt: '2027-01-01',
+    });
+    const rows = [
+      held,
+      horizonRowOf({ externalId: 'navy' }),
+      horizonRowOf({ externalId: 'other-code', agencyCode: '097.97AS', naicsCode: '541511' }),
+      horizonRowOf({ externalId: 'nowhere', agencyCode: null }),
+      later,
+    ];
+    // The order given is kept: the lens lists the soonest-ending first.
+    expect(incumbentsOf(notice, rows)).toEqual([held, later]);
+    expect(incumbentsOf({ ...notice, naicsCode: null }, rows)).toEqual([]);
+    expect(incumbentsOf(notice, [])).toEqual([]);
   });
 });

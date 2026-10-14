@@ -11,10 +11,13 @@ import {
   currentFiscalPeriod,
   facetsOfQuery,
   familyUnder,
+  INCUMBENT_HORIZON_MONTHS,
   isoDateOf,
   type AgencyDirectory,
   type AgencyOutlook,
   type AwardDetail,
+  type IncumbentGap,
+  type NoticeIncumbents,
   type Provenance,
   type SpendingBreakdown,
   type SpendingHorizon,
@@ -42,20 +45,25 @@ import { pulseLens } from '../../core/spending/lenses/pulse';
 import { reachLens } from '../../core/spending/lenses/reach';
 import {
   horizonNaics,
+  incumbentPlanOf,
+  incumbentsOf,
   matchOpenNotices,
   openNoticesFilter,
   type JoinedAward,
 } from '../../core/spending/recompetes';
 import { OPPORTUNITY_REPOSITORY } from '../opportunities/tokens';
 import { BUDGET_POLICY, CLOCK, REQUEST_GATE, SPENDING_SOURCES } from '../sources/tokens';
-import type {
-  AgencyOutlookQueryInput,
-  BreakdownQueryInput,
-  HorizonQueryInput,
-  PrimesQueryInput,
-  PulseQueryInput,
-  ReachQueryInput,
-  ScopeInput,
+import {
+  horizonQuerySchema,
+  isScopePsc,
+  type AgencyOutlookQueryInput,
+  type BreakdownQueryInput,
+  type HorizonQueryInput,
+  type IncumbentsQueryInput,
+  type PrimesQueryInput,
+  type PulseQueryInput,
+  type ReachQueryInput,
+  type ScopeInput,
 } from './spending-requests';
 import { SPENDING_SNAPSHOTS } from './tokens';
 
@@ -174,6 +182,68 @@ export class SpendingService {
       ),
     );
     return { ...body, ...(await this.openNoticesOf(body.rows)) };
+  }
+
+  /**
+   * Who may hold the work a stored notice is about: the awards in its NAICS
+   * code — and its product service code, unless asked not to — ending in
+   * the coming months, read through the horizon lens and kept to the
+   * notice's own sub-agency by the join the horizon uses. The buyer's
+   * department narrows the read only when the source lists it under that
+   * code; the join holds either way. A notice lacking a fact the join needs
+   * answers with that gap and asks no source anything.
+   */
+  async incumbents(
+    noticeId: string,
+    query: IncumbentsQueryInput,
+    options: ReadOptions = {},
+  ): Promise<NoticeIncumbents> {
+    const notice = await this.notices.findOne(noticeId);
+    if (notice === null) throw new NotFoundException(`no stored notice ${noticeId}`);
+    const today = isoDateOf(this.now().getTime());
+    const unread = (gap: IncumbentGap): NoticeIncumbents => ({
+      noticeId,
+      gap,
+      scope: null,
+      today,
+      months: INCUMBENT_HORIZON_MONTHS,
+      rows: [],
+      listed: 0,
+      capped: false,
+      completeBefore: null,
+      provenance: null,
+    });
+    const plan = incumbentPlanOf(notice, query.samePsc);
+    if (plan.kind === 'gap') return unread(plan.gap);
+    const directory = await this.agencies();
+    const listed = directory.entries.some((entry) => entry.toptierCode === plan.toptier);
+    const scoped = horizonQuerySchema.safeParse({
+      naics: [plan.naics],
+      psc: plan.psc !== null && isScopePsc(plan.psc) ? [plan.psc] : [],
+      agency: listed ? plan.toptier : undefined,
+      months: INCUMBENT_HORIZON_MONTHS,
+    });
+    // A code the scope refuses is a code the source does not take.
+    if (!scoped.success) return unread('naics');
+    const horizon = await this.answer(
+      this.cache.read(
+        horizonLens(this.deps),
+        { ...scopeOf(scoped.data), months: scoped.data.months, today },
+        options,
+      ),
+    );
+    return {
+      noticeId,
+      gap: null,
+      scope: horizon.scope,
+      today: horizon.today,
+      months: horizon.months,
+      rows: incumbentsOf(notice, horizon.rows),
+      listed: horizon.rows.length,
+      capped: horizon.capped,
+      completeBefore: horizon.completeBefore,
+      provenance: horizon.provenance,
+    };
   }
 
   agencies(options: ReadOptions = {}): Promise<AgencyDirectory> {

@@ -3,6 +3,7 @@ import type {
   GetAgenciesResponse,
   GetAgencyOutlookResponse,
   GetAwardDetailResponse,
+  GetNoticeIncumbentsResponse,
   GetSpendingPrimesResponse,
   GetSpendingBreakdownResponse,
   GetSpendingHorizonResponse,
@@ -16,6 +17,7 @@ import {
   awardIdSchema,
   breakdownQuerySchema,
   horizonQuerySchema,
+  incumbentsQuerySchema,
   primesQuerySchema,
   pulseQuerySchema,
   reachQuerySchema,
@@ -23,6 +25,7 @@ import {
   type AgencyOutlookQueryInput,
   type BreakdownQueryInput,
   type HorizonQueryInput,
+  type IncumbentsQueryInput,
   type PrimesQueryInput,
   type PulseQueryInput,
   type ReachQueryInput,
@@ -67,6 +70,15 @@ export class SpendingController {
     @Param('externalId', new ZodValidationPipe(awardIdSchema)) externalId: string,
   ): Promise<GetAwardDetailResponse> {
     return { data: await this.spending.award(externalId) };
+  }
+
+  /** Who may hold the work one stored notice is about. */
+  @Get('incumbents/:noticeId')
+  async incumbents(
+    @Param('noticeId') noticeId: string,
+    @Query(new ZodValidationPipe(incumbentsQuerySchema)) query: IncumbentsQueryInput,
+  ): Promise<GetNoticeIncumbentsResponse> {
+    return { data: await this.spending.incumbents(noticeId, query) };
   }
 
   @Get('horizon')

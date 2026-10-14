@@ -14,6 +14,7 @@ import {
   RECIPIENT_SIZES,
   UEI_SHAPE,
   type AgencyOutlookQuery,
+  type NoticeIncumbentsQuery,
   type FacetId,
   type FacetQuery,
   type SpendingBreakdownQuery,
@@ -162,6 +163,18 @@ export const horizonQuerySchema = z.strictObject({
   months: z.coerce.number().int().min(1).max(MAX_HORIZON_MONTHS).default(DEFAULT_HORIZON_MONTHS),
 }) satisfies z.ZodType<SpendingHorizonQuery>;
 export type HorizonQueryInput = z.output<typeof horizonQuerySchema>;
+
+/** The query of `GET /spending/incumbents/:noticeId`. */
+export const incumbentsQuerySchema = z.strictObject({
+  samePsc: z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .default(true),
+}) satisfies z.ZodType<NoticeIncumbentsQuery>;
+export type IncumbentsQueryInput = z.output<typeof incumbentsQuerySchema>;
+
+/** Whether a product service code is one a scope takes. */
+export const isScopePsc = (code: string): boolean => psc.safeParse(code).success;
 
 export const agencyOutlookQuerySchema = z.strictObject({
   fiscalYear: z.coerce.number().int().min(FIRST_FISCAL_YEAR).optional(),

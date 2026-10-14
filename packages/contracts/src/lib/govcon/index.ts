@@ -33,6 +33,7 @@ export * from './spending';
 export * from './reach';
 export * from './primes';
 export * from './award-detail';
+export * from './incumbents';
 export * from './fixtures';
 export * from './spending-fixtures';
 export * from './prime-fixtures';

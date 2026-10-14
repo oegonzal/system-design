@@ -20,6 +20,12 @@ export const dottedPath = (parts: readonly (string | null)[]): string | null => 
   return segments.length > 0 ? segments.join(SEPARATOR) : null;
 };
 
+/** The department segment of a `department.subtier.office` code. */
+export const toptierOf = (agencyCode: string | null): string | null => {
+  const segment = agencyCode?.split(SEPARATOR)[0];
+  return segment && segment.length > 0 ? segment : null;
+};
+
 /** The subtier segment of a `department.subtier.office` code — what an award and a notice share when the same buyer is behind both. */
 export const subtierOf = (agencyCode: string | null): string | null => {
   const segment = agencyCode?.split(SEPARATOR)[1];

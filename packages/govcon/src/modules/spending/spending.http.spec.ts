@@ -7,6 +7,7 @@ import {
   type AgencyOutlook,
   type AwardDetail,
   type SourceCall,
+  type NoticeIncumbents,
   type SpendingBreakdown,
   type SpendingHorizon,
   type SpendingPrimes,
@@ -348,5 +349,26 @@ describe('the spending routes', () => {
     expect(stored?.payload).toMatchObject({
       rows: [expect.objectContaining({ externalId: ENDING.externalId })],
     });
+  });
+
+  it('[GOV-8] [GOV-34] answers who may hold the work a stored notice is about, narrowed to its product service code unless asked not to, a 404 for a notice the store does not hold, and refuses a query it does not know', async () => {
+    await pullTiny(url);
+    // `a` is DLA Aviation (097.97AS), NAICS 332710, PSC 5340; the scripted award ends at that sub-agency.
+    const found = await get<Envelope<NoticeIncumbents>>(url, '/spending/incumbents/a');
+    expect(found.data).toMatchObject({
+      noticeId: 'a',
+      gap: null,
+      scope: { naics: ['332710'], psc: ['5340'], agency: '097' },
+      months: 24,
+      listed: 1,
+      provenance: { servedFrom: 'source' },
+    });
+    expect(found.data.rows.map((row) => row.externalId)).toEqual([ENDING.externalId]);
+    const any = await get<Envelope<NoticeIncumbents>>(url, '/spending/incumbents/a?samePsc=false');
+    expect(any.data.scope).toMatchObject({ psc: [] });
+
+    expect((await fetch(`${url}/spending/incumbents/nope`)).status).toBe(404);
+    expect((await fetch(`${url}/spending/incumbents/a?samePsc=maybe`)).status).toBe(400);
+    expect((await fetch(`${url}/spending/incumbents/a?months=6`)).status).toBe(400);
   });
 });

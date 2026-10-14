@@ -308,4 +308,84 @@ describe('the spending service', () => {
     const outlook = await service.agency('097', { awardFamily: 'both' });
     expect(outlook).toMatchObject({ name: 'Department of Defense', officesFiscalYear: 2026 });
   });
+
+  it('[GOV-34] reads who may hold the work a stored notice is about through the horizon lens — its code, its product service code unless asked not to, its department when the source lists it — keeps the awards at the notice’s own sub-agency, says how many the scope listed, and asks nothing when the notice lacks a fact the join needs', async () => {
+    const notices = new InMemoryOpportunityRepository();
+    // DLA Aviation (097.97AS), NAICS 332710, PSC 5340; and one whose department the source does not list.
+    await notices.upsertMany(
+      [
+        opportunityOf(),
+        opportunityOf({ noticeId: 'elsewhere', agencyCode: '999.97AS.X1' }),
+        opportunityOf({ noticeId: 'codeless', naicsCode: null, naicsCodes: [] }),
+        opportunityOf({ noticeId: 'department-only', agencyCode: '097' }),
+      ],
+      T0,
+    );
+    const page = fetchedOf({
+      rows: [
+        horizonRowOf({ externalId: 'held', agencyCode: '097.97AS', endsAt: '2026-08-01' }),
+        horizonRowOf({ externalId: 'navy', endsAt: '2026-08-02' }),
+        horizonRowOf({ externalId: 'held-later', agencyCode: '097.97AS', endsAt: '2027-03-01' }),
+      ],
+      rejected: 0,
+      hasMore: false,
+    });
+    const { service, sources, operations } = harness({ script: { ending: [page] }, notices });
+
+    const first = await service.incumbents('n-1', { samePsc: true });
+    expect(first).toMatchObject({
+      noticeId: 'n-1',
+      gap: null,
+      scope: { naics: ['332710'], psc: ['5340'], agency: '097', awardFamily: 'both' },
+      today: '2026-06-15',
+      months: 24,
+      listed: 3,
+      capped: false,
+      provenance: { servedFrom: 'source' },
+    });
+    expect(first.rows.map((row) => row.externalId)).toEqual(['held', 'held-later']);
+    // The directory is read once to say whether the department is one the source lists.
+    expect(operations().filter((operation) => operation === 'agency-directory')).toHaveLength(1);
+    expect(sources.requests.ending[0]).toMatchObject({
+      naics: ['332710'],
+      psc: ['5340'],
+      agency: { toptierCode: '097' },
+    });
+
+    // Asked again the same day: the snapshot, and the same answer.
+    const before = sources.requests.ending.length;
+    expect((await service.incumbents('n-1', { samePsc: true })).provenance?.servedFrom).toBe(
+      'snapshot',
+    );
+    expect(sources.requests.ending).toHaveLength(before);
+    // Any product service code is another scope, and another read.
+    const wide = await service.incumbents('n-1', { samePsc: false });
+    expect(wide.scope).toMatchObject({ psc: [] });
+    expect(sources.requests.ending.length).toBeGreaterThan(before);
+
+    // A department the source does not list narrows nothing; the join still holds.
+    const elsewhere = await service.incumbents('elsewhere', { samePsc: true });
+    expect(elsewhere.scope).toMatchObject({ agency: null, psc: ['5340'] });
+    expect(elsewhere.rows.map((row) => row.externalId)).toEqual(['held', 'held-later']);
+
+    const asked = sources.requests.ending.length;
+    expect(await service.incumbents('codeless', { samePsc: true })).toEqual({
+      noticeId: 'codeless',
+      gap: 'naics',
+      scope: null,
+      today: '2026-06-15',
+      months: 24,
+      rows: [],
+      listed: 0,
+      capped: false,
+      completeBefore: null,
+      provenance: null,
+    });
+    expect(await service.incumbents('department-only', { samePsc: true })).toMatchObject({
+      gap: 'buyer',
+      provenance: null,
+    });
+    expect(sources.requests.ending).toHaveLength(asked);
+    await expect(service.incumbents('nope', { samePsc: true })).rejects.toThrow(NotFoundException);
+  });
 });

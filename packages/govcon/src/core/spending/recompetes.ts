@@ -3,11 +3,12 @@ import {
   noticeRefOf,
   type HorizonNoticeMatch,
   type HorizonRow,
+  type IncumbentGap,
   type NoticeRef,
   type Opportunity,
 } from '@sysdesign/contracts';
 
-import { subtierOf } from '../agency-path';
+import { subtierOf, toptierOf } from '../agency-path';
 import type { CandidateFilter } from '../ports';
 
 /**
@@ -83,4 +84,41 @@ export function matchOpenNotices(
     matches.push({ externalId: row.externalId, notices: [...found].sort(byDeadlineThenId) });
   }
   return matches;
+}
+
+/** What a notice's incumbents are read by — its code, its product service code when asked for, its buyer's department — or the fact it lacks. */
+export type IncumbentPlan =
+  | { kind: 'read'; naics: string; psc: string | null; toptier: string | null }
+  | { kind: 'gap'; gap: IncumbentGap };
+
+/** The facts of a notice the incumbents join reads. */
+export type JoinedNotice = Pick<Opportunity, 'naicsCode' | 'agencyCode' | 'classificationCode'>;
+
+/**
+ * How to look for who holds the work a notice is about: the join needs the
+ * notice's NAICS code and its buyer down to the sub-agency, and without
+ * either there is nothing to read. Its product service code narrows the
+ * read when the caller asks and the notice has one.
+ */
+export function incumbentPlanOf(notice: JoinedNotice, samePsc: boolean): IncumbentPlan {
+  if (notice.naicsCode === null) return { kind: 'gap', gap: 'naics' };
+  if (subtierOf(notice.agencyCode) === null) return { kind: 'gap', gap: 'buyer' };
+  return {
+    kind: 'read',
+    naics: notice.naicsCode,
+    psc: samePsc ? notice.classificationCode : null,
+    toptier: toptierOf(notice.agencyCode),
+  };
+}
+
+/**
+ * Of the awards a scope lists, the ones the notice's own buyer holds in its
+ * code: the join an expiring award is matched to open notices by, read the
+ * other way round. The order given is kept.
+ */
+export function incumbentsOf<R extends JoinedAward>(notice: JoinedNotice, rows: readonly R[]): R[] {
+  const wanted = joinKeyOf(notice.naicsCode, notice.agencyCode);
+  return wanted === null
+    ? []
+    : rows.filter((row) => joinKeyOf(row.naicsCode, row.agencyCode) === wanted);
 }
