@@ -4,7 +4,7 @@ import styled from '@emotion/styled';
 import { PROMPT_COPY } from '@sysdesign/contracts';
 import { Badge, type BadgeTone, Button, Toolbar } from '@sysdesign/design-system';
 
-import { selectCanRedo, selectCanUndo } from '../canvas-store';
+import { selectCanRedo, selectCanUndo } from '../store/state';
 import { useCanvasStore } from '../canvas-store-context';
 import type { DraftSaveStatus } from '../draft-status';
 import { CANVAS_SHORTCUTS } from '../use-canvas-shortcuts';

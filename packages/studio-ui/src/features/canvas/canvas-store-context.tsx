@@ -3,7 +3,8 @@
 import { createContext, use, useState, type ReactNode } from 'react';
 import { useStore } from 'zustand';
 
-import { createCanvasStore, type CanvasState, type CanvasStore } from './canvas-store';
+import { createCanvasStore, type CanvasStore } from './canvas-store';
+import type { CanvasState } from './store/state';
 
 const CanvasStoreContext = createContext<CanvasStore | null>(null);
 

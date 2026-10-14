@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react';
 
-import type { CanvasState } from './canvas-store';
+import type { CanvasState } from './store/state';
 import { useCanvasStoreApi } from './canvas-store-context';
 
 /**
