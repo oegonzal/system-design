@@ -1,6 +1,6 @@
 import { basename, resolve } from 'node:path';
 
-import { DOCUMENT_TITLE_MAX_LENGTH } from '@sysdesign/contracts';
+import { DOCUMENT_TITLE_MAX_LENGTH, type MemoryScope } from '@sysdesign/contracts';
 import { LoopRefused, LoopTimeout, LoopUnreachable } from '@sysdesign/loop-client';
 
 import type { IngestKind } from '../config';
@@ -66,6 +66,12 @@ export interface IngestOptions {
   /** The day the documents speak for; null when nothing says. */
   date: string | null;
   /**
+   * The scope the documents declare for every memory they state, rendered
+   * into each chunk's goal and stamped by the store over the scope test; null
+   * when they declare none, and each memory is then scoped by that test.
+   */
+  scope: MemoryScope | null;
+  /**
    * Post at most this many chunks this run, then halt with the rest pending;
    * null for every chunk. A run of one proves a document end to end — and
    * records that chunk under its document and hash, so the full run skips it
@@ -113,7 +119,7 @@ export async function planIngest(
   paths: readonly string[],
   options: Pick<
     IngestOptions,
-    'kind' | 'subject' | 'chunkBytes' | 'partsPerChunk' | 'date' | 'cwd'
+    'kind' | 'subject' | 'chunkBytes' | 'partsPerChunk' | 'date' | 'scope' | 'cwd'
   >,
   deps: Pick<IngestDeps, 'reader'>,
 ): Promise<PlannedDocument[]> {
@@ -131,6 +137,7 @@ export async function planIngest(
         title,
         subject: options.subject,
         date: options.date,
+        ...(options.scope === null ? {} : { scope: options.scope }),
         chunkBytes: options.chunkBytes,
         partsPerChunk: options.partsPerChunk,
       }),

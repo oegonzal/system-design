@@ -1,7 +1,9 @@
 import {
   DOCUMENT_SUBJECT_MAX_LENGTH,
   GOAL_BUDGET_BYTES,
+  MEMORY_SCOPES,
   type DocumentKind,
+  type MemoryScope,
   type Recovery,
 } from '@sysdesign/contracts';
 
@@ -57,6 +59,10 @@ export const INGEST_FLAGS = {
     describe: `the most a rendered chunk goal may weigh, in bytes (default ${DEFAULT_CHUNK_BYTES})`,
   },
   date: { type: 'string', describe: 'the day the documents speak for, as YYYY-MM-DD' },
+  scope: {
+    type: 'string',
+    describe: `the scope every memory of the documents takes, declared: ${MEMORY_SCOPES.join('|')} (default: each memory scoped by the scope test)`,
+  },
   limit: { type: 'string', describe: 'post at most this many chunks, then halt, the rest pending' },
   'parts-per-chunk': {
     type: 'string',
@@ -196,6 +202,15 @@ export function postLimit(raw: string | undefined): number | null {
     throw new IngestConfigError(`--limit must be a positive integer, got ${JSON.stringify(raw)}`);
   }
   return Number(raw);
+}
+
+/** The scope the documents declare for every memory they state, null when they declare none, or a refusal naming the choices. */
+export function documentScope(raw: string | undefined): MemoryScope | null {
+  if (raw === undefined) return null;
+  if (!(MEMORY_SCOPES as readonly string[]).includes(raw)) {
+    throw new IngestConfigError(`--scope must be one of ${MEMORY_SCOPES.join(', ')}, got ${raw}`);
+  }
+  return raw as MemoryScope;
 }
 
 /** A document kind the ingester takes, or a refusal naming the choices. */

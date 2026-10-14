@@ -298,8 +298,8 @@ is gitignored, as are the traces and the ingest manifest.
 Before any of this is useful, give the store facts about you:
 
 ```bash
-pnpm memory-ingest ingest Resume_a2.pdf --kind resume --subject "Your Name" --dry-run   # what would be posted
-pnpm memory-ingest ingest Resume_a2.pdf notes.md --kind notes --subject "Your Name"    # posts, one chunk at a time
+pnpm memory-ingest ingest docs/ingestion/Resume_2026_c.pdf --kind resume --subject "Your Name" --dry-run   # what would be posted
+pnpm memory-ingest ingest docs/ingestion/Resume_2026_c.pdf notes.md --kind notes --subject "Your Name"    # posts, one chunk at a time
 pnpm memory-ingest export-studio --out docs/ingestion/studio                             # the studio's experience profiles and STAR stories, as documents
 pnpm memory-ingest ingest docs/ingestion/studio/*.md --kind notes --date 2026-10-12      # … ingested like any notes
 pnpm memory-ingest status                                                                # how each chunk's digest went
@@ -372,14 +372,19 @@ not "at least 2 years of Node.js") — a threshold settles only that one
 question, a figure settles every threshold a form will ever ask of it. Label
 compensation as a minimum, a range and a desired figure, each its own
 sentence. A fact about one employer belongs under
-`# Employers`, dated — that is what settles a "have you worked here before"
-question for every employer, since the answerer reads the record of employers
-rather than an answer given about another application. Then:
+`# Employers`, dated, and so does one sentence each saying, in so many words,
+that you answer No to having worked for, been referred to, or knowing anyone
+at any organization other than those employers: that is what settles such a
+question for an employer you never applied to, since an answer given about
+another application settles nothing for this one. The standing answers are
+yours wherever asked, so the document declares it with `--scope subject` —
+the scope test would otherwise file "working or knowing someone there" under
+one application. Then:
 
 ```bash
-pnpm memory-ingest ingest docs/ingestion/standing-answers.md --kind notes --subject "Your Name" --date 2026-10-12
-pnpm memory-ingest ingest docs/ingestion/standing-answers.md --kind notes --subject "Your Name" --date 2026-10-12   # after an edit, same date: posts the chunks whose goals changed, then retracts the digests they replaced
-pnpm memory-ingest ingest docs/ingestion/standing-answers.md --kind notes --subject "Your Name" --date 2026-10-19   # a new date is in every chunk's goal: posts the whole document again, then retracts its earlier digests
+pnpm memory-ingest ingest docs/ingestion/standing-answers.md --kind notes --scope subject --subject "Your Name" --date 2026-10-12
+pnpm memory-ingest ingest docs/ingestion/standing-answers.md --kind notes --scope subject --subject "Your Name" --date 2026-10-12   # after an edit, same date: posts the chunks whose goals changed, then retracts the digests they replaced
+pnpm memory-ingest ingest docs/ingestion/standing-answers.md --kind notes --scope subject --subject "Your Name" --date 2026-10-19   # a new date is in every chunk's goal: posts the whole document again, then retracts its earlier digests
 ```
 
 A measured note: a plan costs four model calls and an answer page four more,

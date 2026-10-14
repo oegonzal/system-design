@@ -54,6 +54,7 @@ export const options = (overrides: Partial<IngestOptions> = {}): IngestOptions =
   chunkBytes: 4000,
   partsPerChunk: 8,
   date: null,
+  scope: null,
   limit: null,
   dryRun: false,
   force: false,

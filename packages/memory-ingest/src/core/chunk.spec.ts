@@ -4,7 +4,9 @@ import {
   DOCUMENT_MAX_MEMORIES,
   DOCUMENT_MAX_PARTS,
   DOCUMENT_PART_MAX_LENGTH,
+  declaredScopeLimit,
   documentChunkSchema,
+  SCOPE_RULE,
   textBytes,
 } from '@sysdesign/contracts';
 
@@ -64,6 +66,23 @@ describe('chunkDocument', () => {
     );
     const retitled = chunkDocument(input({ title: 'other.md' }));
     expect(retitled.chunks[0]?.chunkHash).not.toBe(first.chunks[0]?.chunkHash);
+  });
+
+  it('[ING-1] carries a declared scope on every chunk and renders the declaration in place of the scope test; a document that declares none renders as before', () => {
+    const undeclared = chunkDocument(input());
+    const declared = chunkDocument(input({ scope: 'subject' }));
+    expect(declared.chunks).toHaveLength(undeclared.chunks.length);
+    for (const planned of undeclared.chunks) {
+      expect(planned.chunk).not.toHaveProperty('scope');
+      expect(planned.goal).toContain(SCOPE_RULE);
+      expect(planned.goal).not.toContain(declaredScopeLimit('subject'));
+    }
+    for (const [at, planned] of declared.chunks.entries()) {
+      expect(planned.chunk.scope).toBe('subject');
+      expect(planned.goal).toContain(declaredScopeLimit('subject'));
+      expect(planned.goal).not.toContain(SCOPE_RULE);
+      expect(planned.chunkHash).not.toBe(undeclared.chunks[at]?.chunkHash);
+    }
   });
 
   it('[ING-1] names a chunk by the sha256 of the goal it renders to', () => {

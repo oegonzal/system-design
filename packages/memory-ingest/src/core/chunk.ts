@@ -12,6 +12,7 @@ import {
   textBytes,
   type DocumentChunk,
   type DocumentKind,
+  type MemoryScope,
 } from '@sysdesign/contracts';
 
 import type { PlannedChunk } from './ports';
@@ -33,6 +34,12 @@ export interface ChunkingInput {
   subject: string;
   /** The day the document speaks for, when something says. */
   date: string | null;
+  /**
+   * The scope the document declares for every memory it states; absent when
+   * it declares none, and the chunk then renders exactly as it did before
+   * scopes could be declared, so its hash is unchanged.
+   */
+  scope?: MemoryScope;
   /** The most a rendered goal may weigh, in UTF-8 bytes. */
   chunkBytes: number;
   /**
@@ -186,6 +193,7 @@ const chunkOf = (
   title: input.title,
   subject: input.subject,
   date: input.date,
+  ...(input.scope === undefined ? {} : { scope: input.scope }),
   chunk: { index, of },
   context: contextOf(group[0]?.path ?? []),
   parts: group.map((part) => part.text),

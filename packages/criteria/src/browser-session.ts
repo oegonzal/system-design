@@ -105,7 +105,7 @@ export const BROWSER_SESSION_CRITERIA: readonly Criterion[] = [
   {
     id: 'ING-1',
     statement:
-      'Documents are chunked deterministically — the same text yields the same aliased parts, packed under the declared budget with no overlap and continuity through the enclosing headings — and each chunk is posted to the loop once, one at a time, awaited to settle and recorded in a manifest under its document and content hash, so a re-run skips what that document’s own postings cover — its facts stored, or none to store by a declared table of the loop’s reasons — unless forced.',
+      'Documents are chunked deterministically — the same text yields the same aliased parts, packed under the declared budget with no overlap and continuity through the enclosing headings — and each chunk is posted to the loop once, one at a time, awaited to settle and recorded in a manifest under its document and content hash, so a re-run skips what that document’s own postings cover — its facts stored, or none to store by a declared table of the loop’s reasons — unless forced; and a document may declare the scope every memory it states takes, carried on each of its chunks, while one that declares none renders and hashes as before.',
   },
   {
     id: 'ING-2',

@@ -1,5 +1,5 @@
 /**
- * `main.js ingest <path…> [--kind resume|notes] [--subject <name>] [--chunk-bytes <n>] [--parts-per-chunk <n>] [--date <day>] [--limit <n>] [--dry-run] [--force] [--json]`
+ * `main.js ingest <path…> [--kind resume|notes] [--subject <name>] [--chunk-bytes <n>] [--parts-per-chunk <n>] [--date <day>] [--scope <scope>] [--limit <n>] [--dry-run] [--force] [--json]`
  * `main.js retract <path…> [--dry-run] [--json]`
  * `main.js status [--refresh] [--json]`
  * `main.js export-studio --out <dir> [--json]`
@@ -15,6 +15,7 @@
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
+import type { MemoryScope } from '@sysdesign/contracts';
 import { HttpLoopClient } from '@sysdesign/loop-client';
 
 import { JsonFileLedger } from './adapters/fs-ledger/json-file-ledger';
@@ -25,6 +26,7 @@ import { HttpStudioSource } from './adapters/studio-http/http-studio-source';
 import {
   chunkBytes,
   documentDate,
+  documentScope,
   partsPerChunk,
   postLimit,
   DEFAULT_HOME,
@@ -84,6 +86,7 @@ export const COMMANDS = {
       'chunk-bytes',
       'parts-per-chunk',
       'date',
+      'scope',
       'limit',
       'dry-run',
       'force',
@@ -107,6 +110,8 @@ export type Options =
       chunkBytes: number;
       partsPerChunk: number;
       date: string | null;
+      /** The scope the documents declare for every memory; null when they declare none. */
+      scope: MemoryScope | null;
       limit: number | null;
       dryRun: boolean;
       force: boolean;
@@ -161,6 +166,7 @@ export function parseOptions(argv: readonly string[]): Options | Error {
         chunkBytes: chunkBytes(values['chunk-bytes'] as string | undefined),
         partsPerChunk: partsPerChunk(values['parts-per-chunk'] as string | undefined),
         date: documentDate(values['date'] as string | undefined),
+        scope: documentScope(values['scope'] as string | undefined),
         limit: postLimit(values['limit'] as string | undefined),
         dryRun: flag('dry-run'),
         force: flag('force'),
