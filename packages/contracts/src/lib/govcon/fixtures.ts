@@ -249,6 +249,7 @@ export const savedSearchOf = (overrides: Partial<SavedSearch> = {}): SavedSearch
   includedInPull: true,
   pullOrder: 0,
   lastRunAt: null,
+  lastYield: null,
   createdAt: '2026-09-27T00:00:00.000Z',
   updatedAt: '2026-09-27T00:00:00.000Z',
   ...overrides,

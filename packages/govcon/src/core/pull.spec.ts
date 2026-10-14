@@ -2,7 +2,7 @@ import type { OpportunityQuery } from '@sysdesign/contracts';
 
 import type { Gated } from './budget';
 import type { SearchPage } from './ports';
-import { runPull, type PlannedSlice, type PullDeps } from './pull';
+import { runPull, type PlannedSlice, type PullDeps, type PullOutcome } from './pull';
 import { InMemoryOpportunityRepository, opportunityOf } from './testing';
 
 const query = (naics: string, offset = 0): OpportunityQuery => ({
@@ -13,6 +13,7 @@ const query = (naics: string, offset = 0): OpportunityQuery => ({
   naics,
 });
 const slice = (naics: string, name: string | null = null): PlannedSlice => ({
+  searchId: name === null ? null : `s-${name}`,
   name,
   query: query(naics),
 });
@@ -50,17 +51,27 @@ function harness(replies: readonly Gated<SearchPage>[], overrides: Partial<PullD
   return { deps, repository, queries, warnings, tick: (ms: number) => (nowMs += ms) };
 }
 
+/** The reports of a pull's runs, in the plan's order. */
+const reportsOf = ({ runs }: Pick<PullOutcome, 'runs'>) => runs.map((run) => run.report);
+
 describe('runPull', () => {
   it('runs every slice in order under its name, stores what came in, and reports per slice', async () => {
     const { deps, repository, queries } = harness([page(['a', 'b'], 2), page(['b'])]);
-    const { slices, stoppedBy } = await runPull([slice('11', 'first'), slice('22')], deps);
+    const { runs, stoppedBy } = await runPull([slice('11', 'first'), slice('22')], deps);
     expect(queries.map((q) => q.naics)).toEqual(['11', '22']);
-    expect(slices.map((s) => [s.name, s.outcome, s.received, s.inserted, s.updated])).toEqual([
+    expect(
+      reportsOf({ runs }).map((s) => [s.name, s.outcome, s.received, s.inserted, s.updated]),
+    ).toEqual([
       ['first', 'ok', 2, 2, 0],
       [null, 'ok', 1, 0, 1],
     ]);
     expect(stoppedBy).toBeNull();
     expect(repository.rows.size).toBe(2);
+    // Each run keeps the slice it ran and the notices its pages carried — one a second slice saw again included.
+    expect(runs.map((run) => [run.slice.searchId, run.noticeIds])).toEqual([
+      ['s-first', ['a', 'b']],
+      [null, ['b']],
+    ]);
   });
 
   it('[GOV-19] stops starting slices at the deadline and says which it skipped', async () => {
@@ -72,9 +83,9 @@ describe('runPull', () => {
         return page([`n-${q.naics}`]);
       },
     });
-    const { slices, stoppedBy } = await runPull([slice('11'), slice('22'), slice('33')], deps);
+    const { runs, stoppedBy } = await runPull([slice('11'), slice('22'), slice('33')], deps);
     expect(queries.map((q) => q.naics)).toEqual(['11', '22']);
-    expect(slices.map((s) => [s.outcome, s.detail])).toEqual([
+    expect(reportsOf({ runs }).map((s) => [s.outcome, s.detail])).toEqual([
       ['ok', null],
       ['ok', null],
       ['skipped', 'stopped earlier: deadline'],
@@ -87,8 +98,8 @@ describe('runPull', () => {
       page(['a']),
       { kind: 'budget-exhausted', spent: 1, budget: 1 },
     ]);
-    const { slices, stoppedBy } = await runPull([slice('11'), slice('22'), slice('33')], deps);
-    expect(slices.map((s) => [s.outcome, s.detail])).toEqual([
+    const { runs, stoppedBy } = await runPull([slice('11'), slice('22'), slice('33')], deps);
+    expect(reportsOf({ runs }).map((s) => [s.outcome, s.detail])).toEqual([
       ['ok', null],
       ['budget-exhausted', 'budget 1/1 spent'],
       ['skipped', 'stopped earlier: budget'],
@@ -103,8 +114,8 @@ describe('runPull', () => {
       harness([{ kind: 'error', outcome: 'rate-limited', status: 429, message: 'over quota' }])
         .deps,
     );
-    expect(limited.slices.map((s) => s.outcome)).toEqual(['error', 'skipped']);
-    expect(limited.slices[0]?.detail).toBe('rate-limited: over quota');
+    expect(reportsOf(limited).map((s) => s.outcome)).toEqual(['error', 'skipped']);
+    expect(reportsOf(limited)[0]?.detail).toBe('rate-limited: over quota');
     expect(limited.stoppedBy).toBe('rate-limited');
 
     const { deps, warnings } = harness([
@@ -112,7 +123,7 @@ describe('runPull', () => {
       page(['b']),
     ]);
     const failed = await runPull([slice('11'), slice('22')], deps);
-    expect(failed.slices.map((s) => [s.outcome, s.truncated])).toEqual([
+    expect(reportsOf(failed).map((s) => [s.outcome, s.truncated])).toEqual([
       ['error', false],
       ['ok', false],
     ]);
@@ -122,9 +133,9 @@ describe('runPull', () => {
 
   it('pages up to maxPagesPerSlice, reports what remains as truncated, and marks a failed later page error and truncated', async () => {
     const paged = harness([page(['a', 'b'], 5), page(['c', 'd'], 5)], { maxPagesPerSlice: 2 });
-    const { slices } = await runPull([slice('11')], paged.deps);
+    const { runs } = await runPull([slice('11')], paged.deps);
     expect(paged.queries.map((q) => q.offset)).toEqual([0, 2]);
-    expect(slices[0]).toMatchObject({
+    expect(reportsOf({ runs })[0]).toMatchObject({
       outcome: 'ok',
       pages: 2,
       received: 4,
@@ -136,7 +147,7 @@ describe('runPull', () => {
     const done = harness([page(['a', 'b'], 3), page(['c'], 3)], { maxPagesPerSlice: 5 });
     const complete = await runPull([slice('11')], done.deps);
     expect(done.queries).toHaveLength(2);
-    expect(complete.slices[0]).toMatchObject({ pages: 2, received: 3, truncated: false });
+    expect(reportsOf(complete)[0]).toMatchObject({ pages: 2, received: 3, truncated: false });
 
     const broken = harness(
       [
@@ -146,7 +157,7 @@ describe('runPull', () => {
       { maxPagesPerSlice: 3 },
     );
     const partial = await runPull([slice('11')], broken.deps);
-    expect(partial.slices[0]).toMatchObject({
+    expect(reportsOf(partial)[0]).toMatchObject({
       outcome: 'error',
       pages: 1,
       inserted: 2,
@@ -159,11 +170,12 @@ describe('runPull', () => {
     const { deps, repository } = harness([
       { kind: 'cached', requestedAt: '2026-09-26T11:00:00.000Z', recordCount: 3 },
     ]);
-    const { slices } = await runPull([slice('11')], deps);
-    expect(slices[0]).toMatchObject({
+    const { runs } = await runPull([slice('11')], deps);
+    expect(reportsOf({ runs })[0]).toMatchObject({
       outcome: 'cached',
       detail: 'pulled 2026-09-26T11:00:00.000Z, 3 record(s)',
     });
     expect(repository.rows.size).toBe(0);
+    expect(runs[0]?.noticeIds).toEqual([]);
   });
 });

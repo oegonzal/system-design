@@ -10,10 +10,18 @@ import type { Gated } from './budget';
 import type { SearchPage, UpsertSummary } from './ports';
 import { nextPage } from './query';
 
-/** One slice of a plan: a first page, and the name it runs under. */
+/** One slice of a plan: a first page, and the saved search it runs — by id and by name — when it is one. */
 export interface PlannedSlice {
+  searchId: string | null;
   name: string | null;
   query: OpportunityQuery;
+}
+
+/** One slice as it ran: its report, and the ids of the notices its pages carried — what a yield is counted over. */
+export interface SliceRun {
+  slice: PlannedSlice;
+  report: SliceReport;
+  noticeIds: string[];
 }
 
 export interface PullDeps {
@@ -30,7 +38,8 @@ export interface PullDeps {
 }
 
 export interface PullOutcome {
-  slices: SliceReport[];
+  /** Every planned slice, in the plan's order. */
+  runs: SliceRun[];
   stoppedBy: PullStop | null;
 }
 
@@ -62,7 +71,7 @@ const sliceReport = (
 export async function runPull(plan: readonly PlannedSlice[], deps: PullDeps): Promise<PullOutcome> {
   const startedAt = deps.now();
   const seenAt = startedAt;
-  const slices: SliceReport[] = [];
+  const runs: SliceRun[] = [];
   let stoppedBy: PullStop | null = null;
 
   for (const slice of plan) {
@@ -70,10 +79,15 @@ export async function runPull(plan: readonly PlannedSlice[], deps: PullDeps): Pr
       stoppedBy = 'deadline';
     }
     if (stoppedBy !== null) {
-      slices.push(sliceReport(slice, 'skipped', `stopped earlier: ${stoppedBy}`));
+      runs.push({
+        slice,
+        report: sliceReport(slice, 'skipped', `stopped earlier: ${stoppedBy}`),
+        noticeIds: [],
+      });
       continue;
     }
     const report = sliceReport(slice, 'ok', null);
+    const noticeIds: string[] = [];
     let query = slice.query;
     for (let page = 0; page < deps.maxPagesPerSlice; page += 1) {
       const result = await deps.search(query);
@@ -82,6 +96,7 @@ export async function runPull(plan: readonly PlannedSlice[], deps: PullDeps): Pr
         report.pages += 1;
         report.received += opportunities.length + rejected.length;
         report.rejected += rejected.length;
+        noticeIds.push(...opportunities.map((opportunity) => opportunity.noticeId));
         const summary = await deps.store(opportunities, seenAt);
         report.inserted += summary.inserted;
         report.updated += summary.updated;
@@ -116,8 +131,8 @@ export async function runPull(plan: readonly PlannedSlice[], deps: PullDeps): Pr
       deps.warn(`slice ${describeQuery(query)} failed — ${report.detail}`);
       break;
     }
-    slices.push(report);
+    runs.push({ slice, report, noticeIds });
   }
 
-  return { slices, stoppedBy };
+  return { runs, stoppedBy };
 }

@@ -48,6 +48,7 @@ export const tinySearches = (profileId = 'tiny'): SavedSearchRecord[] =>
     days: 3,
     includedInPull: true,
     lastRunAt: null,
+    lastYield: null,
     createdAt: T0,
     updatedAt: T0,
     ...search,

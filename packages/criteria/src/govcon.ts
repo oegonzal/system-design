@@ -303,6 +303,11 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
       'After each scheduled pull the lead rule runs over the store: every stored notice the profile ranks in the tier its alert policy names, or a better one, is one alert keyed by its notice, carrying the score and tier it was raised at, raised once through the ledger and listed in a digest of its own. The rule reads the store and not the pull, so a lead a refused bus kept back is raised by the next run; a policy with no tier raises none, and a stored profile from before the tier reads as the declared default.',
   },
   {
+    id: 'GOV-37',
+    statement:
+      'Every run of a saved search, by itself or as a slice of a pull, stamps it, and a run that read the source leaves on it what the read brought in: the records the source returned, how many were notices the store had not seen, and how the profile ranks what it carried — by tier for the notices its leads list shows, counted together for the ones a gate keeps off it. A run that read no page — answered from the cache window, skipped, refused — leaves the yield of the last read as it was; a filter never saved keeps nothing; and a stored yield its schema refuses reads as none.',
+  },
+  {
     id: 'GOV-21',
     statement:
       'Spending arithmetic is pure and declared: fiscal periods start in October, a series is aligned on the periods asked for with the partial month marked, the projection is the declared seasonal mean of prior years scaled by the year-to-date ratio only after the declared base, the horizon walk pages the source by number, finds the page where end dates cross today by doubling and halving, reads forward from the soonest-ending award inside a page bound and the wall-clock deadline, and says how far the window is complete, and agency periods are aligned on those present, the year asked for an agency’s offices defaulting to the one the source’s own directory reports active.',

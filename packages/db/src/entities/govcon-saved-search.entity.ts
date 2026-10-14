@@ -16,6 +16,9 @@ import { GovconSearchProfile } from './govcon-search-profile.entity';
  * against the last `days` days and — when `included_in_pull` — as one slice
  * of the profile's daily pull, in `pull_order`. The profile's pull is
  * exactly its flagged searches, so there is one place a slice is declared.
+ * `last_run_at` is when it last ran at all; `last_yield` is what its last
+ * read of the source brought in, which a run answered from the cache window
+ * leaves alone.
  */
 @Entity()
 @Unique({ properties: ['profile', 'name'] })
@@ -48,6 +51,10 @@ export class GovconSavedSearch {
 
   @Property({ type: 'timestamptz', nullable: true })
   lastRunAt!: Date | null;
+
+  /** What its last read of the source brought in; null until a run has read it. Read through its schema, never trusted. */
+  @Property({ type: 'json', nullable: true })
+  lastYield!: unknown;
 
   @Property({ type: 'timestamptz' })
   createdAt!: Date;

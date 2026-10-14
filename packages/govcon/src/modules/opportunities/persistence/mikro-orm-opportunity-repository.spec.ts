@@ -125,6 +125,7 @@ describe('the opportunity repository in Postgres', () => {
       naicsCodes: null,
       setAsideCode: null,
       noticeTypes: null,
+      noticeIds: null,
       agencyContains: null,
       textContains: null,
       limit: 100,
@@ -158,6 +159,10 @@ describe('the opportunity repository in Postgres', () => {
     expect(await ids({ noticeTypes: ['Award Notice'] })).toEqual([]);
     expect(await ids({ noticeTypes: ['Presolicitation'] })).toEqual([]);
     expect(await ids({ noticeTypes: [] })).toEqual([]);
+    // Exactly the notices named, the gates still standing; none named matches nothing.
+    expect(await ids({ noticeIds: ['open', 'closed', 'hubzone', 'nope'] })).toEqual(['open']);
+    expect(await ids({ noticeIds: ['unknown', 'open'], naicsPrefix: '33' })).toEqual(['open']);
+    expect(await ids({ noticeIds: [] })).toEqual([]);
     expect(await ids({ agencyContains: 'dla aviation' })).toEqual(['unknown', 'open']);
     expect(await ids({ textContains: 'SOFTWARE' })).toEqual(['unknown']);
     expect(await ids({ textContains: 'SPE4A7-26' })).toEqual(['unknown', 'open']);

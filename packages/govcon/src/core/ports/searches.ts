@@ -1,4 +1,4 @@
-import type { QueryFilter } from '@sysdesign/contracts';
+import type { QueryFilter, SearchYield } from '@sysdesign/contracts';
 
 export interface SavedSearchInput {
   name: string;
@@ -12,8 +12,18 @@ export interface SavedSearchRecord extends SavedSearchInput {
   id: string;
   profileId: string;
   lastRunAt: Date | null;
+  /** What its last read of the source brought in; null until a run has read it. */
+  lastYield: SearchYield | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+/** One run of a saved search, by itself or as a slice of a pull. */
+export interface SearchRun {
+  id: string;
+  at: Date;
+  /** What the run brought in when it read the source; null — answered from the cache window, skipped, refused — leaves the last yield as it is. */
+  yield: SearchYield | null;
 }
 
 /** Saved searches by profile; names are unique within a profile. */
@@ -30,5 +40,6 @@ export interface SavedSearchRepository {
     at: Date,
   ): Promise<SavedSearchRecord | null | 'conflict'>;
   remove(id: string): Promise<boolean>;
-  markRun(ids: readonly string[], at: Date): Promise<void>;
+  /** Each search stamped as run then; its yield replaced only when the run brought one. */
+  recordRuns(runs: readonly SearchRun[]): Promise<void>;
 }

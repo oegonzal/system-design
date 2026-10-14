@@ -52,7 +52,7 @@ export class MikroOrmOpportunityRepository implements OpportunityRepository {
   /** Every gate and filter in SQL; one row past the limit says whether it cut the set. */
   async findCandidates(filter: CandidateFilter): Promise<CandidateSet> {
     // An empty set names nothing: answered here, since SQL has no `in ()`.
-    if (filter.naicsCodes !== null && filter.naicsCodes.length === 0) {
+    if ([filter.naicsCodes, filter.noticeIds].some((set) => set !== null && set.length === 0)) {
       return { opportunities: [], capped: false };
     }
     const conditions: FilterQuery<GovconOpportunity>[] = [];
@@ -90,6 +90,9 @@ export class MikroOrmOpportunityRepository implements OpportunityRepository {
     if (filter.setAsideCode !== null) conditions.push({ setAsideCode: filter.setAsideCode });
     if (filter.noticeTypes !== null) {
       conditions.push({ noticeType: { $in: [...filter.noticeTypes] } });
+    }
+    if (filter.noticeIds !== null) {
+      conditions.push({ noticeId: { $in: [...filter.noticeIds] } });
     }
     if (filter.agencyContains !== null) {
       conditions.push({ agencyPath: { $ilike: `%${escapeLike(filter.agencyContains)}%` } });

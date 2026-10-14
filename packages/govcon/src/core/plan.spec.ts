@@ -27,6 +27,7 @@ describe('the pull plan', () => {
     );
     expect(plan).toEqual([
       {
+        searchId: 's-1',
         name: 'Machine shops',
         query: {
           limit: 100,
@@ -37,6 +38,7 @@ describe('the pull plan', () => {
         },
       },
       {
+        searchId: 's-2',
         name: 'Computer services',
         query: {
           limit: 100,
@@ -55,6 +57,7 @@ describe('the pull plan', () => {
         { from: '2026-09-20', to: '2026-09-26' },
       ),
     ).toEqual({
+      searchId: null,
       name: null,
       query: {
         limit: 100,

@@ -9,7 +9,9 @@ import type {
   SavedSearchInput,
   SavedSearchRecord,
   SavedSearchRepository,
+  SearchRun,
 } from '../../../core/ports';
+import { readYield } from '../../../core/yield';
 
 const toRecord = (row: GovconSavedSearch): SavedSearchRecord => ({
   id: row.id,
@@ -20,6 +22,8 @@ const toRecord = (row: GovconSavedSearch): SavedSearchRecord => ({
   includedInPull: row.includedInPull,
   pullOrder: row.pullOrder,
   lastRunAt: row.lastRunAt,
+  // A stored yield the schema refuses reads as none.
+  lastYield: readYield(row.lastYield),
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
 });
@@ -56,6 +60,7 @@ export class MikroOrmSavedSearchRepository implements SavedSearchRepository {
       profile: em.getReference(GovconSearchProfile, profileId),
       ...input,
       lastRunAt: null,
+      lastYield: null,
       createdAt: at,
       updatedAt: at,
     });
@@ -90,10 +95,14 @@ export class MikroOrmSavedSearchRepository implements SavedSearchRepository {
     return (await this.em.fork().nativeDelete(GovconSavedSearch, { id })) > 0;
   }
 
-  async markRun(ids: readonly string[], at: Date): Promise<void> {
-    if (ids.length === 0) return;
-    await this.em
-      .fork()
-      .nativeUpdate(GovconSavedSearch, { id: { $in: [...ids] } }, { lastRunAt: at });
+  async recordRuns(runs: readonly SearchRun[]): Promise<void> {
+    const em = this.em.fork();
+    for (const run of runs) {
+      await em.nativeUpdate(
+        GovconSavedSearch,
+        { id: run.id },
+        run.yield === null ? { lastRunAt: run.at } : { lastRunAt: run.at, lastYield: run.yield },
+      );
+    }
   }
 }

@@ -15,6 +15,7 @@ export const toSavedSearch = (record: SavedSearchRecord): SavedSearch => ({
   includedInPull: record.includedInPull,
   pullOrder: record.pullOrder,
   lastRunAt: record.lastRunAt === null ? null : record.lastRunAt.toISOString(),
+  lastYield: record.lastYield,
   createdAt: record.createdAt.toISOString(),
   updatedAt: record.updatedAt.toISOString(),
 });

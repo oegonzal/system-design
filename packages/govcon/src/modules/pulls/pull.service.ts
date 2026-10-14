@@ -14,8 +14,10 @@ import type {
   OpportunitySearch,
   SavedSearchRepository,
 } from '../../core/ports';
-import { runPull, type PlannedSlice } from '../../core/pull';
+import { runPull, type PlannedSlice, type SliceRun } from '../../core/pull';
 import { messageOf } from '../../core/text';
+import { yieldOf } from '../../core/yield';
+import { OpportunitiesService } from '../opportunities/opportunities.service';
 import { OPPORTUNITY_REPOSITORY } from '../opportunities/tokens';
 import { ProfilesService } from '../profiles/profiles.service';
 import { SearchesService } from '../profiles/searches.service';
@@ -29,7 +31,10 @@ type WindowRequest = Pick<StartPullRequest, 'days' | 'from' | 'to'>;
  * gate, storing what normalized — or one saved search by itself, or one
  * filter never saved. All three are the same run over a different plan and
  * answer the same report. The window is resolved here with the injected
- * clock; a window the plan cannot run is a 400.
+ * clock; a window the plan cannot run is a 400. Every slice that is a saved
+ * search is stamped as run, and when it read the source its search keeps
+ * what it brought in: how much, how much of it new, and how the profile
+ * ranked it.
  */
 @Injectable()
 export class PullService {
@@ -43,6 +48,7 @@ export class PullService {
     @Inject(REQUEST_GATE) private readonly gate: RequestGate,
     private readonly profiles: ProfilesService,
     private readonly searches: SearchesService,
+    private readonly opportunities: OpportunitiesService,
     @Inject(CLOCK) private readonly now: () => Date,
   ) {}
 
@@ -51,13 +57,7 @@ export class PullService {
     const profile = await this.profiles.resolve(profileId);
     const window = this.window(request);
     const searches = await this.savedSearches.listByProfile(profile.id);
-    const plan = planPulls(profile, searches, window);
-    const report = await this.execute(profile, plan, window);
-    await this.savedSearches.markRun(
-      searches.filter((search) => search.includedInPull).map((search) => search.id),
-      this.now(),
-    );
-    return report;
+    return this.execute(profile, planPulls(profile, searches, window), window);
   }
 
   /** One saved search, now, over its own days unless a window is given. */
@@ -67,13 +67,7 @@ export class PullService {
     const explicit =
       request.days !== undefined || request.from !== undefined || request.to !== undefined;
     const window = this.window(explicit ? request : { days: search.days });
-    const report = await this.execute(
-      profile,
-      [planSearch(profile, search.name, search.filter, window)],
-      window,
-    );
-    await this.savedSearches.markRun([search.id], this.now());
-    return report;
+    return this.execute(profile, [planSearch(profile, search, search.filter, window)], window);
   }
 
   /** One filter, now, never saved. */
@@ -92,7 +86,8 @@ export class PullService {
     plan: readonly PlannedSlice[],
     window: PullWindow,
   ): Promise<PullReport> {
-    const { slices, stoppedBy } = await runPull(plan, {
+    const startedAt = this.now();
+    const { runs, stoppedBy } = await runPull(plan, {
       maxPagesPerSlice: profile.pull.maxPagesPerSlice,
       deadlineMs: this.budget.pullDeadlineMs,
       now: this.now,
@@ -104,15 +99,39 @@ export class PullService {
       store: (opportunities, seenAt) => this.repository.upsertMany(opportunities, seenAt),
       warn: (message) => this.logger.warn(message),
     });
+    await this.record(profile, runs, window, startedAt);
     return {
       profile: profile.id,
       window,
       source: { id: this.search.id, availability: this.search.availability },
-      slices,
+      slices: runs.map((run) => run.report),
       spent: await this.gate.spent(this.search.id),
       budget: bucketOf(this.budget, this.search.id)?.dailyBudget ?? 0,
       stoppedBy,
     };
+  }
+
+  /** The saved searches among the slices, each stamped as run then, with its yield when it read the source — ranked once for all of them. */
+  private async record(
+    profile: SearchProfile,
+    runs: readonly SliceRun[],
+    window: PullWindow,
+    at: Date,
+  ): Promise<void> {
+    const saved = runs.flatMap((run) =>
+      run.slice.searchId === null ? [] : [{ id: run.slice.searchId, run }],
+    );
+    if (saved.length === 0) return;
+    const carried = [...new Set(saved.flatMap(({ run }) => run.noticeIds))];
+    const ranked = new Map(
+      (await this.opportunities.rankedAmong(profile, carried)).map((lead) => [
+        lead.opportunity.noticeId,
+        lead,
+      ]),
+    );
+    await this.savedSearches.recordRuns(
+      saved.map(({ id, run }) => ({ id, at, yield: yieldOf(run, ranked, window, at) })),
+    );
   }
 
   private window(request: WindowRequest): PullWindow {

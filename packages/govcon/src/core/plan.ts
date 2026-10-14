@@ -69,11 +69,30 @@ export function resolveWindow(
 
 /** What the plan needs of a saved search. */
 export interface PlannableSearch {
+  id: string;
   name: string;
   filter: QueryFilter;
   includedInPull: boolean;
   pullOrder: number;
 }
+
+/** One slice: a filter's first page over a window, for the saved search it is, when it is one. */
+const sliceOf = (
+  profile: SearchProfile,
+  saved: Pick<PlannableSearch, 'id' | 'name'> | null,
+  filter: QueryFilter,
+  { from, to }: PullWindow,
+): PlannedSlice => ({
+  searchId: saved?.id ?? null,
+  name: saved?.name ?? null,
+  query: canonicalQuery({
+    ...filter,
+    postedFrom: from,
+    postedTo: to,
+    limit: profile.pull.pageSize,
+    offset: 0,
+  }),
+});
 
 /**
  * The first page of every saved search flagged for the pull, in `pullOrder`
@@ -85,38 +104,19 @@ export function planPulls(
   searches: readonly PlannableSearch[],
   window: PullWindow,
 ): PlannedSlice[] {
-  const { from, to } = validateWindow(window);
+  const valid = validateWindow(window);
   return searches
     .filter((search) => search.includedInPull)
     .sort((a, b) => a.pullOrder - b.pullOrder || a.name.localeCompare(b.name))
-    .map((search) => ({
-      name: search.name,
-      query: canonicalQuery({
-        ...search.filter,
-        postedFrom: from,
-        postedTo: to,
-        limit: profile.pull.pageSize,
-        offset: 0,
-      }),
-    }));
+    .map((search) => sliceOf(profile, search, search.filter, valid));
 }
 
-/** One search run by itself: the same slice a pull would run, under its name. */
+/** One search run by itself: the same slice a pull would run — a saved search's, or a bare filter's under no name. */
 export function planSearch(
   profile: SearchProfile,
-  name: string | null,
+  saved: Pick<PlannableSearch, 'id' | 'name'> | null,
   filter: QueryFilter,
   window: PullWindow,
 ): PlannedSlice {
-  const { from, to } = validateWindow(window);
-  return {
-    name,
-    query: canonicalQuery({
-      ...filter,
-      postedFrom: from,
-      postedTo: to,
-      limit: profile.pull.pageSize,
-      offset: 0,
-    }),
-  };
+  return sliceOf(profile, saved, filter, validateWindow(window));
 }

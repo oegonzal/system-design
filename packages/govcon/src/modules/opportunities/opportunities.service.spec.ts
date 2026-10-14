@@ -222,4 +222,25 @@ describe('the opportunities service', () => {
       ],
     });
   });
+
+  it('[GOV-37] ranks the stored notices it is named, and only those the leads list would show — a gated one and one never stored are on no list — and names none without reading anything', async () => {
+    const { awards, repository, service } = await harness();
+    await repository.upsertMany(
+      [
+        opportunityOf({ noticeId: 'best' }),
+        opportunityOf({ noticeId: 'other' }),
+        opportunityOf({ noticeId: 'gone', setAsideCode: 'HZC' }),
+      ],
+      NOW,
+    );
+    const ranked = await service.rankedAmong(tinyProfile(), ['best', 'gone', 'never-stored']);
+    expect(ranked.map((lead) => [lead.opportunity.noticeId, lead.tier])).toEqual([
+      ['best', 'high'],
+    ]);
+    const find = vi.spyOn(repository, 'findCandidates');
+    const history = vi.spyOn(awards, 'history');
+    expect(await service.rankedAmong(tinyProfile(), [])).toEqual([]);
+    expect(find).not.toHaveBeenCalled();
+    expect(history).not.toHaveBeenCalled();
+  });
 });

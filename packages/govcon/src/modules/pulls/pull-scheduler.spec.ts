@@ -1,33 +1,19 @@
 import { DEFAULT_ALERT_POLICY, type Opportunity } from '@sysdesign/contracts';
 
-import { RequestGate, type BudgetPolicy } from '../../core/budget';
 import type { SearchPage } from '../../core/ports';
 import {
   InMemoryAlertLedger,
-  InMemoryAwardRepository,
-  InMemoryBidRepository,
-  InMemoryOpportunityRepository,
-  InMemoryProfileRepository,
-  InMemorySavedSearchRepository,
-  InMemorySourceCallLog,
   okPage,
   opportunityOf,
   RecordingAlertSink,
-  scriptedDescriptions,
-  scriptedSearch,
   tinyProfile,
-  tinySearches,
   type Scripted,
 } from '../../core/testing';
 import { AlertRaiser } from '../alerts/alert-raiser';
 import type { Cadence } from '../app/serve-job';
-import { OpportunitiesService } from '../opportunities/opportunities.service';
-import { ProfilesService } from '../profiles/profiles.service';
-import { SearchesService } from '../profiles/searches.service';
 import { PullScheduler } from './pull-scheduler';
-import { PullService } from './pull.service';
+import { NOW, pullHarness, type PullHarnessOptions } from './testing';
 
-const NOW = new Date('2026-09-26T12:00:00Z');
 const DAY = 24 * 60 * 60 * 1000;
 
 /** Ranked by the tiny profile at `NOW`: `best` 92.5 high, `mid` 52.5 medium. */
@@ -41,82 +27,36 @@ const MID: Opportunity = opportunityOf({
   title: 'Help desk',
 });
 
-interface Options {
+interface Options extends PullHarnessOptions {
   replies?: readonly Scripted<SearchPage>[];
   schedule?: Cadence;
-  /** The profile stored as the default; null stores none. */
-  profile?: ReturnType<typeof tinyProfile> | null;
-  ttlMs?: number;
-  /** False builds a source with no key. */
-  enabled?: boolean;
 }
 
+/** The pull's harness with a day's cache window, and the scheduler over it with its own ledger and sink. */
 async function harness({
   replies = [okPage([BEST]), okPage([MID])],
   schedule = { everyMs: null },
-  profile = tinyProfile(),
-  ttlMs = DAY,
-  enabled = true,
+  ...options
 }: Options = {}) {
-  let now = NOW;
-  const clock = () => now;
-  const search = scriptedSearch('sam.gov', replies, enabled);
-  const log = new InMemorySourceCallLog();
-  const repository = new InMemoryOpportunityRepository();
-  const profileRepository = new InMemoryProfileRepository();
-  const searchRepository = new InMemorySavedSearchRepository();
-  const policy: BudgetPolicy = {
-    ttlMs,
-    pullDeadlineMs: 120_000,
-    buckets: { 'sam.gov': { dailyBudget: 10 } },
-  };
-  if (profile !== null) {
-    await profileRepository.insert(profile, true, NOW);
-    for (const saved of tinySearches(profile.id)) {
-      await searchRepository.insert(profile.id, saved, NOW);
-    }
-  }
-  const gate = new RequestGate(log, policy, clock);
-  const profiles = new ProfilesService(profileRepository, searchRepository, clock);
-  const pulls = new PullService(
-    search,
-    repository,
-    searchRepository,
-    policy,
-    gate,
-    profiles,
-    new SearchesService(searchRepository, profiles, clock),
-    clock,
-  );
-  const opportunities = new OpportunitiesService(
-    repository,
-    new InMemoryBidRepository(repository),
-    new InMemoryAwardRepository(),
-    scriptedDescriptions('sam.gov'),
-    gate,
-    profiles,
-    clock,
-  );
+  const pull = await pullHarness(replies, { ttlMs: DAY, ...options });
   const ledger = new InMemoryAlertLedger();
   const sink = new RecordingAlertSink();
   const scheduler = new PullScheduler(
     schedule,
-    search,
-    pulls,
-    opportunities,
-    profiles,
-    new AlertRaiser(ledger, sink, clock),
+    pull.inner,
+    pull.service,
+    pull.opportunities,
+    pull.profiles,
+    new AlertRaiser(ledger, sink, pull.clock),
   );
   return {
     scheduler,
-    pulls,
-    search,
-    repository,
+    pulls: pull.service,
+    search: pull.inner,
+    repository: pull.repository,
     ledger,
     sink,
-    advance: (ms: number) => {
-      now = new Date(now.getTime() + ms);
-    },
+    advance: pull.advance,
   };
 }
 

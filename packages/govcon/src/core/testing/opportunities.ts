@@ -80,6 +80,7 @@ export class InMemoryOpportunityRepository implements OpportunityRepository {
           filter.noticeTypes === null ||
           (o.noticeType !== null && filter.noticeTypes.includes(o.noticeType)),
       )
+      .filter((o) => filter.noticeIds === null || filter.noticeIds.includes(o.noticeId))
       .filter((o) => filter.agencyContains === null || has(o.agencyPath, filter.agencyContains))
       .filter(
         (o) =>

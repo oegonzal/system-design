@@ -62,7 +62,7 @@ describe('the profile and saved-search repositories in Postgres', () => {
     expect(await profiles.count()).toBe(1);
   });
 
-  it('[GOV-14] keeps saved searches per profile by unique name, in pull order, stamped when run, gone with their profile', async () => {
+  it('[GOV-14] [GOV-37] keeps saved searches per profile by unique name, in pull order, stamped when run with what the run brought in, gone with their profile', async () => {
     const profiles = new MikroOrmProfileRepository(orm.em);
     const searches = new MikroOrmSavedSearchRepository(orm.em);
     await profiles.insert(tinyProfile(), true, t1);
@@ -98,9 +98,32 @@ describe('the profile and saved-search repositories in Postgres', () => {
     ).toMatchObject({ includedInPull: false, updatedAt: t2 });
     expect(await searches.update('00000000-0000-0000-0000-000000000000', input, t2)).toBeNull();
 
-    await searches.markRun([first.id], t2);
-    expect((await searches.find(first.id))?.lastRunAt).toEqual(t2);
-    await searches.markRun([], t2);
+    // A run stamps its search; one that read the source leaves what it brought in.
+    const brought = {
+      at: t2.toISOString(),
+      window: { from: '2026-09-23', to: '2026-09-26' },
+      received: 37,
+      inserted: 5,
+      truncated: false,
+      tiers: { high: 1, medium: 3, low: 20 },
+      unlisted: 13,
+    };
+    await searches.recordRuns([
+      { id: first.id, at: t2, yield: brought },
+      { id: second.id, at: t2, yield: null },
+    ]);
+    expect(await searches.find(first.id)).toMatchObject({ lastRunAt: t2, lastYield: brought });
+    expect(await searches.find(second.id)).toMatchObject({ lastRunAt: t2, lastYield: null });
+    // A later run that read nothing — the cache window answered — moves the stamp and leaves the yield.
+    const t3 = new Date('2026-09-26T16:00:00Z');
+    await searches.recordRuns([{ id: first.id, at: t3, yield: null }]);
+    expect(await searches.find(first.id)).toMatchObject({ lastRunAt: t3, lastYield: brought });
+    await searches.recordRuns([]);
+    // A stored yield its schema refuses reads as none: refused, never trusted.
+    await orm.em
+      .fork()
+      .nativeUpdate(GovconSavedSearch, { id: first.id }, { lastYield: { received: 'many' } });
+    expect((await searches.find(first.id))?.lastYield).toBeNull();
 
     expect(await searches.remove(second.id)).toBe(true);
     expect(await searches.remove(second.id)).toBe(false);

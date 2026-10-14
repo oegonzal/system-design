@@ -1,69 +1,9 @@
 import { NotFoundException } from '@nestjs/common';
 
-import { RequestGate, type BudgetPolicy } from '../../core/budget';
-import type { SearchPage } from '../../core/ports';
-import type { SearchProfile } from '../../core/profile';
-import {
-  failure,
-  InMemoryOpportunityRepository,
-  InMemoryProfileRepository,
-  InMemorySavedSearchRepository,
-  InMemorySourceCallLog,
-  okPage,
-  opportunityOf,
-  pick,
-  scriptedSearch,
-  tinyProfile,
-  tinySearches,
-  type Scripted,
-} from '../../core/testing';
-import { ProfilesService } from '../profiles/profiles.service';
-import { SearchesService } from '../profiles/searches.service';
-import { PullService } from './pull.service';
+import { failure, okPage, opportunityOf, pick } from '../../core/testing';
+import { NOW, pullHarness as harness } from './testing';
 
-const NOW = new Date('2026-09-26T12:00:00Z');
 const window = { from: '2026-09-23', to: '2026-09-26' };
-
-async function harness(
-  replies: readonly Scripted<SearchPage>[],
-  options: {
-    profile?: SearchProfile;
-    dailyBudget?: number;
-    ttlMs?: number;
-    searches?: boolean;
-  } = {},
-) {
-  const inner = scriptedSearch('sam.gov', replies);
-  const log = new InMemorySourceCallLog();
-  const repository = new InMemoryOpportunityRepository();
-  const profileRepository = new InMemoryProfileRepository();
-  const searchRepository = new InMemorySavedSearchRepository();
-  const policy: BudgetPolicy = {
-    ttlMs: options.ttlMs ?? 0,
-    pullDeadlineMs: 120_000,
-    buckets: { 'sam.gov': { dailyBudget: options.dailyBudget ?? 10 } },
-  };
-  const profile = options.profile ?? tinyProfile();
-  await profileRepository.insert(profile, true, NOW);
-  if (options.searches !== false) {
-    for (const search of tinySearches(profile.id)) {
-      await searchRepository.insert(profile.id, search, NOW);
-    }
-  }
-  const profiles = new ProfilesService(profileRepository, searchRepository, () => NOW);
-  const searches = new SearchesService(searchRepository, profiles, () => NOW);
-  const service = new PullService(
-    inner,
-    repository,
-    searchRepository,
-    policy,
-    new RequestGate(log, policy, () => NOW),
-    profiles,
-    searches,
-    () => NOW,
-  );
-  return { inner, log, repository, searchRepository, service, profile };
-}
 
 describe('the pull service', () => {
   it('[GOV-1] [GOV-14] pulls every saved search flagged for the pull, stores what normalized and reports what did not, per slice', async () => {
@@ -182,5 +122,90 @@ describe('the pull service', () => {
       /starts after it ends/,
     );
     await expect(service.pull('nope', window)).rejects.toBeInstanceOf(NotFoundException);
+  });
+
+  it('[GOV-37] every saved search a pull ran keeps what its read brought in — what the source returned, how much of it was new, and how the profile ranked what it carried — a notice two searches returned counted for both and new for the first', async () => {
+    const mid = opportunityOf({
+      noticeId: 'mid',
+      naicsCode: '541512',
+      naicsCodes: ['541512'],
+      classificationCode: null,
+      setAsideCode: null,
+      title: 'Help desk',
+    });
+    const { service, searchRepository } = await harness([
+      okPage(
+        [
+          opportunityOf({ noticeId: 'best' }),
+          opportunityOf({ noticeId: 'gone', setAsideCode: 'HZC' }),
+          mid,
+        ],
+        4,
+        [{ noticeId: null, issues: ['noticeId: missing'] }],
+      ),
+      okPage([mid]),
+    ]);
+    await service.pull('tiny', window);
+    expect(
+      (await searchRepository.listByProfile('tiny')).map((search) => [
+        search.name,
+        search.lastYield,
+      ]),
+    ).toEqual([
+      [
+        'Machine shops',
+        {
+          at: NOW.toISOString(),
+          window,
+          received: 4,
+          inserted: 3,
+          truncated: false,
+          tiers: { high: 1, medium: 1, low: 0 },
+          unlisted: 1,
+        },
+      ],
+      [
+        'Computer services',
+        {
+          at: NOW.toISOString(),
+          window,
+          received: 1,
+          inserted: 0,
+          truncated: false,
+          tiers: { high: 0, medium: 1, low: 0 },
+          unlisted: 0,
+        },
+      ],
+    ]);
+  });
+
+  it('[GOV-37] a run answered from the cache window stamps its search and leaves the yield of its last read; a search run by itself keeps its own; a filter never saved keeps nothing anywhere', async () => {
+    const { service, searchRepository, advance } = await harness([okPage([opportunityOf()])], {
+      ttlMs: 60 * 60 * 1000,
+    });
+    await service.pull('tiny', window);
+    const [first] = await searchRepository.listByProfile('tiny');
+    if (first === undefined) throw new Error('expected a saved search');
+    const read = first.lastYield;
+    expect(read).toMatchObject({ received: 1, inserted: 1, tiers: { high: 1, medium: 0, low: 0 } });
+
+    advance(10 * 60 * 1000);
+    const again = await service.pull('tiny', window);
+    expect(again.slices.map((slice) => slice.outcome)).toEqual(['cached', 'cached']);
+    const later = await searchRepository.find(first.id);
+    expect(later?.lastRunAt).toEqual(new Date(NOW.getTime() + 10 * 60 * 1000));
+    expect(later?.lastYield).toEqual(read);
+
+    // Run by itself over another window: a new read, and its own yield.
+    await service.runSaved(first.id, { days: 1 });
+    expect((await searchRepository.find(first.id))?.lastYield).toMatchObject({
+      window: { from: '2026-09-25', to: '2026-09-26' },
+      received: 1,
+      inserted: 0,
+    });
+
+    const before = await searchRepository.listByProfile('tiny');
+    await service.runFilter('tiny', { naics: '11' }, { days: 7 });
+    expect(await searchRepository.listByProfile('tiny')).toEqual(before);
   });
 });

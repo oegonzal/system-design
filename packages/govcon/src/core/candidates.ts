@@ -37,6 +37,7 @@ export function candidateFilterOf(
     naicsCodes: null,
     setAsideCode: filters.setAside ?? null,
     noticeTypes: filters.noticeTypes ?? null,
+    noticeIds: null,
     agencyContains: filters.agency ?? null,
     textContains: filters.q ?? null,
     limit: MAX_CANDIDATES,

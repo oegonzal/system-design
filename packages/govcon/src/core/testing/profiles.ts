@@ -7,6 +7,7 @@ import type {
   SavedSearchInput,
   SavedSearchRecord,
   SavedSearchRepository,
+  SearchRun,
 } from '../ports';
 
 export class InMemoryProfileRepository implements ProfileRepository {
@@ -82,6 +83,7 @@ export class InMemorySavedSearchRepository implements SavedSearchRepository {
       id: `s-${this.next++}`,
       profileId,
       lastRunAt: null,
+      lastYield: null,
       createdAt: at,
       updatedAt: at,
       ...input,
@@ -107,10 +109,15 @@ export class InMemorySavedSearchRepository implements SavedSearchRepository {
     return this.rows.delete(id);
   }
 
-  async markRun(ids: readonly string[], at: Date): Promise<void> {
-    for (const id of ids) {
-      const row = this.rows.get(id);
-      if (row) this.rows.set(id, { ...row, lastRunAt: at });
+  async recordRuns(runs: readonly SearchRun[]): Promise<void> {
+    for (const run of runs) {
+      const row = this.rows.get(run.id);
+      if (row === undefined) continue;
+      this.rows.set(run.id, {
+        ...row,
+        lastRunAt: run.at,
+        lastYield: run.yield ?? row.lastYield,
+      });
     }
   }
 

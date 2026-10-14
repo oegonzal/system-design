@@ -42,6 +42,7 @@ export const openNoticesFilter = (naicsCodes: readonly string[], now: Date): Can
   naicsCodes,
   setAsideCode: null,
   noticeTypes: null,
+  noticeIds: null,
   agencyContains: null,
   textContains: null,
   limit: MAX_RECOMPETE_NOTICES,

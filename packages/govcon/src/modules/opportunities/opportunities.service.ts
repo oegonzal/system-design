@@ -1,6 +1,7 @@
 import { Inject, Injectable, Logger, NotFoundException } from '@nestjs/common';
 import {
   MAX_AWARD_LIMIT,
+  MAX_CANDIDATES,
   type Bid,
   type Description,
   type DescriptionFetch,
@@ -78,6 +79,28 @@ export class OpportunitiesService {
       candidates: opportunities.length,
       capped,
     };
+  }
+
+  /**
+   * Of these stored notices, the ones the profile's leads list would show,
+   * scored — what a run's yield is counted over. Asked for a bounded number
+   * at a time, so no read is cut by the store's own bound.
+   */
+  async rankedAmong(profile: SearchProfile, noticeIds: readonly string[]): Promise<Lead[]> {
+    // A pull answered wholly from the cache window carried nothing: no read at all.
+    if (noticeIds.length === 0) return [];
+    const now = this.now();
+    const filter = candidateFilterOf(profile, {}, now);
+    const context = await this.context(profile, now);
+    const leads: Lead[] = [];
+    for (let start = 0; start < noticeIds.length; start += MAX_CANDIDATES) {
+      const { opportunities } = await this.repository.findCandidates({
+        ...filter,
+        noticeIds: noticeIds.slice(start, start + MAX_CANDIDATES),
+      });
+      leads.push(...rankLeads(opportunities, profile, context).leads);
+    }
+    return leads;
   }
 
   async leads(profileId: string | undefined, options: LeadsOptions): Promise<LeadsReport> {

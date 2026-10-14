@@ -203,7 +203,7 @@ describe('the govcon HTTP surface', () => {
     expect((await post(url, '/pulls', { profile: 'nope', days: 1 })).status).toBe(404);
   });
 
-  it('[GOV-8] [GOV-14] pulls synchronously and answers the report; the ledger counts every attempt', async () => {
+  it('[GOV-8] [GOV-14] [GOV-37] pulls synchronously and answers the report; the ledger counts every attempt, and each search keeps what its read brought in', async () => {
     const response = await pulled();
     expect(response.status).toBe(200);
     const { data: report } = await json<Envelope<PullReport>>(response);
@@ -220,6 +220,27 @@ describe('the govcon HTTP surface', () => {
     expect(source.data.buckets[0]?.spent).toBe(2);
     const searches = await get<Envelope<SavedSearch[]>>(url, '/profiles/tiny/searches');
     expect(searches.data.map((s) => s.lastRunAt)).toEqual([NOW.toISOString(), NOW.toISOString()]);
+    // Each search keeps what its read brought in: `a` ranks high and `b` is a set-aside the profile cannot bid; `c` ranks high.
+    expect(searches.data.map((s) => s.lastYield)).toEqual([
+      {
+        at: NOW.toISOString(),
+        window: report.window,
+        received: 2,
+        inserted: 2,
+        truncated: false,
+        tiers: { high: 1, medium: 0, low: 0 },
+        unlisted: 1,
+      },
+      {
+        at: NOW.toISOString(),
+        window: report.window,
+        received: 1,
+        inserted: 1,
+        truncated: false,
+        tiers: { high: 1, medium: 0, low: 0 },
+        unlisted: 0,
+      },
+    ]);
   });
 
   it('[GOV-8] [GOV-15] ranks the store over the query filters, coerced and bounded at the edge', async () => {

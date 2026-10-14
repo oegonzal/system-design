@@ -29,6 +29,8 @@ export interface CandidateFilter {
   setAsideCode: string | null;
   /** Any of these notice types, by the source's label; an empty set matches nothing. */
   noticeTypes: readonly string[] | null;
+  /** Exactly these notices, by id; an empty set matches nothing. */
+  noticeIds: readonly string[] | null;
   /** Case-insensitive substring of the agency path. */
   agencyContains: string | null;
   /** Case-insensitive substring of the title or the solicitation number. */
