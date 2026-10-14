@@ -10,7 +10,6 @@ import type { StopSignal } from './ports';
 import { runSession, type SessionOutcome } from './session-engine';
 import {
   FakeBrowser,
-  FixedClock,
   InMemoryDumpStore,
   InMemoryGoalSource,
   InMemoryLedger,
@@ -19,6 +18,7 @@ import {
   ScriptedOperator,
   type BrainScript,
 } from './testing';
+import { FixedClock } from './testing-clock';
 import { journeyPages } from './testing-journey';
 import type { ConfiguredAdvisor } from './unit-advice';
 

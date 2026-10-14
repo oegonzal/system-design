@@ -42,7 +42,24 @@ import {
   UNIT_ADVISORS,
 } from './tokens';
 
-const systemClock: Clock = { now: () => new Date() };
+/** The longest delay a timer takes; a later time is reached by re-arming. */
+const MAX_TIMER_MS = 2_147_483_647;
+
+const systemClock: Clock = {
+  now: () => new Date(),
+  at: (when, then) => {
+    let timer: ReturnType<typeof setTimeout>;
+    const arm = (): void => {
+      const left = when.getTime() - Date.now();
+      timer = setTimeout(
+        left > MAX_TIMER_MS ? arm : then,
+        Math.min(Math.max(0, left), MAX_TIMER_MS),
+      );
+    };
+    arm();
+    return () => clearTimeout(timer);
+  },
+};
 
 /**
  * Ctrl-C, or a termination, as the operator's word. The first hands the

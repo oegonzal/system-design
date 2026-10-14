@@ -18,6 +18,7 @@ import {
   type Termination,
   type Withdrawal,
 } from './ports';
+import { timeLimitOf } from './rails';
 import { closeSession, warnOf } from './session-close';
 import { rubricsFile } from './session-dump';
 import { createSessionEvents, startedEvent } from './session-events';
@@ -71,6 +72,9 @@ const byPipeline = <T>(of: (role: Role) => T): Record<string, T> =>
 /** What a question waiting on the operator is withdrawn with when the session is told to stop. */
 export const STOPPING: Withdrawal = { reason: 'abandoned', note: 'the session is stopping' };
 
+/** What a question waiting on the operator is withdrawn with when the session's time limit comes. */
+export const OUT_OF_TIME: Withdrawal = { reason: 'abandoned', note: "the session's time is up" };
+
 export async function runSession(
   deps: SessionDeps,
   options: RunSessionOptions,
@@ -116,6 +120,16 @@ export async function runSession(
     state.operatorStopped = true;
     stopping.abort(STOPPING);
   });
+  // The rails read the time limit between steps, and a step waiting on the
+  // operator has no between: when the limit comes, a question still open is
+  // withdrawn as a stop withdraws one, and the rails then read the limit. The
+  // operator pressed nothing, so the session ends max-minutes, never
+  // operator-stop. Measured 2026-10-13: a session waited 40 minutes on an
+  // unanswered question, and only an interrupt could have ended one past its
+  // limit.
+  const deadline = deps.clock.at(timeLimitOf(startedAt, options.rails), () =>
+    stopping.abort(OUT_OF_TIME),
+  );
   const ticker = startPeriodic(
     { everyMs: SESSION_HEARTBEAT_EVERY_MS, atStart: false },
     () => deps.ledger.heartbeat(state.sessionId, deps.clock.now(), state.step),
@@ -187,6 +201,7 @@ export async function runSession(
     if (!state.terminationRecorded) ctx.terminate(termination, 'engine', null);
   } finally {
     release();
+    deadline();
     // A beat in flight is let finish before the session's closing writes.
     await ticker.stop();
     await deps.browser.close().catch((caught: unknown) => warn('browser not closed', caught));

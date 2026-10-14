@@ -374,6 +374,13 @@ export interface GoalSource {
 
 export interface Clock {
   now(): Date;
+  /**
+   * Runs `then` once, when `when` has come as this clock tells time; the
+   * function returned cancels it. How the session's time limit reaches a step
+   * waiting on the operator: the rails are read between steps, and a step
+   * blocked on a question has no between.
+   */
+  at(when: Date, then: () => void): () => void;
 }
 
 /** One session's dump folder: files land as they come, the index row once at the end. */

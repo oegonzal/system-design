@@ -4,14 +4,8 @@ import type { StepPlan } from '@sysdesign/contracts';
 import { OperatorInterrupted, QuestionWithdrawn } from './ports';
 import { BrainFaulted } from './ports';
 import { STOPPING } from './session-engine';
-import {
-  decidedAnswers,
-  decidedPlan,
-  FakeBrowser,
-  FixedClock,
-  refusing,
-  ScriptedOperator,
-} from './testing';
+import { decidedAnswers, decidedPlan, FakeBrowser, refusing, ScriptedOperator } from './testing';
+import { FixedClock } from './testing-clock';
 import {
   JOURNEY_ANSWERS as ANSWERS,
   JOURNEY_PLANS as PLANS,

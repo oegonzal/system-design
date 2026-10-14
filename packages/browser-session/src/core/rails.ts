@@ -46,8 +46,14 @@ interface Rail {
   detail(state: RailState, rails: SessionRailsDto, now: Date): string;
 }
 
+const MS_PER_MINUTE = 60_000;
+
 const minutesSince = (startedAt: Date, now: Date): number =>
-  (now.getTime() - startedAt.getTime()) / 60_000;
+  (now.getTime() - startedAt.getTime()) / MS_PER_MINUTE;
+
+/** The moment the `max-minutes` rail first holds for a session started at `startedAt`. */
+export const timeLimitOf = (startedAt: Date, rails: Pick<SessionRailsDto, 'maxMinutes'>): Date =>
+  new Date(startedAt.getTime() + rails.maxMinutes * MS_PER_MINUTE);
 
 /** In the order they are checked: the operator's word first, then the session's own limits. */
 export const RAILS: readonly Rail[] = [

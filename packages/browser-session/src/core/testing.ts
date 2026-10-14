@@ -18,7 +18,6 @@ import {
   ActionFailed,
   type BrowserAction,
   type BrowserPort,
-  type Clock,
   type DumpSink,
   type DumpStore,
   type GoalSource,
@@ -354,29 +353,6 @@ export class ScriptedOperator implements OperatorPort {
   }
 }
 
-/** A clock that moves a fixed step on every read, and jumps when a spec says so. */
-export class FixedClock implements Clock {
-  private at: number;
-
-  constructor(
-    start = new Date('2026-10-03T10:00:00.000Z'),
-    private readonly stepMs = 1_000,
-  ) {
-    this.at = start.getTime();
-  }
-
-  now(): Date {
-    const now = new Date(this.at);
-    this.at += this.stepMs;
-    return now;
-  }
-
-  advance(ms: number): void {
-    this.at += ms;
-  }
-}
-
-/** A dump that keeps its files in memory, by path. */
 export class InMemoryDumpStore implements DumpStore {
   readonly files = new Map<string, string | Uint8Array>();
   readonly index: string[] = [];

@@ -131,7 +131,9 @@ async function perform(
     case 'askFields': {
       const outcome = await askFields(ctx, action.refs, observation);
       pushHistory(state, label, outcome.failed ? 'failed' : 'ok', outcome.note);
-      if (outcome.stopped) state.operatorStopped = true;
+      // A /stop the operator typed is theirs; a stop the stopping signal brought was named by
+      // whoever raised it — Ctrl-C marks the session itself, and the time limit is the rails' to report.
+      if (outcome.stopped && !ctx.stopping.aborted) state.operatorStopped = true;
       return { failed: outcome.failed, stopped: outcome.stopped };
     }
     case 'taskStart':
