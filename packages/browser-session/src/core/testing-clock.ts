@@ -47,5 +47,3 @@ export class FixedClock implements Clock {
     }
   }
 }
-
-/** A dump that keeps its files in memory, by path. */

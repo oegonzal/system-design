@@ -353,6 +353,7 @@ export class ScriptedOperator implements OperatorPort {
   }
 }
 
+/** A dump that keeps its files in memory, by path. */
 export class InMemoryDumpStore implements DumpStore {
   readonly files = new Map<string, string | Uint8Array>();
   readonly index: string[] = [];
