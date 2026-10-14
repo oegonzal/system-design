@@ -51,10 +51,11 @@ get `public, max-age=31536000, immutable`, in a rule of their own (matching rule
 values). HSTS is deliberately absent: it is a zone setting, enabled last (setup step 9), and never
 set in two places.
 
-The production origin is one declaration, `SITE.origin` in `src/data/site.ts`. Astro's `site` reads
-it (canonical URLs, the sitemap, robots.txt), so does the deploy workflow (its environment URL and
-its production checks), and `src/data/site.spec.ts` fails if its host is not the custom domain in
-`wrangler.jsonc`.
+The production origin is one declaration, `SITE.origin` in `src/data/site.ts`. The pages and
+robots.txt build their absolute URLs from it (canonical URLs, `og:url` and `og:image`, the JSON-LD);
+`astro.config.ts` makes it Astro's `site`, which the sitemap integration reads; the deploy workflow
+reads it too (its environment URL and its production checks); and `src/data/site.spec.ts` fails if
+its host is not the custom domain in `wrangler.jsonc`.
 
 | What                                          | Where                                                                         |
 | --------------------------------------------- | ----------------------------------------------------------------------------- |
@@ -117,24 +118,46 @@ ports, the e2e's preview takes 4205, and Astro's default 4321 would sit inside t
 ## Content and company facts
 
 Every fact the site states about the company lives in `packages/website/src/data/`: `company.ts`
-(the company facts, and `COMPANY_DETAILS`, the capability statement's company data in reading
-order), `founder.ts` (the About page's founder section), `services.ts` (the five services, one list
-for the home, services and government pages) and `site.ts` (name, origin, navigation).
+(the company facts — the founder and the point of contact among them, with name and title each a
+fact of its own — and `COMPANY_DETAILS`, the capability statement's company data in reading order),
+`founder.ts` (the About page's founder section), `services.ts` (the five services, one list for the
+home, services and government pages) and `site.ts` (name, origin, the company summary, the primary
+action and the closing call to action, navigation).
 
 A company fact is a `Fact` (`src/lib/fact.ts`): either `verified(value)` or `placeholder(label)`,
 where the label says where the confirmed value will come from. The site never presents an
 unconfirmed detail as fact:
 
 - A placeholder renders as a dashed `Placeholder — …` marker (`Placeholder.astro`) that says so in
-  words, not only in colour, is kept out of search snippets (`data-nosnippet`) and carries
-  `data-fact`, so checks can tell a stated fact from the copy around it.
+  words, not only in colour, and is kept out of search snippets (`data-nosnippet`). It carries
+  `data-fact="placeholder"`, by which the e2e finds every placeholder and checks that it shows its
+  word on screen and, wherever it prints, on paper (the header, footer and calls to action never
+  print).
 - Structured data never sees a placeholder. The home page's JSON-LD — an Organization and its
   WebSite, built in `src/lib/structured-data.ts` — uses confirmed facts only, and an unconfirmed
   fact leaves no key behind: the machines that read it cannot see the marker a person sees.
-  `src/lib/structured-data.spec.ts` holds this (`SITE-4`).
-- A credential can only ever be a fact. The e2e fails any page whose visible text outside
-  `[data-fact]` matches the restricted-claims list in `packages/website-e2e/src/support/claims.ts` —
-  set-aside and size statuses, clearances, certifications, a GSA Schedule, awards, prime contracts.
+  `src/lib/structured-data.spec.ts` holds this with made-up facts (`SITE-4`). A graph carries a mark
+  only that module writes, so one written by hand does not type-check and one cast to the type fails
+  to serialize, and serializing fails the build on a fact anywhere in it: a fact carries a mark only
+  `src/lib/fact.ts` writes, which a spread or `Object.assign` copy keeps. A copy of a built graph
+  keeps its mark too, and a `structuredClone` or JSON copy of a fact drops its own, so neither mark
+  proves what a shipped graph holds; the e2e reads every page's JSON-LD for that, and fails on a
+  placeholder's label or a restricted claim in it.
+- The founder's name and the founding year are facts too, and the about page's search description
+  and the capability statement's past-performance line state them only once confirmed. The bio in
+  `founder.ts` is approved copy that restates the legal name, the founder's name and the founding
+  year, and the legal name also runs through `SITE` and the pages' copy, so changing or demoting any
+  of those means rewording that copy; no check reads it.
+- A credential can only ever be a verified fact. The e2e fails any page that states a phrase from
+  the restricted-claims list in `packages/website-e2e/src/support/claims.ts` — set-aside and size
+  statuses, clearances, certifications, a GSA Schedule, awards, prime contracts — outside a verified
+  fact (`data-fact="verified"`), on screen or in print: in the copy, in a placeholder's label, in
+  the title and metadata, in an `aria-label`, `alt` or `title` attribute, or in a JSON-LD value,
+  which carries no verified-fact mark, so a credential there fails even once confirmed. It reads
+  nothing else: not a shadow tree, CSS generated content, a form control's value or placeholder,
+  another attribute or a frame. A word split by markup in content the medium does not render (a
+  closed `<details>`, a hidden element) that runs into the text beside it across a block or a line
+  break is not found either.
 
 Certifications, contract vehicles and contract past performance have no row at all, not even a
 placeholder: Enfav holds none yet, and a placeholder would imply one is pending. There is no phone
@@ -152,8 +175,8 @@ not what Enfav is registered under.
 rests on, by role and dates, never by employer. The founder's prior experience is individual
 experience, and the site says so wherever it appears: the About page heads it as prior professional experience, before
 Enfav LLC and not Enfav LLC contract past performance, and the government page's past performance
-notes that Enfav LLC was formed in 2026 and that the founder's experience is not its contract past
-performance.
+notes the year Enfav LLC was formed (`COMPANY.founded`) and that the founder's experience is not its
+contract past performance.
 
 **Copy rules**, from the approved copy:
 
@@ -179,17 +202,25 @@ production has validated.
 enfav.com was registered at Cloudflare Registrar on 2026-10-14 (UTC), on Cloudflare nameservers,
 with no DS record and nothing at the apex or www.
 
-- Confirm the registration is yours, and which Cloudflare account holds it. The Worker and the CI
-  token must live in that same account: Cloudflare will not create a custom domain on a zone you do
-  not own. If Enfav belongs in another account, move the domain now, before DNSSEC — Cloudflare says
-  to disable DNSSEC before any move between accounts.
 - Verify the ICANN registrant email by about 2026-10-29, from the verification message Registrar
   sent. An unverified registrant email puts the domain on hold with parking nameservers, which takes
   down both the site and Email Routing; the real nameservers come back by themselves once it is
   verified.
-- Leave auto-renew on (Registrar's default) and keep a valid payment method, plus a second one for
-  the retries. Renewal is first tried about 30 days before expiry and retried three times, the last
-  the day before; an expired domain enters redemption, where restoring it can cost more.
+- Confirm the registration is yours, and which Cloudflare account holds it. The Worker and the CI
+  token must live in that same account: Cloudflare will not create a custom domain on a zone you do
+  not own. If Enfav belongs in another account, settle that before anything else in this runbook.
+  Cloudflare accepts a move between accounts only once the registration is more than 10 days old
+  (after 2026-10-24 03:24 UTC), the registrant email is verified, DNSSEC is off, and enfav.com has
+  been added as a site in the target account, which then has five days to accept. The move carries
+  the registration and its contacts; the zone's settings, DNS records, Email Routing rules and
+  certificates do not come with it, and the Worker and the CI token are resources of the old
+  account. Until the move completes, do nothing in steps 2 to 10 and leave DNSSEC off. Inviting the
+  other account's people as members of the account that holds the domain avoids the move.
+- Leave auto-renew on (Registrar's default) and keep the primary payment method valid: Registrar
+  charges only the primary, on the first attempt and on every retry. Renewal is first tried about
+  30 days before expiry and retried three times, the last the day before, so check the card before
+  that window opens and act on any failed-renewal email; an expired domain enters redemption, where
+  restoring it can cost more.
 - Turn on two-factor authentication for Cloudflare and GitHub, and keep admin roles on the zone to
   the people who need them. Anyone with admin on the zone can unlock the domain and take its
   transfer code, and anyone who can push to main or change this repository's environments and
@@ -261,10 +292,16 @@ pnpm exec wrangler logout   # invalidates the OAuth token
 
 Without `--use-keyring` the token is stored in plain text — on macOS in
 `~/Library/Preferences/.wrangler/config/default.toml`, elsewhere typically in
-`~/.config/.wrangler/config/default.toml`. An OAuth login is not granular: it can do whatever your
-user can, which is why the first deploy ends by logging out unless the token is in the keyring.
+`~/.config/.wrangler/config/default.toml`. An OAuth login is not limited to one account or zone the
+way the CI token is (step 7): it carries wrangler's default scopes on every account your user
+belongs to — Workers scripts, routes and custom domains (enough to replace what enfav.com serves, or
+to attach a Worker to a hostname and replace that hostname's DNS record), KV, D1, Pages, queues,
+Email Routing rules and more (`wrangler login --scopes-list` lists them). It has no scope to edit
+DNS records directly, the Registrar or API tokens, and `--scopes` can narrow it. That reach is why
+the first deploy ends by logging out unless the token is in the keyring.
 
-Never put a Cloudflare token in a file Nx or wrangler loads — `.env*` or `.dev.vars*`. Wrangler
+Never put a Cloudflare token in a file Nx or wrangler loads — `.env*`, Nx's `.local.env` and
+`.<target>.env` forms (`.*.env`), or `.dev.vars*`. Wrangler
 reads system variables from `.env` files and Nx loads dotenv files into its tasks; `.gitignore`
 keeps these files out of commits, but a token in one reaches every command that loads it.
 `website:deploy` runs wrangler from `packages/website`, which keeps the root `.env` away from it. A
@@ -290,14 +327,20 @@ it happens where someone can read the question.
    working tree builds, so an uncommitted change would go live with no commit recording it.
 2. `pnpm exec wrangler whoami` names the account that holds enfav.com.
 3. `pnpm website:deploy`. It runs `nx run website:build`, then
-   `cd packages/website && wrangler deploy --config wrangler.jsonc`; the build is one Nx task, so
+   `cd packages/website && wrangler deploy --config wrangler.jsonc --message "$(git rev-parse HEAD) local"`,
+   so the version names its commit as CI's versions do. Before it, check that no pattern in the
+   exclude file git reads (`git rev-parse --git-path info/exclude`: `.git/info/exclude` in a clone,
+   the main checkout's in a linked worktree) or in an `.ignore` above the checkout (`~/.ignore`,
+   say) matches any file or folder under `packages/website/src`, the folder Tailwind scans; a file
+   name such as `Button.astro` or a glob such as `*.astro` counts as much as a folder. Tailwind's
+   class scan honours both, CI has neither, and no check sees them. The build is one Nx task, so
    wrangler gets the real terminal for its questions. If your login reaches more than one account,
    wrangler asks which to use: choose the one that holds enfav.com. Answer any DNS prompt — saying
    no leaves the domain unattached
    (`Publishing to Custom Domain "enfav.com" was skipped, fix conflict and try again`). Note the
    `Current Version ID` it prints.
 4. Wait until SSL/TLS › Edge Certificates shows the certificate Active, then validate (see
-   Validating production). Universal SSL is issued 15 minutes to 24 hours after zone activation; how
+   Validating production; its www check waits for step 6). Universal SSL is issued 15 minutes to 24 hours after zone activation; how
    long the custom domain's own certificate takes is not documented.
 5. `pnpm exec wrangler logout`, unless you signed in with `--use-keyring`.
 
@@ -312,6 +355,7 @@ redirects it to the apex.
 2. Rules › Overview › Create rule › Redirect Rule, with a custom filter expression
    `(http.host eq "www.enfav.com")`, a dynamic target
    `concat("https://enfav.com", http.request.uri.path)`, status 301 and Preserve query string on.
+3. Run the www check from Validating production.
 
 Matching the host, rather than using Cloudflare's "Redirect from WWW to root" template
 (`https://www.*`), also redirects plain-http requests, which the template leaves alone. Whether
@@ -336,8 +380,9 @@ under two names. Workers Scripts uploads each version and its files. Workers Rou
 every deploy, not once, because wrangler re-applies the custom domain each time.
 
 - Set an end date — tokens never expire by default, and dashboard dates take effect at 00:00 UTC —
-  and put the rotation in your calendar before it. Client IP filtering does not suit GitHub-hosted
-  runners: their addresses change weekly, and GitHub advises against allowlisting them.
+  and put the rotation (below) in your calendar before it. Client IP filtering does not suit
+  GitHub-hosted runners: their addresses change weekly, and GitHub advises against allowlisting
+  them.
 - Verify it at the account-scoped endpoint (`/user/tokens/verify` is for user tokens):
 
   ```bash
@@ -353,10 +398,12 @@ every deploy, not once, because wrangler re-applies the custom domain each time.
 - These two permissions are what Cloudflare documents and what wrangler's source calls for (4.143.1
   fixed custom-domain deploys with such tokens, and the repository pins 4.149.0), but no live run
   has proven them yet. The first CI deploy does; dispatch it deliberately (step 8).
-- Rotation: Roll the token, which keeps its permissions and ends the old secret at once; update the
-  `CLOUDFLARE_API_TOKEN` environment secret straight away; then dispatch once to confirm. Deploys
-  fail between the roll and the update. Cloudflare documents Roll at My Profile › API Tokens › ⋯ ›
-  Roll, which is the user-token list; this token lives under Manage account › Account API tokens.
+- Rotation: create a replacement token from the table, with a new end date; update the
+  `CLOUDFLARE_API_TOKEN` environment secret; dispatch once to confirm; then delete the old token. A
+  roll would not do: it changes only the token's value and keeps its permissions and its end date.
+  Roll a token whose value leaked — that ends the old value at once, so deploys fail until the
+  secret is updated. Cloudflare documents Roll under My Profile › API Tokens, the user-token list;
+  this token lives under Manage account › Account API tokens.
 - After a failed deploy, wrangler's hints about missing Memberships or User Details permissions are
   diagnostics, not requirements (see Troubleshooting).
 
@@ -442,18 +489,25 @@ job. Pull requests get the same checks from
    `pnpm install --frozen-lockfile --ignore-scripts` and no cache; downloads the artifact into
    `packages/website/dist`; and fails at once, with an actionable error, if `CLOUDFLARE_API_TOKEN`
    or `CLOUDFLARE_ACCOUNT_ID` is empty. Then one step, run from `packages/website` with the two
-   secrets in its env and nowhere else, records the live Version ID
-   (`wrangler deployments status --json`; none for a new Worker) and deploys:
+   secrets in its env and nowhere else, records the Version ID serving before the deploy
+   (`wrangler deployments status --json`, the version with the most traffic, read up to three times
+   because one API call can fail), deploys, and records the one serving after it, even when wrangler
+   failed. When the version serving before cannot be read, the step deploys nothing and fails: the
+   first deploy is made from a terminal (setup step 5), so a version always serves by then.
 
    ```bash
    ../../node_modules/.bin/wrangler deploy --config wrangler.jsonc --message "$GITHUB_SHA run $GITHUB_RUN_ID"
    ```
 
-   A summary step that always runs writes the new and previous Version IDs and the exact rollback
-   command, and the job outputs `deployed`.
+   wrangler puts the new version live before it applies the custom domain, so a failed deploy can
+   still have changed production. The job's `deployed` output is therefore true when wrangler
+   succeeded or, when it failed, when Cloudflare's record shows a version serving that was not
+   serving before; only a failed deploy whose read afterwards also failed leaves it false while what
+   serves is unknown. A summary step that always runs writes the version wrangler reports, the one
+   serving now, the one serving before, and the exact rollback command.
 
-3. **`verify-production`** runs whenever the deploy step succeeded, even if a later step of that job
-   failed. It downloads the same artifact and runs the e2e against production
+3. **`verify-production`** runs whenever `deployed` is true, even when wrangler or a later step of
+   the deploy job failed. It downloads the same artifact and runs the e2e against production
    (`nx run website-e2e:e2e --excludeTaskDependencies`, with `WEBSITE_E2E_BASE_URL` set in that
    step). The suite's first check waits up to two minutes for production to answer with the
    artifact byte for byte — the new version reaching the edge — and fails on any file served
@@ -467,23 +521,44 @@ serving and failing a check. Read its report and decide (see Rollback).
 
 **Change detection.** A push deploys when it changes:
 
-- anything under `packages/website/` except its README, its specs (`**/*.spec.ts`) and its
-  `vitest.config.ts`, `eslint.config.mjs` and `prettier.config.mjs`, none of which can change what
-  is served;
+- anything under `packages/website/`;
+- the root `.gitignore`, which Tailwind's class scan honours;
 - `package.json`, `pnpm-lock.yaml`, `pnpm-workspace.yaml`, `.nvmrc` or `nx.json`, which can change
   the build;
 - the workflow itself.
 
-A new file in the package deploys by default, and the list stays complete because
-`tooling/website-imports.spec.ts` fails when anything the build reads imports a module outside the
-package other than an `astro:` or `node:` module or a root dependency (`SITE-6`); CI runs it with
-the other tooling gates. The trade-off cuts both ways. A
-dependency bump for another package costs one redundant Worker version (rollback reaches the last
-100). A push that touches none of these paths starts no run at all, so a failed deploy followed only
-by unrelated pushes is never retried — dispatch. GitHub's own limits on path filters also apply: a
-push of more than 1,000 commits, or one whose diff times out, always runs, and one whose diff
-exceeds 3,000 files does not run when no matching file is among the first 3,000 — dispatch after
-such a push.
+There is no exclusion list: one that leaves out the specs is wrong as soon as Tailwind scans them,
+so an edit that cannot change the site — its README, a spec, a lint config — costs one redundant
+Worker version instead. The list is declared once, as `DEPLOY_PATHS` in
+`packages/website/integrations/watched-inputs.ts` — each row a folder with everything under it or
+one file, so no row can express a negation — and `tooling/website-imports.spec.ts` reads the
+workflow's whole `paths` list and fails when it differs (`SITE-6`). The build checks what its tools
+report reading against it: every module Rolldown loads (pages, components and their scripts, data,
+a glob's matches), the modules Astro's content sync loads (the content config and what it imports)
+among them; every file and folder PostCSS plugins report (a stylesheet an `@import` or `@reference`
+brings in, a `@plugin` or `@config` module, each file and folder Tailwind's class scan reads); the
+source of every asset a stylesheet's `url()` emits; and every file copied from `public/`, symlinks
+resolved. It fails when one lies outside the watched paths (`node_modules` counts as watched,
+because the lockfile fixes it, wherever pnpm keeps its store), or when a `.gitignore` or `.ignore`
+between a folder Tailwind scans and the repository root is not watched, since the scan honours
+those. What loads before the build — `astro.config.ts` with what it imports, and `tsconfig.json`
+with what it extends — is held to the same paths by `tooling/website-imports.spec.ts`, which walks
+every script the config reaches, wherever it lies, and runs in CI with the other tooling gates.
+Some reads reach no report the build can read, so neither check sees them: a content collection's
+entries (its loader reads them itself), a font file the config names, a stylesheet a CSS
+preprocessor (Sass, Less, Stylus) loads itself through `@use`, `@forward` or `@import`, and a file
+a page or the config opens with `node:fs`. Keep each such input inside the package. CSS Modules
+would be another, so they stay off (`css.modules: false`), and the build fails if Vite's resolved
+config turns them on. Tailwind's scan also honours the exclude file git reads
+(`git rev-parse --git-path info/exclude`) and any `.ignore` above the checkout; no push can change
+those and CI has neither, but they change a local build.
+
+The trade-off cuts both ways. A dependency bump for another package costs one redundant Worker
+version (rollback reaches the last 100). A push that touches none of these paths starts no run at
+all, so a failed deploy followed only by unrelated pushes is never retried — dispatch. GitHub's own
+limits on path filters also apply: a push of more than 1,000 commits, or one whose diff times out,
+always runs, and one whose diff exceeds 3,000 files does not run when no matching file is among the
+first 3,000 — dispatch after such a push.
 
 **Concurrency.** `group: deploy-website-${{ github.ref }}` with `cancel-in-progress: false`. A
 running deploy always finishes; the newest pending run replaces any older pending one, so a burst of
@@ -518,8 +593,9 @@ assets back together, to any of the last 100 versions. Pause first.
    pnpm exec wrangler deployments list --config packages/website/wrangler.jsonc
    ```
 
-   CI labels every deployment `<commit> run <run id>`, and the failed run's summary names the
-   version that was live before it, with the exact rollback command.
+   Every version names its commit: CI's message is `<commit> run <run id>`, and `pnpm website:deploy`
+   gives `<commit> local`. The failed run's summary names the version that was live before it, with
+   the exact rollback command.
 
 3. **Roll back:**
 
@@ -528,12 +604,27 @@ assets back together, to any of the last 100 versions. Pause first.
    ```
 
    Give the ID: without one, wrangler picks the most recent earlier version that served all traffic.
-   `--message` also skips the prompts. Success prints
+   In a terminal it still asks twice — for a message, pre-filled from `--message` (Enter keeps it),
+   then to confirm the move to 100% of traffic (Enter accepts); 4.149.0 declares `--yes` for this
+   command but does not read it. Success prints
    `Worker Version <id> has been deployed to 100% of traffic.` Rolling back needs only Editor on the
    Worker, so your login or the CI token will do; the dashboard equivalent is Workers & Pages ›
    enfav-website › Deployments › ⋯ › Rollback.
 
-4. **Validate** (see Validating production).
+4. **Validate** (see Validating production) from a checkout of the commit the restored version was
+   built from, after `pnpm install --frozen-lockfile` there — nothing reinstalls on checkout, and
+   `pnpm exec` does not compare `node_modules` with the lockfile — so the specs, the build and its
+   dependencies match what serves. The version's message names that commit
+   (`pnpm exec wrangler versions view <version-id> --config packages/website/wrangler.jsonc`). For a
+   CI version less than 30 days old, download that run's `website-dist` artifact into
+   `packages/website/dist` and run the e2e with `--excludeTaskDependencies`; otherwise run
+   `rm -rf packages/website/node_modules/.astro`, then the e2e with `--skip-nx-cache`, which builds
+   that commit afresh. Astro keeps the images it rasterized in that folder across checkouts and
+   installs, keyed without the encoder settings or the Astro and sharp versions, and reuses them
+   unchecked; neither `--skip-nx-cache` nor `astro build --force` clears it. A rebuild usually
+   matches byte for byte but is not certain to, so a first check that reports files served
+   differently may mean the rebuild differs, not that the rollback failed. Run
+   `pnpm install --frozen-lockfile` again on returning to main.
 5. **Revert** the bad commit on main.
 6. **Resume.** Set `WEBSITE_DEPLOYS` back to `on` and dispatch once
    (`gh workflow run deploy-website.yml --ref main`), so production again runs what main holds.
@@ -572,31 +663,75 @@ WEBSITE_E2E_BASE_URL=https://enfav.com pnpm exec nx run website-e2e:e2e --exclud
 After the first deploy, which built on your machine, the `dist/` it deployed is that build. A fresh
 local build of the live commit usually matches too — on 2026-10-14 a macOS and a Linux build of the
 same commit, both arm64, matched byte for byte — but CI builds on x64, and nothing guarantees that
-sharp encodes the images identically on every machine; the artifact is exact. What it checks, every page at
-both widths unless noted:
+sharp encodes the images identically on every machine, that no local ignore file (see setup step 5)
+changed Tailwind's scan, or that Astro's image cache in `packages/website/node_modules/.astro` holds
+no image another commit rasterized (remove the folder before such a build); the artifact is exact.
+What it checks, every page at both widths
+unless noted:
 
 - `build-served.spec.ts`, first and once — production answers with every built file unchanged (the
   404 page at an unknown path), retried for up to two minutes; every other check waits for it.
-- `pages.spec.ts` — axe finds no WCAG 2.2 A/AA or best-practice violation; at 320 px nothing scrolls
-  sideways, with `overflow-x` left visible so the check cannot be faked; `lang="en"`, one `<h1>`, a
-  description of at most 160 characters, a canonical equal to the page's sitemap URL and an `og:url`
-  equal to the canonical (the 404 has `noindex` and neither); no console error, page error or failed
-  request, so a CSP violation fails here, and no inline script or style; every internal link lands
-  on a 200 without a redirect, and every `#fragment` exists; no credential claim outside a verified
-  fact.
+- `pages.spec.ts` — axe finds no WCAG 2.2 A/AA or best-practice violation; at 320 px nothing
+  scrolls sideways, and no element, line of text or element's content ends past the right edge, even
+  where an overflow clip in the document hides it — fixed-position boxes as drawn, an element's
+  scrolling area counting generated content and shadow trees, a scaled element at its scale. A box
+  of at most a pixel that clips its content (visually hidden text) is not walked, and an element
+  with no box of its own is. Not seen: a fixed box or a clip the walk cannot reach (generated, in a
+  shadow tree, inside a visually hidden box), and content the walk cannot reach inside a rotated or
+  skewed element. `lang="en"`, one `<h1>`, a description of at most 160 characters, a canonical
+  equal to the page's sitemap URL and an `og:url` equal to the canonical (the 404 has `noindex` and
+  neither); no console error, page error or failed request; no Content-Security-Policy violation,
+  with every inline event handler compiled under the page's own policy so one that never fires still
+  counts (Chromium compiles the handlers it lists through the DevTools protocol: every node's,
+  through shadow roots and frames, and every window's); no inline script or style, and no
+  `javascript:` URL in an attribute that holds a URL (a link, a form's action, a frame's, image's,
+  script's or object's source, an SVG animation's `to`, `from`, `by` or any entry of its `values`)
+  in the document, its open shadow roots and every frame (a closed shadow root is not read); every
+  internal link lands on a 200 without a redirect, and every `#fragment` exists. Once, on the home
+  page: the served policy refuses, not merely reports, an inline handler and an inline style, and no
+  directive governing script or style attributes allows `'unsafe-inline'` or `'unsafe-hashes'` (a
+  directive given twice counts by its first copy, as the browser reads it), which is what lets those
+  checks see one.
+- `facts.spec.ts` — no restricted claim outside a verified fact, on screen or in print (see Content
+  and company facts), with the body's text read three ways — its text nodes joined, each element's
+  whole text, and its innerText — so adjacent items never run together and a word split by markup
+  stays whole where it renders or its element's text sets it apart, and every JSON-LD value read
+  too; no page's JSON-LD carries a placeholder's label; every placeholder shows its word on screen
+  and wherever it prints; `/government/` states every detail `COMPANY_DETAILS` declares, in order,
+  as the fact declared, visible and with the text each medium draws in any letter case, on screen
+  and on paper; on `/about/` and `/government/` the element marked `data-person` holds exactly the
+  founder's or the point of contact's name and then title facts, and no other; and the claims check
+  itself finds a phrase spaced, hyphenated (a hyphen-minus or U+2010, or a hyphen compatibility
+  normalization folds into one: a non-breaking, small or full-width hyphen; a soft hyphen is
+  ignored) or written as one word, beside a symbol such as ™, split by markup (rendered, or apart
+  from the text beside it), across elements or in the JSON-LD, and only whole phrases. These read
+  the checkout's company data, so run the suite from the commit that built what you validate.
 - `serving.spec.ts` — the sitemap lists exactly the built pages; titles and descriptions are unique;
   robots.txt names the sitemap on the canonical origin; the Open Graph image and the touch icon are
   PNGs of their declared sizes;
   the home page's JSON-LD parses and names the canonical origin; an unknown path answers 404 with
-  the 404 page; `/about` answers 307 to `/about/`; the security headers are on 200s and 404s;
-  `/_astro/*` is immutable; `/_headers` is not served.
-- `navigation.spec.ts` — the skip link moves focus to `main`; under forced colours a focused link
-  keeps a visible outline at least 2 px wide; navigation links are targets of at least 24 px.
-- `print.spec.ts` (desktop Chromium) — `/government/` prints as exactly one US-Letter page.
+  the 404 page; `/about` answers 307 to `/about/`; every built file, the 404 page and every
+  trailing-slash redirect carry the headers `/*` declares, and every file `/_astro/*` names is
+  immutable; `/_headers` is not served.
+- `navigation.spec.ts` — on the home page, the skip link moves focus to `main` and the primary
+  navigation links are targets of at least 24 px; on every page, Tab walks every stop from the
+  first, past whatever had focus once the page loaded — the element that has focus, inside open
+  shadow roots and same-origin frames, a control that takes several presses counted once — until
+  focus leaves the page, and a walk that comes back to an earlier stop fails as a keyboard trap. A
+  closed shadow root or a cross-origin frame is one stop, judged by its host's own outline, and the
+  stops inside are not measured; Chromium matches no focus pseudo-class on a frame whose content has
+  focus, so such a frame passes only with an outline it always shows. Every stop has an outline at
+  least 2 px wide and 3:1 against what it is painted over — outside the element, over its border
+  (taken as solid), within it, or across these, its alpha included, each background colour taken to
+  lie under the whole outline (`background-clip` and the edges of the boxes behind it are not read)
+  — and keeps a visible outline in forced-colors mode.
+- `print.spec.ts` (desktop Chromium) — `/government/` loads with 200 and prints as exactly one page
+  with a US-Letter page box (612 × 792 pt), which only the stylesheet's `@page` rule can set.
 
 The criteria these checks claim are `SITE-1` to `SITE-7` in `packages/criteria/src/site.ts`: the e2e
 claims `SITE-2`, `SITE-3`, `SITE-4`, `SITE-5` and `SITE-7`; the unit specs `SITE-1`, `SITE-4` and
-`SITE-6`; and `tooling/website-imports.spec.ts` the other half of `SITE-6`.
+`SITE-6` (the single origin, and the build's check of its own inputs, which every build runs); and
+`tooling/website-imports.spec.ts` the rest of `SITE-6`, what loads before the build.
 
 By hand:
 
@@ -605,7 +740,7 @@ curl -sSI https://enfav.com/                  # 200, with the headers from publi
 curl -sSI https://enfav.com/about             # 307 to /about/
 curl -sSI https://enfav.com/nope/             # 404, the site's 404 page, same headers
 curl -sSI http://enfav.com/                   # redirect to https://enfav.com/ (Always Use HTTPS)
-curl -sSI 'https://www.enfav.com/x?y=1'       # 301, location: https://enfav.com/x?y=1
+curl -sSI 'https://www.enfav.com/x?y=1'       # 301, location: https://enfav.com/x?y=1 (from setup step 6)
 curl -sSI https://enfav.com/_headers          # 404: the rules file is applied, never served
 curl -sS https://enfav.com/robots.txt         # ends with Sitemap: https://enfav.com/sitemap-index.xml
 curl -sS https://enfav.com/sitemap-index.xml  # points to https://enfav.com/sitemap-0.xml
@@ -668,8 +803,33 @@ asks: the record or the domain is taken over silently, so anything added at the 
 deploy is replaced by the next CI deploy, and a custom domain attached in the dashboard is likely
 detached. `Trigger configuration for "enfav-website" was only partially updated` means the version
 uploaded but the domain step failed — the zone is not active, or the token lacks Workers Routes —
-and the changes that succeeded were not rolled back, so the new version may be live. Fix the cause
-and deploy again.
+and the changes that succeeded were not rolled back, so the new version may be live. In CI the
+deploy job then fails, but its summary shows which version serves, and `verify-production` runs
+when that version is new. If the read after the deploy failed too, the summary says what serves is
+unknown and `verify-production` is skipped, even if the new version serves;
+`pnpm exec wrangler deployments status --config packages/website/wrangler.jsonc` tells. Fix the
+cause and deploy again, or validate a version you keep by hand (see Validating production).
+
+**The deploy job fails with "Serving version unknown".** Cloudflare's record of what serves could
+not be read in three tries, so nothing was deployed. A Worker never deployed needs its first deploy
+from a terminal (setup step 5). If the log shows an authentication error (code 10000), every run
+fails the same way until the CI token is fixed, and the log reads the same whatever the cause, so
+look at the token under Manage account › Account API tokens:
+
+- Past its end date: create a replacement from the table in setup step 7, update the
+  `CLOUDFLARE_API_TOKEN` secret, dispatch, and delete the old token. A roll keeps the end date.
+- Lost a permission: edit the token back to the two permissions in the table. Editing keeps its
+  value, so the secret stays as it is; a roll would keep the reduced permissions.
+- Rolled without the secret being updated: update the secret with the rolled value, and roll again
+  only if that value is lost.
+
+Otherwise the API failed, and running the workflow again retries.
+
+**The build fails: "The build read what … does not watch".** A change made the build read a file
+outside the watched paths, or put an ignore file above a folder Tailwind scans, and the message
+names each. Move the input into the package, or add its path to the workflow's `paths` and to
+`DEPLOY_PATHS` in `packages/website/integrations/watched-inputs.ts`; the tooling spec fails until
+the two agree.
 
 **A deploy fails with error 10000 (or 9106), then asks about Memberships or User Details.** On an
 authentication error, wrangler prints a hint about custom API tokens and runs `whoami`, which asks
