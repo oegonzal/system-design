@@ -1,7 +1,23 @@
-import { bound, bounded, CUT_MARKER, SOFT_ISSUE_NOTE } from '@sysdesign/contracts';
+import {
+  BINDING_CLAIM_BOUND,
+  bound,
+  bounded,
+  CUT_MARKER,
+  designSubmissionSchema,
+  NARRATION_OVERVIEW_BOUND,
+  NODE_CONFIG_STRING_VALUE_BOUND,
+  RESPONSIBILITY_BOUND,
+  SOFT_ISSUE_NOTE,
+  type Bound,
+} from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
+import coach185832p2 from './fixtures/canvas-coach-18-58-32-p2.json';
+import coach185832p3 from './fixtures/canvas-coach-18-58-32-p3.json';
+import coach215319p1 from './fixtures/canvas-coach-21-53-19-p1.json';
+import coach215319p2 from './fixtures/canvas-coach-21-53-19-p2.json';
+import coach215319p3 from './fixtures/canvas-coach-21-53-19-p3.json';
 import { extractStructured, jsonCandidates, parseStructured } from './structured-reply';
 
 const schema = z.object({ answer: z.string(), score: z.number().int() });
@@ -153,4 +169,85 @@ describe('extractStructured', () => {
       score: 1,
     });
   });
+});
+
+/**
+ * The canvas coach replies two recorded runs threw away whole (static/runs,
+ * 2026-10-02T21-53-19 producer 1–3 and 2026-10-02T18-58-32 producer 2–3):
+ * each a complete revision of 30–40k output tokens, each refused because a
+ * string or two ran 1–19% past the bound it was shown. The objects are the
+ * replies as written, unfenced; `overran` is every field the old parse named,
+ * with what it wrote and the bound that field declares now. Measured, three
+ * of those targets now sit above what the coach writes (`pnpm
+ * measure:bounds`), so a field is an overrun only while it is past the target
+ * it is asked for today — and every one is within its ceiling.
+ */
+const RECORDED_COACH_LOSSES: readonly [string, unknown, Record<string, [number, Bound]>][] = [
+  [
+    '21-53-19 producer 1',
+    coach215319p1,
+    {
+      'graph.nodes[2].responsibilities[1]': [87, RESPONSIBILITY_BOUND],
+      'graph.nodes[2].responsibilities[2]': [89, RESPONSIBILITY_BOUND],
+    },
+  ],
+  ['21-53-19 producer 2', coach215319p2, { 'brief.bindings[1].claim': [358, BINDING_CLAIM_BOUND] }],
+  [
+    '21-53-19 producer 3',
+    coach215319p3,
+    { 'narrative.overview': [1438, NARRATION_OVERVIEW_BOUND] },
+  ],
+  [
+    '18-58-32 producer 2',
+    coach185832p2,
+    {
+      'graph.nodes[2].config[3].value': [141, NODE_CONFIG_STRING_VALUE_BOUND],
+      'graph.nodes[5].config[3].value': [126, NODE_CONFIG_STRING_VALUE_BOUND],
+      'graph.nodes[2].responsibilities[0]': [81, RESPONSIBILITY_BOUND],
+    },
+  ],
+  [
+    '18-58-32 producer 3',
+    coach185832p3,
+    {
+      'brief.bindings[1].claim': [320, BINDING_CLAIM_BOUND],
+      'brief.bindings[2].claim': [304, BINDING_CLAIM_BOUND],
+      'brief.bindings[4].claim': [326, BINDING_CLAIM_BOUND],
+      'narrative.overview': [1472, NARRATION_OVERVIEW_BOUND],
+    },
+  ],
+];
+
+/** The value at a located path, read off the reply as written. */
+const at = (value: unknown, path: readonly (string | number)[]): unknown =>
+  path.reduce<unknown>((node, key) => (node as Record<string | number, unknown>)[key], value);
+
+describe('the recorded coach losses, replayed', () => {
+  it.each(RECORDED_COACH_LOSSES)(
+    '[QL-59] %s, refused whole before, now parses with every overrun recorded and nothing cut',
+    (_, reply, overran) => {
+      // Fenced, as the model wrote it.
+      const text = ['```json', JSON.stringify(reply), '```'].join('\n');
+      const read = parseStructured(text, designSubmissionSchema);
+      expect(read.ok).toBe(true);
+      if (!read.ok) return;
+
+      const stillOver = Object.entries(overran).filter(([, [written, b]]) => written > b.target);
+      expect(
+        Object.fromEntries(
+          read.overruns.map((overrun) => [overrun.path, [overrun.actual, overrun.target]]),
+        ),
+      ).toEqual(
+        Object.fromEntries(stillOver.map(([path, [written, b]]) => [path, [written, b.target]])),
+      );
+      // All within the ceiling: accepted as written, not one word cut.
+      for (const [written, b] of Object.values(overran))
+        expect(written).toBeLessThanOrEqual(b.ceiling);
+      expect(read.overruns.every((overrun) => overrun.handling === 'accepted')).toBe(true);
+      expect(read.repairs).toEqual([]);
+      for (const overrun of read.overruns) {
+        expect(at(read.value, overrun.at)).toBe(at(reply, overrun.at));
+      }
+    },
+  );
 });
