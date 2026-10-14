@@ -1,4 +1,5 @@
-import type { IngestDeps, IngestOptions, IngestReport } from '../core/ingest';
+import type { IngestDeps, IngestOptions } from '../core/ingest';
+import type { IngestReport } from '../core/ingest-report';
 import { fakeIngestLoop, type SettleScript } from './fake-ingest-loop';
 import { fixedClock, InMemoryLedger, scriptedReader } from './fakes';
 
@@ -20,6 +21,32 @@ export const bullet = (seed: string): string =>
  */
 export const NOTES = ['alpha', 'bravo', 'delta'].map(bullet).join('\n');
 export const LOOP_URL = 'http://loop.test';
+
+/** Judged below the bar, and nothing drawn on: the chunk's facts are not in the store. */
+export const NOT_ACCEPTED: SettleScript = {
+  steps: {
+    digest: {
+      status: 'complete',
+      reason: 'not-accepted',
+      runIds: ['not-accepted-run'],
+      counts: { memories: 4, kept: 0 },
+    },
+    store: { status: 'skipped', reason: 'upstream-skipped', note: 'digest' },
+  },
+};
+
+/** Judged, accepted, and nothing endorsed: the loop's verdict that the chunk holds no fact to store. */
+export const NO_FACTS: SettleScript = {
+  steps: {
+    digest: {
+      status: 'complete',
+      reason: 'no-memories',
+      runIds: ['no-facts-run'],
+      counts: { memories: 0, kept: 0 },
+    },
+    store: { status: 'skipped', reason: 'upstream-skipped', note: 'digest' },
+  },
+};
 
 export const options = (overrides: Partial<IngestOptions> = {}): IngestOptions => ({
   kind: 'notes',

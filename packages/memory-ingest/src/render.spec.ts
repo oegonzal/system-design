@@ -1,7 +1,15 @@
-import type { FileReport, IngestReport } from './core/ingest';
+import type { FileReport, IngestReport } from './core/ingest-report';
 import type { DocumentRetraction, RetractReport } from './core/retract';
 import { renderIngest, renderRetract, renderStatus } from './render';
 import { manifestEntry } from './test/fakes';
+
+const LOOP_URL = 'http://loop.test';
+/** A digest run retracted through the configured loop, with the points it removed. */
+const run = (digestRunId: string, removed: number) => ({
+  digestRunId,
+  removed,
+  recordedUnder: null,
+});
 
 const report = (overrides: Partial<IngestReport> = {}): IngestReport => ({
   dryRun: false,
@@ -60,11 +68,21 @@ const report = (overrides: Partial<IngestReport> = {}): IngestReport => ({
         },
       ],
       replaced: null,
+      heldBack: { chunk: 2, outcome: 'failed', earlierRuns: 0 },
+      unresolved: 0,
     },
-    { document: 'empty.pdf', parts: 0, chunks: [], replaced: null },
+    {
+      document: 'empty.pdf',
+      parts: 0,
+      chunks: [],
+      replaced: null,
+      heldBack: null,
+      unresolved: 0,
+    },
   ],
   chunks: 3,
   posted: 1,
+  noFacts: 0,
   unstored: 1,
   skipped: 0,
   failed: 1,
@@ -88,6 +106,12 @@ describe('renderIngest', () => {
     expect(text).toContain('chunks 3 · posted 1 · unstored 1 · skipped 0 · failed 1');
     expect(text).not.toContain('retracted');
     expect(text).not.toContain('dry run');
+    // Held back, with no earlier digest outside the plan to keep: nothing to say.
+    expect(text).not.toContain('held back');
+    // A chunk with no fact to store is counted apart, as covered.
+    expect(renderIngest(report({ noFacts: 2 }))).toContain(
+      'chunks 3 · posted 1 · no facts 2 · unstored 1 · skipped 0 · failed 1',
+    );
   });
 
   it('says so when nothing was posted, and where a refusal stopped the run', () => {
@@ -101,14 +125,39 @@ describe('renderIngest', () => {
     ).toContain('stopped at notes.md chunk 2: 400: no index');
   });
 
-  it('[ING-3] says how to resume a halted run — without --force when the halted run was forced, since what it posted is stored', () => {
+  it('[ING-3] says what re-running a halted run does — and for a forced one, both ways on: without --force the chunks it did not reach keep their earlier digests, with it each document is posted whole again', () => {
     const halted = { reason: 'limit' as const, after: 1 };
     expect(renderIngest(report({ halted }))).toContain(
-      'halted after 1 chunk(s): limit — the pending chunks post on re-running the same command',
+      'halted after 1 chunk(s): limit — re-running the same command posts what is not covered yet',
     );
     expect(renderIngest(report({ halted }))).not.toContain('--force');
     expect(renderIngest(report({ halted, force: true }))).toContain(
-      'the pending chunks post on re-running the same command without --force',
+      'halted after 1 chunk(s): limit — re-running without --force posts what is not covered yet, so the chunks this run did not reach keep their earlier digests; re-running with --force posts each document whole again',
+    );
+  });
+
+  it('[ING-3] says why a replacement was held back — the chunk, and the earlier digest runs outside the plan that still stand — and what no digest run is known for', () => {
+    const base = report();
+    const [notes, empty] = base.files as [FileReport, FileReport];
+    const text = renderIngest({
+      ...base,
+      files: [
+        { ...notes, heldBack: { chunk: 2, outcome: 'failed', earlierRuns: 3 }, unresolved: 1 },
+        empty,
+      ],
+    });
+    expect(text).toContain(
+      'replacement held back at chunk 2 (failed): 3 earlier digest runs outside the current plan still stand',
+    );
+    expect(text).toContain(
+      'unresolved: 1 entry with an orchestration whose report was never read — status --refresh reads it back from the loop; then ingest again',
+    );
+    const one = renderIngest({
+      ...base,
+      files: [{ ...notes, heldBack: { chunk: 3, outcome: 'pending', earlierRuns: 1 } }, empty],
+    });
+    expect(one).toContain(
+      'replacement held back at chunk 3 (pending): 1 earlier digest run outside the current plan still stands',
     );
   });
 
@@ -121,13 +170,11 @@ describe('renderIngest', () => {
         {
           ...notes,
           replaced: {
-            retracted: [
-              { digestRunId: 'run-1', removed: 4 },
-              { digestRunId: 'run-2', removed: 0 },
-              { digestRunId: 'run-3', removed: 2 },
-            ],
+            through: LOOP_URL,
+            retracted: [run('run-1', 4), run('run-2', 0), run('run-3', 2)],
             left: { digestRunIds: ['run-4'], error: '503: the store is unavailable' },
           },
+          heldBack: null,
         },
         empty,
       ],
@@ -152,11 +199,8 @@ describe('renderRetract', () => {
         already: ['run-0'],
         runs: ['run-1', 'run-2', 'run-3'],
         retraction: {
-          retracted: [
-            { digestRunId: 'run-1', removed: 8 },
-            { digestRunId: 'run-2', removed: 0 },
-            { digestRunId: 'run-3', removed: 1 },
-          ],
+          through: LOOP_URL,
+          retracted: [run('run-1', 8), run('run-2', 0), run('run-3', 1)],
           left: null,
         },
         unresolved: 1,
@@ -172,6 +216,33 @@ describe('renderRetract', () => {
     expect(text).toContain('already retracted (1): run-0');
     expect(text).toContain('unresolved: 1 entry with an orchestration whose report was never read');
     expect(text).toContain('retracted 3 digest runs (9 points)');
+  });
+
+  it('[ING-3] lists the runs recorded under another loop apart, with what each removed through the configured one, never among the runs that held nothing', () => {
+    const [document] = retired.documents as [DocumentRetraction];
+    const other = 'http://localhost:3013';
+    const text = renderRetract({
+      dryRun: false,
+      documents: [
+        {
+          ...document,
+          retraction: {
+            through: LOOP_URL,
+            retracted: [
+              run('run-1', 8),
+              { digestRunId: 'run-5', removed: 0, recordedUnder: other },
+              { digestRunId: 'run-6', removed: 2, recordedUnder: other },
+            ],
+            left: null,
+          },
+        },
+      ],
+    });
+    expect(text).toContain(
+      `recorded under ${other}, retracted through ${LOOP_URL} (2): run-5 (0 points), run-6 (2 points)`,
+    );
+    expect(text).not.toContain('held nothing');
+    expect(text).toContain('retracted 3 digest runs (10 points)');
   });
 
   it('lists what a dry run would retract and says nothing was', () => {

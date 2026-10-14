@@ -6,6 +6,8 @@ import type { ManifestEntry } from './ports';
 import { NotInManifest, retractDocuments, type RetractDeps } from './retract';
 
 const EARLIER = '2026-10-01T09:00:00.000Z';
+/** The loop the command is configured for — the one `manifestEntry` records postings under. */
+const LOOP_URL = manifestEntry().loopUrl;
 
 /** The fake loop behind the shipping sink, its store holding the points a spec gives each digest run. */
 function harness(entries: Partial<ManifestEntry>[], points: Record<string, number>) {
@@ -13,9 +15,16 @@ function harness(entries: Partial<ManifestEntry>[], points: Record<string, numbe
   for (const [digestRunId, held] of Object.entries(points))
     fake.client.points.set(digestRunId, held);
   const ledger = new InMemoryLedger(entries.map((overrides) => manifestEntry(overrides)));
-  const deps: RetractDeps = { sink: fake.sink, ledger, clock: fixedClock() };
+  const deps: RetractDeps = { sink: fake.sink, ledger, clock: fixedClock(), loopUrl: LOOP_URL };
   return { ...fake, ledger, deps };
 }
+
+/** A digest run retracted through the configured loop, with the points it removed. */
+const retracted = (digestRunId: string, removed: number) => ({
+  digestRunId,
+  removed,
+  recordedUnder: null,
+});
 
 const options = (overrides: { dryRun?: boolean; cwd?: string } = {}) => ({
   dryRun: false,
@@ -60,11 +69,8 @@ describe('retractDocuments', () => {
           already: [],
           runs: ['run-1', 'run-2', 'run-3'],
           retraction: {
-            retracted: [
-              { digestRunId: 'run-1', removed: 4 },
-              { digestRunId: 'run-2', removed: 0 },
-              { digestRunId: 'run-3', removed: 2 },
-            ],
+            through: LOOP_URL,
+            retracted: [retracted('run-1', 4), retracted('run-2', 0), retracted('run-3', 2)],
             left: null,
           },
           unresolved: 0,
@@ -125,10 +131,11 @@ describe('retractDocuments', () => {
     const error = 'the quality loop is unreachable: ECONNREFUSED';
     expect(report.documents.map((document) => document.retraction)).toEqual([
       {
-        retracted: [{ digestRunId: 'a-run-1', removed: 3 }],
+        through: LOOP_URL,
+        retracted: [retracted('a-run-1', 3)],
         left: { digestRunIds: ['a-run-2'], error },
       },
-      { retracted: [], left: { digestRunIds: ['b-run-1'], error } },
+      { through: LOOP_URL, retracted: [], left: { digestRunIds: ['b-run-1'], error } },
     ]);
     // The first mark is on the saved ledger though the second retraction failed.
     expect(ledger.entries.map((entry) => entry.retractedAt)).toEqual([FIXED_NOW, null, null]);
@@ -179,9 +186,34 @@ describe('retractDocuments', () => {
     expect(after.documents[0]).toMatchObject({
       already: ['run-1', 'run-2'],
       runs: [],
-      retraction: { retracted: [], left: null },
+      retraction: { through: LOOP_URL, retracted: [], left: null },
     });
     expect(loop.retracted).toEqual(['run-2']);
+  });
+
+  it('[ING-3] retracts a run recorded under another loop through the configured one and marks it — one store may serve both — but reports it apart, under the loop it was recorded under', async () => {
+    const OTHER = 'http://other-loop.test';
+    const { deps, ledger, loop } = harness(
+      [
+        { chunkHash: 'h1', digestRunId: 'run-1' },
+        { chunkHash: 'h2', digestRunId: 'run-2', loopUrl: OTHER },
+      ],
+      { 'run-1': 3, 'run-2': 4 },
+    );
+    const report = await retractDocuments(['notes.md'], options(), deps);
+    expect(report.documents[0]?.retraction).toEqual({
+      through: LOOP_URL,
+      retracted: [
+        retracted('run-1', 3),
+        { digestRunId: 'run-2', removed: 4, recordedUnder: OTHER },
+      ],
+      left: null,
+    });
+    expect(loop.retracted).toEqual(['run-1', 'run-2']);
+    expect(ledger.entries.map((entry) => [entry.retractedAt, entry.retractedPoints])).toEqual([
+      [FIXED_NOW, 3],
+      [FIXED_NOW, 4],
+    ]);
   });
 
   it('counts the entries naming an orchestration whose report was never read, since no digest run is known to retract for them', async () => {

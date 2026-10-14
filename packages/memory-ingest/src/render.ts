@@ -1,5 +1,5 @@
 import type { ExportReport } from './core/export-studio';
-import type { ChunkReport, FileReport, IngestReport } from './core/ingest';
+import type { ChunkReport, FileReport, IngestReport } from './core/ingest-report';
 import type { ManifestEntry, ManifestStep } from './core/ports';
 import { whyNotStored } from './core/record';
 import type { DocumentRetraction, RetractReport, Retraction } from './core/retract';
@@ -50,11 +50,21 @@ function retractedTotal(retractions: readonly (Retraction | null)[]): string {
 /**
  * A batch of retractions: the runs that removed points, with how many; the
  * runs that removed none, apart — what they stored was gone already, or they
- * stored nothing; and the runs left standing, with why.
+ * stored nothing; the runs whose postings were recorded under another loop,
+ * apart again, with what each removed — the loop asked counts only what its
+ * own store held; and the runs left standing, with why.
  */
 function retractionLines(retraction: Retraction): string[] {
-  const removed = retraction.retracted.filter((run) => run.removed > 0);
-  const empty = retraction.retracted.filter((run) => run.removed === 0);
+  const here = retraction.retracted.filter((run) => run.recordedUnder === null);
+  const removed = here.filter((run) => run.removed > 0);
+  const empty = here.filter((run) => run.removed === 0);
+  const elsewhere = [
+    ...new Set(retraction.retracted.flatMap((run) => run.recordedUnder ?? [])),
+  ].map((loopUrl) => {
+    const under = retraction.retracted.filter((run) => run.recordedUnder === loopUrl);
+    const each = under.map((run) => `${run.digestRunId} (${count(run.removed, 'point')})`);
+    return `recorded under ${loopUrl}, retracted through ${retraction.through} (${under.length}): ${each.join(', ')}`;
+  });
   const runs = (ids: readonly string[]): string => `(${ids.length}): ${ids.join(', ')}`;
   return [
     ...(removed.length === 0
@@ -66,11 +76,28 @@ function retractionLines(retraction: Retraction): string[] {
           ),
         ]),
     ...(empty.length === 0 ? [] : [`held nothing ${runs(empty.map((run) => run.digestRunId))}`]),
+    ...elsewhere,
     ...(retraction.left === null
       ? []
       : [`left standing ${runs(retraction.left.digestRunIds)} — ${retraction.left.error}`]),
   ];
 }
+
+/** The entries a retraction cannot reach — no digest run is known for them — and how to reach them, by the command to run again. */
+const unresolvedLines = (unresolved: number, command: string): string[] =>
+  unresolved === 0
+    ? []
+    : [
+        `unresolved: ${count(unresolved, 'entry', 'entries')} with an orchestration whose report was never read — status --refresh reads it back from the loop; then ${command} again`,
+      ];
+
+/** Why a document's replacement was held back, when earlier digest runs outside its current plan still stand. */
+const heldBackLines = (heldBack: FileReport['heldBack']): string[] =>
+  heldBack === null || heldBack.earlierRuns === 0
+    ? []
+    : [
+        `replacement held back at chunk ${heldBack.chunk} (${heldBack.outcome}): ${count(heldBack.earlierRuns, 'earlier digest run')} outside the current plan still ${heldBack.earlierRuns === 1 ? 'stands' : 'stand'}`,
+      ];
 
 const touched = (retraction: Retraction | null): retraction is Retraction =>
   retraction !== null && (retraction.retracted.length > 0 || retraction.left !== null);
@@ -87,6 +114,8 @@ function renderFile(file: FileReport): string {
     ...(touched(file.replaced)
       ? [`replaced ${retractedTotal([file.replaced])}`, ...retractionLines(file.replaced)]
       : []),
+    ...heldBackLines(file.heldBack),
+    ...unresolvedLines(file.unresolved, 'ingest'),
   ].join('\n');
 }
 
@@ -95,19 +124,23 @@ export function renderIngest(report: IngestReport): string {
   const summary = [
     `chunks ${report.chunks}`,
     `posted ${report.posted}`,
+    ...(report.noFacts > 0 ? [`no facts ${report.noFacts}`] : []),
     `unstored ${report.unstored}`,
     `skipped ${report.skipped}`,
     `failed ${report.failed}`,
     ...(replaced.some(touched) ? [`retracted ${retractedTotal(replaced)}`] : []),
   ].join(' · ');
-  const resume = `re-running the same command${report.force ? ' without --force' : ''}`;
+  // A plain re-run skips every covered chunk: after a forced run, that includes the chunks it never reached.
+  const resume = report.force
+    ? 're-running without --force posts what is not covered yet, so the chunks this run did not reach keep their earlier digests; re-running with --force posts each document whole again'
+    : 're-running the same command posts what is not covered yet';
   const tail = [
     report.dryRun ? 'dry run — nothing was posted and nothing was recorded' : null,
     report.stopped
       ? `stopped at ${report.stopped.document} chunk ${report.stopped.chunk}: ${report.stopped.message}`
       : null,
     report.halted
-      ? `halted after ${report.halted.after} chunk(s): ${report.halted.reason} — the pending chunks post on ${resume}`
+      ? `halted after ${report.halted.after} chunk(s): ${report.halted.reason} — ${resume}`
       : null,
   ].filter((line): line is string => line !== null);
   return [...report.files.map(renderFile), [summary, ...tail].join('\n')].join('\n\n');
@@ -123,11 +156,7 @@ function renderRetiring(document: DocumentRetraction): string {
       ? ids('would retract', document.runs)
       : retractionLines(document.retraction)),
     ...ids('already retracted', document.already),
-    ...(document.unresolved === 0
-      ? []
-      : [
-          `unresolved: ${count(document.unresolved, 'entry', 'entries')} with an orchestration whose report was never read — status --refresh reads it back from the loop; then retract again`,
-        ]),
+    ...unresolvedLines(document.unresolved, 'retract'),
   ].join('\n');
 }
 

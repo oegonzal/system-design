@@ -1,5 +1,5 @@
 /**
- * `main.js ingest <path…> [--kind resume|notes] [--subject <name>] [--chunk-bytes <n>] [--date <day>] [--limit <n>] [--dry-run] [--force] [--json]`
+ * `main.js ingest <path…> [--kind resume|notes] [--subject <name>] [--chunk-bytes <n>] [--parts-per-chunk <n>] [--date <day>] [--limit <n>] [--dry-run] [--force] [--json]`
  * `main.js retract <path…> [--dry-run] [--json]`
  * `main.js status [--refresh] [--json]`
  * `main.js export-studio --out <dir> [--json]`
@@ -9,8 +9,8 @@
  * framework, no database — and exits by the result: 2 for a usage problem, an
  * input the program cannot use, a path the manifest has no entry for, or a
  * manifest home another command is writing; 1 when a chunk failed, was
- * refused or was settled with nothing stored, or a retraction left a digest
- * run standing; 0 otherwise.
+ * refused or was settled with its facts left out of the store, or a
+ * retraction left a digest run standing; 0 otherwise.
  */
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -27,7 +27,6 @@ import {
   documentDate,
   partsPerChunk,
   postLimit,
-  DEFAULT_CHUNK_BYTES,
   DEFAULT_HOME,
   DEFAULT_LOOP_URL,
   DEFAULT_STUDIO_URL,
@@ -49,22 +48,31 @@ import { leftStanding, NotInManifest, retractDocuments } from './core/retract';
 import { refreshStatus } from './core/status';
 import { renderExport, renderIngest, renderRetract, renderStatus } from './render';
 
+/** One line per flag, with what it means as `INGEST_FLAGS` declares it. */
+function flagLines(): string {
+  const flags = Object.entries(INGEST_FLAGS).map(
+    ([name, flag]) => [`--${name}`, flag.describe] as const,
+  );
+  const width = Math.max(...flags.map(([name]) => name.length));
+  return flags.map(([name, meaning]) => `  ${name.padEnd(width)}  ${meaning}`).join('\n');
+}
+
 export const USAGE = `usage: memory-ingest <command> [options]
   ingest  <path…> [--kind ${INGEST_KINDS.join('|')}] [--subject <name>] [--chunk-bytes <n>] [--parts-per-chunk <n>] [--date <day>] [--limit <n>] [--dry-run] [--force] [--json]
           reads each document (${Object.keys(READERS).join(', ')}), chunks it and posts one chunk at a time to the loop;
-          --chunk-bytes defaults to ${DEFAULT_CHUNK_BYTES}; --date is the day the documents speak for;
-          --limit posts at most n chunks then halts, the rest pending; --dry-run prints the chunks and posts nothing;
-          a chunk whose facts the manifest holds as stored is skipped unless --force; once every chunk of a
-          document is stored, every other digest the manifest holds as stored for it is retracted
+          a chunk the document's own postings cover — its facts stored, or none to store — is skipped unless --force;
+          once every chunk of a document is covered, every other digest run its entries name is retracted
   retract <path…> [--dry-run] [--json]
           retracts every digest run the manifest's entries for each document name, whatever their status,
-          and marks the entries; the documents are never read; --dry-run lists the runs and retracts nothing
+          and marks the entries; the documents are never read
   status  [--refresh] [--json]
-          the manifest; --refresh re-reads every recorded orchestration from the loop
+          the manifest
   export-studio --out <dir> [--json]
           writes the studio's experience profiles and STAR stories as markdown documents under <dir>,
           one titled section per record, for ingest to read like any notes file
-exit: 0 ok · 1 a chunk failed, was refused or stored nothing, or a retraction left a digest run standing · 2 usage, an input the program cannot use, a path the manifest has no entry for, or a manifest home another command is writing
+flags:
+${flagLines()}
+exit: 0 ok · 1 a chunk failed, was refused or was settled with its facts unstored, or a retraction left a digest run standing · 2 usage, an input the program cannot use, a path the manifest has no entry for, or a manifest home another command is writing
 environment: ${INGEST_ENV.loopUrl} (default ${DEFAULT_LOOP_URL}), ${INGEST_ENV.studioUrl} (default ${DEFAULT_STUDIO_URL}), ${INGEST_ENV.home} (default ${DEFAULT_HOME}), ${INGEST_ENV.subject}`;
 
 /** Commands, the flags each takes and whether it takes paths — as data. */
@@ -254,8 +262,8 @@ async function dispatch(options: Options, deps: CliDeps, io: Io): Promise<number
   }
   const report = await runIngest(documents, options, deps);
   print(io, options.json, report, renderIngest(report));
-  // Anything short of facts in the store is not ok: a failure, a refusal, a loop that settled with
-  // nothing stored, or an earlier digest left standing beside its replacement.
+  // Anything short of every chunk covered is not ok: a failure, a refusal, a loop that settled with
+  // the facts unstored, or an earlier digest left standing beside its replacement.
   const standing = report.files.some((file) => leftStanding(file.replaced) > 0);
   return report.failed > 0 || report.unstored > 0 || report.stopped !== null || standing ? 1 : 0;
 }

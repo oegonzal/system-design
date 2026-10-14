@@ -32,27 +32,36 @@ export const DEFAULT_HOME = 'static/memory-ingest';
 /**
  * How long a call to the loop rides out a loop that is restarting before its
  * failure stands: a call that never reached it, or a read or a retraction it
- * answered with a server error, is asked again at the pause within the
- * window. The browser session's `loopRecovery` numbers, reused: they were
- * sized from the loop's measured restarts (2026-10-10: fifteen watch-mode
- * restarts each listened again within six seconds, and three calls in the
- * three seconds of one restart ended a session forty minutes in), and the
- * ingester calls the same loop the same way. A start still unreachable past
- * the window stops the run.
+ * answered with a server error, is asked again every 2 s for 60 s — ten times
+ * the six seconds within which each of fifteen watch-mode restarts of the
+ * loop, measured on 2026-10-10, listened again, so several restarts back to
+ * back are ridden out too. A start still unreachable past the window stops
+ * the run.
  */
 export const INGEST_LOOP_RECOVERY: Recovery = { windowMs: 60_000, pauseMs: 2_000 };
 
 /**
- * Every flag, by its long name, with the type `parseArgs` reads it as. Which
- * command takes which flag is `COMMANDS` in `cli.ts`; the meaning is here.
+ * Every flag, by its long name, with the type `parseArgs` reads it as and
+ * what it means — the one place a flag is explained: `USAGE` in `cli.ts`
+ * prints each meaning from here. Which command takes which flag is
+ * `COMMANDS` in `cli.ts`.
  */
 export const INGEST_FLAGS = {
-  kind: { type: 'string', describe: `what the documents are: ${INGEST_KINDS.join('|')}` },
+  kind: {
+    type: 'string',
+    describe: `what the documents are: ${INGEST_KINDS.join('|')} (default ${DEFAULT_KIND})`,
+  },
   subject: { type: 'string', describe: 'whom the facts are about, by name' },
-  'chunk-bytes': { type: 'string', describe: 'the most a rendered chunk goal may weigh' },
+  'chunk-bytes': {
+    type: 'string',
+    describe: `the most a rendered chunk goal may weigh, in bytes (default ${DEFAULT_CHUNK_BYTES})`,
+  },
   date: { type: 'string', describe: 'the day the documents speak for, as YYYY-MM-DD' },
-  limit: { type: 'string', describe: 'post at most this many chunks, then halt' },
-  'parts-per-chunk': { type: 'string', describe: 'the most sections one chunk may carry' },
+  limit: { type: 'string', describe: 'post at most this many chunks, then halt, the rest pending' },
+  'parts-per-chunk': {
+    type: 'string',
+    describe: `the most sections one chunk may carry (default ${PARTS_PER_CHUNK})`,
+  },
   'dry-run': {
     type: 'boolean',
     describe:
@@ -61,7 +70,7 @@ export const INGEST_FLAGS = {
   force: {
     type: 'boolean',
     describe:
-      'post again the chunks the manifest holds as stored; their earlier digests are retracted once every chunk is stored',
+      "post again the chunks the manifest covers; a document's earlier digests are retracted once every chunk is covered again",
   },
   json: { type: 'boolean', describe: 'print the report as JSON' },
   refresh: { type: 'boolean', describe: 'read every recorded orchestration back from the loop' },

@@ -225,6 +225,41 @@ describe('execute', () => {
       /unstored\s+orch-1\s+digest skipped: embeddings-disabled — no provider/,
     );
     expect(third.out[0]).toContain('chunks 1 · posted 0 · unstored 1 · skipped 0 · failed 0');
+
+    // Settled with no fact to store: the chunk is covered, and nothing is wrong.
+    const empty = deps({
+      sink: new ScriptedSink([
+        settledOrchestration({
+          steps: {
+            digest: stepOf({ reason: 'no-memories', runIds: ['d-1'], counts: { memories: 0 } }),
+            store: stepOf({ status: 'skipped', reason: 'upstream-skipped', note: 'digest' }),
+          },
+        }),
+      ]),
+    });
+    const fourth = io();
+    expect(
+      await execute(parsed(['ingest', 'notes.md', '--subject', 'Ada']), empty, fourth.sink),
+    ).toBe(0);
+    expect(fourth.out[0]).toMatch(/no-facts\s+orch-1\s+digest complete: no-memories/);
+    expect(fourth.out[0]).toContain('posted 0 · no facts 1 · unstored 0');
+  });
+
+  it('[ING-3] exits 1 and names what was left standing when replacing a document hit a retraction the loop did not carry out', async () => {
+    // An earlier digest of the document, from text it no longer has.
+    const ledger = new InMemoryLedger([
+      manifestEntry({ chunkHash: 'earlier', digestRunId: 'run-earlier' }),
+    ]);
+    const d = deps({ ledger });
+    d.scripted.failingRetractions.set(
+      'run-earlier',
+      new LoopRefused(503, 'the store is unavailable'),
+    );
+    const { out, sink } = io();
+    expect(await execute(parsed(['ingest', 'notes.md', '--subject', 'Ada']), d, sink)).toBe(1);
+    expect(out[0]).toMatch(/posted\s+orch-1/);
+    expect(out[0]).toContain('left standing (1): run-earlier — 503: the store is unavailable');
+    expect(ledger.entries[0]?.retractedAt).toBeNull();
   });
 
   it('status prints the manifest, and --refresh rewrites what the loop has settled', async () => {

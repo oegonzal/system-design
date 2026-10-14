@@ -399,9 +399,10 @@ dealt evidence, as the `form-memory` orchestrator's recall step would compose
 them; `DELETE
 /memory/:id` retracts every point a digest run stored, by the run's id — one
 writer per digest run — which is how a document taught or ingested again closes
-behind itself (`memory-ingest ingest` once every chunk of the document is stored
-again, `memory-ingest retract` retiring one, `browser-session teach-again`); a
-run the store never held removes nothing and is no error.
+behind itself (`memory-ingest ingest` once the store holds every fact of a
+document's current text, `memory-ingest retract` retiring one,
+`browser-session teach-again`); a run the store never held removes nothing and
+is no error.
 
 Guards, before any row exists: an unknown orchestrator is a 404; a pipeline
 not in `RunsService.list()` is a 404, the same as `POST /runs`; whatever the

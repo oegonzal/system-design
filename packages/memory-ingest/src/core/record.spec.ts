@@ -1,6 +1,8 @@
-import { settledOrchestration, stepOf } from '../test/fakes';
+import { DOCUMENT_MEMORY_STEP_REASONS } from '@sysdesign/contracts';
+
+import { manifestEntry, settledOrchestration, stepOf } from '../test/fakes';
 import type { ManifestEntry } from './ports';
-import { statusOf, unstoredBy, whyNotStored } from './record';
+import { covers, HOLDS_NO_FACTS, statusOf, unstoredBy, whyNotStored } from './record';
 
 describe('statusOf', () => {
   it('[ING-1] is earned by the store step, not read off the orchestration: complete only when the facts were stored', () => {
@@ -97,5 +99,48 @@ describe('unstoredBy', () => {
     ).toBe('400: no index');
     expect(whyNotStored({ status: 'complete', error: null, steps: steps(ok, ok) })).toBeNull();
     expect(whyNotStored({ status: null, error: null, steps: steps(null, null) })).toBeNull();
+  });
+});
+
+describe('covers', () => {
+  /** A posting the loop settled with nothing stored, the step that stopped it giving this reason. */
+  const unstored = (reason: string, overrides: Partial<ManifestEntry> = {}): ManifestEntry =>
+    manifestEntry({
+      status: 'unstored',
+      steps: {
+        digest: { status: 'complete', reason, note: null, counts: { memories: 0, kept: 0 } },
+        store: { status: 'skipped', reason: 'upstream-skipped', note: 'digest', counts: {} },
+      },
+      ...overrides,
+    });
+
+  it('[ING-1] classifies every reason the orchestrator declares, and only those', () => {
+    expect(Object.keys(HOLDS_NO_FACTS).sort()).toEqual([...DOCUMENT_MEMORY_STEP_REASONS].sort());
+  });
+
+  it('[ING-1] holds a stored posting covering, and an unstored one only where its reason says the chunk holds no fact to store — never once a retraction marks it', () => {
+    expect(covers(manifestEntry())).toBe(true);
+    for (const reason of DOCUMENT_MEMORY_STEP_REASONS) {
+      expect(covers(unstored(reason)), reason).toBe(HOLDS_NO_FACTS[reason]);
+    }
+    expect(covers(unstored('no-memories'))).toBe(true);
+    // A reason the orchestrator does not declare — the runner's own, a newer loop's — reads as facts missing.
+    expect(covers(unstored('pipeline-unavailable'))).toBe(false);
+    // The store step's own reason decides when the digest completed cleanly.
+    expect(
+      covers(
+        manifestEntry({
+          status: 'unstored',
+          steps: {
+            digest: { status: 'complete', reason: null, note: null, counts: { memories: 2 } },
+            store: { status: 'skipped', reason: 'store-unavailable', note: null, counts: {} },
+          },
+        }),
+      ),
+    ).toBe(false);
+    const marked = { retractedAt: '2026-10-14T08:00:00.000Z', retractedPoints: 0 };
+    expect(covers(manifestEntry(marked))).toBe(false);
+    expect(covers(unstored('no-memories', marked))).toBe(false);
+    expect(covers(manifestEntry({ status: 'failed' }))).toBe(false);
   });
 });

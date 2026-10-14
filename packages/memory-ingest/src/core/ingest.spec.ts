@@ -4,10 +4,17 @@ import { LoopRefused } from '@sysdesign/loop-client';
 import { INGEST_MAX_ITERATIONS } from '../adapters/loop-http/loop-ingest-sink';
 import type { SettleScript } from '../test/fake-ingest-loop';
 import { FIXED_NOW } from '../test/fakes';
-import { harness, LOOP_URL, options, outcomes } from '../test/ingest-harness';
-import { DocumentNameTooLong, ingest, latestByHash, planIngest } from './ingest';
+import {
+  harness,
+  LOOP_URL,
+  NO_FACTS,
+  NOT_ACCEPTED,
+  options,
+  outcomes,
+} from '../test/ingest-harness';
+import { DocumentNameTooLong, ingest, latestByChunk, planIngest } from './ingest';
 
-/** The three ways the loop settles `complete` with nothing stored, as the orchestrator's steps report them. */
+/** Three ways the loop settles `complete` with the chunk's facts left out of the store, as the orchestrator's steps report them. */
 const UNSTORED: SettleScript[] = [
   {
     steps: {
@@ -15,17 +22,7 @@ const UNSTORED: SettleScript[] = [
       store: { status: 'skipped', reason: 'upstream-skipped', note: 'digest' },
     },
   },
-  {
-    steps: {
-      digest: {
-        status: 'complete',
-        reason: 'not-accepted',
-        runIds: ['not-accepted-run'],
-        counts: { memories: 4, kept: 0 },
-      },
-      store: { status: 'skipped', reason: 'upstream-skipped', note: 'digest' },
-    },
-  },
+  NOT_ACCEPTED,
   {
     steps: {
       digest: { status: 'complete', runIds: ['store-down-run'], counts: { memories: 2, kept: 2 } },
@@ -97,7 +94,11 @@ describe('ingest', () => {
     expect(outcomes(report)).toEqual(['posted', 'posted', 'posted']);
     expect(chunks[0]?.steps).toEqual(ledger.entries[0]?.steps);
     // Every chunk stands on its own posting, and nothing else of the document stood to replace.
-    expect(report.files[0]?.replaced).toEqual({ retracted: [], left: null });
+    expect(report.files[0]).toMatchObject({
+      replaced: { through: LOOP_URL, retracted: [], left: null },
+      heldBack: null,
+      unresolved: 0,
+    });
   });
 
   it('[ING-1] a limit posts that many chunks and no more, and the chunks it did not reach are posted by re-running the same command', async () => {
@@ -118,7 +119,7 @@ describe('ingest', () => {
     const exact = harness();
     const whole = await ingest(['notes.md'], options({ limit: 3 }), exact.deps);
     expect(whole).toMatchObject({ posted: 3, halted: null });
-    expect(whole.files[0]?.replaced).toEqual({ retracted: [], left: null });
+    expect(whole.files[0]?.replaced).toEqual({ through: LOOP_URL, retracted: [], left: null });
   });
 
   it('[ING-1] an interrupt halts once the chunk in flight is recorded, so no orchestration is left unrecorded', async () => {
@@ -177,16 +178,42 @@ describe('ingest', () => {
       note: 'qdrant refused the connection',
       counts: {},
     });
-    expect(report.files[0]?.replaced).toBeNull();
+    expect(report.files[0]).toMatchObject({
+      replaced: null,
+      heldBack: { chunk: 1, outcome: 'unstored', earlierRuns: 0 },
+    });
 
     // Unstored is not ingested: the next run posts all three again, and this time they land.
     const second = await ingest(['notes.md'], options(), deps);
     expect(second).toMatchObject({ posted: 3, unstored: 0, skipped: 0, failed: 0 });
     expect(posted).toHaveLength(6);
-    expect(latestByHash(ledger.entries).size).toBe(3);
-    expect([...latestByHash(ledger.entries).values()].every((e) => e.status === 'complete')).toBe(
+    expect(latestByChunk(ledger.entries).size).toBe(3);
+    expect([...latestByChunk(ledger.entries).values()].every((e) => e.status === 'complete')).toBe(
       true,
     );
+  });
+
+  it('[ING-1] a chunk the loop settles with no fact to store is recorded unstored with its reason, reported no-facts, and covers its chunk: a re-run skips it', async () => {
+    const { deps, ledger, posted } = harness([NO_FACTS]);
+    const report = await ingest(['notes.md'], options(), deps);
+    expect(report).toMatchObject({ posted: 2, noFacts: 1, unstored: 0, failed: 0 });
+    expect(outcomes(report)).toEqual(['no-facts', 'posted', 'posted']);
+    expect(ledger.entries[0]).toMatchObject({
+      status: 'unstored',
+      digestRunId: 'no-facts-run',
+      steps: { digest: { reason: 'no-memories', counts: { memories: 0, kept: 0 } } },
+    });
+    // Every chunk is covered, the one with no facts included, so the document stands whole.
+    expect(report.files[0]).toMatchObject({ heldBack: null, replaced: { left: null } });
+
+    const again = await ingest(['notes.md'], options(), deps);
+    expect(again).toMatchObject({ posted: 0, noFacts: 0, skipped: 3 });
+    expect(outcomes(again)).toEqual(['skipped', 'skipped', 'skipped']);
+    expect(again.files[0]?.chunks[0]).toMatchObject({
+      status: 'unstored',
+      steps: ledger.entries[0]?.steps,
+    });
+    expect(posted).toHaveLength(3);
   });
 
   it('[ING-1] a chunk met twice in one run is posted once: the second meeting reads the first posting', async () => {

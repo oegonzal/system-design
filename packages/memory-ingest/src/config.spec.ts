@@ -1,6 +1,6 @@
 import { recoverySchema } from '@sysdesign/contracts';
 
-import { COMMANDS } from './cli';
+import { COMMANDS, USAGE } from './cli';
 import {
   chunkBytes,
   DEFAULT_CHUNK_BYTES,
@@ -112,5 +112,15 @@ describe('flag values', () => {
   it('declares every flag a command takes, and no flag no command takes', () => {
     const taken = new Set(Object.values(COMMANDS).flatMap((command) => [...command.flags]));
     expect([...taken].sort()).toEqual(Object.keys(INGEST_FLAGS).sort());
+  });
+
+  it('explains every flag in the usage by the meaning it declares, one line each', () => {
+    const lines = USAGE.split('\n');
+    for (const [name, flag] of Object.entries(INGEST_FLAGS)) {
+      const explained = lines.filter(
+        (line) => line.startsWith(`  --${name} `) && line.endsWith(`  ${flag.describe}`),
+      );
+      expect(explained, `--${name}`).toHaveLength(1);
+    }
   });
 });

@@ -1,6 +1,6 @@
 import { relative, resolve } from 'node:path';
 
-import type { OrchestrationRunDto } from '@sysdesign/contracts';
+import type { DocumentMemoryStepReason, OrchestrationRunDto } from '@sysdesign/contracts';
 import { LoopRefused } from '@sysdesign/loop-client';
 
 import {
@@ -19,9 +19,11 @@ import {
  * want of embeddings, judged and not accepted, or finding nothing, and a
  * store that was unavailable, all settle `complete` with nothing stored. Here
  * each of those is `unstored`, and the steps — reason and note kept — say
- * which one it was. What a posting stored stands until a retraction marks it,
- * and the mark is the ledger's own decision: rewriting a posting from what the
- * loop reports keeps it.
+ * which one it was; whether the posting still covers its chunk, because the
+ * chunk holds no fact to store, is that reason's to say, as `HOLDS_NO_FACTS`
+ * declares. What a posting stored stands until a retraction marks it, and the
+ * mark is the ledger's own decision: rewriting a posting from what the loop
+ * reports keeps it.
  */
 
 /**
@@ -61,21 +63,67 @@ export const statusOf = (orchestration: OrchestrationRunDto): IngestStatus => {
 };
 
 /**
- * The step that kept a posting from storing anything, as one line — the first
- * that skipped, failed or completed with a reason, with its note — or null
- * when every step completed cleanly.
+ * The step that kept a posting from storing anything — the first that was not
+ * reported, skipped, failed or completed with a reason — or null when every
+ * step completed cleanly.
  */
-export function unstoredBy(steps: ManifestEntry['steps'] | null): string | null {
-  if (steps === null) return null;
+function stoppingStep(
+  steps: ManifestEntry['steps'],
+): { id: DocumentMemoryStep; step: ManifestStep | null } | null {
   for (const id of DOCUMENT_MEMORY_STEPS) {
     const step = steps[id];
-    if (step === null) return `${id} was not reported`;
-    if (step.status === 'complete' && step.reason === null) continue;
-    const reason = step.reason === null ? '' : `: ${step.reason}`;
-    const note = step.note === null ? '' : ` — ${step.note}`;
-    return `${id} ${step.status}${reason}${note}`;
+    if (step === null || step.status !== 'complete' || step.reason !== null) return { id, step };
   }
   return null;
+}
+
+/** The step that kept a posting from storing anything, as one line with its note; null when every step completed cleanly. */
+export function unstoredBy(steps: ManifestEntry['steps'] | null): string | null {
+  const stopping = steps === null ? null : stoppingStep(steps);
+  if (stopping === null) return null;
+  const { id, step } = stopping;
+  if (step === null) return `${id} was not reported`;
+  const reason = step.reason === null ? '' : `: ${step.reason}`;
+  const note = step.note === null ? '' : ` — ${step.note}`;
+  return `${id} ${step.status}${reason}${note}`;
+}
+
+/**
+ * What an `unstored` posting says of its chunk, by the reason of the step
+ * that kept it from storing: true where the reason is the loop's verdict that
+ * the chunk holds no fact to store, so the posting covers its chunk as a
+ * stored one does — a re-run skips it, and it counts toward its document's
+ * plan standing whole; false where the chunk's facts are missing from the
+ * store, so it is posted again. Total over the orchestrator's declared
+ * reasons, so a reason the loop adds is classified here before this build
+ * compiles; a reason it does not declare — the runner's own, or a newer
+ * loop's — reads as facts missing.
+ */
+export const HOLDS_NO_FACTS = {
+  // Never digested: the loop had no embedding provider.
+  'embeddings-disabled': false,
+  // Digested, and the store was not there to take what the digest endorsed.
+  'store-unavailable': false,
+  // Digested, and embedding what it endorsed failed.
+  'embedding-failed': false,
+  // Judged below the bar with nothing drawn on: a digest of the same text may yet be.
+  'not-accepted': false,
+  // Never judged: no rubric was derived.
+  'no-rubric': false,
+  // Never judged: nothing was produced.
+  'no-artifact': false,
+  // Judged, accepted, and it endorsed nothing: the chunk holds no fact to store.
+  'no-memories': true,
+} as const satisfies Record<DocumentMemoryStepReason, boolean>;
+
+const isDeclaredReason = (reason: string): reason is DocumentMemoryStepReason =>
+  Object.hasOwn(HOLDS_NO_FACTS, reason);
+
+/** Whether a posting settled with nothing stored for a reason that says its chunk holds no fact to store. */
+export function holdsNoFacts(entry: ManifestEntry): boolean {
+  if (entry.status !== 'unstored') return false;
+  const reason = stoppingStep(entry.steps)?.step?.reason ?? null;
+  return reason !== null && isDeclaredReason(reason) && HOLDS_NO_FACTS[reason];
 }
 
 /** A loop error as a record words it: a refusal by its status and the loop's own message, anything else by its message. */
@@ -123,9 +171,14 @@ export function entryOf(input: {
   };
 }
 
-/** Whether a posting's facts are in the store: it stored them, and no retraction has taken them out since. */
-export const stored = (entry: ManifestEntry): boolean =>
-  entry.status === 'complete' && entry.retractedAt === null;
+/**
+ * Whether a posting covers its chunk: no retraction has marked it, and it
+ * either stored the chunk's facts or settled with nothing stored because the
+ * chunk holds none (`HOLDS_NO_FACTS`). A covered chunk is skipped on a re-run
+ * unless forced, and a document whose every chunk is covered stands whole.
+ */
+export const covers = (entry: ManifestEntry): boolean =>
+  entry.retractedAt === null && (entry.status === 'complete' || holdsNoFacts(entry));
 
 /**
  * The entries with every posting that names the digest run and still stands
