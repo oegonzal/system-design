@@ -11,8 +11,8 @@ type Props = PageMeta;
 
 const { title, description, noindex = false, structuredData } = Astro.props;
 
-// Both are set by astro.config.ts (`site`); the fallback only serves the type.
-const site = Astro.site ?? new URL(SITE.origin);
+// Absolute URLs name the production origin SITE declares.
+const site = new URL(SITE.origin);
 const canonical = new URL(Astro.url.pathname, site).href;
 
 // Rasterized from the site's own SVGs at build time; social cards need a PNG.

@@ -7,22 +7,21 @@ import Section from '../components/Section.astro';
 import ServiceCard from '../components/ServiceCard.astro';
 import { COMPANY } from '../data/company';
 import { SERVICES } from '../data/services';
-import { SITE } from '../data/site';
+import { CLOSING_CTA, PRIMARY_ACTION, SITE } from '../data/site';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { organizationGraph } from '../lib/structured-data';
 import { getImage } from 'astro:assets';
 
-const site = Astro.site ?? new URL(SITE.origin);
 const logo = await getImage({ src: iconArt, format: 'png', width: 512, height: 512 });
 
 const structuredData = organizationGraph(
   {
     legalName: COMPANY.legalName,
     email: COMPANY.email.general,
-    founder: COMPANY.pointOfContact,
+    founder: COMPANY.founder,
   },
   SITE,
-  new URL(logo.src, site).href,
+  new URL(logo.src, SITE.origin).href,
 );
 
 const steps = [
@@ -52,10 +51,10 @@ const steps = [
 >
   <PageHeader
     title="AI automation and software engineering, built to production standards."
-    lede="Enfav LLC is an AI-focused software engineering company. We design and build AI workflow automation, custom software, systems integrations and data-processing solutions for commercial and public-sector organizations."
+    lede={SITE.summary}
   >
-    <div class="mt-8 flex flex-wrap gap-3">
-      <Button href="/contact/" variant="solid">Start a conversation</Button>
+    <div class="mt-8 flex flex-wrap gap-3 print:hidden">
+      <Button href={PRIMARY_ACTION.href} variant="solid">{PRIMARY_ACTION.action}</Button>
       <Button href="/government/" variant="outline">Government contracting</Button>
     </div>
   </PageHeader>
@@ -88,10 +87,5 @@ const steps = [
     </div>
   </Section>
 
-  <CtaBand
-    title="Have a process worth automating?"
-    text="Tell us what you are working on."
-    href="/contact/"
-    action="Start a conversation"
-  />
+  <CtaBand {...CLOSING_CTA} />
 </BaseLayout>

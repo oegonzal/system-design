@@ -3,6 +3,7 @@ import CtaBand from '../components/CtaBand.astro';
 import Container from '../components/Container.astro';
 import PageHeader from '../components/PageHeader.astro';
 import { SERVICES } from '../data/services';
+import { CLOSING_CTA } from '../data/site';
 import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
@@ -38,10 +39,5 @@ import BaseLayout from '../layouts/BaseLayout.astro';
     </div>
   </Container>
 
-  <CtaBand
-    title="Have a process worth automating?"
-    text="Tell us what you are working on."
-    href="/contact/"
-    action="Start a conversation"
-  />
+  <CtaBand {...CLOSING_CTA} />
 </BaseLayout>

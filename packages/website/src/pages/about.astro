@@ -1,9 +1,13 @@
 ---
 import CtaBand from '../components/CtaBand.astro';
+import FactValue from '../components/FactValue.astro';
 import PageHeader from '../components/PageHeader.astro';
 import Section from '../components/Section.astro';
+import { COMPANY } from '../data/company';
 import { FOUNDER } from '../data/founder';
+import { CLOSING_CTA, SITE } from '../data/site';
 import BaseLayout from '../layouts/BaseLayout.astro';
+import { confirmed } from '../lib/fact';
 
 const principles = [
   {
@@ -23,16 +27,16 @@ const principles = [
     text: 'We say what we know, mark what we do not, and never present an unverified claim as fact.',
   },
 ];
+
+// Search results state the founding year and the founder's name only once each is confirmed.
+// The page names the founder through the fact, but the bio (founder.ts) restates both as copy.
+const year = confirmed(COMPANY.founded);
+const name = confirmed(COMPANY.founder.name);
+const description = `Enfav LLC is an AI-focused software engineering company founded${year === undefined ? '' : ` in ${year}`} by ${name === undefined ? '' : `${name}, `}a full-stack engineer with ten-plus years of production experience.`;
 ---
 
-<BaseLayout
-  title="About — Enfav LLC"
-  description="Enfav LLC is an AI-focused software engineering company founded in 2026 by Oscar Gonzalez, a full-stack engineer with ten-plus years of production experience."
->
-  <PageHeader
-    title="About Enfav"
-    lede="Enfav LLC is an AI-focused software engineering company. We design and build AI workflow automation, custom software, systems integrations and data-processing solutions for commercial and public-sector organizations."
-  />
+<BaseLayout title="About — Enfav LLC" description={description}>
+  <PageHeader title="About Enfav" lede={SITE.summary} />
 
   <Section id="principles" title="Principles">
     <ul class="grid gap-6 sm:grid-cols-2">
@@ -46,8 +50,8 @@ const principles = [
   <Section id="founder" title="Founder" tone="muted">
     <div class="grid gap-10 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
       <div>
-        <p class="text-xl font-semibold">{FOUNDER.name}</p>
-        <p class="text-ink-soft">{FOUNDER.title}</p>
+        <p class="text-xl font-semibold"><FactValue fact={COMPANY.founder.name} /></p>
+        <p class="text-ink-soft"><FactValue fact={COMPANY.founder.title} /></p>
         {FOUNDER.bio.map((paragraph) => <p class="mt-4 leading-7">{paragraph}</p>)}
         <p class="mt-4 text-ink-soft">{FOUNDER.education}</p>
       </div>
@@ -75,10 +79,5 @@ const principles = [
     </div>
   </Section>
 
-  <CtaBand
-    title="Have a process worth automating?"
-    text="Tell us what you are working on."
-    href="/contact/"
-    action="Start a conversation"
-  />
+  <CtaBand {...CLOSING_CTA} />
 </BaseLayout>

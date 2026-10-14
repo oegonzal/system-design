@@ -4,19 +4,29 @@ import EmailLink from '../components/EmailLink.astro';
 import PageHeader from '../components/PageHeader.astro';
 import { COMPANY } from '../data/company';
 import BaseLayout from '../layouts/BaseLayout.astro';
+import { confirmed } from '../lib/fact';
 
 const channels = [
   {
     title: 'General inquiries',
+    purpose: 'general inquiries',
     address: COMPANY.email.general,
     text: 'Projects, consultations and questions about our services.',
   },
   {
     title: 'Government, contracting and teaming',
+    purpose: 'government, contracting and teaming',
     address: COMPANY.email.contracts,
     text: 'Solicitations, capability requests, subcontracting and teaming.',
   },
 ];
+
+// Search results name an address only once it is confirmed, as the page does.
+const reach = channels.flatMap(({ purpose, address }) => {
+  const value = confirmed(address);
+  return value === undefined ? [] : [`${value} for ${purpose}`];
+});
+const description = `Contact Enfav LLC${reach.length > 0 ? `: ${reach.join(', ')}` : ' by email'}.`;
 
 const include = [
   'Your organization and role',
@@ -26,10 +36,7 @@ const include = [
 ];
 ---
 
-<BaseLayout
-  title="Contact — Enfav LLC"
-  description="Contact Enfav LLC: contact@enfav.com for general inquiries, contracts@enfav.com for government, contracting and teaming."
->
+<BaseLayout title="Contact — Enfav LLC" description={description}>
   <PageHeader title="Contact" lede="Email is the best way to reach us." />
 
   <Container class="py-14 sm:py-20">

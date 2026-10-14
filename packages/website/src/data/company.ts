@@ -1,6 +1,27 @@
-import { type Fact, placeholder, verified } from '../lib/fact';
+import { type Fact, type PersonFacts, placeholder, verified } from '../lib/fact';
 
 import { FOUNDER } from './founder';
+
+/**
+ * The company facts, declared so that a fact demoted to a placeholder keeps the
+ * type every page reads. Approved copy states some of them too, and no check
+ * reads it: the bio in founder.ts restates the legal name, the founder's name
+ * and the founding year, and the legal name runs through SITE and the pages'
+ * copy. Changing or demoting any of those means rewording that copy.
+ */
+interface Company {
+  readonly legalName: Fact<string>;
+  readonly founded: Fact<string>;
+  readonly founder: PersonFacts;
+  /**
+   * The capability statement's named contact. It is the founder today, but it
+   * is its own field, so naming another contact leaves the founder unchanged.
+   */
+  readonly pointOfContact: PersonFacts;
+  readonly email: { readonly general: Fact<string>; readonly contracts: Fact<string> };
+}
+
+const founder: PersonFacts = { name: verified(FOUNDER.name), title: verified(FOUNDER.title) };
 
 /**
  * Every company fact the site states, and only these.
@@ -14,15 +35,16 @@ import { FOUNDER } from './founder';
  * Certifications, contract vehicles and contract past performance have no row at
  * all: Enfav holds none yet, and a placeholder would imply one is pending.
  */
-export const COMPANY = {
+export const COMPANY: Company = {
   legalName: verified('Enfav LLC'),
   founded: verified('2026'),
-  pointOfContact: verified({ name: FOUNDER.name, title: FOUNDER.title }),
+  founder,
+  pointOfContact: founder,
   email: {
     general: verified('contact@enfav.com'),
     contracts: verified('contracts@enfav.com'),
   },
-} as const;
+};
 
 /** One row of the capability statement's company data. */
 export interface CompanyDetail {

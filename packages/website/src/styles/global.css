@@ -4,9 +4,11 @@
  * generate (bg-surface, text-ink, …) and never a raw colour.
  *
  * source('../') limits class scanning to src/, whatever directory the build runs
- * from.
+ * from, and the specs are left out of it: the shipped CSS comes from the site's
+ * own sources, so editing a test never changes what is served.
  */
 @import 'tailwindcss' source('../');
+@source not '../**/*.spec.ts';
 
 @theme {
   --font-sans:
@@ -46,13 +48,6 @@
     --focus-ring: var(--color-ink);
   }
 
-  html {
-    font-family: var(--font-sans);
-    color: var(--color-ink);
-    background: var(--color-surface);
-    -webkit-text-size-adjust: 100%;
-  }
-
   @media (prefers-reduced-motion: no-preference) {
     html {
       scroll-behavior: smooth;
@@ -68,19 +63,8 @@
     --focus-ring: var(--color-on-brand);
   }
 
-  a {
-    color: inherit;
-  }
-
-  button:not(:disabled),
-  [role='button']:not(:disabled) {
-    cursor: pointer;
-  }
-
-  /* Long addresses and identifiers wrap instead of pushing a narrow page sideways. */
-  dd,
-  address,
-  .wrap-anywhere {
+  /* Long fact values (identifiers, addresses) wrap instead of pushing a narrow page sideways. */
+  dd {
     overflow-wrap: anywhere;
   }
 

@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
-import { COMPANY } from '../data/company';
 import { SITE } from '../data/site';
-import { confirmed, placeholder } from './fact';
-import { organizationGraph, serializeJsonLd } from './structured-data';
+import { placeholder, verified } from './fact';
+import { organizationGraph, serializeJsonLd, type StructuredData } from './structured-data';
 
 const LOGO = 'https://example.test/logo.png';
 
-const nodesOf = (graph: Record<string, unknown>) => graph['@graph'] as Record<string, unknown>[];
+/** The facts most cases start from: all made up, all confirmed. */
+const FACTS = {
+  legalName: verified('Example LLC'),
+  email: verified('hello@example.test'),
+  founder: { name: verified('Ada Example'), title: verified('Founder') },
+};
 
 describe('structured data', () => {
   it('[SITE-4] leaves no trace of a placeholder: an unconfirmed fact contributes no key', () => {
@@ -15,43 +19,71 @@ describe('structured data', () => {
       {
         legalName: placeholder('legal name pending'),
         email: placeholder('address pending'),
-        founder: placeholder('founder pending'),
+        founder: { name: placeholder('founder pending'), title: placeholder('title pending') },
       },
       SITE,
       LOGO,
     );
 
-    expect(JSON.stringify(graph)).not.toContain('pending');
-    const [organization] = nodesOf(graph);
+    expect(serializeJsonLd(graph)).not.toContain('pending');
+    const [organization] = graph['@graph'];
     expect(organization).not.toHaveProperty('name');
     expect(organization).not.toHaveProperty('email');
     expect(organization).not.toHaveProperty('founder');
   });
 
-  it('[SITE-4] states every confirmed fact', () => {
-    const facts = {
-      legalName: COMPANY.legalName,
-      email: COMPANY.email.general,
-      founder: COMPANY.pointOfContact,
-    };
-    const [organization, website] = nodesOf(organizationGraph(facts, SITE, LOGO));
-    const founder = confirmed(facts.founder);
+  it('[SITE-4] states every confirmed fact, and nothing of one that is not', () => {
+    const graph = organizationGraph(
+      { ...FACTS, founder: { ...FACTS.founder, title: placeholder('title pending') } },
+      SITE,
+      LOGO,
+    );
+    const [organization, website] = graph['@graph'];
 
-    expect(organization).toMatchObject({
+    expect(organization).toEqual({
       '@type': 'Organization',
-      name: confirmed(facts.legalName),
+      '@id': `${new URL('/', SITE.origin).href}#organization`,
+      name: 'Example LLC',
       url: new URL('/', SITE.origin).href,
       logo: LOGO,
-      email: confirmed(facts.email),
-      founder: { '@type': 'Person', name: founder?.name, jobTitle: founder?.title },
+      email: 'hello@example.test',
+      founder: { '@type': 'Person', name: 'Ada Example' },
     });
     expect(website).toMatchObject({ '@type': 'WebSite', name: SITE.name });
   });
 
+  it('[SITE-4] refuses to write a fact itself, wherever it sits in the graph', () => {
+    // A node is a Record<string, unknown>, so its type admits a fact: one written
+    // without confirmed(), in a spread copy, or set on a built node. Only this guard
+    // refuses it; the cast here just appends a node to the readonly list.
+    const holding = (node: Record<string, unknown>): StructuredData => {
+      const graph = organizationGraph(FACTS, SITE, LOGO);
+      (graph['@graph'] as Record<string, unknown>[]).push(node);
+      return graph;
+    };
+
+    expect(() => serializeJsonLd(holding({ identifier: placeholder('from SAM.gov') }))).toThrow(
+      /holds a fact at "identifier"/,
+    );
+    expect(() => serializeJsonLd(holding({ founder: { name: { ...verified('Ada') } } }))).toThrow(
+      /holds a fact at "name"/,
+    );
+  });
+
+  it("[SITE-4] refuses a graph cast to the type without organizationGraph's mark", () => {
+    const forged = { '@context': 'https://schema.org', '@graph': [] } as unknown as StructuredData;
+
+    expect(() => serializeJsonLd(forged)).toThrow(/organizationGraph built/);
+  });
+
   it('cannot close its script element early', () => {
-    const json = serializeJsonLd({ name: '</script><script>alert(1)</script>' });
+    const name = '</script><script>alert(1)</script>';
+    const json = serializeJsonLd(
+      organizationGraph({ ...FACTS, legalName: verified(name) }, SITE, LOGO),
+    );
 
     expect(json).not.toContain('</script>');
-    expect(JSON.parse(json)).toEqual({ name: '</script><script>alert(1)</script>' });
+    const [organization] = (JSON.parse(json) as { '@graph': unknown[] })['@graph'];
+    expect(organization).toMatchObject({ name });
   });
 });

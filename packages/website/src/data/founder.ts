@@ -3,7 +3,10 @@
  * for it. Each claim notes the résumé line it rests on — by role and
  * dates, never by employer, because this repository is public. Prior experience
  * is the founder's own; the page heads it as such and never as Enfav LLC
- * contract past performance.
+ * contract past performance. The bio restates three company facts as copy: the
+ * legal name, the founder's name and the founding year (COMPANY.legalName,
+ * COMPANY.founder.name and COMPANY.founded), so changing or demoting any of
+ * them means rewording it.
  */
 export const FOUNDER = {
   name: 'Oscar Gonzalez',

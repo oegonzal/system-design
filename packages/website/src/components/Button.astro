@@ -1,8 +1,9 @@
 ---
 /**
  * A call to action — always a link, since every action on this site goes
- * somewhere. `solid` on the brand band is white; on light surfaces it is the
- * brand colour. `outline` is the quieter companion on the band.
+ * somewhere, and never printed: on paper it leads nowhere. `brand` (the
+ * default) is the brand-coloured button for light surfaces; on the brand band,
+ * `solid` is the white button and `outline` its quieter companion.
  */
 interface Props {
   href: string;
@@ -21,7 +22,7 @@ const variants = {
 <a
   href={href}
   class:list={[
-    'inline-flex min-h-11 items-center justify-center rounded-md px-5 text-sm font-semibold no-underline transition-colors motion-reduce:transition-none',
+    'inline-flex min-h-11 items-center justify-center rounded-md px-5 text-sm font-semibold no-underline transition-colors motion-reduce:transition-none print:hidden',
     variants[variant],
   ]}
 >

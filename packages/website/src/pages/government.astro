@@ -2,6 +2,7 @@
 import Container from '../components/Container.astro';
 import EmailLink from '../components/EmailLink.astro';
 import FactList from '../components/FactList.astro';
+import FactValue from '../components/FactValue.astro';
 import PageHeader from '../components/PageHeader.astro';
 import Section from '../components/Section.astro';
 import { COMPANY, COMPANY_DETAILS } from '../data/company';
@@ -28,7 +29,7 @@ const differentiators = [
   },
 ];
 
-const contact = COMPANY.pointOfContact.status === 'verified' ? COMPANY.pointOfContact.value : null;
+const contact = COMPANY.pointOfContact;
 
 // Paper has no links: the printed statement spells out the addresses it refers to.
 const printed = (path: string): string => {
@@ -83,7 +84,8 @@ const printed = (path: string): string => {
 
   <Section id="past-performance" title="Past performance" tone="muted">
     <p class="max-w-3xl leading-7 text-ink-soft print:max-w-none print:text-xs print:leading-snug">
-      Enfav LLC was formed in 2026. The founder's prior professional experience appears on the
+      Enfav LLC was formed in <FactValue fact={COMPANY.founded} />. The founder's prior professional
+      experience appears on the
       <a href="/about/" class="text-link underline underline-offset-4">About page</a
       ><span class="hidden print:inline"> ({printed('/about/')})</span>; it is not Enfav LLC
       contract past performance.
@@ -93,7 +95,10 @@ const printed = (path: string): string => {
   <Section id="contact" title="Point of contact">
     <div class="grid gap-8 sm:grid-cols-2 print:grid-cols-2 print:gap-4 print:text-xs">
       <div>
-        {contact && <p><span class="font-semibold">{contact.name}</span>, {contact.title}</p>}
+        <p>
+          <span class="font-semibold"><FactValue fact={contact.name} /></span>,
+          <FactValue fact={contact.title} />
+        </p>
         <p class="mt-2 print:mt-0">
           Contracting and teaming:
           <EmailLink
