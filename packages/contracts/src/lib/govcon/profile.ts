@@ -1,5 +1,5 @@
 import type { ApiResponse } from '../envelope';
-import type { AlertAudience, FactorId } from './vocab';
+import type { AlertAudience, FactorId, LeadTier } from './vocab';
 
 /**
  * The search profile as data: everything the scorer, the ranking and the
@@ -70,7 +70,7 @@ export interface ScoringPolicy {
   };
 }
 
-/** What the daily spending warm alerts on, declared per profile. */
+/** What is raised for a person, declared per profile: by the daily spending warm, and after the daily pull. */
 export interface AlertPolicy {
   /** An award ending within this many days raises one alert; 0 raises none. */
   endingWithinDays: number;
@@ -80,6 +80,8 @@ export interface AlertPolicy {
   audience: AlertAudience;
   /** An award found in the scope is raised only with at least this much obligated on it; a tracked award always is. */
   minObligated: number;
+  /** A stored notice the profile ranks in this tier or a better one is raised once, after the daily pull; null raises none. */
+  newLeadTier: LeadTier | null;
 }
 
 /** What a profile alerts on until it says otherwise; a stored document from before a field reads as this. */
@@ -88,6 +90,7 @@ export const DEFAULT_ALERT_POLICY: AlertPolicy = {
   pulseAboveBand: true,
   audience: 'scope',
   minObligated: 0,
+  newLeadTier: 'high',
 };
 
 /** What the profile looks for in a prime to work under. */

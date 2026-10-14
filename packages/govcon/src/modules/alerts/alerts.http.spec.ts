@@ -17,6 +17,7 @@ import {
   type GovconHttp,
   type Page,
 } from '../app/testing';
+import { PullScheduler } from '../pulls/pull-scheduler';
 import { SpendingWarmer } from '../spending/warm/spending-warmer';
 
 /** The harness's clock is 2026-09-26; this award ends fifty days on. */
@@ -82,6 +83,38 @@ describe('the alert routes', () => {
     const second = await warmer.warm();
     expect(second.alerts).toEqual({ found: 1, fresh: 0, published: 0, prompted: false });
     expect((await get<Page<RaisedAlertView>>(url, '/alerts')).meta.total).toBe(1);
+  });
+
+  it('[GOV-8] [GOV-35] [GOV-36] a scheduled pull stores what the flagged searches return through the gate, and each stored notice the profile ranks high is raised once and read back at /alerts as the line a person was sent', async () => {
+    const scheduler = http.app.get(PullScheduler);
+    const first = await scheduler.run();
+    expect(first.profile).toBe('tiny');
+    expect(
+      first.report?.slices.map((slice) => [slice.name, slice.outcome, slice.inserted]),
+    ).toEqual([
+      ['Machine shops', 'ok', 2],
+      ['Computer services', 'ok', 1],
+    ]);
+    // `a` and `c` rank high; `b` is a set-aside the profile cannot bid, and is on no list.
+    expect(first.alerts).toEqual({ found: 2, fresh: 2, published: 2, prompted: true });
+    // The suite's sink keeps every digest it was handed; this run's is the last.
+    expect(http.sink.prompts.at(-1)?.title).toBe('2 new leads for Tiny LLC');
+
+    const listed = await get<Page<RaisedAlertView>>(url, '/alerts');
+    expect(listed.data.map((view) => [view.key.kind, view.key.subject])).toEqual([
+      ['lead-new', 'a'],
+      ['lead-new', 'c'],
+    ]);
+    const [view] = listed.data;
+    if (!view?.alert) throw new Error('expected the alert that was published');
+    expect(describeAlert(view.alert)).toBe(
+      'New high lead, scored 92.5: “Additive manufacturing of replacement brackets” (Solicitation, due 2026-10-10), DLA AVIATION.',
+    );
+
+    // The next run pulls again — this harness keeps no cache window — and raises nothing twice.
+    const second = await scheduler.run();
+    expect(second.alerts).toEqual({ found: 2, fresh: 0, published: 0, prompted: false });
+    expect((await get<Page<RaisedAlertView>>(url, '/alerts')).meta.total).toBe(2);
   });
 
   it('[GOV-33] pages the alerts within its declared bounds and refuses a page outside them', async () => {

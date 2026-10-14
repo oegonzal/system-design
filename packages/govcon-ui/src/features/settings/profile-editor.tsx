@@ -1,8 +1,10 @@
 import {
   ALERT_AUDIENCES,
+  LEAD_TIERS,
   MAX_ALERT_ENDING_DAYS,
   MAX_PAGE_SIZE,
   type AlertAudience,
+  type LeadTier,
   type ScoringPolicy,
   type SearchProfile,
 } from '@sysdesign/contracts';
@@ -44,6 +46,15 @@ export interface ProfileEditorProps {
 const ALERT_AUDIENCE_LABEL: Record<AlertAudience, string> = {
   scope: 'Awards in these codes, and tracked awards',
   watched: 'Tracked awards only',
+};
+
+/** A select has no null: this value stands for a policy that raises no lead. */
+const NO_LEADS = 'none';
+/** What is raised when the floor is that tier: it, and every better one. */
+const NEW_LEAD_TIER_LABEL: Record<LeadTier, string> = {
+  high: 'Ranked high',
+  medium: 'Ranked medium or high',
+  low: 'Every ranked notice',
 };
 
 const upperNoSpace = (code: string): string => code.trim().toUpperCase();
@@ -233,7 +244,7 @@ export function ProfileEditor({
 
       <Section
         title="Alerts"
-        hint="What the daily digest flags for this profile: an award ending inside this many days — one in its codes with at least the floor obligated on it, or one that is tracked, whatever is on it — and the fiscal period in progress obligating above every prior year's. A tracked award also says when its end moves and when a stored notice may follow it."
+        hint="What is put to a person for this profile. After the daily warm: an award ending inside this many days — one in its codes with at least the floor obligated on it, or one that is tracked, whatever is on it — and the fiscal period in progress obligating above every prior year's; a tracked award also says when its end moves and when a stored notice may follow it. After the daily pull: each stored notice ranked in the tier chosen here, once."
       >
         <Stack direction="row" gap={4} align="end" wrap>
           <SelectField
@@ -279,6 +290,27 @@ export function ProfileEditor({
               patch({ alerts: { ...value.alerts, pulseAboveBand: event.target.checked } })
             }
           />
+          <SelectField
+            label="New leads raised"
+            value={value.alerts.newLeadTier ?? NO_LEADS}
+            disabled={saving}
+            onChange={(event) =>
+              patch({
+                alerts: {
+                  ...value.alerts,
+                  newLeadTier:
+                    event.target.value === NO_LEADS ? null : (event.target.value as LeadTier),
+                },
+              })
+            }
+          >
+            {LEAD_TIERS.map((tier) => (
+              <option key={tier} value={tier}>
+                {NEW_LEAD_TIER_LABEL[tier]}
+              </option>
+            ))}
+            <option value={NO_LEADS}>None</option>
+          </SelectField>
         </Stack>
         <FieldIssues issues={issues} path="alerts" />
       </Section>

@@ -13,6 +13,7 @@ export const ALERT_KIND_LABEL: Record<AlertKind, string> = {
   'award-end-moved': 'End moved',
   'award-notice': 'Possible follow-on',
   'pulse-above-band': 'Spending above its band',
+  'lead-new': 'New lead',
 };
 
 export interface AlertLink {
@@ -26,6 +27,10 @@ const awardLink = (externalId: string): AlertLink => ({
   label: 'Award',
   href: awardHref(externalId),
 });
+const noticeLink = (noticeId: string): AlertLink => ({
+  label: 'Notice',
+  href: noticeHref(noticeId),
+});
 
 /** Where a published alert leads: the pages of the things it names. */
 const linksOf = (alert: GovconAlert): AlertLink[] => {
@@ -34,26 +39,26 @@ const linksOf = (alert: GovconAlert): AlertLink[] => {
     case GOVCON_TOPICS.awardEndMoved:
       return [awardLink(alert.payload.externalId)];
     case GOVCON_TOPICS.awardNotice:
-      return [
-        { label: 'Notice', href: noticeHref(alert.payload.noticeId) },
-        awardLink(alert.payload.externalId),
-      ];
+      return [noticeLink(alert.payload.noticeId), awardLink(alert.payload.externalId)];
     case GOVCON_TOPICS.pulseAboveBand:
       return [PULSE];
+    case GOVCON_TOPICS.leadNew:
+      return [noticeLink(alert.payload.noticeId)];
   }
 };
 
 /**
  * Where an alert kept without its payload still leads, from its key alone:
- * an ending award's subject is the award's id, and a pulse's finding is on
- * the pulse. The other kinds key on two things at once, and lead nowhere
- * without the payload that names them apart.
+ * an ending award's subject is the award's id, a new lead's is its notice's,
+ * and a pulse's finding is on the pulse. The other kinds key on two things
+ * at once, and lead nowhere without the payload that names them apart.
  */
 const LINKS_BY_KEY: Record<AlertKind, (subject: string) => AlertLink[]> = {
   'award-ending': (subject) => [awardLink(subject)],
   'award-end-moved': () => [],
   'award-notice': () => [],
   'pulse-above-band': () => [PULSE],
+  'lead-new': (subject) => [noticeLink(subject)],
 };
 
 export const alertLinks = (view: RaisedAlertView): AlertLink[] =>

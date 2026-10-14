@@ -95,9 +95,13 @@ export const SOURCE_OPERATIONS = [
 ] as const;
 export type SourceOperation = (typeof SOURCE_OPERATIONS)[number];
 
-/** A ranked lead's band, cut by the profile's thresholds. */
+/** A ranked lead's band, cut by the profile's thresholds — the best first. */
 export const LEAD_TIERS = ['high', 'medium', 'low'] as const;
 export type LeadTier = (typeof LEAD_TIERS)[number];
+
+/** Whether a tier is a floor or better: `LEAD_TIERS` lists the best first. */
+export const tierAtLeast = (tier: LeadTier, floor: LeadTier): boolean =>
+  LEAD_TIERS.indexOf(tier) <= LEAD_TIERS.indexOf(floor);
 
 /** How one slice of a pull ended, as the report rows it. */
 export const SLICE_OUTCOMES = ['ok', 'cached', 'budget-exhausted', 'error', 'skipped'] as const;

@@ -77,6 +77,23 @@ describe('ProfileEditor', () => {
     expect(onChange).toHaveBeenLastCalledWith(
       expect.objectContaining({ alerts: { ...PROFILE.alerts, minObligated: 250_000 } }),
     );
+    // The tier a stored notice is raised from after the daily pull, or none at all.
+    const leads = screen.getByLabelText('New leads raised') as HTMLSelectElement;
+    expect(leads.value).toBe('high');
+    expect([...leads.options].map((option) => [option.value, option.textContent])).toEqual([
+      ['high', 'Ranked high'],
+      ['medium', 'Ranked medium or high'],
+      ['low', 'Every ranked notice'],
+      ['none', 'None'],
+    ]);
+    fireEvent.change(leads, { target: { value: 'medium' } });
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ alerts: { ...PROFILE.alerts, newLeadTier: 'medium' } }),
+    );
+    fireEvent.change(leads, { target: { value: 'none' } });
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ alerts: { ...PROFILE.alerts, newLeadTier: null } }),
+    );
     expect((screen.getByLabelText('Smallest subcontract (USD)') as HTMLInputElement).value).toBe(
       '50000',
     );

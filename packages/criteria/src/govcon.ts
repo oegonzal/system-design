@@ -54,7 +54,7 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
   {
     id: 'GOVU-10',
     statement:
-      'The settings page edits a profile as data — codes, interests, weights with their live sum, prices, bands, tiers and the alert policy (the days an expiring award is flagged within, whose ending awards are raised, the least obligated on one found in the scope, and whether a pulse above its band alerts) — creates, copies, defaults and removes profiles, shows the service issues per field, and shows the sources and the full ledger.',
+      'The settings page edits a profile as data — codes, interests, weights with their live sum, prices, bands, tiers and the alert policy (the days an expiring award is flagged within, whose ending awards are raised, the least obligated on one found in the scope, whether a pulse above its band alerts, and the tier a stored notice is raised from, or none) — creates, copies, defaults and removes profiles, shows the service issues per field, and shows the sources and the full ledger.',
   },
   {
     id: 'GOVU-11',
@@ -109,7 +109,7 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
   {
     id: 'GOVU-21',
     statement:
-      'The dashboard lists what the daily warm raised, newest first and a page at a time: each alert as the line a person was sent, with its kind and the day it was raised, and links to the award or notice it names; an alert kept without what was published is named by its key. It is where a digest’s "and more" lands, and reading it asks no source anything.',
+      'The dashboard lists what the daily warm and the daily pull raised, newest first and a page at a time: each alert as the line a person was sent, with its kind and the day it was raised, and links to the award or notice it names; an alert kept without what was published is named by its key. It is where a digest’s "and more" lands, and reading it asks no source anything.',
   },
   {
     id: 'GOVU-22',
@@ -235,7 +235,7 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
   {
     id: 'GOV-24',
     statement:
-      'Alert rules are declared on the profile and run after a warm as pure arithmetic over what it read: each alert is raised once per kind, scope and subject through the ledger, published on its declared topic, listed in one digest prompt per warm put to a person, recorded only once published, and an unreachable bus or ledger is one warning, never a throw.',
+      'Alert rules are declared on the profile and are pure arithmetic over what a run read. Whoever finds alerts hands them to one raiser: each is raised once per kind and subject through the ledger, published on its declared topic the weightiest first, listed in one digest prompt per run named by its finder, recorded only once published, and an unreachable bus or ledger is one warning, never a throw.',
   },
   {
     id: 'GOV-23',
@@ -291,6 +291,16 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
     id: 'GOV-34',
     statement:
       'Who may hold the work a stored notice is about is read through the horizon lens: the awards in the notice’s NAICS code — and its product service code, unless asked not to — ending inside INCUMBENT_HORIZON_MONTHS, kept to the notice’s own sub-agency by the join the horizon uses, with how many the scope listed and how far the list is complete. The buyer’s department narrows the read only when the source lists that code; a notice lacking a NAICS code, or a buyer named down to its sub-agency, answers that gap and asks no source anything; a notice the store does not hold is a 404.',
+  },
+  {
+    id: 'GOV-35',
+    statement:
+      'The daily pull runs on a cadence declared in the environment (GOVCON_PULL_HOURS; 0 never), started only by serve on the lifecycle the warm has: the default profile’s pull as it is asked for by hand, through the gate, so the budget bounds it and a search already pulled inside the cache window answers cached — a restart inside the day spends no request. A store with no default profile is skipped, a source that is disabled is never asked, and a pull that cannot run is one logged line.',
+  },
+  {
+    id: 'GOV-36',
+    statement:
+      'After each scheduled pull the lead rule runs over the store: every stored notice the profile ranks in the tier its alert policy names, or a better one, is one alert keyed by its notice, carrying the score and tier it was raised at, raised once through the ledger and listed in a digest of its own. The rule reads the store and not the pull, so a lead a refused bus kept back is raised by the next run; a policy with no tier raises none, and a stored profile from before the tier reads as the declared default.',
   },
   {
     id: 'GOV-21',

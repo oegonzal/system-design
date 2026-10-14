@@ -3,6 +3,7 @@ import {
   DEFAULT_ALERT_POLICY,
   DEFAULT_TEAMING_POLICY,
   FACTOR_IDS,
+  LEAD_TIERS,
   MAX_ALERT_ENDING_DAYS,
   MAX_PAGE_SIZE,
   MAX_PULL_DAYS,
@@ -74,12 +75,13 @@ const weightsSchema = z.strictObject(
   Object.fromEntries(FACTOR_IDS.map((id) => [id, unit])) as Record<FactorId, typeof unit>,
 );
 
-/** What the daily warm alerts on; a document from before the policy reads as the declared default. */
+/** What is raised for a person; a document from before the policy, or before one of its fields, reads as the declared default. */
 const alertPolicySchema = z.strictObject({
   endingWithinDays: z.number().int().min(0).max(MAX_ALERT_ENDING_DAYS),
   pulseAboveBand: z.boolean(),
   audience: z.enum(ALERT_AUDIENCES).default(DEFAULT_ALERT_POLICY.audience),
   minObligated: z.number().min(0).default(DEFAULT_ALERT_POLICY.minObligated),
+  newLeadTier: z.enum(LEAD_TIERS).nullable().default(DEFAULT_ALERT_POLICY.newLeadTier),
 });
 
 /** The size of subcontract the company could take; a document from before the policy reads as the declared default. */

@@ -17,6 +17,27 @@ const named = {
 /** One of each kind, newest first, and one kept from before payloads were. */
 const ALERTS: RaisedAlertView[] = [
   {
+    id: 'a-5',
+    key: { kind: 'lead-new', subject: 'n-9' },
+    profileId: 'enfav',
+    raisedAt: '2026-09-29T03:00:00.000Z',
+    alert: {
+      topic: 'govcon.lead.new',
+      key: { kind: 'lead-new', subject: 'n-9' },
+      payload: {
+        profileId: 'enfav',
+        noticeId: 'n-9',
+        title: 'Enterprise data platform modernization',
+        noticeType: 'Sources Sought',
+        agencyPath: 'Department of Energy.Department of Energy.HEADQUARTERS PROCUREMENT SERVICES',
+        naicsCode: '541512',
+        responseDeadlineAt: '2026-10-20T17:00:00.000Z',
+        score: 81.5,
+        tier: 'high',
+      },
+    },
+  },
+  {
     id: 'a-4',
     key: { kind: 'award-notice', subject: `${AWARD}|n-1` },
     profileId: 'enfav',

@@ -111,9 +111,12 @@ describe('the profiles service', () => {
     await expect(service.resolve('nope')).rejects.toBeInstanceOf(NotFoundException);
   });
 
-  it('[GOV-13] names an empty store when no profile is default', async () => {
+  it('[GOV-13] names an empty store when no profile is default — a 404 to a request, and nothing to a job, which has nobody to hand one to', async () => {
     const { service } = harness();
     await expect(service.resolve(undefined)).rejects.toThrow(/no default profile/);
+    expect(await service.defaultOrNull()).toBeNull();
+    await service.create(tinyProfile());
+    expect((await service.defaultOrNull())?.id).toBe('tiny');
   });
 });
 

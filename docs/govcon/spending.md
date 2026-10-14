@@ -338,25 +338,27 @@ warm agencies source 1 req 310 ms
 warm horizon 097 source 9 req 6210 ms
 warm agency 097 source 2 req 1105 ms
 warm award CONT_AWD_W912DY23F0468_9700_W912DY20D0079_9700 snapshot 1 req 6 ms
-warm alerts: 3 found, 2 new, 2 published, digest sent
+spending alerts: 3 found, 2 new, 2 published, digest sent
 ```
 
 Then the alert rules run over what was read. They are declared on the
 profile and edited in Settings → Alerts:
 
-| Rule                              | Profile field             | What it raises                                                                                                               |
-| --------------------------------- | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| An award is ending                | `alerts.endingWithinDays` | One alert per award ending within this many days of today (default 90; `0` raises none)                                      |
-| Whose ending awards               | `alerts.audience`         | `scope`: every award the horizons list, and every tracked award. `watched`: tracked awards only                              |
-| How much must be obligated on one | `alerts.minObligated`     | An award found in the scope is raised only with at least this many dollars obligated on it (default 0). A tracked one always |
-| The pulse runs above its band     | `alerts.pulseAboveBand`   | One alert when the period in progress has already obligated more than every prior year's amount for it                       |
+| Rule                              | Profile field             | What it raises                                                                                                                                                  |
+| --------------------------------- | ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| An award is ending                | `alerts.endingWithinDays` | One alert per award ending within this many days of today (default 90; `0` raises none)                                                                         |
+| Whose ending awards               | `alerts.audience`         | `scope`: every award the horizons list, and every tracked award. `watched`: tracked awards only                                                                 |
+| How much must be obligated on one | `alerts.minObligated`     | An award found in the scope is raised only with at least this many dollars obligated on it (default 0). A tracked one always                                    |
+| The pulse runs above its band     | `alerts.pulseAboveBand`   | One alert when the period in progress has already obligated more than every prior year's amount for it                                                          |
+| A notice is worth hearing about   | `alerts.newLeadTier`      | After the daily pull, not the warm: one alert per stored notice ranked in this tier or a better one (default `high`; none turns it off), in a digest of its own |
 
 Each alert is raised once per kind and subject — the same expiring award
 seen through the profile's horizon and an agency's is one alert: the
 `govcon_alert` table remembers what was raised, so tomorrow's warm raises
 only what is new. Each new alert is published on its declared topic
 (`govcon.award.ending`, `govcon.award.end-moved`, `govcon.award.notice`,
-`govcon.pulse.above-band`) on the notifications bus at `NOTIFICATIONS_URL`,
+`govcon.pulse.above-band`, and `govcon.lead.new` after the daily pull) on
+the notifications bus at `NOTIFICATIONS_URL`,
 and one digest per warm — "N spending alerts for Enfav LLC", at most ten
 lines and a count of the rest, one "Noted" button, expiring after seven
 days — is published as a prompt, which is what the Telegram channel
@@ -365,9 +367,10 @@ reached is one warning and the same alerts are raised next warm.
 
 **Where the rest are.** The table keeps what was published with each alert,
 so the dashboard's Alerts panel reads them back as the lines that were
-sent, newest warm first and, within a warm, in the digest's order: a
-tracked award's news, then a finding about the whole scope, then the ending
-awards with the most obligated first. Each line links to the award or the
+sent, newest run first and, within a run, in the digest's order: a
+tracked award's news, then a new lead with the best score first, then a
+finding about the whole scope, then the ending awards with the most
+obligated first. Each line links to the award or the
 notice it names. `GET /alerts?limit&offset` is the same list. An alert
 raised before 2026-10-14 kept no payload, and is listed by its key with a
 link to the award when it is an ending one.
@@ -655,22 +658,23 @@ families and interests that name parts and repair.
 
 ## Troubleshooting
 
-| What you see                                             | Why, and what to do                                                                                                                                                                                    |
-| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| A first look takes long                                  | The scope is new today: the lens is built from the source. Later reads answer from the snapshot; the warm fills the default profile's scope daily.                                                     |
-| "from an older snapshot — the source refused a refresh"  | USAspending answered 429, 5xx or timed out; the day-old answer is better than none. Read the ledger row for the outcome.                                                                               |
-| "The walk stopped early (pages)"                         | The scope is wide: the list is complete for awards ending before the date named, and later months are partial. Narrow the scope or the family to see further.                                          |
-| "…before it could place today"                           | The scope's active awards run deeper than the page bound, or than the 50,000 awards the source pages to. Pick an agency in the Agency tab, or one code family.                                         |
-| "The walk stopped early (source)"                        | A page failed; the answer was not kept, so the next read walks again.                                                                                                                                  |
-| 404 on an agency                                         | The toptier code is not in USAspending's directory (`GET /spending/agencies`).                                                                                                                         |
-| 400 `a NAICS family is 2, 4 or 6 digits`                 | The scope names a 3- or 5-digit NAICS family, which USAspending does not filter by. Name the 4-digit family or the 6-digit codes.                                                                      |
-| 502 on an agency with `fiscal_year is outside the range` | A fiscal year was asked that the source has no submissions for yet; leave it out and the agency's active year is used.                                                                                 |
-| "No projection"                                          | No complete prior fiscal year in the lookback with anything obligated.                                                                                                                                 |
-| Every "Open notices" is 0                                | No pull has stored notices in these codes yet (`pnpm govcon pull`), or none is open.                                                                                                                   |
-| `warm skipped: no default profile`                       | The store has no profile; the seed runs on an empty store at boot.                                                                                                                                     |
-| `warm pulse refused 400 naics Too big`                   | The profile names more codes than a scope may (`MAX_SCOPE_CODES`).                                                                                                                                     |
-| `alerts not published` / `digest not sent`               | The notifications service at `NOTIFICATIONS_URL` is down or does not know the `govcon.*` topics yet (rebuild it); nothing is recorded, so the same alerts are raised next warm.                        |
-| `fetch failed`, or 500 with "Web Page Blocked!"          | USAspending's firewall is refusing this address after a burst of requests. Stored snapshots still answer (as `stale` once past the window); wait before asking again — every retry is another request. |
+| What you see                                                                    | Why, and what to do                                                                                                                                                                                    |
+| ------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| A first look takes long                                                         | The scope is new today: the lens is built from the source. Later reads answer from the snapshot; the warm fills the default profile's scope daily.                                                     |
+| "from an older snapshot — the source refused a refresh"                         | USAspending answered 429, 5xx or timed out; the day-old answer is better than none. Read the ledger row for the outcome.                                                                               |
+| "The walk stopped early (pages)"                                                | The scope is wide: the list is complete for awards ending before the date named, and later months are partial. Narrow the scope or the family to see further.                                          |
+| "…before it could place today"                                                  | The scope's active awards run deeper than the page bound, or than the 50,000 awards the source pages to. Pick an agency in the Agency tab, or one code family.                                         |
+| "The walk stopped early (source)"                                               | A page failed; the answer was not kept, so the next read walks again.                                                                                                                                  |
+| 404 on an agency                                                                | The toptier code is not in USAspending's directory (`GET /spending/agencies`).                                                                                                                         |
+| 400 `a NAICS family is 2, 4 or 6 digits`                                        | The scope names a 3- or 5-digit NAICS family, which USAspending does not filter by. Name the 4-digit family or the 6-digit codes.                                                                      |
+| 502 on an agency with `fiscal_year is outside the range`                        | A fiscal year was asked that the source has no submissions for yet; leave it out and the agency's active year is used.                                                                                 |
+| "No projection"                                                                 | No complete prior fiscal year in the lookback with anything obligated.                                                                                                                                 |
+| Every "Open notices" is 0                                                       | No pull has stored notices in these codes yet (`pnpm govcon pull`), or none is open.                                                                                                                   |
+| `warm skipped: no default profile`                                              | The store has no profile; the seed runs on an empty store at boot.                                                                                                                                     |
+| `scheduled pull skipped: sam.gov is disabled (no-key)`                          | `SAM_GOV_API_KEY` is not set, so the daily pull asks nothing. The lead rule still runs over what is stored.                                                                                            |
+| `warm pulse refused 400 naics Too big`                                          | The profile names more codes than a scope may (`MAX_SCOPE_CODES`).                                                                                                                                     |
+| `spending alerts not published` / `new leads not published` / `digest not sent` | The notifications service at `NOTIFICATIONS_URL` is down or does not know the `govcon.*` topics yet (rebuild and restart it); nothing is recorded, so the same alerts are raised by the next run.      |
+| `fetch failed`, or 500 with "Web Page Blocked!"                                 | USAspending's firewall is refusing this address after a burst of requests. Stored snapshots still answer (as `stale` once past the window); wait before asking again — every retry is another request. |
 
 ## Limits
 

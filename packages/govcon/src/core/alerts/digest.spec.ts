@@ -114,5 +114,35 @@ describe('the alert digest', () => {
       'LARGE',
       'N6660',
     ]);
+    // A notice to answer stands ahead of a finding about the scope, and the better-scored lead ahead of the other.
+    const lead = (noticeId: string, score: number): GovconAlert => ({
+      topic: 'govcon.lead.new',
+      key: { kind: 'lead-new', subject: noticeId },
+      payload: {
+        profileId: 'enfav',
+        noticeId,
+        title: noticeId,
+        noticeType: null,
+        agencyPath: null,
+        naicsCode: null,
+        responseDeadlineAt: null,
+        score,
+        tier: 'high',
+      },
+    });
+    const mixed = alertPromptOf({
+      id: crypto.randomUUID(),
+      profile: PROFILE,
+      alerts: [one, ...pulse, lead('second', 71), moved, lead('first', 90)],
+      kind: SPENDING_DIGEST,
+      now: NOW,
+    });
+    expect(mixed.details.map((line) => line.slice(0, 26))).toEqual([
+      'MOVED now ends 2027-01-01,',
+      'New high lead, scored 90: ',
+      'New high lead, scored 71: ',
+      expect.stringMatching(/^FY2026 period/),
+      expect.stringMatching(/^N6660426P0205/),
+    ]);
   });
 });

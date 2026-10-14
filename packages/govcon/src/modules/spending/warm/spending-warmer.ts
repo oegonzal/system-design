@@ -1,11 +1,4 @@
-import {
-  HttpException,
-  Inject,
-  Injectable,
-  Logger,
-  NotFoundException,
-  type OnModuleDestroy,
-} from '@nestjs/common';
+import { HttpException, Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import {
   biddableSetAsides,
   WARM_TOP_AGENCIES,
@@ -122,7 +115,7 @@ export class SpendingWarmer implements OnModuleDestroy {
 
   /** One warm — renewing unless told to read what the window holds. A lens the source or the schema refuses is one logged line; the rest still run. */
   async warm(options: ReadOptions = RENEW): Promise<WarmReport> {
-    const profile = await this.defaultProfile();
+    const profile = await this.profiles.defaultOrNull();
     if (profile === null) {
       this.logger.warn('warm skipped: no default profile');
       return { profile: null, lenses: [], alerts: NOTHING_RAISED };
@@ -207,15 +200,6 @@ export class SpendingWarmer implements OnModuleDestroy {
       await this.watched.settle(tracked.observations);
     } catch (error) {
       this.logger.warn(`tracked ends not written, compared again next warm: ${messageOf(error)}`);
-    }
-  }
-
-  private async defaultProfile(): Promise<SearchProfile | null> {
-    try {
-      return await this.profiles.resolve(undefined);
-    } catch (error) {
-      if (error instanceof NotFoundException) return null;
-      throw error;
     }
   }
 

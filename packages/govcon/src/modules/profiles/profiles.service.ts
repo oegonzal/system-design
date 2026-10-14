@@ -82,6 +82,12 @@ export class ProfilesService implements OnModuleInit {
     return validateProfile(record.profile);
   }
 
+  /** The default profile as validated data, or null when the store has none — what a job asks, which has nobody to hand a 404 to. */
+  async defaultOrNull(): Promise<SearchProfile | null> {
+    const record = await this.profiles.findDefault();
+    return record ? validateProfile(record.profile) : null;
+  }
+
   async create(candidate: unknown): Promise<StoredProfile> {
     const profile = this.validated(candidate);
     const isDefault = (await this.profiles.count()) === 0;

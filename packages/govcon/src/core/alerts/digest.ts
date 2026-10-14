@@ -37,28 +37,37 @@ export interface DigestInput {
 
 /**
  * Where each kind of alert stands in a digest: a tracked award's news
- * first, since someone chose to follow it, then a finding about the whole
- * scope, then the ending awards.
+ * first, since someone chose to follow it, then a notice to answer, then a
+ * finding about the whole scope, then the ending awards.
  */
 const DIGEST_RANK: Record<AlertKind, number> = {
   'award-end-moved': 0,
   'award-notice': 1,
-  'pulse-above-band': 2,
-  'award-ending': 3,
+  'lead-new': 2,
+  'pulse-above-band': 3,
+  'award-ending': 4,
 };
 
-/** What an ending award has obligated on it; nothing for any other finding. */
-const obligatedOn = (alert: GovconAlert): number =>
-  alert.topic === GOVCON_TOPICS.awardEnding ? alert.payload.amount : 0;
+/** What sets one alert ahead of another of its kind: the dollars obligated on an ending award, a lead's score; nothing for any other finding. */
+const weightOf = (alert: GovconAlert): number => {
+  switch (alert.topic) {
+    case GOVCON_TOPICS.awardEnding:
+      return alert.payload.amount;
+    case GOVCON_TOPICS.leadNew:
+      return alert.payload.score;
+    default:
+      return 0;
+  }
+};
 
 /**
  * The order a person reads alerts in — the digest's, and the ledger's for
- * the alerts of one run: by kind as ranked above, then the most obligated
+ * the alerts of one run: by kind as ranked above, then the weightiest
  * first, then by subject.
  */
 export const byWeight = (a: GovconAlert, b: GovconAlert): number =>
   DIGEST_RANK[a.key.kind] - DIGEST_RANK[b.key.kind] ||
-  obligatedOn(b) - obligatedOn(a) ||
+  weightOf(b) - weightOf(a) ||
   a.key.subject.localeCompare(b.key.subject);
 
 /**

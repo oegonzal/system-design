@@ -100,6 +100,7 @@ export const ALERT_KIND_TONE: Record<AlertKind, BadgeTone> = {
   'award-end-moved': 'high',
   'award-notice': 'success',
   'pulse-above-band': 'accent',
+  'lead-new': 'success',
 };
 
 export const AWARD_SOURCE_TONE: Record<AwardSource, BadgeTone> = {

@@ -4,6 +4,7 @@ import {
   type Bid,
   type Description,
   type DescriptionFetch,
+  type Lead,
   type LeadsReport,
   type LeadTier,
   type NoticeAwards,
@@ -39,6 +40,14 @@ export interface LeadsOptions extends LeadFilters {
   offset: number;
 }
 
+/** A profile's stored candidates, scored: the leads in rank order, what a gate excluded, and whether the store's bound cut the set. */
+export interface Ranking {
+  leads: Lead[];
+  excluded: Lead[];
+  candidates: number;
+  capped: boolean;
+}
+
 /**
  * The stored notices as leads. Ranking reads the repository — filtered and
  * bounded in SQL — and never a source; a description is one gated request
@@ -58,21 +67,30 @@ export class OpportunitiesService {
     @Inject(CLOCK) private readonly now: () => Date,
   ) {}
 
-  async leads(profileId: string | undefined, options: LeadsOptions): Promise<LeadsReport> {
-    const profile = await this.profiles.resolve(profileId);
+  /** A profile's candidates out of the store, every one scored: the ranking the leads list cuts and pages, and the one the lead alerts read. */
+  async ranked(profile: SearchProfile, filters: LeadFilters = {}): Promise<Ranking> {
     const now = this.now();
     const { opportunities, capped } = await this.repository.findCandidates(
-      candidateFilterOf(profile, options, now),
+      candidateFilterOf(profile, filters, now),
     );
-    const ranked = rankLeads(opportunities, profile, await this.context(profile, now));
+    return {
+      ...rankLeads(opportunities, profile, await this.context(profile, now)),
+      candidates: opportunities.length,
+      capped,
+    };
+  }
+
+  async leads(profileId: string | undefined, options: LeadsOptions): Promise<LeadsReport> {
+    const profile = await this.profiles.resolve(profileId);
+    const ranked = await this.ranked(profile, options);
     const matching = ranked.leads.filter(
       (lead) =>
         lead.score >= options.minScore && (options.tier === null || lead.tier === options.tier),
     );
     return {
       profile: profile.id,
-      candidates: opportunities.length,
-      capped,
+      candidates: ranked.candidates,
+      capped: ranked.capped,
       excluded: ranked.excluded.length,
       matching: matching.length,
       leads: matching.slice(options.offset, options.offset + options.limit),

@@ -8,9 +8,11 @@ import {
   awardNoticeSchema,
   describeAlert,
   GOVCON_TOPICS,
+  leadNewSchema,
   pulseAboveBandSchema,
   type GovconAlert,
 } from './alerts';
+import { LEAD_TIERS, tierAtLeast } from './vocab';
 
 const SCOPE_KEY = 'a'.repeat(64);
 const NAMED = {
@@ -45,6 +47,17 @@ const PULSE = {
   total: 900,
   expected: 500,
   high: 800,
+};
+const LEAD = {
+  profileId: 'enfav',
+  noticeId: 'n-9',
+  title: 'Enterprise data platform modernization',
+  noticeType: 'Sources Sought',
+  agencyPath: 'Department of Energy.Office of Science',
+  naicsCode: '541512',
+  responseDeadlineAt: '2026-07-20T17:00:00.000Z',
+  score: 81.5,
+  tier: 'high',
 };
 
 describe('the govcon alerts', () => {
@@ -94,9 +107,12 @@ describe('the govcon alerts', () => {
     });
     expect(
       ALERT_KINDS.map((kind) =>
-        ALERT_DECLARATIONS[kind].read({ kind, subject: 's' }, { AWARD, MOVED, NOTICE, PULSE }),
+        ALERT_DECLARATIONS[kind].read(
+          { kind, subject: 's' },
+          { AWARD, MOVED, NOTICE, PULSE, LEAD },
+        ),
       ),
-    ).toEqual([null, null, null, null]);
+    ).toEqual(ALERT_KINDS.map(() => null));
     // A row from before payloads were kept.
     expect(
       ALERT_DECLARATIONS['award-ending'].read({ kind: 'award-ending', subject: 's' }, null),
@@ -158,5 +174,44 @@ describe('the govcon alerts', () => {
     expect(line({ topic: 'govcon.pulse.above-band', key, payload: PULSE })).toBe(
       "FY2026 period 9 (Jun) has $900 obligated so far, above every prior year's $800 for that period (mean $500).",
     );
+  });
+
+  it('[GOV-36] a new lead carries its notice, when that is due, and the score and tier it was raised at — a tier outside the vocabulary is refused — reads back by its kind, is said in one line, and its tier is a floor: it and every better one', () => {
+    expect(leadNewSchema.parse(LEAD)).toEqual(LEAD);
+    expect(
+      leadNewSchema.parse({
+        ...LEAD,
+        noticeType: null,
+        agencyPath: null,
+        responseDeadlineAt: null,
+      }),
+    ).toMatchObject({ noticeType: null, responseDeadlineAt: null });
+    expect(leadNewSchema.safeParse({ ...LEAD, tier: 'urgent' }).success).toBe(false);
+    expect(leadNewSchema.safeParse({ ...LEAD, noticeId: '' }).success).toBe(false);
+    expect(leadNewSchema.safeParse({ ...LEAD, scopeKey: SCOPE_KEY }).success).toBe(false);
+
+    const key = { kind: 'lead-new' as const, subject: 'n-9' };
+    const read = ALERT_DECLARATIONS['lead-new'].read(key, LEAD);
+    expect(read).toEqual({ topic: 'govcon.lead.new', key, payload: LEAD });
+    expect(ALERT_DECLARATIONS['lead-new'].read(key, NOTICE)).toBeNull();
+    if (read === null) throw new Error('expected the alert');
+    expect(describeAlert(read)).toBe(
+      'New high lead, scored 81.5: “Enterprise data platform modernization” (Sources Sought, due 2026-07-20), Office of Science.',
+    );
+    const bare = ALERT_DECLARATIONS['lead-new'].read(key, {
+      ...LEAD,
+      noticeType: null,
+      agencyPath: null,
+      responseDeadlineAt: null,
+      tier: 'medium',
+    });
+    if (bare === null) throw new Error('expected the alert');
+    expect(describeAlert(bare)).toBe(
+      'New medium lead, scored 81.5: “Enterprise data platform modernization” (notice, no deadline stated), agency not named.',
+    );
+
+    expect(
+      LEAD_TIERS.map((tier) => LEAD_TIERS.filter((floor) => tierAtLeast(tier, floor))),
+    ).toEqual([['high', 'medium', 'low'], ['medium', 'low'], ['low']]);
   });
 });

@@ -27,6 +27,7 @@ describe('the search profile', () => {
       pulseAboveBand: false,
       audience: DEFAULT_ALERT_POLICY.audience,
       minObligated: DEFAULT_ALERT_POLICY.minObligated,
+      newLeadTier: DEFAULT_ALERT_POLICY.newLeadTier,
     });
     expect(
       validateProfile({
@@ -42,6 +43,23 @@ describe('the search profile', () => {
       if (parsed.ok) throw new Error('expected issues');
       expect(parsed.issues.map((issue) => issue.path)).toEqual([path]);
     }
+  });
+
+  it('[GOV-5] [GOV-36] reads an alert policy stored before it named a tier for new leads as the declared default, keeps a tier or none when one is stored, and refuses a tier outside the vocabulary with the path named', () => {
+    const { newLeadTier: _tier, ...before } = DEFAULT_ALERT_POLICY;
+    expect(validateProfile({ ...tinyProfile(), alerts: before }).alerts.newLeadTier).toBe('high');
+    for (const newLeadTier of ['medium', null] as const) {
+      expect(
+        validateProfile({ ...tinyProfile(), alerts: { ...DEFAULT_ALERT_POLICY, newLeadTier } })
+          .alerts.newLeadTier,
+      ).toBe(newLeadTier);
+    }
+    const parsed = parseProfile({
+      ...tinyProfile(),
+      alerts: { ...DEFAULT_ALERT_POLICY, newLeadTier: 'urgent' },
+    });
+    if (parsed.ok) throw new Error('expected issues');
+    expect(parsed.issues.map((issue) => issue.path)).toEqual(['alerts.newLeadTier']);
   });
 
   it('[GOV-5] [GOV-29] reads a document without a teaming policy as the declared default, and refuses a smallest subcontract above the largest with the path named', () => {

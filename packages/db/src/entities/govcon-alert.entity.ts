@@ -7,12 +7,13 @@ const KINDS = [
   'award-end-moved',
   'award-notice',
   'pulse-above-band',
+  'lead-new',
 ] as const satisfies ContractKinds;
 
 /**
- * One alert the daily warm raised, by the key that makes it the same alert
- * tomorrow or in another scope — its kind and its subject — so a warm raises
- * each once. `scope_key` is the scope it was first found in, null for one
+ * One alert that was raised, by the key that makes it the same alert
+ * tomorrow or in another scope — its kind and its subject — so each is
+ * raised once. `scope_key` is the scope it was first found in, null for one
  * found on a tracked target. `payload` is what was published, kept so the
  * alert can be read back as the line a person was sent; null on a row from
  * before payloads were kept. `position` is its place among the alerts raised
