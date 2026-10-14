@@ -1,0 +1,32 @@
+// The deployment source of truth for enfav.com: an assets-only Cloudflare Worker
+// serving the prerendered site in dist/. There is no Worker script (no `main`),
+// so no request ever runs code, and every asset request is free.
+// Runbook: docs/enfav/website.md.
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "enfav-website",
+  // The date of the workerd release the pinned wrangler bundles; move it only
+  // together with a wrangler upgrade.
+  "compatibility_date": "2026-10-06",
+  "assets": {
+    // Astro's outDir, relative to this file.
+    "directory": "./dist",
+    // dist/<page>/index.html answers at /<page>/, and /<page> redirects there:
+    // the trailing-slash URLs Astro writes into links, canonicals and the sitemap.
+    "html_handling": "auto-trailing-slash",
+    // Unknown paths get dist/404.html with a 404 status.
+    "not_found_handling": "404-page",
+  },
+  // The only custom domain, declared here and nowhere else: every deploy
+  // reconciles the Worker's domains to this list. www.enfav.com redirects to the
+  // apex through a zone Redirect Rule instead (docs/enfav/website.md).
+  "routes": [{ "pattern": "enfav.com", "custom_domain": true }],
+  // No *.workers.dev copy of the site and no preview URLs: enfav.com is its only address.
+  "workers_dev": false,
+  "preview_urls": false,
+  // No usage telemetry, and no dependency list sent with each deploy.
+  "send_metrics": false,
+  "dependencies_instrumentation": { "enabled": false },
+  // `wrangler dev` (the website:preview target) serves dist/ as production does.
+  "dev": { "ip": "127.0.0.1", "port": 4204 },
+}

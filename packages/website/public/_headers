@@ -1,0 +1,17 @@
+# Response headers for every asset Workers serves, the 404 page and redirects
+# included. Read by Cloudflare at deploy and by `wrangler dev` locally; never
+# served itself. The site ships nothing inline (astro.config.ts), so the policy
+# allows its own origin and nothing else. HSTS is a zone setting, never set
+# here too (docs/enfav/website.md).
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self'; font-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'; upgrade-insecure-requests
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()
+  X-Frame-Options: DENY
+  Cross-Origin-Opener-Policy: same-origin
+
+# Content-hashed build output never changes under its name. Cache-Control is set
+# here alone: when two matching rules set one header, the values are joined.
+/_astro/*
+  Cache-Control: public, max-age=31536000, immutable

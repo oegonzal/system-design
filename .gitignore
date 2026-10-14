@@ -79,3 +79,7 @@ playwright-report/
 # Per-target env files Nx loads into tasks — never committable, since a deploy
 # token is exactly what someone would put there
 .env.*
+
+# Wrangler's local state and the secrets file it reads (packages/website)
+.wrangler/
+.dev.vars*

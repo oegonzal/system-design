@@ -4,7 +4,7 @@
   "sourceRoot": "packages/website/src",
   "projectType": "application",
   "tags": ["type:app", "scope:web"],
-  "// targets": "lint is inferred from eslint.config.mjs and test from vitest.config.ts. typecheck is astro check, because tsc cannot read .astro files; it replaces the tsc target @nx/vite would infer. ASTRO_DEV_BACKGROUND=0 keeps astro dev in the foreground when a coding agent starts it.",
+  "// targets": "lint is inferred from eslint.config.mjs and test from vitest.config.ts. typecheck is astro check, because tsc cannot read .astro files; it replaces the tsc target @nx/vite would infer. ASTRO_DEV_BACKGROUND=0 keeps astro dev in the foreground when a coding agent starts it. preview serves the built dist/ through wrangler dev, with the routing, 404 page and headers production applies; the deploy itself is the root website:deploy script, kept out of Nx so wrangler owns the terminal.",
   "targets": {
     "serve": {
       "executor": "nx:run-commands",
@@ -22,6 +22,15 @@
         "cwd": "packages/website",
         "command": "astro build",
         "env": { "ASTRO_TELEMETRY_DISABLED": "1" }
+      }
+    },
+    "preview": {
+      "executor": "nx:run-commands",
+      "dependsOn": ["build"],
+      "options": {
+        "cwd": "packages/website",
+        "command": "wrangler dev --config wrangler.jsonc",
+        "env": { "CLOUDFLARE_CF_FETCH_ENABLED": "false" }
       }
     },
     "typecheck": {

@@ -20,8 +20,8 @@ import {
  * refuses the run: the API it found must read the suite's database.
  */
 
-/** Every port a developer's stack binds: the APIs, the loop, govcon, notifications, job-application, the web clients, the marketing site's dev server, Postgres, Qdrant. */
-const DEV_PORTS = [3000, 3003, 3004, 3005, 3006, 4200, 4201, 4202, 4203, 5433, 6333];
+/** Every port a developer's stack binds: the APIs, the loop, govcon, notifications, job-application, the web clients, the marketing site's dev and preview servers, Postgres, Qdrant. */
+const DEV_PORTS = [3000, 3003, 3004, 3005, 3006, 4200, 4201, 4202, 4203, 4204, 5433, 6333];
 
 const SERVERS = Object.keys(BASE_PORTS) as (keyof typeof BASE_PORTS)[];
 

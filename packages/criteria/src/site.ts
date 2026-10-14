@@ -12,4 +12,9 @@ export const SITE_CRITERIA: readonly Criterion[] = [
     statement:
       'A company fact that is not verified renders as a visible placeholder and never reaches the structured data, and no credential claim appears anywhere but through a verified fact.',
   },
+  {
+    id: 'SITE-6',
+    statement:
+      'The production origin is one fact — the Worker’s custom domain is the host of the site’s origin — and the site imports nothing the deploy workflow’s change detection cannot see.',
+  },
 ];

@@ -25,7 +25,7 @@ const accessibility = astro.configs['jsx-a11y-recommended'].map((config) =>
 
 export default [
   ...workspace,
-  { ignores: ['.astro/'] },
+  { ignores: ['.astro/', '.wrangler/'] },
   ...astro.configs.recommended,
   ...accessibility,
   {

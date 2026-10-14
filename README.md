@@ -24,7 +24,7 @@ sits alongside for the behavioral half of the interview.
 - **NestJS** API and the **quality loop** service — a generic critic/evaluator/controller loop whose pipelines are data
 - **PostgreSQL** + **MikroORM** (hand-written migrations, `migration:check` drift gate) · **Qdrant** for the loop's memory
 - **Tilt** + Docker Desktop **Kubernetes** dev environment
-- **Astro** + **Tailwind CSS** for the Enfav LLC marketing site — every page prerendered, no client JavaScript
+- **Astro** + **Tailwind CSS** for the Enfav LLC marketing site — every page prerendered, no client JavaScript, served by **Cloudflare Workers** static assets
 - **Vitest** + **Playwright** · GitHub Actions CI with an LLM + rules code-review pipeline
 
 ## Getting started
@@ -158,6 +158,8 @@ pnpm govcon:start                          # govcon on :3004 + its web client on
 pnpm notifications:serve                   # the event bus on :3005, Telegram polling with TELEGRAM_API_KEY (needs the db)
 pnpm job-application:serve                 # the record of applications on :3006, fed by the bus; the advisor a browser session asks (needs the db)
 pnpm website:serve                         # the Enfav LLC marketing site on :4203
+pnpm website:preview                       # the built site under wrangler dev on :4204: Cloudflare's routing, 404 page and headers
+pnpm website:deploy                        # build, then deploy to enfav.com with wrangler (read docs/enfav/website.md first)
 ```
 
 The dev servers need no Nx daemon: `nx run studio-api:serve` and

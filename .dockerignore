@@ -17,3 +17,5 @@ CLAUDE.md
 Resume_a2.pdf
 **/.astro
 **/.env*
+**/.wrangler
+**/.dev.vars*

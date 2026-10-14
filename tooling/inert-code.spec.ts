@@ -62,7 +62,8 @@ const REPO = join(__dirname, '..');
 
 /**
  * Directories that hold no authored source: dependencies, build output,
- * caches, and generated types (Astro's `.astro`).
+ * caches, generated types (Astro's `.astro`) and local runtime state
+ * (Wrangler's `.wrangler`, whose dev bundles include TypeScript).
  */
 const SKIP = new Set([
   'node_modules',
@@ -73,6 +74,7 @@ const SKIP = new Set([
   '.nx',
   '.git',
   '.astro',
+  '.wrangler',
   'static',
   'storybook-static',
 ]);

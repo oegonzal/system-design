@@ -12,6 +12,10 @@ allowBuilds:
   nx: true
   sharp: true
   unrs-resolver: true
+  # wrangler resolves workerd's binary from its platform package at run time; the
+  # postinstall only re-links and version-checks it. Skipping it keeps install-time
+  # code out, and the Alpine image builds never execute the glibc-only binary.
+  workerd: false
 peerDependencyRules:
   allowedVersions:
     typescript: '6'
