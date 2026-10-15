@@ -43,6 +43,9 @@ describe('the session settings', () => {
       inferred: 'fill',
       composed: 'fill',
       policy: 'fill',
+      // A value about the unit alone rests on the page's own words, which the grounding critic reads beside it,
+      // and the operator asked (2026-10-14) that such questions be answered without asking.
+      unit: 'fill',
       none: 'ask',
     });
     // [BRW-18] The record's own suggestion is typed; a draft is offered.

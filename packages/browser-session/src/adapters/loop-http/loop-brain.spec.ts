@@ -174,7 +174,7 @@ describe('the loop brain', () => {
     const input = {
       session: SESSION,
       mission: MISSION_FIXTURE,
-      task: { label: 'Acme', url: 'https://x.test/1', facets: [], unitKey: 'u-1' },
+      task: { label: 'Acme', url: 'https://x.test/1', facets: [], unitKey: 'u-1', context: null },
       fields,
       criteria: CRITERIA,
     };

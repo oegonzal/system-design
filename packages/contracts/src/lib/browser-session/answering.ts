@@ -27,6 +27,7 @@ const fills = {
   inferred: fillChoice,
   composed: fillChoice,
   policy: fillChoice,
+  unit: fillChoice,
   none: fillChoice,
 } satisfies Record<AnswerBasis, typeof fillChoice>;
 

@@ -28,7 +28,7 @@ import {
 } from '@sysdesign/contracts';
 
 import type { PendingExpectation } from './expectations';
-import type { FieldsInput } from './ports';
+import type { UnitContext } from './open-unit';
 import { remainingTasks, type RailState } from './rails';
 import type { CaptureRecord } from './session-dump';
 
@@ -85,6 +85,12 @@ export interface SessionState {
     counts: Record<TaskOutcome, number>;
     closed: TaskLedgerSummary['closed'];
     closedOmitted: number;
+    /**
+     * What the page stated about each unit when it opened, by the unit's row
+     * id — the one store of it: the open unit's form goals read it here, and
+     * the tasks dump at the close records it beside every unit's row.
+     */
+    contexts: Map<string, UnitContext | null>;
   };
   consecutiveFailures: number;
   /** Brain calls in a row that answered nothing; reset by one that answered. */
@@ -148,7 +154,14 @@ export function createState(ids: {
     step: 0,
     history: [],
     objections: [],
-    tasks: { open: null, started: 0, counts: zeroCounts(), closed: [], closedOmitted: 0 },
+    tasks: {
+      open: null,
+      started: 0,
+      counts: zeroCounts(),
+      closed: [],
+      closedOmitted: 0,
+      contexts: new Map(),
+    },
     consecutiveFailures: 0,
     brainFaults: 0,
     unreadablePages: 0,
@@ -249,21 +262,6 @@ export const openUnitAnswers = (state: SessionState): Map<string, string> =>
 /** What this session settled into fields in the unit of work open now, by what each field asks: the only values a field here is kept for holding. */
 export const openUnitFilled = (state: SessionState): Map<string, string> =>
   openUnitEntries(state, state.filled);
-
-/**
- * The open unit of work as a form goal is composed for it: the label, url
- * and identity the prose states, and the key the recall reads its unit-bound
- * memories by — the same key the answers given in it are taught under.
- */
-export const formTaskOf = (state: SessionState): FieldsInput['task'] =>
-  state.tasks.open === null
-    ? null
-    : {
-        label: state.tasks.open.label,
-        url: state.tasks.open.url,
-        facets: [...state.tasks.open.facets],
-        unitKey: unitKeyOf(state.tasks.open),
-      };
 
 /** The units of work as the next goal is told them. */
 export const ledgerSummaryOf = (

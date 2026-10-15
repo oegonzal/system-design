@@ -1,4 +1,5 @@
 import {
+  composeFieldGoal,
   composeStepGoal,
   stopsOf,
   stopsOnPage,
@@ -7,15 +8,17 @@ import {
   GOAL_BUDGET_BYTES,
   GoalBudgetExceeded,
   textBytes,
+  type FormPipeline,
   type PageObservation,
   type StepGoalInput,
   quoted,
 } from '@sysdesign/contracts';
 
+import type { UnitContext } from '../../core/open-unit';
 import type { FieldsInput, GoalComposition } from '../../core/ports';
 // The snapshot's own codec, not a browser: it reduces snapshot text by the
 // declared rungs and never touches a page.
-import { fitSnapshot, withoutUnlistedRefs } from '../playwright/aria-snapshot';
+import { firstThatFit, fitSnapshot, withoutUnlistedRefs } from '../playwright/aria-snapshot';
 import { snapshotScopeOf } from '../playwright/observation-reading';
 
 /**
@@ -166,24 +169,122 @@ export function composeStepGoalWithinBudget(
   throw new GoalBudgetExceeded(textBytes(input.mission), budget);
 }
 
+/** The heading the form goal states the open unit of work under; the lenses name it. */
+export const OPEN_UNIT_HEADING = '## Open unit of work';
+
+/**
+ * The form goal fitted to the loop's budget by a declared ladder of its own:
+ * the unit's statement whole; the statement cut to the room the rest of the
+ * goal leaves, at a node boundary; no statement line at all. The mission and
+ * the fields are never cut — a form page is answered on the fields it lists —
+ * so a goal that does not fit even so is a refusal, as a step goal's is. The
+ * recall then fills whatever room remains with evidence, lowest-ranked dropped
+ * first: the statement yields to the fields and the evidence to the statement,
+ * a declared order rather than a size that happens to fit one mission.
+ */
+type FieldGoalRung = 'full' | 'statement-cut' | 'without-statement';
+
+interface ComposedFieldGoal extends GoalComposition {
+  goal: string;
+  rung: FieldGoalRung;
+}
+
+/** The node lines a statement carries: one node, one line, as the snapshot grammar reads a node from one line. */
+const statementLines = (context: UnitContext): string[] => context.text.split('\n');
+
+/**
+ * The title over what the page stated about the unit: the landmark it was read
+ * from, that a landmark may hold other items beside the unit, and how many of
+ * its nodes the goal shows — every one, the first so many, or none — so no
+ * reader takes the beginning for the whole, or the landmark's list for the
+ * unit's own words.
+ */
+function statementTitle(context: UnitContext, shown: number): string {
+  const total = statementLines(context).length + context.omitted;
+  const head = `What the page laid out under its ${context.landmark} landmark as the unit opened — its words, node by node, which may name other items beside this unit`;
+  if (shown === total) return `${head}:`;
+  if (shown === 0) return `${head} — none of its ${total} nodes fit this goal.`;
+  return `${head} — the first ${shown} of ${total} nodes, ${total - shown} not shown:`;
+}
+
+/** The statement as the goal states it: the title, then the first `shown` of its lines. */
+const statementSection = (context: UnitContext, shown: number): string[] => [
+  '',
+  statementTitle(context, shown),
+  ...(shown === 0 ? [] : ['', ...statementLines(context).slice(0, shown)]),
+];
+
 /**
  * The prose half of a field-answer goal: the mission verbatim, and the unit of
  * work the fields belong to — with the identity its mission declared, so a
  * question about "this employer" is answered against a declared value, never a
- * reading of the label.
+ * reading of the label; and with what the page stated about the unit when it
+ * opened — the first `shown` of its node lines, every one by default — so a
+ * question about the unit itself rests on the page's own words.
  */
-export function renderFieldProse(input: Pick<FieldsInput, 'mission' | 'task'>): string {
+export function renderFieldProse(
+  input: Pick<FieldsInput, 'mission' | 'task'>,
+  shown: number | null = null,
+): string {
   const facets =
     input.task === null || input.task.facets.length === 0
       ? ''
       : ` · ${input.task.facets.map((facet) => `${facet.name} ${quoted(facet.value)}`).join(' · ')}`;
+  const context = input.task?.context ?? null;
+  const statement =
+    context === null ? [] : statementSection(context, shown ?? statementLines(context).length);
   return [
     input.mission.trim(),
     '',
-    '## Open unit of work',
+    OPEN_UNIT_HEADING,
     '',
     input.task === null
       ? 'No unit of work is open.'
       : `${quoted(input.task.label)} at ${input.task.url}${facets}`,
+    ...statement,
   ].join('\n');
+}
+
+/** The goal with the first `shown` statement lines (every one for null), composed without a budget: the ladder measures it. */
+const fieldGoalAt = (pipeline: FormPipeline, input: FieldsInput, shown: number | null): string =>
+  composeFieldGoal(
+    {
+      pipeline,
+      prose: renderFieldProse(input, shown),
+      fields: input.fields,
+      evidence: [],
+      ...(input.task === null ? {} : { unitKey: input.task.unitKey }),
+    },
+    Number.MAX_SAFE_INTEGER,
+  );
+
+export function composeFieldGoalWithinBudget(
+  pipeline: FormPipeline,
+  input: FieldsInput,
+  budget = GOAL_BUDGET_BYTES,
+): ComposedFieldGoal {
+  const composed = (goal: string, rung: FieldGoalRung): ComposedFieldGoal => ({
+    goal,
+    rung,
+    bytes: textBytes(goal),
+    snapshotRung: null,
+  });
+  const whole = fieldGoalAt(pipeline, input, null);
+  if (textBytes(whole) <= budget) return composed(whole, 'full');
+  const context = input.task?.context ?? null;
+  if (context === null) throw new GoalBudgetExceeded(textBytes(whole), budget);
+  // The room the rest of the goal leaves, measured once with the title alone;
+  // the whole lines that fit it follow, in document order, after the blank line
+  // before them. The title's counts move by a few bytes with the cut, so the
+  // fit is checked and the cut deepened until it holds.
+  const bare = fieldGoalAt(pipeline, input, 0);
+  let kept = firstThatFit(statementLines(context), budget - textBytes(bare) - 1).length;
+  for (;;) {
+    const goal = fieldGoalAt(pipeline, input, kept);
+    if (textBytes(goal) <= budget) {
+      return composed(goal, kept === 0 ? 'without-statement' : 'statement-cut');
+    }
+    if (kept === 0) throw new GoalBudgetExceeded(textBytes(goal), budget);
+    kept -= 1;
+  }
 }

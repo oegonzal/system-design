@@ -3,14 +3,21 @@ import { join } from 'node:path';
 
 import {
   advisorsOf,
+  composeFieldGoal,
   composeStepGoal,
+  FIELD_ANSWER_PIPELINE_ID,
   formObservation,
+  heaviestRecordedFields,
   marksOf,
   stopsOf,
   TASK_OUTCOMES,
   stepGoalInput,
+  unitContextLandmarkOf,
   unitFacetsOf,
 } from '@sysdesign/contracts';
+
+import { renderFieldProse } from './adapters/loop-http/render-goal';
+import { UNIT_CONTEXT_MAX_BYTES, unitContextOf } from './core/open-unit';
 
 /**
  * Each goal is held to the template the deriver personas read by heading
@@ -55,8 +62,10 @@ describe('the goals', () => {
       const causes: readonly string[] = stops.map((stop) => stop.cause);
       // A Marks section, when a goal has one, reads whole: a mark nobody reads is a trap.
       expect(() => marksOf(text)).not.toThrow();
-      // So do a Unit identity and an Advisors section: a fact or an advisor nobody reads is a record nobody keeps.
+      // So do a Unit identity, a Unit context and an Advisors section: a fact, a landmark or an advisor nobody
+      // reads is a record nobody keeps.
       expect(() => unitFacetsOf(text)).not.toThrow();
+      expect(() => unitContextLandmarkOf(text)).not.toThrow();
       expect(() => advisorsOf(text)).not.toThrow();
       // A goal that asks an advisor declares what a unit is known by, or the advisor would have nothing to answer about.
       if (advisorsOf(text).length > 0) expect(unitFacetsOf(text).length).toBeGreaterThan(0);
@@ -69,6 +78,29 @@ describe('the goals', () => {
       expect(() =>
         composeStepGoal(stepGoalInput({ mission: text, observation: formObservation() })),
       ).not.toThrow();
+      // A statement at its bound beside the heaviest recorded field list composes whole with this goal: the
+      // form goal's ladder (`composeFieldGoalWithinBudget`) never cuts a shipped goal's statement at the
+      // recorded maximum, so the codec alone is asked here, with no ladder to catch it.
+      const landmark = unitContextLandmarkOf(text);
+      if (landmark !== null) {
+        const context = unitContextOf(['x'.repeat(UNIT_CONTEXT_MAX_BYTES)], landmark);
+        const task = {
+          label: 'Unit',
+          url: 'https://example.test/unit',
+          facets: [],
+          unitKey: 'unit-1',
+          context,
+        };
+        expect(() =>
+          composeFieldGoal({
+            pipeline: FIELD_ANSWER_PIPELINE_ID,
+            prose: renderFieldProse({ mission: text, task }),
+            fields: heaviestRecordedFields(),
+            evidence: [],
+            unitKey: task.unitKey,
+          }),
+        ).not.toThrow();
+      }
     },
   );
 });

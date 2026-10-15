@@ -144,3 +144,23 @@ before it ran, so its `executePrefix` is the validator's, not the session's.
 `manifest.json` lists `unsentEvents` when the bus was down past
 `busRecovery.windowMs` at the close; `replay-events <id>` sends a session's
 events again from its rows.
+
+## 6. A unit's own words
+
+A mission that declares `## Unit context` (`- landmark: main`) carries, with
+each unit, what the page stated under that landmark as the unit opened. Then:
+
+```bash
+jq -r '.[] | "\(.label): \(.context.text // "" | utf8bytelength) bytes, \(.context.omitted // 0) node lines past the bound"' static/sessions/<id>/02-tasks.json   # one statement per unit; 0 for none
+grep -n -A 6 '^## Open unit of work' static/runs/<form run id>/01-goal.md   # the form goal states it under the unit, titled by its landmark and the nodes shown
+jq -r '.composition.rung' static/sessions/<id>/01-steps/NN/fields.json      # full | statement-cut | without-statement: how the form goal fitted the budget
+```
+
+What to read: a field asking about the organisation itself — its mission, its
+work — is answered (`rests unit`, filled as `config/answering/standard.json`
+says) or drafted from that statement, where before it went to the operator
+with no draft; a `null` context on a unit means the mission declares no
+landmark or the page laid out none. The statement is the landmark's, not the
+unit's alone: on the shipped layout it names the other listed items before the
+opened one, the goal's title over it says so and counts the nodes shown, and
+the lenses read what it says of another item as no statement about this one.

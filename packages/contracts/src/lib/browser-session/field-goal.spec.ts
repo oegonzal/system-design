@@ -12,10 +12,10 @@ import {
   fieldTypeOf,
   readFieldIndex,
   splitFieldGoal,
-  unitNamedLegend,
   valueFaults,
   type EvidenceItem,
 } from './field-goal';
+import { unitNamedLegend } from './field-goal-terms';
 import { formObservation } from './fixtures';
 import { readFencedIndex, stripIndexSection } from '../quality-loop/goal-index';
 

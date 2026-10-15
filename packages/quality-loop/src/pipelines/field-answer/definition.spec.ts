@@ -80,6 +80,7 @@ describe('the field-answer pipeline', () => {
       'inferred',
       'composed',
       'policy',
+      'unit',
     ]) {
       expect(FIELD_ANSWER.producer.persona).toContain(kind);
     }
@@ -121,9 +122,29 @@ describe('the field-answer pipeline', () => {
     expect(FIELD_ANSWER.critics[0].persona).toMatch(
       /a group mixing entries, or restating an earlier answer/,
     );
-    // Whatever its kind, a value claims nothing about the unit of work its evidence does not state, and a part
-    // of the question nothing bears on is left out and named — never filled with an unstated stance.
-    expect(FIELD_ANSWER.producer.persona).toMatch(/how the subject measures against it/);
+    // Whatever its kind, a value claims nothing about the unit of work its evidence does not state — except what
+    // the goal's Open unit of work states the page said of the unit, which is the page's words under one
+    // landmark, never the subject's record (measured 2026-10-14: a field about the organisation's mission drew
+    // no draft while the page had stated it). The block may name other items beside the unit (measured
+    // 2026-10-14: on the shipped layout the landmark lists the other items before the opened one), so what it
+    // says of another item grounds nothing; a value resting on it alone declares the kind `unit`, which the
+    // validators owe no citation; and a part of the question nothing bears on is left out and named, never
+    // filled with an unstated stance.
+    expect(FIELD_ANSWER.producer.persona).toMatch(
+      /the goal's Open unit of work states it of this unit in the page's own words/,
+    );
+    expect(FIELD_ANSWER.producer.persona).toMatch(/may name other items beside the unit/);
+    expect(FIELD_ANSWER.producer.persona).toMatch(/resting on it alone declares unit/);
+    expect(FIELD_ANSWER.producer.persona).toMatch(/how the subject measures against the unit/);
+    expect(FIELD_ANSWER.critics[0].persona).toMatch(/ungrounded only where neither states it/);
+    expect(FIELD_ANSWER.critics[0].persona).toMatch(/grounds nothing about this one/);
+    expect(FIELD_ANSWER.critics[0].persona).toMatch(
+      /declared unit that says anything of the subject/,
+    );
+    expect(FIELD_ANSWER.evaluators[0].persona).toMatch(/not of another item the same block names/);
+    expect(FIELD_ANSWER.deriveCriteria.persona).toMatch(
+      /the Open unit of work, the Fields to answer/,
+    );
     // A composed account lets its particulars speak: measured 2026-10-13, "shows how the subject suits the unit"
     // drew a closing sentence on what the unit calls for, withheld every time.
     expect(FIELD_ANSWER.producer.persona).toMatch(/no sentence of it says what the unit of work/);

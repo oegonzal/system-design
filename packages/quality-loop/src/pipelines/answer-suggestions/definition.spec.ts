@@ -90,8 +90,25 @@ describe('the answer-suggestions pipeline', () => {
     // Measured 2026-10-13 (static/runs/2026-10-13T20-05-27-375-1b0cf5-quality): three of four drafts for one fit
     // question were withheld as ungrounded — one for a claim about the role alone, one for a claim of alignment with
     // the role and "in production systems", one for calling the subject's own project "production-oriented".
+    // What the page stated about the unit, carried under the goal's Open unit of work, is the one other source a
+    // suggestion may say the unit is, needs or offers from (measured 2026-10-14: a question about the
+    // organisation's mission drew no draft while the page had stated it); how the subject suits it never is.
+    // The block is one landmark's words and may name other items beside the unit (measured 2026-10-14: on the
+    // shipped layout the landmark lists the other items before the opened one), so every lens says what it
+    // states of another item grounds nothing about this one.
     expect(ANSWER_SUGGESTIONS.producer.persona).toMatch(
-      /says nothing about the open unit of work or the organisation it is for/,
+      /says nothing about what the open unit of work or the organisation it is for is, needs or offers that an item it cites or the goal's Open unit of work does not state of this unit/,
+    );
+    expect(ANSWER_SUGGESTIONS.producer.persona).toMatch(/may name other items beside the unit/);
+    expect(ANSWER_SUGGESTIONS.critics[0].persona).toMatch(
+      /ungrounded only where neither states it of this unit/,
+    );
+    expect(ANSWER_SUGGESTIONS.critics[0].persona).toMatch(/grounds nothing about this one/);
+    expect(ANSWER_SUGGESTIONS.evaluators[0].persona).toMatch(
+      /not of another item the same block names/,
+    );
+    expect(ANSWER_SUGGESTIONS.deriveCriteria.persona).toMatch(
+      /The Open unit of work, the Fields to answer/,
     );
     expect(ANSWER_SUGGESTIONS.producer.persona).toMatch(
       /as long and as concrete as the Suggesting policy asks/,

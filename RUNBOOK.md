@@ -453,6 +453,12 @@ first two are missing:
    a company on record to avoid unless the plan declares `onRecordTaken: true`
    under that exception; one at a company in progress in another session the
    loop's validator cuts and the session refuses regardless.
+   `## Unit context` names the landmark whose
+   words state what a unit is (`- landmark: main`), so a form's question about
+   the company itself is answered from what the page laid out under that
+   landmark as the unit opened — on this layout the results list and the opened
+   listing's pane alike, which the goal says over it; `02-tasks.json` shows what
+   each unit carried, with the node lines the bound left out counted.
 
 Backfill first, or the record starts empty: `pnpm browser-session sessions`
 and `show <id>` list every recorded unit with its label; enter each company

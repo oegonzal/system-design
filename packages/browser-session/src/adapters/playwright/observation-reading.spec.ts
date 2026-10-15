@@ -45,6 +45,7 @@ const reading = (overrides: Partial<PageReading> = {}): PageReading => ({
   url: 'https://jobs.example.test/search',
   title: 'Jobs',
   snapshot: '- generic [ref=e1]:\n  - button "Easy Apply" [ref=e2]',
+  nodes: [],
   elements: [],
   unreadElements: 0,
   unreadSnapshotLines: 0,

@@ -16,6 +16,7 @@ import type {
   InteractionAnswer,
   InteractionPrompt,
   InteractionWithdrawn,
+  LandmarkRole,
   LastStep,
   PageObservation,
   QualityRunDto,
@@ -34,6 +35,8 @@ import type {
 } from '@sysdesign/contracts';
 import { MISSION_STOP } from '@sysdesign/contracts';
 import type { DumpBytes, DumpFile } from '@sysdesign/run-dump';
+
+import type { FormTask } from './open-unit';
 
 /**
  * The ports the session engine drives. The engine is pure over these: a
@@ -78,6 +81,8 @@ export interface BrowserPort {
   open(profile: string, options: { headed: boolean }): Promise<void>;
   /** The page as it is now; the refs it lists resolve only until the next `observe`. */
   observe(): Promise<PageObservation>;
+  /** What the page the last `observe` read states inside one landmark — each node's words in document order, from that observation's tree, never a new read; none when it lays out no such landmark. */
+  wordsUnder(landmark: LandmarkRole): readonly string[];
   /** Throws `ActionFailed`. */
   act(action: BrowserAction): Promise<void>;
   /** Mark a field for the operator's eye. */
@@ -194,8 +199,7 @@ export interface FormReport {
 export interface FieldsInput {
   session: SessionStepRef;
   mission: string;
-  /** The open unit of work, as `formTaskOf` composes it for the form goal. */
-  task: { label: string; url: string; facets: readonly UnitFacet[]; unitKey: string } | null;
+  task: FormTask | null;
   fields: readonly FieldSpec[];
   criteria: readonly SuccessCriterion[];
 }

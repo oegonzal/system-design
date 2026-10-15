@@ -26,7 +26,7 @@ import {
   type OperatorReply,
 } from './operator-interaction';
 import { OperatorInterrupted, QuestionWithdrawn, type Withdrawal } from './ports';
-import { formTaskOf } from './session-state';
+import { formTaskOf } from './open-unit';
 
 /**
  * Putting a field to the operator, with the suggested answers readied for it.

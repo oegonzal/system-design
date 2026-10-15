@@ -162,7 +162,11 @@ describe('the field-answer validators', () => {
         message: 'e1 rests restated on the evidence yet cites none',
       },
     ]);
-    // A policy value rests on the Answering policy, not on the evidence: no citation is owed.
+    // A policy value rests on the Answering policy, a unit value on the page's statement under the Open
+    // unit of work — neither on the evidence: no citation is owed, as the vocabulary's table declares.
+    expect(problems(withAnswer('e1', answer('e1', { value: '6', rests: 'unit' }))).limits).toEqual(
+      [],
+    );
     expect(
       problems(withAnswer('e1', answer('e1', { value: '6', rests: 'policy' }))).limits,
     ).toEqual([]);

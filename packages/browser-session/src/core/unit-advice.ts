@@ -4,6 +4,7 @@ import {
   NO_UNITS_ON_RECORD,
   stopsOf,
   takenOf,
+  unitContextLandmarkOf,
   unitFacetsOf,
   type AdvisorDescriptor,
   type UnitAdvice,
@@ -126,6 +127,7 @@ function declaredOf(mission: string): { facets: string[]; advisors: string[] } {
     marksOf(mission);
     stopsOf(mission);
     takenOf(mission);
+    unitContextLandmarkOf(mission);
     return { facets: unitFacetsOf(mission), advisors: advisorsOf(mission) };
   } catch (error) {
     throw new SessionRefused(describeError(error).message);

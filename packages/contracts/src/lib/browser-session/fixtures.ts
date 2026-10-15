@@ -9,6 +9,7 @@ import { DOCUMENT_RULES } from '../quality-loop/document-digest';
 import { takenOf, takenOnPage } from '../units/mission-taken';
 import { NO_UNITS_ON_RECORD } from '../units/record';
 import type { AnsweringSettings } from './answering';
+import { fieldSpecOf, type FieldSpec } from './field-goal';
 import type { ObservedElement, PageObservation, TaskLedgerSummary } from './observation.schema';
 import { stopsOf, stopsOnPage } from './mission-stops';
 import type { StepGoalInput } from './step-goal';
@@ -225,6 +226,36 @@ export const MISSION_WITH_TAKEN = `${MISSION_WITH_IDENTITY}
 
 - avoid unless "Next page": a listing at a company on record to avoid is taken only when no next page is listed.
 `;
+
+/** The fixture mission declaring, besides a unit's identity, the landmark whose words state what a unit is: the page's main. */
+export const MISSION_WITH_CONTEXT = `${MISSION_WITH_IDENTITY}
+## Unit context
+
+- landmark: main
+`;
+
+/**
+ * A field list heavier than any a recorded form goal carried, for a budget
+ * pin. Measured 2026-10-14 over 287 recorded form goals: the most fields any
+ * listed was 18, and the largest fields section 4.1 KB over 11 fields — so 18
+ * fields, each with a longer name and context than any recorded, outweigh
+ * every recorded page.
+ */
+export const heaviestRecordedFields = (): FieldSpec[] => {
+  const field = fieldSpecOf(
+    observedElement('e0', 'textbox', 'Question', {
+      kind: 'fillable',
+      inputType: 'textarea',
+      required: true,
+    }),
+  );
+  return Array.from({ length: 18 }, (_, at) => ({
+    ...field,
+    ref: `e${at + 1}`,
+    name: `${at}. ${'Which of the technologies the role names have you used in production? '.repeat(2)}`,
+    context: 'Please describe how you used it, with the scale and the figures. '.repeat(2),
+  }));
+};
 
 export function resumeChunk(): DocumentChunk {
   return {

@@ -1,6 +1,7 @@
 /**
  * A mission declares facts for the engine under `##` headings, one bullet
- * each — its Marks, its Stop conditions, its Unit identity, its Advisors.
+ * each — its Marks, its Stop conditions, its Unit identity, its Unit context,
+ * its Advisors.
  * `bulletsUnder` is the one reader of such a section; `declaredSection` is the
  * one grammar machine: a bullet regex whose named groups are the row, a row
  * schema, a list bound, the refusal that names the offending bullet, and an

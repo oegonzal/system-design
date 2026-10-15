@@ -17,7 +17,8 @@ import { remember, teach } from './field-teach';
 import { askOperator, SuggestionsPrefetch, type SuggestionsRecord } from './operator-ask';
 import { BrainFaulted, type Decided, type FormReport } from './ports';
 import { stepJsonFile } from './session-dump';
-import { formTaskOf, openUnitAnswers, openUnitFilled } from './session-state';
+import { formTaskOf } from './open-unit';
+import { openUnitAnswers, openUnitFilled } from './session-state';
 
 /**
  * A plan's `askFields`: the fields go to the form-memory orchestration as

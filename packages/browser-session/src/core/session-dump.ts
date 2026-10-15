@@ -14,6 +14,7 @@ import {
   type DumpFile,
 } from '@sysdesign/run-dump';
 
+import type { UnitContext } from './open-unit';
 import {
   causeOf,
   type BrowserActionKind,
@@ -196,11 +197,22 @@ export function manifestOf(input: ManifestInput) {
 }
 export type SessionManifest = ReturnType<typeof manifestOf>;
 
+/** A unit of work as the tasks file records it: the row, and what the page stated about the unit when it opened — the landmark, its words, the lines the bound left out. */
+interface DumpedTask extends BrowserTaskDto {
+  context: UnitContext | null;
+}
+
+/** The rows beside what the session kept of each unit's statement, by the unit's id. */
+export const dumpedTasks = (
+  rows: readonly BrowserTaskDto[],
+  contexts: ReadonlyMap<string, UnitContext | null>,
+): DumpedTask[] => rows.map((row) => ({ ...row, context: contexts.get(row.id) ?? null }));
+
 /** The files written once the session is whole: the manifest, the goal and the units of work. */
 export function closingFiles(
   manifest: SessionManifest,
   goalMarkdown: string,
-  tasks: readonly BrowserTaskDto[],
+  tasks: readonly DumpedTask[],
 ): DumpFile[] {
   return [
     { path: MANIFEST_FILE, content: json(manifest) },

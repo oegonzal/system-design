@@ -3,7 +3,7 @@ import { describeError } from '@sysdesign/run-dump';
 
 import type { EngineContext, SessionDeps } from './engine-context';
 import type { GoalSource, Termination } from './ports';
-import { closingFiles, indexRowOf, manifestOf } from './session-dump';
+import { closingFiles, dumpedTasks, indexRowOf, manifestOf } from './session-dump';
 import type { SessionOutcome } from './session-engine';
 import { endedEvent } from './session-events';
 import { tasksClosed } from './session-state';
@@ -101,8 +101,8 @@ export async function closeSession(ctx: EngineContext, end: SessionEnd): Promise
       error: end.error,
       unsentEvents,
     });
-    const tasks = (await deps.ledger.getSession(state.sessionId))?.tasks ?? [];
-    dump.write(closingFiles(manifest, end.goal.markdown, tasks));
+    const rows = (await deps.ledger.getSession(state.sessionId))?.tasks ?? [];
+    dump.write(closingFiles(manifest, end.goal.markdown, dumpedTasks(rows, state.tasks.contexts)));
     dump.index(indexRowOf(manifest));
   } catch (caught) {
     warn('dump not closed', caught);

@@ -34,6 +34,7 @@ const BASES = [
   'inferred',
   'composed',
   'policy',
+  'unit',
   'none',
 ] as const satisfies ContractBases;
 

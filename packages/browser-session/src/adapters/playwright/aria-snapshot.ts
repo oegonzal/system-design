@@ -120,6 +120,30 @@ export const landmarkRolesOf = (nodes: readonly SnapshotNode[]): LandmarkRole[] 
 const holdsValue = (role: string): boolean => (VALUE_ROLES as readonly string[]).includes(role);
 
 /**
+ * What the tree says inside one landmark: for each node whose nearest landmark
+ * it is — the one definition of "inside" the whole engine reads the tree by
+ * (`ancestryOf`), so a landmark nested in it is its own, and its words stay
+ * with it: a navigation or a complementary overlay laid out inside a main is
+ * not the main's statement of anything — in document order, its name and its
+ * inline text — a value-holding control's inline text is what it holds and
+ * stays out, as in `subtreeText` — one entry per node that has any; none when
+ * the tree lays out no such landmark. What a unit of work carries as the
+ * page's statement of it (`unitContextOf`), so nothing here reads the words:
+ * a node's words are kept as the tree has them.
+ */
+export function landmarkWords(nodes: readonly SnapshotNode[], landmark: LandmarkRole): string[] {
+  const ancestry = ancestryOf(nodes);
+  return nodes.flatMap((node, index) => {
+    if (ancestry[index]?.landmark !== landmark) return [];
+    const words = [
+      ...(node.name !== null && node.name !== '' ? [node.name] : []),
+      ...(node.inline !== null && !holdsValue(node.role) ? [node.inline] : []),
+    ];
+    return words.length === 0 ? [] : [words.join(' ')];
+  });
+}
+
+/**
  * A node's own words and those of every node beneath it, in document order;
  * empty when it has none. The inline text of a control that holds a value is
  * that value, not a word anyone calls it by, and is left out.
@@ -249,8 +273,8 @@ const carriesWords = (line: string): boolean => {
   );
 };
 
-/** The longest run of lines from the first that fits the room, joined one per line. */
-const firstThatFit = (lines: readonly string[], room: number): string[] => {
+/** The longest run of lines from the first that fits the room, each line costing its bytes and the newline before it. */
+export const firstThatFit = (lines: readonly string[], room: number): string[] => {
   const kept: string[] = [];
   let used = 0;
   for (const line of lines) {

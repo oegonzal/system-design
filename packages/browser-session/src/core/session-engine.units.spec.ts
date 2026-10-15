@@ -1,5 +1,7 @@
 import {
   formObservation,
+  MISSION_FIXTURE,
+  MISSION_WITH_CONTEXT,
   type StepAction,
   type StepPlan,
   type UnitFacet,
@@ -17,8 +19,10 @@ import { runScripted as run } from './testing-session';
 /**
  * What a session records of one unit of work and reads back only for it: the
  * key the open unit is named by reaches the form's goal and the answers taught
- * in it alike, and an answer the operator gave — or any value the session
- * settled into a field — stands for the unit it was given in alone.
+ * in it alike, an answer the operator gave — or any value the session settled
+ * into a field — stands for the unit it was given in alone, and what the page
+ * stated about the unit as it opened travels with it to the answerer and into
+ * the dump, and nowhere else.
  */
 
 const common = { reason: 'the procedure says so', expect: null, serves: [] };
@@ -83,6 +87,50 @@ const twoUnits = (
     browser: new FakeBrowser(pages),
   });
 };
+
+/** The journey with its results page stating, under the given landmarks, what the listing is. */
+const statingPages = (states: ScriptedPage['states']): ScriptedPage[] =>
+  journeyPages().map((page) => (page.id === 'results' ? { ...page, states } : page));
+
+/** One unit through the whole journey under the given mission, the operator answering the one asked field. */
+const oneUnit = (mission: string, pages: ScriptedPage[]) =>
+  run({
+    script: {
+      plans: [PLANS.search, PLANS.results, PLANS.form, PLANS.done, PLANS.end].map((plan) =>
+        decidedPlan(plan),
+      ),
+      answers: [decidedAnswers(ANSWERS)],
+    },
+    mission,
+    lines: ['Yes'],
+    browser: new FakeBrowser(pages),
+  });
+
+describe('what a unit of work carries of the page that opened it', () => {
+  const STATED = ['Acme builds tools for teams.', 'Senior Engineer — Acme', 'Remote'];
+
+  it('[BRW-16] captures, as the unit opens, every word under the landmark its mission declares, carries it to the answerer and records it in the tasks dump — never on a row or the bus', async () => {
+    const { brain, dumps, detail, events } = await oneUnit(
+      MISSION_WITH_CONTEXT,
+      statingPages({ main: STATED, banner: ['Jobs'] }),
+    );
+    const context = { landmark: 'main', text: STATED.join('\n'), omitted: 0 };
+    expect(brain.fieldInputs.map((input) => input.task?.context)).toEqual([context]);
+    expect(JSON.parse(dumps.text('02-tasks.json'))).toMatchObject([
+      { label: 'Senior Engineer at Acme', context },
+    ]);
+    expect(detail.tasks[0]).not.toHaveProperty('context');
+    expect(JSON.stringify(events.published)).not.toContain('"context"');
+  });
+
+  it('[BRW-16] carries nothing when the mission declares no landmark, or when the page lays out none', async () => {
+    const declaredNone = await oneUnit(MISSION_FIXTURE, statingPages({ main: STATED }));
+    expect(declaredNone.brain.fieldInputs.map((input) => input.task?.context)).toEqual([null]);
+    expect(JSON.parse(declaredNone.dumps.text('02-tasks.json'))).toMatchObject([{ context: null }]);
+    const noMain = await oneUnit(MISSION_WITH_CONTEXT, statingPages({ banner: STATED }));
+    expect(noMain.brain.fieldInputs.map((input) => input.task?.context)).toEqual([null]);
+  });
+});
 
 describe('what a session keeps of one unit of work', () => {
   it('[BRW-16] [BRW-17] names the open unit the same way to the form it answers and in the answers it teaches: by its own row id when its mission declares no identity', async () => {

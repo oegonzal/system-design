@@ -2,11 +2,12 @@ import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync } from 'node
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { listingObservation } from '@sysdesign/contracts';
+import { listingObservation, type BrowserTaskDto } from '@sysdesign/contracts';
 import { INDEX_FILE, isRunId } from '@sysdesign/run-dump';
 
 import {
   closingFiles,
+  dumpedTasks,
   fsDumpStore,
   indexRowOf,
   manifestOf,
@@ -48,6 +49,22 @@ const manifest = () =>
     finishedAt: new Date('2026-10-03T10:05:00.000Z'),
     error: null,
   });
+
+/** One unit of work as the ledger reads it back, every fact the quiet default. */
+const taskRow = (id: string): BrowserTaskDto => ({
+  id,
+  sessionId: 'session-1',
+  ordinal: 1,
+  label: 'Senior Engineer at Acme',
+  externalRef: 'https://jobs.example.test/apply/42',
+  facets: [{ name: 'company', value: 'Acme' }],
+  status: 'complete',
+  outcome: 'done',
+  startStep: 2,
+  endStep: 4,
+  startedAt: '2026-10-03T10:01:00.000Z',
+  finishedAt: '2026-10-03T10:04:00.000Z',
+});
 
 describe('the session dump', () => {
   let dir: string;
@@ -97,7 +114,27 @@ describe('the session dump', () => {
 
     sink.write(observationFiles(2, listingObservation(), null));
     const built = manifest();
-    sink.write(closingFiles({ ...built, runId: sink.runId }, '# Mission\n', []));
+    // The units as the ledger holds them, each beside what the page stated about it when it opened.
+    const contexts = new Map([
+      [
+        'task-1',
+        { landmark: 'main' as const, text: 'Acme builds tools for teams.\nRemote', omitted: 2 },
+      ],
+    ]);
+    sink.write(
+      closingFiles(
+        { ...built, runId: sink.runId },
+        '# Mission\n',
+        dumpedTasks([taskRow('task-1'), { ...taskRow('task-2'), ordinal: 2 }], contexts),
+      ),
+    );
+    expect(JSON.parse(readFileSync(join(dir, sink.runId, '02-tasks.json'), 'utf8'))).toEqual([
+      {
+        ...taskRow('task-1'),
+        context: { landmark: 'main', text: 'Acme builds tools for teams.\nRemote', omitted: 2 },
+      },
+      { ...taskRow('task-2'), ordinal: 2, context: null },
+    ]);
     sink.index(indexRowOf({ ...built, runId: sink.runId }));
     const index = readFileSync(join(dir, INDEX_FILE), 'utf8').trim().split('\n');
     expect(index).toHaveLength(1);

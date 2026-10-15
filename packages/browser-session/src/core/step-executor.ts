@@ -12,6 +12,7 @@ import {
   takenStancesOf,
   TASK_OUTCOME_STATUS,
   unitOnRecordFor,
+  unitContextLandmarkOf,
   type PageObservation,
   type PlanReadout,
   type StepAction,
@@ -23,6 +24,7 @@ import { captureAfter, touchedName } from './capture';
 import type { EngineContext } from './engine-context';
 import { exactCheckOf } from './expectations';
 import { askFields } from './field-flow';
+import { unitContextOf } from './open-unit';
 import {
   ActionFailed,
   isBrowserAction,
@@ -101,6 +103,17 @@ function openTaskUnlessRefused(
   };
   state.tasks.open = task;
   state.tasks.started = task.ordinal;
+  // What the page states about the unit, from the observation it opens on:
+  // the words under the landmark the mission declares, within the declared
+  // bound. The validators cut a taskStart after any action that could have
+  // changed the page, so the browser's last tree is the page this plan claims
+  // shows the unit; that the page shows it is the plan's claim, which the
+  // lenses judge against the page.
+  const landmark = unitContextLandmarkOf(ctx.mission);
+  state.tasks.contexts.set(
+    task.id,
+    landmark === null ? null : unitContextOf(deps.browser.wordsUnder(landmark), landmark),
+  );
   const startedAt = deps.clock.now();
   queue.write(`task ${task.ordinal} open`, () =>
     deps.ledger.openTask({

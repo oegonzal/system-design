@@ -1,5 +1,6 @@
 import {
   ADVISORS_HEADING,
+  CONTEXT_HEADING,
   MISSION_WITH_IDENTITY,
   NO_UNITS_ON_RECORD,
   type UnitAdvice,
@@ -116,6 +117,10 @@ describe('the advisors a mission names', () => {
     await refused(
       { script, mission: `${MISSION}\n## Taking a unit on record\n\n- forbid: never.\n` },
       /a line under ## Taking a unit on record is not an exception/,
+    );
+    await refused(
+      { script, mission: `${MISSION_WITH_IDENTITY}\n${CONTEXT_HEADING}\n\n- landmark: sidebar\n` },
+      /a line under ## Unit context is not a landmark/,
     );
     // A described advisor the mission does not name is never asked.
     const unnamed = new ScriptedAdvisor({ id: 'other', facets: ['company'] }, [ACME]);

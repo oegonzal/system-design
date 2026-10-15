@@ -149,12 +149,17 @@ export const SUGGESTION_BASES = ['record', 'transfer', 'invented'] as const;
 export type SuggestionBasis = (typeof SUGGESTION_BASES)[number];
 
 /**
- * How a value rests on the listed evidence: the one word the read-back routes
- * by, through the answering settings' table of which kinds fill. Declared by
- * the answerer, checked by the judges, never a number. Measured 2026-10-12:
- * under a three-word confidence the read-back could not tell a fact
- * transferred from another wording from a fact invented, and 36 answered
- * fields went to the operator — 30 of the 34 whose answer is known were right.
+ * How a value rests on the listed evidence — or on another section of the
+ * goal: a line of the Answering policy, the page's own statement of the unit
+ * under the Open unit of work — the one word the read-back routes by, through
+ * the answering settings' table of which kinds fill. Declared by the answerer,
+ * checked by the judges, never a number. Measured 2026-10-12: under a
+ * three-word confidence the read-back could not tell a fact transferred from
+ * another wording from a fact invented, and 36 answered fields went to the
+ * operator — 30 of the 34 whose answer is known were right. Measured
+ * 2026-10-14: a field asking about the organisation's mission drew no value
+ * while the page had stated it, since a value about the unit alone had no
+ * evidence to cite and no kind to declare; `unit` is that kind.
  */
 export const ANSWER_BASES = [
   'stated',
@@ -164,6 +169,7 @@ export const ANSWER_BASES = [
   'inferred',
   'composed',
   'policy',
+  'unit',
   'none',
 ] as const;
 export type AnswerBasis = (typeof ANSWER_BASES)[number];
@@ -181,8 +187,38 @@ export const ANSWER_BASIS_MEANINGS: Readonly<Record<AnswerBasis, string>> = {
     "prose assembled from stated facts, in the answerer's words, adding nothing they do not state",
   policy:
     'what a line of the Answering policy names as the value this question takes, whatever the record holds',
+  unit: "what the goal's Open unit of work states the page said of this unit, in the page's own words — the unit's statement of itself, saying nothing about the subject",
   none: 'nothing listed bears on it',
 };
+
+/**
+ * Whether a value of each kind cites listed evidence by alias. A value resting
+ * on another section of the goal — the Answering policy, the page's statement
+ * under the Open unit of work — or on nothing has no alias to cite. The limits
+ * validator holds a citing kind to its citation and the goal's Limits say
+ * which kinds cite, both from this one table.
+ */
+export const ANSWER_BASIS_CITES = {
+  stated: true,
+  restated: true,
+  derived: true,
+  mapped: true,
+  inferred: true,
+  composed: true,
+  policy: false,
+  unit: false,
+  none: false,
+} as const satisfies Record<AnswerBasis, boolean>;
+
+/** The kinds that cite evidence, in the vocabulary's order. */
+export const CITING_ANSWER_BASES: readonly AnswerBasis[] = ANSWER_BASES.filter(
+  (kind) => ANSWER_BASIS_CITES[kind],
+);
+
+/** The kinds that rest on a section of the goal other than the evidence, in the vocabulary's order: declared, never cited. */
+export const UNCITED_ANSWER_BASES: readonly AnswerBasis[] = ANSWER_BASES.filter(
+  (kind) => !ANSWER_BASIS_CITES[kind] && kind !== 'none',
+);
 
 /** What the session did with a field, after the decision and the routing rules; `keep` touches nothing. */
 export const FIELD_ROUTES = ['fill', 'keep', 'ask-operator', 'leave-blank'] as const;

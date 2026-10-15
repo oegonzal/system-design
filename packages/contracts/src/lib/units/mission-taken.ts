@@ -44,7 +44,7 @@ const takenDeclarationSchema = z.strictObject({
   /** The exact name of a control the page lists while the exception is withheld; null when the mission ties it to none. */
   control: bounded.id(TAKEN_CONTROL_MAX_LENGTH, { min: 1 }).nullable(),
 });
-export type TakenDeclaration = z.infer<typeof takenDeclarationSchema>;
+type TakenDeclaration = z.infer<typeof takenDeclarationSchema>;
 
 /** One bullet: the stance, an optional `unless` with the control's quoted name, a colon, the meaning. */
 const TAKEN_LINE = /^- (?<stance>[a-z][a-z0-9-]*)(?: unless "(?<control>[^"]+)")?: .+$/;

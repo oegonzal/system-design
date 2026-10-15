@@ -1,7 +1,6 @@
 import {
   ANSWER_SUGGESTIONS_PIPELINE_ID,
   BROWSER_STEP_PIPELINE_ID,
-  composeFieldGoal,
   DOCUMENT_MEMORY_ORCHESTRATOR_ID,
   FIELD_ANSWER_PIPELINE_ID,
   FORM_MEMORY_ORCHESTRATOR_ID,
@@ -9,7 +8,6 @@ import {
   formTargetReportSchema,
   GoalBudgetExceeded,
   renderDocumentGoal,
-  textBytes,
   type AnswerSuggestions,
   type DocumentChunk,
   type FieldAnswers,
@@ -42,7 +40,7 @@ import {
   type SessionStepRef,
   type StepInput,
 } from '../../core/ports';
-import { composeStepGoalWithinBudget, renderFieldProse } from './render-goal';
+import { composeFieldGoalWithinBudget, composeStepGoalWithinBudget } from './render-goal';
 
 /**
  * The brain is the quality loop. A plan is a `browser-step` run started on
@@ -184,18 +182,12 @@ export class LoopBrain implements BrainPort {
     what: string,
   ): Promise<Decided<T> & FormReport> {
     return guarded(async () => {
-      const goal = composeFieldGoal({
-        pipeline,
-        prose: renderFieldProse(input),
-        fields: input.fields,
-        evidence: [],
-        ...(input.task === null ? {} : { unitKey: input.task.unitKey }),
-      });
+      const composed = composeFieldGoalWithinBudget(pipeline, input);
       const { orchestrationRunId } = await this.client.startOrchestration(
         FORM_MEMORY_ORCHESTRATOR_ID,
         {
           pipeline,
-          goal,
+          goal: composed.goal,
           criteria: [...input.criteria],
           maxIterations: DECISION_ITERATIONS,
           openedBy: openedBy(input.session, what),
@@ -228,7 +220,7 @@ export class LoopBrain implements BrainPort {
         runId,
         orchestrationRunId,
         run,
-        composition: { rung: 'full', bytes: textBytes(goal), snapshotRung: null },
+        composition: { rung: composed.rung, bytes: composed.bytes, snapshotRung: null },
         admission: report.success ? report.data.admission : 'fell-short',
         withheld: report.success ? report.data.withheld : [],
       };

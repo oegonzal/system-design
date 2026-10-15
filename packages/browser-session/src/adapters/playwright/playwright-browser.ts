@@ -6,6 +6,7 @@ import {
   escapeRegExp,
   observationFingerprint,
   pageObservationSchema,
+  type LandmarkRole,
   type ObservationReading,
   type ObservedElement,
   type PageObservation,
@@ -17,9 +18,11 @@ import {
   decodeAriaSnapshot,
   ancestryOf,
   landmarkRolesOf,
+  landmarkWords,
   settledSnapshot,
   subtreeText,
   unreadSnapshotLines,
+  type SnapshotNode,
 } from './aria-snapshot';
 import { busyCheck } from './busy-check';
 import { readElementFacts, readWithinBudget } from './element-facts';
@@ -165,6 +168,8 @@ export const launchOptions = (options: PlaywrightBrowserOptions, headed: boolean
 export class PlaywrightBrowser implements BrowserPort {
   private context: BrowserContext | null = null;
   private known = new Map<string, ObservedElement>();
+  /** The tree of the last observation reported: what `wordsUnder` reads, so a unit's statement is the page as the plan saw it. */
+  private tree: readonly SnapshotNode[] = [];
 
   constructor(private readonly options: PlaywrightBrowserOptions) {}
 
@@ -248,6 +253,7 @@ export class PlaywrightBrowser implements BrowserPort {
       url: page.url(),
       title: await page.title(),
       snapshot,
+      nodes,
       elements,
       unreadElements: unread,
       unreadSnapshotLines: unreadSnapshotLines(snapshot, nodes),
@@ -278,7 +284,7 @@ export class PlaywrightBrowser implements BrowserPort {
    * and the time spent ride on the observation, so a live session can size
    * the reader from data.
    */
-  private async readPage(): Promise<PageObservation> {
+  private async readPage(): Promise<{ observation: PageObservation; reading: PageReading }> {
     const startedAt = Date.now();
     const deadline = startedAt + OBSERVE_BUDGET_MS;
     const agreement = (reading: PageReading): string =>
@@ -299,13 +305,27 @@ export class PlaywrightBrowser implements BrowserPort {
         agreement(again) === agreement(reading) && !mainUnrendered(again) && !again.scopeBusy;
       reading = again;
     }
-    return toObservation(reading, { reads, settled, durationMs: Date.now() - startedAt, busy });
+    return {
+      observation: toObservation(reading, {
+        reads,
+        settled,
+        durationMs: Date.now() - startedAt,
+        busy,
+      }),
+      reading,
+    };
   }
 
   async observe(): Promise<PageObservation> {
-    const observation = pageObservationSchema.parse(await this.readPage());
+    const read = await this.readPage();
+    const observation = pageObservationSchema.parse(read.observation);
     this.known = new Map(observation.elements.map((element) => [element.ref, element]));
+    this.tree = read.reading.nodes;
     return observation;
+  }
+
+  wordsUnder(landmark: LandmarkRole): readonly string[] {
+    return landmarkWords(this.tree, landmark);
   }
 
   async act(action: BrowserAction): Promise<void> {
@@ -367,6 +387,7 @@ export class PlaywrightBrowser implements BrowserPort {
     const context = this.context;
     this.context = null;
     this.known.clear();
+    this.tree = [];
     if (context !== null) await context.close();
   }
 

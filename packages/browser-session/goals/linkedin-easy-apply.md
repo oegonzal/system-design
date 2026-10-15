@@ -14,6 +14,10 @@ One application: from opening a listing's card to the confirmation that the appl
 
 - company: the company as the listing's pane names it, beside the title.
 
+## Unit context
+
+- landmark: main
+
 ## Advisors
 
 - job-application

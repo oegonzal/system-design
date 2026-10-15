@@ -11,6 +11,7 @@ import {
   type BrowserSessionDto,
   type BrowserTaskDto,
   type InteractionAnswer,
+  type LandmarkRole,
   type PageObservation,
   type SuccessCriterion,
 } from '@sysdesign/contracts';
@@ -52,6 +53,8 @@ export interface ScriptedPage {
   observation: PageObservation;
   /** Action key (`click e3`, `navigate https://…`, `press Enter`) → the page shown after it. */
   transitions?: Record<string, string>;
+  /** What the page states under each landmark, node by node, as a browser reads it from the tree; a landmark not listed says nothing. */
+  states?: Partial<Record<LandmarkRole, readonly string[]>>;
 }
 
 /** The key a transition is declared under: the action's kind and its target, never its value. */
@@ -95,6 +98,8 @@ export class FakeBrowser implements BrowserPort {
   closed = false;
   private current: ScriptedPage;
   private observed = new Set<string>();
+  /** The page the last `observe` read: what `wordsUnder` answers from, as the real browser answers from its last tree. */
+  private lastObserved: ScriptedPage | null = null;
 
   constructor(private readonly pages: readonly ScriptedPage[]) {
     const [first] = pages;
@@ -114,7 +119,12 @@ export class FakeBrowser implements BrowserPort {
   async observe(): Promise<PageObservation> {
     this.calls.push(`observe ${this.current.id}`);
     this.observed = new Set(this.current.observation.elements.map((element) => element.ref));
+    this.lastObserved = this.current;
     return structuredClone(this.current.observation);
+  }
+
+  wordsUnder(landmark: LandmarkRole): readonly string[] {
+    return this.lastObserved?.states?.[landmark] ?? [];
   }
 
   async act(action: BrowserAction): Promise<void> {

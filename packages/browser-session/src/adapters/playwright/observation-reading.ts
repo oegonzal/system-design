@@ -39,6 +39,8 @@ export interface PageReading {
   url: string;
   title: string;
   snapshot: string;
+  /** The tree the snapshot decodes to, in document order: what the browser answers `wordsUnder` from until the next read. */
+  nodes: readonly SnapshotNode[];
   elements: ObservedElement[];
   unreadElements: number;
   unreadSnapshotLines: number;

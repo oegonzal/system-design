@@ -9,6 +9,7 @@
  * is in the index the composer wrote.
  */
 import {
+  ANSWER_BASIS_CITES,
   fieldLocation,
   valueFaults,
   type FieldAnswer,
@@ -78,14 +79,15 @@ function answerFaults(answer: FieldAnswer, field: FieldSpec): Fault[] {
     fault('medium', `${ref} is required and visible, yet left blank`);
   }
   // How a value rests is declared data the read-back routes by: a declaration
-  // the answer itself contradicts is withheld, never filled on its word.
+  // the answer itself contradicts is withheld, never filled on its word. Which
+  // kinds owe a citation is the vocabulary's own table: a kind resting on
+  // another section of the goal — the policy, the unit's statement — owes none.
   if (answer.decision === 'answer' && answer.rests === 'none') {
     fault('medium', `${ref} is answered with a value resting on nothing`);
   }
   if (
     answer.decision === 'answer' &&
-    answer.rests !== 'policy' &&
-    answer.rests !== 'none' &&
+    ANSWER_BASIS_CITES[answer.rests] &&
     answer.basis.length === 0
   ) {
     fault('medium', `${ref} rests ${answer.rests} on the evidence yet cites none`);
