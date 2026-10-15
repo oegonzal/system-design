@@ -12,7 +12,7 @@
   },
   "drafts": {
     "record": "fill",
-    "transfer": "offer",
-    "invented": "offer"
+    "transfer": "fill",
+    "invented": "fill"
   }
 }
