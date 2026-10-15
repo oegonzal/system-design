@@ -1,0 +1,41 @@
+---
+/**
+ * A tinted card led by a line icon — drawn inline from a declared set, hidden
+ * from assistive technology — with the caller's content under it.
+ */
+interface Props {
+  icon: 'mail' | 'landmark';
+}
+
+const { icon } = Astro.props;
+
+/** Each icon's strokes, on a 24-unit grid. */
+const ICONS = {
+  mail: ['M3 7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z', 'm3 7 9 6 9-6'],
+  landmark: ['m3 10 9-6 9 6', 'M5 10v10M10 10v10M14 10v10M19 10v10', 'M2 20h20'],
+} as const;
+---
+
+<div class="flex h-full flex-col rounded-xl border border-line bg-surface-tint p-6">
+  <span
+    class="flex size-11 items-center justify-center rounded-lg border border-line bg-surface"
+    aria-hidden="true"
+  >
+    <svg
+      viewBox="0 0 24 24"
+      class="size-6 stroke-accent-strong"
+      fill="none"
+      stroke-width="1.75"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+      focusable="false"
+    >
+      {ICONS[icon].map((d) => (
+        <path d={d}></path>
+      ))}
+    </svg>
+  </span>
+  <div class="mt-4">
+    <slot />
+  </div>
+</div>

@@ -8,9 +8,15 @@ const { areas } = Astro.props;
 ---
 
 <dl class="grid gap-6 sm:grid-cols-3 print:grid-cols-3 print:gap-3">
-  {areas.map(({ area, items }) => <div class="break-inside-avoid">
-    <dt class="font-semibold print:text-sm">{area}</dt>
-    <dd class="mt-1 leading-7 text-ink-soft print:mt-0 print:text-xs print:leading-snug">
+  {areas.map(({ area, items }) => <div
+    class="rounded-xl border border-line bg-surface-tint p-5 break-inside-avoid print:rounded-none print:border-0 print:bg-transparent print:p-0"
+  >
+    <dt
+      class="text-xs font-semibold tracking-wide text-accent-strong uppercase print:text-sm print:tracking-normal print:text-ink print:normal-case"
+    >
+      {area}
+    </dt>
+    <dd class="mt-2 leading-7 text-ink-soft print:mt-0 print:text-xs print:leading-snug">
       {items.join(', ')}
     </dd>
   </div>)}

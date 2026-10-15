@@ -1,0 +1,47 @@
+---
+/**
+ * The node-graph motif of the link-preview image, drawn inline with the
+ * palette's tokens for the home page's hero: a decoration, hidden from
+ * assistive technology, that the page shows only where it has a column for it.
+ * Every shape sits inside the viewBox, so nothing reaches past the page's edge.
+ */
+---
+
+<svg viewBox="0 0 320 320" class="h-auto w-full max-w-sm" aria-hidden="true" focusable="false">
+  <g class="stroke-accent" stroke-width="3" stroke-linecap="round" fill="none">
+    <line x1="30" y1="60" x2="160" y2="30"></line>
+    <line x1="160" y1="30" x2="280" y2="110"></line>
+    <line x1="30" y1="60" x2="110" y2="190"></line>
+    <line x1="110" y1="190" x2="280" y2="110"></line>
+    <line x1="110" y1="190" x2="200" y2="290"></line>
+    <line x1="280" y1="110" x2="200" y2="290"></line>
+  </g>
+  <g
+    class="stroke-accent-bright"
+    stroke-width="2"
+    stroke-dasharray="6 8"
+    stroke-linecap="round"
+    fill="none"
+  >
+    <line x1="160" y1="30" x2="110" y2="190"></line>
+    <line x1="280" y1="110" x2="290" y2="230"></line>
+    <line x1="290" y1="230" x2="200" y2="290"></line>
+  </g>
+  <g class="fill-on-brand-soft">
+    <circle cx="30" cy="60" r="12"></circle>
+    <circle cx="160" cy="30" r="12"></circle>
+    <circle cx="280" cy="110" r="12"></circle>
+    <circle cx="110" cy="190" r="12"></circle>
+    <circle cx="290" cy="230" r="9"></circle>
+  </g>
+  <circle cx="200" cy="290" r="16" class="fill-accent-bright"></circle>
+  <circle
+    cx="200"
+    cy="290"
+    r="26"
+    class="stroke-accent-bright"
+    stroke-width="2"
+    fill="none"
+    opacity="0.5"
+  ></circle>
+</svg>

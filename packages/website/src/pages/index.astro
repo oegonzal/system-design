@@ -3,6 +3,7 @@ import iconArt from '../assets/icon.svg';
 import Button from '../components/Button.astro';
 import CtaBand from '../components/CtaBand.astro';
 import FactValue from '../components/FactValue.astro';
+import HeroFigure from '../components/HeroFigure.astro';
 import ItemList from '../components/ItemList.astro';
 import NumberedCard from '../components/NumberedCard.astro';
 import PageHeader from '../components/PageHeader.astro';
@@ -96,6 +97,7 @@ const assurance = [
         <dd class="mt-1 text-on-brand-soft"><FactValue fact={COMPANY.delivery} /></dd>
       </div>
     </dl>
+    <HeroFigure slot="figure" />
   </PageHeader>
 
   <Section id="services" eyebrow="Four service lines" title="What we build">

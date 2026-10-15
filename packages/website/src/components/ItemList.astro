@@ -1,11 +1,12 @@
 ---
 /**
  * Titled items — a title and a line of text each — in two columns from `sm`
- * up and on paper, or three on the brand band, where the text is light.
+ * up and on paper: plain, on tinted panels, or three across the brand band,
+ * where the text is light.
  */
 interface Props {
   items: readonly { readonly title: string; readonly text: string }[];
-  tone?: 'light' | 'brand';
+  tone?: 'light' | 'panel' | 'brand';
 }
 
 const { items, tone = 'light' } = Astro.props;
@@ -17,7 +18,13 @@ const { items, tone = 'light' } = Astro.props;
     tone === 'brand' ? 'sm:grid-cols-3' : 'sm:grid-cols-2',
   ]}
 >
-  {items.map((item) => <li class="break-inside-avoid">
+  {items.map((item) => <li
+    class:list={[
+      'break-inside-avoid',
+      tone === 'panel' &&
+        'rounded-xl border border-line bg-surface-tint p-5 print:rounded-none print:border-0 print:bg-transparent print:p-0',
+    ]}
+  >
     <p class="font-semibold print:text-sm">{item.title}</p>
     <p
       class:list={[

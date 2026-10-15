@@ -28,7 +28,9 @@ const headingId = `${id}-title`;
   ]}
 >
   <Container>
-    {eyebrow !== undefined && <Eyebrow tone={tone === 'brand' ? 'brand' : 'light'} class="mb-2"
+    {eyebrow !== undefined && <Eyebrow
+      tone={tone === 'brand' ? 'brand' : 'light'}
+      class="mb-2 print:hidden"
       >{eyebrow}</Eyebrow
     >}
     <h2 id={headingId} class="text-2xl font-bold tracking-tight sm:text-3xl print:text-base">

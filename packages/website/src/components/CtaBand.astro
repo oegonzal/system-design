@@ -18,6 +18,7 @@ const { title, text, href, action } = Astro.props;
     class="flex flex-col items-start gap-6 py-14 sm:flex-row sm:items-center sm:justify-between"
   >
     <div>
+      <span aria-hidden="true" class="mb-4 block h-1 w-10 rounded-full bg-accent-bright"></span>
       <h2 id="cta-title" class="text-2xl font-bold tracking-tight">{title}</h2>
       <p class="mt-2 text-lg text-on-brand-soft">{text}</p>
     </div>

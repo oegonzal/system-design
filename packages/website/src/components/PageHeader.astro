@@ -2,7 +2,11 @@
 import Container from './Container.astro';
 import Eyebrow from './Eyebrow.astro';
 
-/** The brand band that opens every page: the page's one <h1> and its lede. */
+/**
+ * The brand band that opens every page: the page's one <h1> and its lede,
+ * with whatever the page puts under them, and, where the page gives one, a
+ * figure beside them from `lg` up.
+ */
 interface Props {
   title: string;
   lede: string;
@@ -10,23 +14,34 @@ interface Props {
 }
 
 const { title, lede, eyebrow } = Astro.props;
+const figure = Astro.slots.has('figure');
 ---
 
-<div
-  class="surface-brand bg-brand text-on-brand print:bg-transparent print:text-ink print:[--focus-ring:var(--color-ink)]"
->
+<div class="surface-brand bg-brand text-on-brand print:bg-transparent print:text-ink">
   <Container class="py-14 sm:py-20 print:pt-0 print:pb-1">
-    {eyebrow && <Eyebrow tone="brand">{eyebrow}</Eyebrow>}
-    <h1
-      class="mt-2 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl print:mt-0 print:text-2xl"
+    <div
+      class:list={[
+        'grid gap-10',
+        figure && 'lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)] lg:items-center',
+      ]}
     >
-      {title}
-    </h1>
-    <p
-      class="mt-5 max-w-2xl text-lg leading-8 text-on-brand-soft print:mt-1 print:max-w-none print:text-sm print:leading-snug print:text-ink-soft"
-    >
-      {lede}
-    </p>
-    <slot />
+      <div>
+        {eyebrow && <Eyebrow tone="brand">{eyebrow}</Eyebrow>}
+        <h1
+          class="mt-2 max-w-3xl text-4xl font-bold tracking-tight text-balance sm:text-5xl print:mt-0 print:text-2xl"
+        >
+          {title}
+        </h1>
+        <p
+          class="mt-5 max-w-2xl text-lg leading-8 text-on-brand-soft print:mt-1 print:max-w-none print:text-sm print:leading-snug print:text-ink-soft"
+        >
+          {lede}
+        </p>
+        <slot />
+      </div>
+      {figure && <div class="hidden justify-self-end lg:block print:hidden">
+        <slot name="figure" />
+      </div>}
+    </div>
   </Container>
 </div>

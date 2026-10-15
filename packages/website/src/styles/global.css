@@ -73,6 +73,13 @@
     --focus-ring: var(--color-on-brand);
   }
 
+  /* On paper every band prints light, so the ring is ink there too. */
+  @media print {
+    .surface-brand {
+      --focus-ring: var(--color-ink);
+    }
+  }
+
   /* Long fact values (identifiers, addresses) wrap instead of pushing a narrow page sideways. */
   dd {
     overflow-wrap: anywhere;
