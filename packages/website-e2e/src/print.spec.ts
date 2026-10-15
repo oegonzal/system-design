@@ -1,10 +1,16 @@
 import { expect, test } from '@playwright/test';
 
+/** The capability statement's length on paper, as the owner's own statement runs. */
+const MAX_PAGES = 2;
+
+/** 8.5 × 11 inches, in PDF points. */
+const LETTER = [0, 0, 612, 792];
+
 /**
  * Runs in the desktop project only (playwright.config.ts): printing to PDF is a
  * Chromium feature, and the printed page does not depend on the window width.
  */
-test('[SITE-7] the government page prints as a one-page US Letter capability statement', async ({
+test('[SITE-7] the government page prints as a capability statement of at most two US Letter pages', async ({
   page,
 }) => {
   const response = await page.goto('/government/');
@@ -15,7 +21,9 @@ test('[SITE-7] the government page prints as a one-page US Letter capability sta
   const pdf = await page.pdf({ preferCSSPageSize: true, printBackground: true, format: 'A4' });
   const { getDocument } = await import('pdfjs-dist/legacy/build/pdf.mjs');
   const document = await getDocument({ data: new Uint8Array(pdf) }).promise;
-  expect(document.numPages).toBe(1);
-  // 8.5 × 11 inches, in PDF points.
-  expect((await document.getPage(1)).view).toEqual([0, 0, 612, 792]);
+  expect(document.numPages).toBeLessThanOrEqual(MAX_PAGES);
+  const pages = await Promise.all(
+    Array.from({ length: document.numPages }, (_, index) => document.getPage(index + 1)),
+  );
+  expect(pages.map(({ view }) => view)).toEqual(pages.map(() => LETTER));
 });

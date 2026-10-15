@@ -1,0 +1,17 @@
+---
+/** Technology by area: each area's name and what it covers. */
+interface Props {
+  areas: readonly { readonly area: string; readonly items: readonly string[] }[];
+}
+
+const { areas } = Astro.props;
+---
+
+<dl class="grid gap-6 sm:grid-cols-3 print:grid-cols-3 print:gap-3">
+  {areas.map(({ area, items }) => <div class="break-inside-avoid">
+    <dt class="font-semibold print:text-sm">{area}</dt>
+    <dd class="mt-1 leading-7 text-ink-soft print:mt-0 print:text-xs print:leading-snug">
+      {items.join(', ')}
+    </dd>
+  </div>)}
+</dl>

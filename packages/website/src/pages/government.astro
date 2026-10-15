@@ -3,97 +3,139 @@ import Container from '../components/Container.astro';
 import EmailLink from '../components/EmailLink.astro';
 import FactList from '../components/FactList.astro';
 import FactValue from '../components/FactValue.astro';
+import ItemList from '../components/ItemList.astro';
 import PageHeader from '../components/PageHeader.astro';
+import Registration from '../components/Registration.astro';
 import Section from '../components/Section.astro';
+import TechnologyList from '../components/TechnologyList.astro';
 import { COMPANY, COMPANY_DETAILS } from '../data/company';
-import { SERVICES } from '../data/services';
+import { FOUNDER } from '../data/founder';
+import { ENGAGEMENTS, SERVICES, TECHNOLOGY } from '../data/services';
 import { SITE } from '../data/site';
 import BaseLayout from '../layouts/BaseLayout.astro';
+import { formatYears, yearOf } from '../lib/dates';
 
-const differentiators = [
+const useCases = [
   {
-    title: 'Senior-led delivery',
-    text: 'Engineering is led by the founder, a full-stack engineer with more than ten years of production experience.',
+    title: 'Document and case intake',
+    text: 'Classify submissions, extract fields, validate them against rules and route exceptions to a reviewer.',
   },
   {
-    title: 'Evaluation-driven AI',
-    text: 'Automated critics, evaluators and audit trails are part of every AI workflow we build.',
+    title: 'Knowledge and policy retrieval',
+    text: 'Traceable internal search over approved documentation, with citations and human review.',
   },
   {
-    title: 'Maintainable by design',
-    text: 'Typed, tested and documented code, delivered with the runbooks to operate it.',
+    title: 'Operations workflow integration',
+    text: 'Records and status synchronized across APIs, databases and existing administrative systems.',
+  },
+];
+
+const riskControls = [
+  {
+    title: 'Evaluation and governance',
+    text: 'Scoping criteria, acceptance tests, schema validation, traceability and documented human-in-the-loop controls, as appropriate.',
   },
   {
-    title: 'A modern, well-supported stack',
-    text: 'TypeScript, Node.js, React, PostgreSQL, AWS and GCP.',
+    title: 'Production-informed build',
+    text: 'Typed APIs, modular components, observability, CI test automation, rollout planning and a maintainable handoff.',
   },
 ];
 
 const contact = COMPANY.pointOfContact;
 
-// Paper has no links: the printed statement spells out the addresses it refers to.
-const printed = (path: string): string => {
-  const url = new URL(path, SITE.origin);
-  return url.pathname === '/' ? url.host : `${url.host}${url.pathname}`;
-};
+// Paper has no links: the printed statement spells out the site's address.
+const host = new URL(SITE.origin).host;
 ---
 
 <BaseLayout
   title="Government contracting & capability statement — Enfav LLC"
-  description="Enfav LLC's capability statement: core competencies, differentiators, company data and points of contact for agencies and prime contractors."
+  description="Enfav LLC's federal capability statement: service lines, engagements, SAM.gov registration (UEI, CAGE, NAICS, PSC) and a point of contact."
 >
   <PageHeader
-    eyebrow="Capability statement"
+    eyebrow="Federal capability statement"
     title="Government contracting"
-    lede="Enfav LLC provides AI workflow automation and software engineering to government agencies, directly or as a subcontractor and teaming partner to prime contractors."
-  />
+    lede="Enfav LLC designs and integrates AI-centered workflows. For federal prime contractors it focuses on bounded, inspectable software deliverables: agent orchestration, reliable data retrieval, workflow automation, service integration and engineering validation."
+  >
+    <p class="mt-6 font-semibold print:mt-1 print:text-xs"><Registration /></p>
+  </PageHeader>
 
   <Container class="pt-8 print:hidden">
     <p class="rounded-md border border-line bg-surface-muted px-4 py-3 text-sm text-ink-soft">
-      This page prints as a one-page capability statement — use your browser's Print or Save as PDF.
+      This page prints as a two-page capability statement — use your browser's Print or Save as PDF.
     </p>
   </Container>
 
-  <Section id="competencies" title="Core competencies">
-    <ul class="grid gap-x-10 gap-y-4 sm:grid-cols-2 print:grid-cols-2 print:gap-x-6 print:gap-y-1">
-      {SERVICES.map((service) => <li>
-        <p class="font-semibold print:text-sm">{service.title}</p>
-        <p class="mt-1 leading-7 text-ink-soft print:mt-0 print:text-xs print:leading-snug">
-          {service.line}
-        </p>
-      </li>)}
-    </ul>
+  <Section id="service-lines" title="Core service lines">
+    <ItemList items={SERVICES.map(({ title, line }) => ({ title, text: line }))} />
   </Section>
 
-  <Section id="differentiators" title="Differentiators" tone="muted">
-    <ul class="grid gap-x-10 gap-y-4 sm:grid-cols-2 print:grid-cols-2 print:gap-x-6 print:gap-y-1">
-      {differentiators.map((item) => <li>
-        <p class="font-semibold print:text-sm">{item.title}</p>
-        <p class="mt-1 leading-7 text-ink-soft print:mt-0 print:text-xs print:leading-snug">
-          {item.text}
-        </p>
-      </li>)}
-    </ul>
+  <Section id="engagements" title="Engagements for prime contractors" tone="muted">
+    <ItemList items={ENGAGEMENTS} />
   </Section>
 
-  <Section id="company-data" title="Company data">
-    <div class="max-w-3xl print:max-w-none print:text-xs">
+  <Section id="company-data" title="Contracting profile">
+    <div class="max-w-3xl print:max-w-none print:text-print-data print:leading-snug">
       <FactList details={COMPANY_DETAILS} />
     </div>
   </Section>
 
-  <Section id="past-performance" title="Past performance" tone="muted">
+  <Section id="delivery-evidence" title="Delivery evidence" tone="muted">
     <p class="max-w-3xl leading-7 text-ink-soft print:max-w-none print:text-xs print:leading-snug">
-      Enfav LLC was formed in <FactValue fact={COMPANY.founded} />. The founder's prior professional
-      experience appears on the
-      <a href="/about/" class="text-link underline underline-offset-4">About page</a
-      ><span class="hidden print:inline"> ({printed('/about/')})</span>; it is not Enfav LLC
-      contract past performance.
+      Enfav LLC was organized in {yearOf(COMPANY.organized.value)} and has no federal contract past
+      performance yet.
     </p>
+    <h3 class="mt-8 text-lg font-semibold print:mt-1 print:text-sm">
+      Founder-developed AI systems
+    </h3>
+    <p class="mt-1 text-sm text-ink-soft print:mt-0 print:break-after-avoid print:text-xs">
+      {FOUNDER.systemsNote}
+    </p>
+    <div class="mt-3 print:mt-0.5">
+      <ItemList items={FOUNDER.systems} />
+    </div>
+    <div data-employment-list class="mt-8 print:mt-1">
+      <h3 class="text-lg font-semibold print:text-sm">Prior employment</h3>
+      <p
+        data-employment-note
+        class="mt-1 text-sm text-ink-soft print:mt-0 print:break-after-avoid print:text-xs"
+      >
+        {FOUNDER.experienceNote}
+      </p>
+      <ol class="mt-3 space-y-2 print:mt-0.5 print:space-y-0.5">
+        {FOUNDER.experience.map((job) => <li
+          data-employment
+          class="leading-7 break-inside-avoid print:text-xs print:leading-snug"
+        >
+          <span class="font-semibold"
+            ><span data-employer>{job.employer}</span> ·
+            <span data-employment-dates>{formatYears(job.period)}</span></span
+          >
+          <span class="text-ink-soft">— {job.summary}</span>
+        </li>)}
+      </ol>
+      <p class="mt-3 text-sm print:hidden">
+        Roles and details are on the
+        <a href="/about/#experience" class="text-link underline underline-offset-4">About page</a>.
+      </p>
+    </div>
   </Section>
 
-  <Section id="contact" title="Point of contact">
-    <div class="grid gap-8 sm:grid-cols-2 print:grid-cols-2 print:gap-4 print:text-xs">
+  <Section id="use-cases" title="Illustrative use cases">
+    <ItemList items={useCases} />
+  </Section>
+
+  <Section id="delivery-risk" title="How Enfav reduces delivery risk" tone="muted">
+    <ItemList items={riskControls} />
+  </Section>
+
+  <Section id="technology" title="Applied technology">
+    <TechnologyList areas={TECHNOLOGY} />
+  </Section>
+
+  <Section id="contact" title="Point of contact" tone="muted">
+    <div
+      class="grid gap-8 break-inside-avoid sm:grid-cols-2 print:grid-cols-2 print:gap-4 print:text-xs"
+    >
       <div>
         <p data-person="pointOfContact">
           <span class="font-semibold"><FactValue fact={contact.name} /></span>,
@@ -113,7 +155,10 @@ const printed = (path: string): string => {
             class="text-link underline underline-offset-4"
           />
         </p>
-        <p class="hidden print:block">Website: {printed('/')}</p>
+        <p class="hidden print:block">Website: {host}</p>
+        <p class="mt-1 print:mt-0">
+          <FactValue fact={COMPANY.location} /> · <FactValue fact={COMPANY.delivery} />
+        </p>
       </div>
       <div>
         <h3 class="font-semibold">Teaming and subcontracting</h3>
@@ -128,4 +173,16 @@ const printed = (path: string): string => {
       </div>
     </div>
   </Section>
+
+  <Container class="py-10 print:py-1">
+    <p
+      class="max-w-3xl text-sm leading-6 text-ink-soft print:max-w-none print:text-print-note print:leading-snug"
+    >
+      Enfav LLC offers unclassified software services. Access to restricted information, on-site
+      performance, insurance and cybersecurity controls are set for each engagement by the prime
+      contractor and the subcontract. Service categories are offered as capability alignment: no
+      representation is made that a PSC code is a registration credential or that Enfav LLC holds a
+      clearance, and no special set-aside certifications are claimed.
+    </p>
+  </Container>
 </BaseLayout>

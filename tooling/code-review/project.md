@@ -75,8 +75,9 @@ anything the map already generates is deliberately absent, because a second copy
 - `studio-e2e` — Playwright, driving a real browser against the real API.
 - `website` — the Enfav LLC marketing site: Astro pages prerendered to static files, served by
   Cloudflare Workers Static Assets from `wrangler.jsonc`. Its unit specs cover the static output,
-  the structured data (with made-up facts), the single origin and the build's check of its own
-  inputs; the company data in `src/data` is checked through the built pages in `website-e2e`. Astro
+  the structured data (with made-up facts), the single origin, the build's check of its own inputs,
+  how dates, addresses and SAM.gov codes are written, and the order of the founder's employment; the
+  company data in `src/data` is checked through the built pages in `website-e2e`. Astro
   components have no stories: they are tested through the built pages in `website-e2e`.
 - `website-e2e` — Playwright and axe over every page of the built site as Workers serves it, locally
   against `wrangler dev` and, after a deploy, against production.

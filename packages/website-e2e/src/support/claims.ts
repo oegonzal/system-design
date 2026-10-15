@@ -6,10 +6,11 @@ import type { Page } from '@playwright/test';
  * The owner's rule for this site is that no certification, set-aside status,
  * clearance, contract vehicle or award is ever invented. A verified fact renders
  * inside an element marked `data-fact="verified"`; anything matching these
- * phrases in what restrictedClaimsOn reads — the copy, a placeholder's label,
- * the page's title and metadata, an aria-label, alt or title attribute, or the
- * JSON-LD — is a claim nobody confirmed. The list is data: extend it, never
- * special-case a page.
+ * phrases in what restrictedClaimsOn reads — the copy, the page's title and
+ * metadata, an aria-label, alt or title attribute, or the JSON-LD — is a claim
+ * nobody confirmed. The list is data: extend it, never special-case a page. It
+ * matches phrases, not meaning, so the capability statement's disclaimers are
+ * worded around it, and a phrase added here may mean rewording one.
  */
 const RESTRICTED_CLAIMS: readonly string[] = [
   '8(a)',
@@ -87,7 +88,7 @@ const stringsIn = (value: unknown): string[] =>
       : [];
 
 /** The string values of every JSON-LD block on a loaded page, the head's included. */
-export async function structuredDataStrings(page: Page): Promise<string[]> {
+async function structuredDataStrings(page: Page): Promise<string[]> {
   const blocks = await page.locator('script[type="application/ld+json"]').allTextContents();
   return blocks.flatMap((block) => stringsIn(JSON.parse(block) as unknown));
 }
@@ -107,7 +108,7 @@ export async function structuredDataStrings(page: Page): Promise<string[]> {
  * whole in no reading, and is not found. The title, every meta content, every
  * aria-label, alt and title attribute, and every string value of every JSON-LD
  * block are read as well; the JSON-LD carries no verified-fact mark, so a
- * phrase there counts even once confirmed. Nothing else is read: not a shadow
+ * phrase there counts even as a verified fact. Nothing else is read: not a shadow
  * tree, CSS generated content, a form control's value or placeholder, any other
  * attribute, or a frame's document.
  */

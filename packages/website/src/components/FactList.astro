@@ -4,7 +4,8 @@ import FactValue from './FactValue.astro';
 
 /**
  * Name–value pairs as a description list: the pairs stack on a narrow screen and
- * sit side by side from `sm` up, with no table to scroll sideways.
+ * sit side by side from `sm` up, with no table to scroll sideways. A detail with
+ * several values (the NAICS codes) lists them, one per line.
  */
 interface Props {
   details: readonly CompanyDetail[];
@@ -14,12 +15,20 @@ const { details } = Astro.props;
 ---
 
 <dl class="divide-y divide-line border-y border-line">
-  {details.map(({ term, fact }) => <div
-    class="grid gap-1 py-3 sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] sm:gap-6 print:grid-cols-[minmax(0,12rem)_minmax(0,1fr)] print:py-0.5"
+  {details.map(({ term, values }) => <div
+    class="grid gap-1 py-3 break-inside-avoid sm:grid-cols-[minmax(0,14rem)_minmax(0,1fr)] sm:gap-6 print:grid-cols-[minmax(0,10rem)_minmax(0,1fr)] print:gap-3 print:py-0.5"
   >
     <dt class="font-semibold">{term}</dt>
     <dd class="text-ink-soft">
-      <FactValue fact={fact} />
+      {values.length > 1 ? (
+        <ul class="space-y-1 print:space-y-0">
+          {values.map((value) => <li>
+            <FactValue fact={value} />
+          </li>)}
+        </ul>
+      ) : (
+        values.map((value) => <FactValue fact={value} />)
+      )}
     </dd>
   </div>)}
 </dl>

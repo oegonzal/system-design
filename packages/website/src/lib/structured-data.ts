@@ -1,10 +1,14 @@
-import { confirmed, type Fact, isFact, type PersonFacts } from './fact';
+import type { PostalAddress } from './address';
+import type { Day } from './dates';
+import { type Fact, isFact, type PersonFacts } from './fact';
 
-/** The facts an Organization is described from. Any of them may still be a placeholder. */
+/** The facts an Organization is described from. */
 interface OrganizationFacts {
   readonly legalName: Fact<string>;
   readonly email: Fact<string>;
   readonly founder: PersonFacts;
+  readonly organized: Fact<Day>;
+  readonly address: Fact<PostalAddress>;
 }
 
 interface SiteIdentity {
@@ -26,14 +30,9 @@ export interface StructuredData {
   readonly [GRAPH]: true;
 }
 
-/** An object with its undefined members dropped, so an unconfirmed fact leaves no key behind. */
-const defined = (entries: Record<string, unknown>): Record<string, unknown> =>
-  Object.fromEntries(Object.entries(entries).filter(([, value]) => value !== undefined));
-
 /**
- * The home page's schema.org graph — an Organization and its WebSite — built
- * from confirmed facts only. A placeholder contributes nothing: structured data
- * is read by machines that cannot see the "Placeholder" marker a person sees.
+ * The home page's schema.org graph — an Organization and its WebSite — written
+ * from the company's facts, each as its value.
  */
 export function organizationGraph(
   facts: OrganizationFacts,
@@ -41,27 +40,33 @@ export function organizationGraph(
   logoUrl: string,
 ): StructuredData {
   const url = new URL('/', site.origin).href;
-  const founder = confirmed(facts.founder.name);
+  const address = facts.address.value;
   return {
     [GRAPH]: true,
     '@context': 'https://schema.org',
     '@graph': [
-      defined({
+      {
         '@type': 'Organization',
         '@id': `${url}#organization`,
-        name: confirmed(facts.legalName),
+        name: facts.legalName.value,
         url,
         logo: logoUrl,
-        email: confirmed(facts.email),
-        founder:
-          founder === undefined
-            ? undefined
-            : defined({
-                '@type': 'Person',
-                name: founder,
-                jobTitle: confirmed(facts.founder.title),
-              }),
-      }),
+        email: facts.email.value,
+        foundingDate: facts.organized.value,
+        address: {
+          '@type': 'PostalAddress',
+          streetAddress: address.street,
+          addressLocality: address.locality,
+          addressRegion: address.region,
+          postalCode: address.postalCode,
+          addressCountry: address.countryCode,
+        },
+        founder: {
+          '@type': 'Person',
+          name: facts.founder.name.value,
+          jobTitle: facts.founder.title.value,
+        },
+      },
       {
         '@type': 'WebSite',
         '@id': `${url}#website`,
@@ -77,7 +82,7 @@ export function organizationGraph(
  * JSON for an inline `<script type="application/ld+json">`. The graph must
  * carry organizationGraph's mark, checked here too, so a cast cannot pass off
  * one written by hand; a fact found anywhere in it fails the build, since only
- * a confirmed value is data; and `<` is escaped so no value can close the
+ * a fact's value is data; and `<` is escaped so no value can close the
  * element early. A copy of a built graph keeps the mark, so what a shipped
  * graph holds is checked on the built pages, whose JSON-LD website-e2e reads.
  */
@@ -85,7 +90,7 @@ export function serializeJsonLd(data: StructuredData): string {
   if (!(GRAPH in data)) throw new Error('Structured data must be a graph organizationGraph built.');
   return JSON.stringify(data, (key, value: unknown) => {
     if (isFact(value)) {
-      throw new Error(`Structured data holds a fact at "${key}": write its confirmed value.`);
+      throw new Error(`Structured data holds a fact at "${key}": write its value.`);
     }
     return value;
   }).replace(/</g, '\\u003c');

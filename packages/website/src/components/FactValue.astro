@@ -1,8 +1,7 @@
 ---
 import type { Fact } from '../lib/fact';
-import Placeholder from './Placeholder.astro';
 
-/** A company fact as text when confirmed, the placeholder marker until then. */
+/** A company fact as text, marked so the credential check knows it is one. */
 interface Props {
   fact: Fact<string>;
 }
@@ -10,8 +9,4 @@ interface Props {
 const { fact } = Astro.props;
 ---
 
-{fact.status === 'verified' ? (
-  <span data-fact="verified" set:text={fact.value} />
-) : (
-  <Placeholder label={fact.label} />
-)}
+<span data-fact="verified" set:text={fact.value} />

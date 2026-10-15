@@ -70,10 +70,11 @@ its host is not the custom domain in `wrangler.jsonc`.
 
 Workers rather than Pages is the owner's decision; it keeps the whole deployment — files, routing,
 the custom domain — declared in `wrangler.jsonc` and deployed by this repository's own workflow. The
-owner's earlier note, `docs/enfav/hosting.md` (not committed), recommended Cloudflare Pages, set up
-through the dashboard's Git integration with both hostnames added as Pages custom domains; for
-hosting, this runbook supersedes it. It remains the content brief, which the site follows except for
-deferring the downloadable capability-statement PDF (see the pre-launch checklist).
+owner's earlier note, `docs/enfav/hosting.md`, recommended Cloudflare Pages, set up through the
+dashboard's Git integration with both hostnames added as Pages custom domains; for hosting, this
+runbook supersedes it. It was the first content brief; the content now follows the owner's two-page
+federal capability statement (not in the repository), and the site publishes no separate
+capability-statement PDF (see Content upkeep).
 
 ## Local development
 
@@ -120,75 +121,78 @@ ports, the e2e's preview takes 4205, and Astro's default 4321 would sit inside t
 
 Every fact the site states about the company lives in `packages/website/src/data/`: `company.ts`
 (the company facts — the founder and the point of contact among them, with name and title each a
-fact of its own — and `COMPANY_DETAILS`, the capability statement's company data in reading order),
-`founder.ts` (the About page's founder section), `services.ts` (the five services, one list for the
-home, services and government pages) and `site.ts` (name, origin, the company summary, the primary
-action and the closing call to action, navigation).
+fact of its own — and `COMPANY_DETAILS`, the capability statement's contracting profile in reading
+order), `founder.ts` (the founder's bio, prior employment and the founder-developed systems),
+`services.ts` (the four service lines, the engagements and the applied technology, one list each
+for every page that shows it) and `site.ts` (name, origin, the company summary, the primary action
+and the closing call to action, navigation).
 
-A company fact is a `Fact` (`src/lib/fact.ts`): either `verified(value)` or `placeholder(label)`,
-where the label says where the confirmed value will come from. The site never presents an
-unconfirmed detail as fact:
+A company fact is a `Fact` (`src/lib/fact.ts`), declared with `verified(value)`, its value copied
+verbatim from its source (the PSC titles' letter case aside, and the business size, which sums up
+SAM.gov's per-code size column). A page renders one through `FactValue` (or `EmailLink`), inside
+`data-fact="verified"`. A detail with several values — the NAICS and the PSC codes — is a list of
+facts, one per value. Dates are ISO strings, formatted by `src/lib/dates.ts`; the address is
+structured (`src/lib/address.ts`); a NAICS entry is data (its code, title, and whether it is the
+primary code or a size-standard exception), so no page reads a fact's text to find something in it.
 
-- A placeholder renders as a dashed `Placeholder — …` marker (`Placeholder.astro`) that says so in
-  words, not only in colour, and is kept out of search snippets (`data-nosnippet`). It carries
-  `data-fact="placeholder"`, by which the e2e finds every placeholder and checks that it shows its
-  word on screen and, wherever it prints, on paper (the header, footer and calls to action never
-  print).
-- Structured data never sees a placeholder. The home page's JSON-LD — an Organization and its
-  WebSite, built in `src/lib/structured-data.ts` — uses confirmed facts only, and an unconfirmed
-  fact leaves no key behind: the machines that read it cannot see the marker a person sees.
-  `src/lib/structured-data.spec.ts` holds this with made-up facts (`SITE-4`). A graph carries a mark
-  only that module writes, so one written by hand does not type-check and one cast to the type fails
-  to serialize, and serializing fails the build on a fact anywhere in it: a fact carries a mark only
-  `src/lib/fact.ts` writes, which a spread or `Object.assign` copy keeps. A copy of a built graph
-  keeps its mark too, and a `structuredClone` or JSON copy of a fact drops its own, so neither mark
-  proves what a shipped graph holds; the e2e reads every page's JSON-LD for that, and fails on a
-  placeholder's label or a restricted claim in it.
-- The founder's name and the founding year are facts too, and the about page's search description
-  and the capability statement's past-performance line state them only once confirmed. The bio in
-  `founder.ts` is approved copy that restates the legal name, the founder's name and the founding
-  year, and the legal name also runs through `SITE` and the pages' copy, so changing or demoting any
-  of those means rewording that copy; no check reads it.
+- Structured data writes a fact's value, never the fact. The home page's JSON-LD — an Organization
+  (name, logo, email, founding date, postal address, founder) and its WebSite, built in
+  `src/lib/structured-data.ts` — is covered by `src/lib/structured-data.spec.ts` with made-up facts
+  (`SITE-4`). A graph carries a mark only that module writes, so one written by hand does not
+  type-check and one cast to the type fails to serialize, and serializing fails the build on a fact
+  anywhere in it: a fact carries a mark only `src/lib/fact.ts` writes, which a spread or
+  `Object.assign` copy keeps. A copy of a built graph keeps its mark too, and a `structuredClone` or
+  JSON copy of a fact drops its own, so neither mark proves what a shipped graph holds; the e2e
+  reads every page's JSON-LD for that, and fails on a restricted claim in it.
+- The bio in `founder.ts` is approved copy that restates the legal name, the founder's name and the
+  year the company was organized, and the legal name also runs through `SITE` and the pages' copy,
+  so changing any of those means rewording that copy; no check reads it. The about page's search
+  description reads the founder's name and the year from the facts, and the capability statement's
+  delivery evidence reads the year.
 - A credential can only ever be a verified fact. The e2e fails any page that states a phrase from
   the restricted-claims list in `packages/website-e2e/src/support/claims.ts` — set-aside and size
   statuses, clearances, certifications, a GSA Schedule, awards, prime contracts — outside a verified
-  fact (`data-fact="verified"`), on screen or in print: in the copy, in a placeholder's label, in
-  the title and metadata, in an `aria-label`, `alt` or `title` attribute, or in a JSON-LD value,
-  which carries no verified-fact mark, so a credential there fails even once confirmed. It reads
-  nothing else: not a shadow tree, CSS generated content, a form control's value or placeholder,
-  another attribute or a frame. A word split by markup in content the medium does not render (a
-  closed `<details>`, a hidden element) that runs into the text beside it across a block or a line
-  break is not found either.
+  fact (`data-fact="verified"`), on screen or in print: in the copy, in the title and metadata, in
+  an `aria-label`, `alt` or `title` attribute, or in a JSON-LD value, which carries no verified-fact
+  mark, so a credential there fails even as a verified fact. The list matches phrases, not meaning:
+  a disclaimer that names a restricted phrase fails too, so the capability statement's own
+  disclaimers are worded around them. It reads nothing else: not a shadow tree, CSS generated
+  content, a form control's value or placeholder, another attribute or a frame. A word split by
+  markup in content the medium does not render (a closed `<details>`, a hidden element) that runs
+  into the text beside it across a block or a line break is not found either.
 
-Certifications, contract vehicles and contract past performance have no row at all, not even a
-placeholder: Enfav holds none yet, and a placeholder would imply one is pending. There is no phone
-number.
+Certifications, contract vehicles and contract past performance have no fact at all: Enfav holds
+none yet. The phone number on the owner's capability statement is not on the site.
 
-**Confirming a fact** is a one-line change in `src/data/company.ts`, from `placeholder('…')` to
-`verified('…')`, with the value copied verbatim from its source — for the registration details, the
-SAM.gov entity record (see the pre-launch checklist). Look at the result under
-`pnpm website:preview` (`/government/`) and land it like any site change: the deploy's build job
-runs the specs and the e2e before anything ships. Never fill the NAICS or PSC codes from
-`packages/govcon/src/profiles/enfav.ts`: that file is the scope govcon searches for opportunities,
-not what Enfav is registered under.
+**Changing a fact** is a change in `src/data/company.ts`, with the value copied verbatim from its
+source: the registration details from the SAM.gov entity record, the organization date from the
+state filing (see Content upkeep). Look at the result under `pnpm website:preview` (`/government/`)
+and land it like any site change: the deploy's build job runs the specs and the e2e before anything
+ships. Never fill the NAICS or PSC codes from `packages/govcon/src/profiles/enfav.ts`: that file is
+the scope govcon searches for opportunities, not what Enfav is registered under.
 
-**The founder** (`src/data/founder.ts`). Every claim carries a comment citing the résumé line it
-rests on, by role and dates, never by employer. The founder's prior experience is individual
-experience, and the site says so wherever it appears: the About page heads it as prior professional experience, before
-Enfav LLC and not Enfav LLC contract past performance, and the government page's past performance
-notes the year Enfav LLC was formed (`COMPANY.founded`) and that the founder's experience is not its
-contract past performance.
+**The founder** (`src/data/founder.ts`). Every claim cites, in a comment, the résumé entry it rests
+on. Prior employment is listed newest first, one employer per entry with its role and dates, and
+every list of it carries `FOUNDER.experienceNote`: the founder's own prior employment, evidence of
+technical experience, not Enfav LLC contract past performance (`SITE-8`). The founder-developed
+systems carry `FOUNDER.systemsNote` in the same way: continued at Enfav, not client work. The About
+page gives each role in full; the capability statement's delivery evidence gives one line per
+employer, after stating the year Enfav LLC was organized and that it has no federal contract past
+performance yet.
 
 **Copy rules**, from the approved copy:
 
 - Offerings are written in the present tense ("we build…"), never as past results.
-- No client, agency or employer names, anywhere in this public repository — copy, comments, commit
-  messages, docs. Before committing a content change, search the staged diff and your commit message
-  for them with the names typed in the shell (`git diff --cached | grep -n -i -E '<name>|<name>'`),
-  and never write the list to a file in the repository.
-- No claims about team size, clearances or location beyond the founder, and no response-time
-  promises.
-- Certifications, set-asides and registration appear only through fact rows.
+- On the site, the founder's employers are named in `src/data/founder.ts` and nowhere else; no
+  client or agency is named anywhere. Comments, commit messages and docs name no employer either:
+  before committing a content change, search the staged diff outside `founder.ts`, and your commit
+  message, with the names typed in the shell
+  (`git diff --cached -- . ':!**/founder.ts' | grep -n -i -E '<name>|<name>'`), and never
+  write the list to a file in the repository.
+- Team size, location and registration appear only as company facts, and no response-time promises
+  are made.
+- Registration details appear only as facts; a certification, set-aside or clearance appears only
+  to be disclaimed, in words the claims check allows.
 - No string in a `.ts` file may read as SQL that empties a table:
   `tooling/test-database-guarantees.spec.ts` scans every `.ts` file under `packages/` for it.
 
@@ -708,10 +712,9 @@ unless noted:
   and company facts), with the body's text read three ways — its text nodes joined, each element's
   whole text, and its innerText — so adjacent items never run together and a word split by markup
   stays whole where it renders or its element's text sets it apart, and every JSON-LD value read
-  too; no page's JSON-LD carries a placeholder's label; every placeholder shows its word on screen
-  and wherever it prints; `/government/` states every detail `COMPANY_DETAILS` declares, in order,
-  as the fact declared, visible and with the text each medium draws in any letter case, on screen
-  and on paper; on `/about/` and `/government/` the element marked `data-person` holds exactly the
+  too; `/government/` states every detail `COMPANY_DETAILS` declares, in order, each value as the
+  fact declared, visible and with the text each medium draws in any letter case, on screen and on
+  paper; on `/about/` and `/government/` the element marked `data-person` holds exactly the
   founder's or the point of contact's name and then title facts, and no other; and the claims check
   itself finds a phrase spaced, hyphenated (a hyphen-minus or U+2010, or a hyphen compatibility
   normalization folds into one: a non-breaking, small or full-width hyphen; a soft hyphen is
@@ -737,13 +740,17 @@ unless noted:
   (taken as solid), within it, or across these, its alpha included, each background colour taken to
   lie under the whole outline (`background-clip` and the edges of the boxes behind it are not read)
   — and keeps a visible outline in forced-colors mode.
-- `print.spec.ts` (desktop Chromium) — `/government/` loads with 200 and prints as exactly one page
-  with a US-Letter page box (612 × 792 pt), which only the stylesheet's `@page` rule can set.
+- `employment.spec.ts` — on `/about/` and `/government/`, the founder's prior employment lists one
+  entry per employer `FOUNDER.experience` declares, in order, each naming its own employer and no
+  other with its dates as that page states them, under `FOUNDER.experienceNote`.
+- `print.spec.ts` (desktop Chromium) — `/government/` loads with 200 and prints on at most two
+  pages, each with a US-Letter page box (612 × 792 pt), which only the stylesheet's `@page` rule can
+  set.
 
-The criteria these checks claim are `SITE-1` to `SITE-7` in `packages/criteria/src/site.ts`: the e2e
-claims `SITE-2`, `SITE-3`, `SITE-4`, `SITE-5` and `SITE-7`; the unit specs `SITE-1`, `SITE-4` and
-`SITE-6` (the single origin, and the build's check of its own inputs, which every build runs); and
-`tooling/website-imports.spec.ts` the rest of `SITE-6`, what loads before the build.
+The criteria these checks claim are `SITE-1` to `SITE-8` in `packages/criteria/src/site.ts`: the e2e
+claims `SITE-2`, `SITE-3`, `SITE-4`, `SITE-5`, `SITE-7` and `SITE-8`; the unit specs `SITE-1`,
+`SITE-4` and `SITE-6` (the single origin, and the build's check of its own inputs, which every build
+runs); and `tooling/website-imports.spec.ts` the rest of `SITE-6`, what loads before the build.
 
 By hand:
 
@@ -770,12 +777,13 @@ openssl s_client -connect enfav.com:443 -servername enfav.com </dev/null   # Ver
   [securityheaders.com](https://securityheaders.com/), which reports HSTS missing until setup
   step 9.
 
-## Pre-launch checklist
+## Content upkeep
 
-1. **Registration facts, verbatim from SAM.gov.** Replace the placeholders in `COMPANY_DETAILS` —
-   UEI, CAGE code, NAICS codes, PSC codes, business size, SAM.gov registration status and business
-   address — with the values in Enfav's SAM.gov entity record. Never take any of them from the
-   govcon prospecting profile, `packages/govcon/src/profiles/enfav.ts`.
+1. **Registration facts.** The SAM.gov details in `src/data/company.ts` are the entity record's,
+   verbatim, and the organization date is the state filing's. SAM.gov registration lasts a year:
+   after each renewal, set `samRegistration.expires` to the new date, or the site goes on stating
+   one that has passed (today 2027-09-26). Re-check the rest whenever the registration changes. To
+   read the record:
 
    ```bash
    pnpm govcon entities lookup <UEI> --json
@@ -783,19 +791,19 @@ openssl s_client -connect enfav.com:443 -servername enfav.com </dev/null   # Ver
 
    That spends one SAM.gov request and needs `SAM_GOV_API_KEY` and the govcon database (see
    [docs/govcon/overview.md](../govcon/overview.md)). The record carries the CAGE code, the NAICS
-   codes with whether SBA sizes Enfav small in each (the business size by NAICS), the PSC codes (in
-   the `--json` output; the table leaves them out), and the registration status and expiry. It
-   carries no address: take the business address from the registration on SAM.gov itself.
+   codes with whether SBA sizes Enfav small in each, the PSC codes (in the `--json` output; the
+   table leaves them out), and the registration status and expiry. It does not carry the address,
+   which NAICS code is primary, the organization date or the employee count: take those from the
+   registration on SAM.gov itself.
 
-   The e2e's print check (`SITE-7`) fails if the real values push `/government/` onto a second
-   page. On 2026-10-14 the placeholder version ended at 878 of the 960 CSS px a Letter page holds.
+   The e2e's print check (`SITE-7`) fails if a change pushes `/government/` past two pages. On
+   2026-10-15 the second page ended about 100 CSS px short of its foot.
 
-2. **Founder bio.** Re-check every claim in `src/data/founder.ts` against the dates and titles in
-   the owner's current résumé, which is not in the repository.
-3. **Capability-statement PDF.** Deferred until the facts above are verified: a PDF carrying
-   placeholders would be filed and forwarded where it can no longer be corrected. Until then,
-   `/government/` is the capability statement and prints as one US-Letter page. How the PDF is
-   produced and where it is linked is not decided yet.
+2. **Founder bio and employment.** Re-check every claim in `src/data/founder.ts` against the dates
+   and titles in the owner's current résumé, which is not in the repository.
+3. **Capability-statement PDF.** `/government/` prints as a capability statement of at most two
+   US-Letter pages that follows the owner's own. The site publishes no separate PDF; one added later
+   must state the facts `company.ts` declares.
 
 ## Troubleshooting
 

@@ -10,10 +10,10 @@ export const SITE = {
   origin: 'https://enfav.com',
   name: 'Enfav LLC',
   description:
-    'AI workflow automation and software engineering for commercial and public-sector organizations.',
-  /** What the company is, in the words the home and about pages open with. */
+    'Agentic AI, workflow automation and software engineering for commercial and public-sector organizations.',
+  /** What the company is, in the words the about page opens with. */
   summary:
-    'Enfav LLC is an AI-focused software engineering company. We design and build AI workflow automation, custom software, systems integrations and data-processing solutions for commercial and public-sector organizations.',
+    'Enfav LLC is an AI-focused software engineering company. We design and integrate AI-centered workflows that reduce repetitive manual steps and connect knowledge, people and existing applications.',
   locale: 'en_US',
 } as const;
 

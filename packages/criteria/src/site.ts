@@ -20,7 +20,7 @@ export const SITE_CRITERIA: readonly Criterion[] = [
   {
     id: 'SITE-4',
     statement:
-      'A company fact that is not verified renders as a visible placeholder and never reaches the structured data, and no credential claim appears anywhere but through a verified fact.',
+      'The capability statement’s company data and every person the site names are rendered from declared facts, the structured data writes each fact’s value and never the fact, and no credential claim appears anywhere but through a verified fact.',
   },
   {
     id: 'SITE-5',
@@ -35,6 +35,11 @@ export const SITE_CRITERIA: readonly Criterion[] = [
   {
     id: 'SITE-7',
     statement:
-      'The government page prints as a single US Letter page: it is the capability statement until a PDF of verified facts replaces it.',
+      'The government page is the capability statement, and prints on at most two US Letter pages.',
+  },
+  {
+    id: 'SITE-8',
+    statement:
+      'The founder’s prior employment is listed one employer per entry, each with its dates, under a note that it is the founder’s own experience and not Enfav LLC contract past performance.',
   },
 ];

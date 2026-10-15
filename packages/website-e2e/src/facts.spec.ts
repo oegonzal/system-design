@@ -1,28 +1,13 @@
 import { expect, test } from '@playwright/test';
 
-import { COMPANY, COMPANY_DETAILS, type CompanyDetail } from '../../website/src/data/company';
-import { restrictedClaimsIn, restrictedClaimsOn, structuredDataStrings } from './support/claims';
+import { COMPANY, COMPANY_DETAILS } from '../../website/src/data/company';
+import { restrictedClaimsIn, restrictedClaimsOn } from './support/claims';
 import { builtPages, MISSING } from './support/site';
 
 /** Every page the build produced, plus the 404 page. */
 const PAGES = [...builtPages(), MISSING];
 
 const MEDIA = ['screen', 'print'] as const;
-
-/** How a fact reads on the page: its value once confirmed, its marker and label until then. */
-const shown = (fact: CompanyDetail['fact']): string =>
-  fact.status === 'verified' ? fact.value : `Placeholder — ${fact.label}`;
-
-/** The label of every placeholder among the facts the site declares, however deep it sits. */
-const labelsIn = (value: unknown): string[] => {
-  if (typeof value !== 'object' || value === null) return [];
-  if ('status' in value && value.status === 'placeholder' && 'label' in value) {
-    return typeof value.label === 'string' ? [value.label] : [];
-  }
-  return Object.values(value).flatMap(labelsIn);
-};
-
-const PLACEHOLDER_LABELS = [...new Set(labelsIn([COMPANY, COMPANY_DETAILS]))];
 
 for (const path of PAGES) {
   test(`[SITE-4] ${path} claims no credential outside a verified fact, on screen or on paper`, async ({
@@ -35,50 +20,16 @@ for (const path of PAGES) {
       expect(await restrictedClaimsOn(page), media).toEqual([]);
     }
   });
-
-  test(`[SITE-4] the structured data on ${path} states no placeholder`, async ({ page }) => {
-    await page.goto(path);
-    const strings = await structuredDataStrings(page);
-
-    expect(
-      strings.filter((text) => PLACEHOLDER_LABELS.some((label) => text.includes(label))),
-    ).toEqual([]);
-  });
-
-  test(`[SITE-4] every placeholder on ${path} shows its word on screen, and wherever it prints`, async ({
-    page,
-  }) => {
-    await page.goto(path);
-    const markers = page.locator('[data-fact="placeholder"]');
-
-    // The word's own box: text content reads the same whatever is drawn.
-    for (const marker of await markers.all()) {
-      await expect(marker, 'screen').toBeVisible();
-      await expect(marker.getByText('Placeholder', { exact: true }), 'screen').toBeVisible();
-    }
-    // The header, footer and calls to action never print, so a placeholder there
-    // puts nothing on paper; every one that does print carries its word.
-    await page.emulateMedia({ media: 'print' });
-    for (const marker of await markers.filter({ visible: true }).all()) {
-      await expect(marker.getByText('Placeholder', { exact: true }), 'print').toBeVisible();
-    }
-  });
 }
 
-test('[SITE-4] the capability statement states every company detail, in order, as the fact the site declares, on screen and on paper', async ({
+test('[SITE-4] the capability statement states every company detail, in order, as the facts the site declares, on screen and on paper', async ({
   page,
 }) => {
   await page.goto('/government/');
   const data = page.locator('#company-data');
-  const kinds = await data
-    .locator('dd')
-    .evaluateAll((values) =>
-      values.map((value) =>
-        [...value.querySelectorAll('[data-fact]')].map((fact) => fact.getAttribute('data-fact')),
-      ),
-    );
+  const details = data.locator('dd');
 
-  expect(kinds).toEqual(COMPANY_DETAILS.map(({ fact }) => [fact.status]));
+  await expect(details).toHaveCount(COMPANY_DETAILS.length);
   // The text each medium draws, in any letter case (text-transform changes what
   // innerText returns); an element that draws nothing reads as its text content,
   // so each term and value must be visible too.
@@ -91,10 +42,19 @@ test('[SITE-4] the capability statement states every company detail, in order, a
       COMPANY_DETAILS.map(({ term }) => term),
       { useInnerText: true, ignoreCase: true },
     );
-    await expect(data.locator('dd'), media).toHaveText(
-      COMPANY_DETAILS.map(({ fact }) => shown(fact)),
-      { useInnerText: true, ignoreCase: true },
-    );
+    for (const [index, { values }] of COMPANY_DETAILS.entries()) {
+      const detail = details.nth(index);
+      const shown = values.map(({ value }) => value);
+      // Each value in a fact of its own, in order, and nothing in the detail besides them.
+      await expect(detail.locator('[data-fact="verified"]'), media).toHaveText(shown, {
+        useInnerText: true,
+        ignoreCase: true,
+      });
+      await expect(detail, media).toHaveText(shown.join(' '), {
+        useInnerText: true,
+        ignoreCase: true,
+      });
+    }
   }
 });
 
@@ -114,10 +74,7 @@ for (const { path, person } of PEOPLE) {
     const facts = page.locator(`[data-person="${person}"] [data-fact]`);
 
     // These two and no other, in order, so no fact that reads alike stands in for either.
-    await expect(facts).toHaveText([shown(name), shown(title)]);
-    expect(
-      await facts.evaluateAll((values) => values.map((value) => value.getAttribute('data-fact'))),
-    ).toEqual([name.status, title.status]);
+    await expect(facts).toHaveText([name.value, title.value]);
   });
 }
 
@@ -168,9 +125,9 @@ test('[SITE-4] the claims check finds a phrase spaced, hyphenated or written as 
     '<!doctype html><html><head><script type="application/ld+json">{"@graph":[{"award":"SBA 8(a) certified"}]}</script></head><body></body></html>',
   );
   expect(await restrictedClaimsOn(page)).toContain('8(a)');
-  // A placeholder's label is copy like any other; only a verified fact may state a credential.
+  // Only a verified fact may state a credential: any other element's text is copy.
   await page.setContent(
-    '<p><span data-fact="placeholder">Placeholder — HUBZone status</span> <span data-fact="verified">CMMC Level 2</span></p>',
+    '<p><span>HUBZone status</span> <span data-fact="verified">CMMC Level 2</span></p>',
   );
   const found = await restrictedClaimsOn(page);
   expect(found).toContain('HUBZone');

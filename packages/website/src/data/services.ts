@@ -3,78 +3,132 @@ export interface Service {
   /** The anchor on /services/ and the key cards link to. */
   readonly id: string;
   readonly title: string;
-  /** One sentence for the home cards and the capability statement's core competencies. */
+  /** One sentence for the home cards and the capability statement's service lines. */
   readonly line: string;
   /** The full description on /services/. */
   readonly summary: string;
   readonly deliverables: readonly string[];
 }
 
-/** The services, in the order every page lists them. Offerings, never past results. */
+/**
+ * The service lines, in the order every page lists them, as the capability
+ * statement does. Offerings, never past results.
+ */
 export const SERVICES: readonly Service[] = [
   {
-    id: 'ai-workflow-automation',
-    title: 'AI workflow automation',
-    line: 'Agentic workflows built on language models, tool calling and API orchestration, with critics and evaluators.',
+    id: 'agentic-workflow-engineering',
+    title: 'Agentic workflow engineering',
+    line: 'Multi-agent and tool-enabled orchestration with typed contracts, evaluations and human review.',
     summary:
-      'Agentic workflows that combine language models, tool calling, API orchestration and contextual memory to automate multi-step technical and business processes, with automated critics, evaluators and human checkpoints so every decision can be traced.',
+      'Multi-agent and tool-enabled orchestration that automates multi-step technical and business processes: task planning and DAGs, MCP and API actions, typed JSON contracts, retries, evaluations and human review, so decisions can be traced.',
     deliverables: [
-      'Workflow design and orchestration',
-      'Tool and API integrations for agents',
-      'Evaluation harnesses: critics, rubrics and regression datasets',
-      'Human review steps, audit trails and cost controls',
+      'Workflow design, task planning and DAG orchestration',
+      'MCP and API tool integrations for agents',
+      'Typed JSON contracts, retries and failure handling',
+      'Evaluation harnesses, human review steps and audit trails',
     ],
   },
   {
-    id: 'retrieval-and-data-processing',
-    title: 'Retrieval and data processing',
-    line: 'Retrieval-augmented generation and data pipelines: embeddings, hybrid search, reranking and grounding.',
+    id: 'document-intelligence-and-rag',
+    title: 'Document intelligence and RAG',
+    line: 'Document extraction, classification and validation, with grounded retrieval-augmented answers.',
     summary:
-      'Retrieval-augmented generation and data pipelines: embeddings, semantic and hybrid search, reranking and contextual grounding over your documents and records.',
+      'Extraction and enrichment workflows, document classification and validation, and retrieval over your documents and records — embeddings, hybrid search, reranking and grounded answers — with retrieval quality measured.',
     deliverables: [
-      'Document ingestion, chunking and extraction pipelines',
+      'Document ingestion, extraction and enrichment pipelines',
+      'Classification and validation against your rules',
       'Vector and hybrid search with reranking',
-      'Grounded answers with source references',
-      'Retrieval quality measurement',
+      'Grounded answers with source references, and retrieval evaluation',
     ],
   },
   {
-    id: 'custom-software-engineering',
-    title: 'Custom software engineering',
-    line: 'Web applications and backend services in TypeScript, React, Node.js and PostgreSQL.',
+    id: 'systems-and-data-integration',
+    title: 'Systems and data integration',
+    line: 'Custom APIs and backends, event processing, data pipelines and internal web tools on AWS and GCP.',
     summary:
-      'Modular web applications and backend services in TypeScript, Node.js, React, Next.js and PostgreSQL, built for reliability and extensibility.',
+      'Custom APIs and backends, workflow modernization, event processing, PostgreSQL and MongoDB pipelines, AWS and GCP services and internal web tools — typed, modular and observable.',
     deliverables: [
-      'Web applications and dashboards',
-      'APIs and backend services',
-      'Reusable component libraries and design systems',
-      'Automated tests and CI/CD pipelines',
+      'APIs, backend services and data synchronizers',
+      'Event processing and PostgreSQL and MongoDB pipelines',
+      'Incremental modernization of legacy services and front ends',
+      'Internal web tools and dashboards',
     ],
   },
   {
-    id: 'cloud-architecture-and-modernization',
-    title: 'Cloud architecture and modernization',
-    line: 'Architecture on AWS and GCP, event-driven services and incremental modernization.',
+    id: 'ai-assisted-qa-and-browser-automation',
+    title: 'AI-assisted QA and browser automation',
+    line: 'Playwright and MCP browser automation, regression harnesses and CI/CD quality gates.',
     summary:
-      'Architecture for scale and reliability on AWS and GCP, event-driven services, and incremental modernization of legacy front ends and services.',
+      'Playwright and MCP browser sessions, regression harnesses, CI/CD validations, structured evaluations, debugging and observability for release quality.',
     deliverables: [
-      'Architecture reviews and target designs',
-      'Incremental migration of legacy applications',
-      'Scalability and performance engineering',
-      'Containerized services with logs, metrics and traces',
-    ],
-  },
-  {
-    id: 'systems-integration-and-quality-engineering',
-    title: 'Systems integration and quality engineering',
-    line: 'Platform and developer-tool integrations, end-to-end test automation and CI quality gates.',
-    summary:
-      'Integrations between your platforms and developer tools — GitHub, Jira, Playwright and MCP — and end-to-end test automation that makes releases predictable.',
-    deliverables: [
-      'API and webhook integrations',
-      'Developer-workflow automation',
       'End-to-end and regression test automation',
-      'CI quality gates and release checks',
+      'Agentic browser sessions with Playwright and MCP',
+      'CI/CD validations and release checks',
+      'Debugging and observability with logs, metrics and traces',
+    ],
+  },
+];
+
+/** A bounded unit of work a buyer can scope and contract for. */
+interface Engagement {
+  readonly title: string;
+  readonly text: string;
+}
+
+/** The ways to engage, on /services/ and in the capability statement. */
+export const ENGAGEMENTS: readonly Engagement[] = [
+  {
+    title: '2–4 week AI prototype',
+    text: 'A narrow workflow demonstrated against measurable success criteria, on approved data, with handoff documentation.',
+  },
+  {
+    title: 'Document and knowledge pipeline',
+    text: 'Sources connected, governed ingestion and retrieval built, and checks and human review added.',
+  },
+  {
+    title: 'Modernization component',
+    text: 'An API, data synchronizer, service migration or case-processing module, delivered within an existing platform.',
+  },
+  {
+    title: 'QA automation sprint',
+    text: 'Critical paths automated, with regression evidence integrated into your existing CI/CD.',
+  },
+];
+
+/** The technology the services are built with, by area. */
+interface TechnologyArea {
+  readonly area: string;
+  readonly items: readonly string[];
+}
+
+/** On /services/ and in the capability statement. */
+export const TECHNOLOGY: readonly TechnologyArea[] = [
+  {
+    area: 'AI and orchestration',
+    items: [
+      'LLMs',
+      'RAG',
+      'embeddings',
+      'reranking',
+      'MCP',
+      'workflow DAGs',
+      'evaluation harnesses',
+    ],
+  },
+  { area: 'Software', items: ['TypeScript', 'Node.js', 'NestJS', 'Python', 'React', 'Next.js'] },
+  {
+    area: 'Platform and quality',
+    items: [
+      'AWS',
+      'GCP',
+      'PostgreSQL',
+      'MongoDB',
+      'Redis',
+      'Kafka',
+      'Playwright',
+      'Jest',
+      'Datadog',
+      'CI/CD',
     ],
   },
 ];

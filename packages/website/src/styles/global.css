@@ -31,10 +31,9 @@
   --color-on-brand: #ffffff;
   --color-on-brand-soft: #c9d8e6;
 
-  /* Placeholders: unmistakable, and still AA. */
-  --color-placeholder-ink: #7a3e00;
-  --color-placeholder-surface: #fff6e6;
-  --color-placeholder-line: #c27a1a;
+  /* Type on paper: the capability statement's dense data, and its closing note. */
+  --text-print-data: 0.6875rem;
+  --text-print-note: 0.625rem;
 
   --container-content: 72rem;
 }
@@ -68,8 +67,14 @@
     overflow-wrap: anywhere;
   }
 
+  /* On paper a heading stays on the page with what follows it. */
+  h2,
+  h3 {
+    break-after: avoid;
+  }
+
   @page {
     size: letter;
-    margin: 0.5in;
+    margin: 0.4in;
   }
 }

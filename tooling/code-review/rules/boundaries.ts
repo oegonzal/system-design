@@ -37,7 +37,7 @@ import type { ChangedFile } from './index';
  *   website        -> (nothing)         the Enfav marketing site, statically built with Astro; it imports no workspace package
  *   storybook      -> (anything)        the catalog host legitimately sees both sides
  *   studio-e2e     -> (anything)        drives the whole stack by definition
- *   website-e2e    -> (anything)        drives the built site through a browser, as studio-e2e drives the stack, and reads the company facts the site declares
+ *   website-e2e    -> (anything)        drives the built site through a browser, as studio-e2e drives the stack, and reads the company and founder data the site declares
  *
  * `null` means unconstrained — the `type:tooling` tag in eslint.config.mjs.
  */

@@ -3,6 +3,7 @@ import iconArt from '../assets/icon.svg';
 import Button from '../components/Button.astro';
 import CtaBand from '../components/CtaBand.astro';
 import PageHeader from '../components/PageHeader.astro';
+import Registration from '../components/Registration.astro';
 import Section from '../components/Section.astro';
 import ServiceCard from '../components/ServiceCard.astro';
 import { COMPANY } from '../data/company';
@@ -19,6 +20,8 @@ const structuredData = organizationGraph(
     legalName: COMPANY.legalName,
     email: COMPANY.email.general,
     founder: COMPANY.founder,
+    organized: COMPANY.organized,
+    address: COMPANY.address,
   },
   SITE,
   new URL(logo.src, SITE.origin).href,
@@ -27,7 +30,7 @@ const structuredData = organizationGraph(
 const steps = [
   {
     title: 'Define the outcome',
-    text: 'We start from the decision or process you want to change and the criteria a good result must meet.',
+    text: 'We start from the decision or process you want to change, the data it may use and the acceptance criteria a good result must meet.',
   },
   {
     title: 'Design for production',
@@ -35,23 +38,23 @@ const steps = [
   },
   {
     title: 'Build with evaluation',
-    text: 'Automated tests, and for AI work critics and evaluators, run on every change so quality is measured rather than assumed.',
+    text: 'Automated tests and schema validation, and for AI work critics and evaluators, run on every change, with human review where it matters.',
   },
   {
     title: 'Hand over cleanly',
-    text: 'You receive typed, tested, documented code and the runbooks to operate it.',
+    text: 'You receive typed, tested, documented code, with the observability and runbooks to operate it.',
   },
 ];
 ---
 
 <BaseLayout
-  title="Enfav LLC — AI automation and software engineering"
-  description="Enfav LLC designs and builds AI workflow automation, custom software, systems integrations and data processing for commercial and public-sector teams."
+  title="Enfav LLC — Agentic AI and workflow automation"
+  description="Enfav LLC designs and integrates agentic AI workflows, document intelligence, systems integration and AI-assisted QA for commercial and public-sector teams."
   structuredData={structuredData}
 >
   <PageHeader
-    title="AI automation and software engineering, built to production standards."
-    lede={SITE.summary}
+    title="Agentic AI and workflow automation, built to production standards."
+    lede="From document-heavy operations to controlled AI workflows, connected systems and measurable engineering outcomes."
   >
     <div class="mt-8 flex flex-wrap gap-3 print:hidden">
       <Button href={PRIMARY_ACTION.href} variant="solid">{PRIMARY_ACTION.action}</Button>
@@ -60,7 +63,7 @@ const steps = [
   </PageHeader>
 
   <Section id="services" title="What we build">
-    <ul class="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    <ul class="grid gap-6 sm:grid-cols-2">
       {SERVICES.map((service) => <li>
         <ServiceCard service={service} />
       </li>)}
@@ -79,10 +82,13 @@ const steps = [
 
   <Section id="government" title="For government buyers and prime contractors">
     <div class="flex flex-col items-start gap-6 lg:flex-row lg:items-center lg:justify-between">
-      <p class="max-w-2xl text-lg leading-8 text-ink-soft">
-        Enfav LLC offers AI automation and software engineering to government agencies — directly,
-        or as a subcontractor and teaming partner to prime contractors.
-      </p>
+      <div class="max-w-2xl">
+        <p class="text-lg leading-8 text-ink-soft">
+          Enfav LLC offers agentic AI and software engineering to government agencies, directly or
+          as a subcontractor and teaming partner to prime contractors.
+        </p>
+        <p class="mt-3 font-semibold"><Registration /></p>
+      </div>
       <Button href="/government/">Read the capability statement</Button>
     </div>
   </Section>

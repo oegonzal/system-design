@@ -1,0 +1,9 @@
+---
+import { COMPANY } from '../data/company';
+import FactValue from './FactValue.astro';
+
+/** The company's SAM.gov identifiers and registration status, as one line of facts. */
+---
+
+UEI <FactValue fact={COMPANY.uei} /> · CAGE <FactValue fact={COMPANY.cage} /> · SAM.gov registration
+<FactValue fact={COMPANY.samRegistration.status} />

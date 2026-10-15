@@ -1,19 +1,22 @@
 ---
 import CtaBand from '../components/CtaBand.astro';
 import Container from '../components/Container.astro';
+import ItemList from '../components/ItemList.astro';
 import PageHeader from '../components/PageHeader.astro';
-import { SERVICES } from '../data/services';
+import Section from '../components/Section.astro';
+import TechnologyList from '../components/TechnologyList.astro';
+import { ENGAGEMENTS, SERVICES, TECHNOLOGY } from '../data/services';
 import { CLOSING_CTA } from '../data/site';
 import BaseLayout from '../layouts/BaseLayout.astro';
 ---
 
 <BaseLayout
   title="Services — Enfav LLC"
-  description="AI workflow automation, retrieval and data processing, custom software, cloud architecture and modernization, and systems integration and quality engineering."
+  description="Agentic workflow engineering, document intelligence and RAG, systems and data integration, and AI-assisted QA and browser automation."
 >
   <PageHeader
     title="Services"
-    lede="Five ways we help teams put AI and modern software into production."
+    lede="How we put AI and modern software into production, and bounded ways to start."
   />
 
   <Container class="py-14 sm:py-20">
@@ -38,6 +41,14 @@ import BaseLayout from '../layouts/BaseLayout.astro';
       </section>)}
     </div>
   </Container>
+
+  <Section id="engagements" title="Ways to engage" tone="muted">
+    <ItemList items={ENGAGEMENTS} />
+  </Section>
+
+  <Section id="technology" title="Applied technology">
+    <TechnologyList areas={TECHNOLOGY} />
+  </Section>
 
   <CtaBand {...CLOSING_CTA} />
 </BaseLayout>

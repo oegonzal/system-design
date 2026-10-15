@@ -31,14 +31,21 @@ export default [
     },
   },
   {
-    // The suite compares the built pages with the company facts the site
-    // declares: its one import from the site, and only of that data. An allow
-    // entry is a regular expression, so this one is anchored and escaped.
+    // The suite compares the built pages with the company and founder data the
+    // site declares, and reads dates the way the site formats them: its only
+    // imports from the site. An allow entry is a regular expression, so each is
+    // anchored and escaped.
     files: ['**/*.ts'],
     rules: {
       '@nx/enforce-module-boundaries': [
         'error',
-        { ...moduleBoundaries, allow: ['^\\.\\./\\.\\./website/src/data/company$'] },
+        {
+          ...moduleBoundaries,
+          allow: [
+            '^\\.\\./\\.\\./website/src/data/(company|founder)$',
+            '^\\.\\./\\.\\./website/src/lib/dates$',
+          ],
+        },
       ],
     },
   },

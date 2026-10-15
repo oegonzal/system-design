@@ -101,7 +101,7 @@ dependency is hoisted to the root and Nx is the single entry point.
 | `packages/quality-loop-ui` | Next.js client for the quality loop: pick a prompt, run, watch, read the verdict                                                               |
 | `packages/govcon`          | SAM.gov contract opportunities: budgeted pull, Postgres store, deterministic leads (CLI + HTTP)                                                |
 | `packages/govcon-ui`       | Next.js client for govcon: pull, rank, read a lead's trace and description, watch the ledger                                                   |
-| `packages/website`         | The Enfav LLC marketing site: Astro + Tailwind, every page prerendered; unconfirmed company facts render as marked placeholders                |
+| `packages/website`         | The Enfav LLC marketing site: Astro + Tailwind, every page prerendered; every company detail is a declared fact                                |
 | `packages/notifications`   | The event bus over HTTP — declared topics, pulled subscriptions — and the channels (Telegram) that put prompts to you and bring answers back   |
 | `packages/job-application` | The record of units a browser session applied to, fed by the session's events, and the advisor it asks what is on record before each plan      |
 | `packages/web-kit`         | Shared web plumbing: Emotion SSR registry, HTTP request core, hooks, route table and announcer                                                 |

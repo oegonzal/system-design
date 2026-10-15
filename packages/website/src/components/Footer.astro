@@ -3,6 +3,8 @@ import { COMPANY } from '../data/company';
 import { NAV, SITE } from '../data/site';
 import Container from './Container.astro';
 import EmailLink from './EmailLink.astro';
+import FactValue from './FactValue.astro';
+import Registration from './Registration.astro';
 
 const year = new Date().getFullYear();
 ---
@@ -12,6 +14,9 @@ const year = new Date().getFullYear();
     <div>
       <p class="text-lg font-bold text-on-brand">{SITE.name}</p>
       <p class="mt-2 max-w-xs text-sm leading-6">{SITE.description}</p>
+      <p class="mt-4 text-sm leading-6">
+        <FactValue fact={COMPANY.location} /><br /><Registration />
+      </p>
     </div>
     <nav aria-label="Footer">
       <p class="font-semibold text-on-brand">Company</p>

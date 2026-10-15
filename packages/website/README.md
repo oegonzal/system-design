@@ -1,15 +1,16 @@
 # website
 
 The public site of Enfav LLC at enfav.com — home, services, government (the capability statement,
-which prints as one US-Letter page), about, contact and a 404, with a sitemap and robots.txt — built
-with Astro, TypeScript and Tailwind and served by Cloudflare Workers Static Assets from
-`wrangler.jsonc` (Worker `enfav-website`, custom domain `enfav.com`, no `*.workers.dev` copy). Every
-page is prerendered to `dist/`: there is no adapter, no server and no client JavaScript, and
-`public/_headers` gives every response a Content-Security-Policy that admits the site's own files
-and nothing inline. Unit specs cover the static output, the structured data and the single origin.
-The build fails when a module (the content config's imports among them), stylesheet, scanned folder,
-asset or public file its tools report reading lies outside what the deploy workflow watches
-(`integrations/watched-inputs.ts`, which declares those paths), and
+which prints on at most two US-Letter pages), about, contact and a 404, with a sitemap and
+robots.txt — built with Astro, TypeScript and Tailwind and served by Cloudflare Workers Static
+Assets from `wrangler.jsonc` (Worker `enfav-website`, custom domain `enfav.com`, no `*.workers.dev`
+copy). Every page is prerendered to `dist/`: there is no adapter, no server and no client
+JavaScript, and `public/_headers` gives every response a Content-Security-Policy that admits the
+site's own files and nothing inline. Unit specs cover the static output, the structured data, the
+single origin, how dates, addresses and SAM.gov codes are written, and the order of the founder's
+employment. The build fails when a module (the content config's imports among them), stylesheet,
+scanned folder, asset or public file its tools report reading lies outside what the deploy workflow
+watches (`integrations/watched-inputs.ts`, which declares those paths), and
 `tooling/website-imports.spec.ts` holds the workflow to that list and what loads before the build —
 `astro.config.ts` and its imports, `tsconfig.json` and what it extends — to the same paths. A file
 read any other way (a content collection's loader, a font file the config names, a stylesheet a CSS
@@ -26,14 +27,13 @@ pnpm exec nx test website          # the unit specs
 ```
 
 Every company fact the site states lives in `src/data/` — `company.ts`, beside `founder.ts`,
-`services.ts` and `site.ts` — as a `Fact` (`src/lib/fact.ts`) that is either `verified(…)` or
-`placeholder(…)`, with one exception: the founder's bio in `founder.ts` is approved copy that
-restates the legal name, the founder's name and the founding year, so changing or demoting any of
-them means rewording it. A placeholder renders as a visible `Placeholder — …` marker and never
-reaches the JSON-LD; confirming one is a one-line change to `verified(…)`, with the value copied
-verbatim from its source (for the registration details, the SAM.gov entity record, never
-`packages/govcon/src/profiles/enfav.ts`). A credential appears only as a verified fact, and no
-client or employer is ever named: the repository is public.
+`services.ts` and `site.ts` — as a `Fact` (`src/lib/fact.ts`) declared with `verified(…)`, its value
+copied verbatim from its source (for the registration details, the SAM.gov entity record, never
+`packages/govcon/src/profiles/enfav.ts`), with one exception: the founder's bio in `founder.ts` is
+approved copy that restates the legal name, the founder's name and the year the company was
+organized, so changing any of them means rewording it. A credential appears only as a verified
+fact. The founder's employers are named in `founder.ts`, one per entry, always under the note that
+they are the founder's own employment and not Enfav LLC past performance; no client is named.
 
 Tailwind CSS 4 is built for Chrome 111, Safari 16.4 and Firefox 128; since 4.1 its fallbacks keep
 the pages rendering, degraded, in older browsers. It runs as a PostCSS plugin, declared in
