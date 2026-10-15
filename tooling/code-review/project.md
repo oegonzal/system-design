@@ -76,9 +76,10 @@ anything the map already generates is deliberately absent, because a second copy
 - `website` — the Enfav LLC marketing site: Astro pages prerendered to static files, served by
   Cloudflare Workers Static Assets from `wrangler.jsonc`. Its unit specs cover the static output,
   the structured data (with made-up facts), the single origin, the build's check of its own inputs,
-  how dates, addresses and SAM.gov codes are written, and the order of the founder's employment; the
-  company data in `src/data` is checked through the built pages in `website-e2e`. Astro
-  components have no stories: they are tested through the built pages in `website-e2e`.
+  how dates, addresses and SAM.gov codes are written, the order of the founder's employment, and the
+  palette's contrast; the company data in `src/data` is checked through the built pages in
+  `website-e2e`. Astro components have no stories: they are tested through the built pages in
+  `website-e2e`.
 - `website-e2e` — Playwright and axe over every page of the built site as Workers serves it, locally
   against `wrangler dev` and, after a deploy, against production.
 - `tooling/` — repository infrastructure, including this review pipeline. Not an Nx project, so it

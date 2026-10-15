@@ -7,10 +7,12 @@ Assets from `wrangler.jsonc` (Worker `enfav-website`, custom domain `enfav.com`,
 copy). Every page is prerendered to `dist/`: there is no adapter, no server and no client
 JavaScript, and `public/_headers` gives every response a Content-Security-Policy that admits the
 site's own files and nothing inline. Unit specs cover the static output, the structured data, the
-single origin, how dates, addresses and SAM.gov codes are written, and the order of the founder's
-employment. The build fails when a module (the content config's imports among them), stylesheet,
-scanned folder, asset or public file its tools report reading lies outside what the deploy workflow
-watches (`integrations/watched-inputs.ts`, which declares those paths), and
+single origin, how dates, addresses and SAM.gov codes are written, the order of the founder's
+employment, which engagement each service names, and the palette: every colour pairing a component
+may draw is held at WCAG AA from the tokens in `src/styles/global.css`. The build fails when a
+module (the content config's imports among them), stylesheet, scanned folder, asset or public file
+its tools report reading lies outside what the deploy workflow watches
+(`integrations/watched-inputs.ts`, which declares those paths), and
 `tooling/website-imports.spec.ts` holds the workflow to that list and what loads before the build —
 `astro.config.ts` and its imports, `tsconfig.json` and what it extends — to the same paths. A file
 read any other way (a content collection's loader, a font file the config names, a stylesheet a CSS
