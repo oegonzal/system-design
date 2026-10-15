@@ -157,7 +157,7 @@ pnpm test:stories                                          # render every story,
 pnpm quality-loop:run --pipeline system-design --goal packages/quality-loop/prompts/order-history.md
 pnpm quality:start                         # quality-loop on :3003 + its web client on :4201 (needs the db)
 pnpm govcon:start                          # govcon on :3004 + its web client on :4202 (needs the db)
-pnpm notifications:serve                   # the event bus on :3005, Telegram polling with TELEGRAM_API_KEY (needs the db)
+pnpm notifications:serve                   # the event bus on :3005, polling one Telegram bot per purpose (needs the db)
 pnpm job-application:serve                 # the record of applications on :3006, fed by the bus; the advisor a browser session asks (needs the db)
 pnpm website:serve                         # the Enfav LLC marketing site on :4203
 pnpm website:preview                       # the built site under wrangler dev on :4204: Cloudflare's routing, 404 page and headers

@@ -20,17 +20,31 @@ docker_build(
     ],
 )
 
-if not env_value('TELEGRAM_API_KEY'):
+def _bound_variables(channels_file):
+    """Every variable a channels file binds, once each, in the order it binds them."""
+    bound = []
+    for kind in read_json(channels_file).values():
+        for instance in kind['instances'].values():
+            for name in instance['env'].values():
+                if name not in bound:
+                    bound.append(name)
+    return bound
+
+# The variables the chosen channels file binds -- each bot's token, its
+# username and the chat it serves -- read from that file, so no name is
+# repeated here. Telegram takes one poller per token: run the service here or
+# with `pnpm notifications:serve`, never both.
+_channels_file = './config/channels/%s.json' % read_json('./config/engine.json')['channels']
+_bound = _bound_variables(_channels_file)
+_unset = [name for name in _bound if not env_value(name)]
+if _unset:
     warn(
-        'notifications: no TELEGRAM_API_KEY in this shell or in .env.\n'
-        + '  packages/notifications/config/engine.json runs the Telegram channel, so the pod\n'
-        + '  refuses to boot without the bot token, naming the variable.\n'
-        + '  Fix: put the token in .env as TELEGRAM_API_KEY, or choose channels "none" there.'
+        'notifications: unset in this shell and in .env: %s.\n' % ', '.join(_unset)
+        + '  %s binds them; an unset bot token refuses the pod\'s boot, naming it.\n' % _channels_file
+        + '  Fix: set them in .env, or choose channels "none" in config/engine.json.'
     )
 
-# The bot's token and the one chat it serves. Telegram takes one poller per
-# token: run the service here or with `pnpm notifications:serve`, never both.
-k8s_yaml(env_secret('notifications-telegram', ['TELEGRAM_API_KEY', 'TELEGRAM_CHAT_ID']))
+k8s_yaml(env_secret('notifications-telegram', _bound))
 
 k8s_yaml(['./k8s/local/deployment.yaml'])
 

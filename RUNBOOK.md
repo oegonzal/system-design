@@ -552,28 +552,42 @@ start.
 ## Answering from your phone: the Telegram channel
 
 `packages/notifications` is the project's event bus (`:3005`), and its
-Telegram channel puts every prompt published on it in front of you as a
-message from the bot — the question, its choices lettered `a`, `b`, `c`…, a
+Telegram channel puts each prompt published on it in front of you as a
+message from a bot — the question, its choices lettered `a`, `b`, `c`…, a
 button per letter and per command — and brings your answer back as an
 `interaction.answered` event for whoever asked. Tap a button, type the
 letter, type your own answer where the prompt takes one, or reply to the
 message you are answering when several wait.
 
-Pairing, once:
+There is one bot per purpose, and each carries only its own publisher's
+prompts. `packages/notifications/config/channels/telegram.json` declares them
+and binds each one's variables, as set in `.env`:
 
-1. The bot's token goes in the repo's `.env` as `TELEGRAM_API_KEY` (BotFather
-   gives it when the bot is created). Without it the service refuses to boot
-   while `config/engine.json` chooses the `telegram` channel; choose
-   `"channels": "none"` to run the bus alone.
+| Bot             | Carries           | Token                             | Username                         | Chat               |
+| --------------- | ----------------- | --------------------------------- | -------------------------------- | ------------------ |
+| job application | `browser-session` | `JOBAPPLICATION_TELEGRAM_API_KEY` | `JOBAPPLICATION_TELEGRAM_BOT_ID` | `TELEGRAM_CHAT_ID` |
+| govcon          | `govcon`          | `GOVCON_TELEGRAM_API_KEY`         | `GOVCON_TELEGRAM_BOT_ID`         | `TELEGRAM_CHAT_ID` |
+
+Pairing, once per bot:
+
+1. Create the bot with BotFather, and put its token and its username (without
+   the `@`) in `.env` under its variables. Without a token the service
+   refuses to boot while `config/engine.json` chooses the `telegram` channels
+   file; choose `"channels": "none"` to run the bus alone. A token that
+   belongs to another bot than the username beside it refuses boot, naming
+   both, so two bots' tokens can never be swapped unnoticed.
 2. Start the service — `pnpm notifications:serve`, or `tilt up` — and send
-   `/start` to the bot in Telegram. Until a chat is named the bot serves no
+   `/start` to the bot in Telegram. Until its chat is named the bot serves no
    one: it answers `/start` with your chat id and delivers nothing.
-3. Put that id in `.env` as `TELEGRAM_CHAT_ID` and restart the service. From
-   then on it serves that chat alone and ignores every other.
+3. Put that id in `.env` under its chat variable and restart the service.
+   From then on the bot serves that chat alone and ignores every other. A
+   private chat's id is your own Telegram id, so every bot that serves you
+   privately reads the same `TELEGRAM_CHAT_ID`.
 
 Telegram takes one poller per bot token: run the service under Tilt or with
 `pnpm notifications:serve`, never both at once — the second is refused, and
-the service logs it and waits. A prompt nobody withdraws expires at the time
+the service logs it and waits. Two bots bound to one token refuse boot for
+the same reason. A prompt nobody withdraws expires at the time
 its asker gave it; the bot then edits its message to say so.
 
 ## Notes / gotchas
@@ -587,8 +601,9 @@ its asker gave it; the bot then edits its message to say so.
   no `claude login`; `claude setup-token` prints the token). `OPENAI_API_KEY`
   and `OPENAI_EMBEDDING_MODEL` ride in the same Secret, so memory runs in the
   pod as on this machine, and govcon's `SAM_GOV_API_KEY` reaches its pod the
-  same way, through the Secret `govcon-sam`; so do `TELEGRAM_API_KEY` and
-  `TELEGRAM_CHAT_ID`, through `notifications-telegram`. With no token Tilt warns
+  same way, through the Secret `govcon-sam`; so do the Telegram variables,
+  through `notifications-telegram`, which the notifications Tiltfile builds
+  from every variable the chosen channels file binds. With no token Tilt warns
   and the loop's pod exits at boot with the loop's own message.
 - Under Tilt the loop's audit dumps land on the volume claim
   `quality-loop-runs`, mounted at its default `static/runs`, which outlives

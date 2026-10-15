@@ -12,7 +12,7 @@ import { startPeriodic, type Periodic } from '@sysdesign/contracts';
 import { Interaction, InteractionDelivery } from '@sysdesign/db';
 
 import { Bus } from '../bus';
-import type { ChannelLog, NotificationChannel } from '../channels/port';
+import type { ChannelInstance, ChannelLog } from '../channels/port';
 import { CLOCK, type Clock } from '../common/clock';
 import { Dispatcher, sweepInteractions } from './dispatcher';
 import { Inbound } from './inbound';
@@ -20,7 +20,7 @@ import { MikroOrmInteractionStore } from './persistence/mikro-orm-interaction-st
 import type { InteractionStore } from './ports';
 import { INTERACTION_SETTINGS, type InteractionSettings } from './settings';
 
-/** The channels the service runs, built once by the composition root; a spec puts its own here. */
+/** The channel instances the service runs, built once by the composition root; a spec puts its own here. */
 export const CHANNELS = Symbol('CHANNELS');
 const INTERACTION_STORE = Symbol('INTERACTION_STORE');
 
@@ -68,15 +68,15 @@ class InteractionsLifecycle implements OnApplicationBootstrap, OnModuleDestroy {
 }
 
 /**
- * Prompts put to people: the dispatcher that delivers and closes them on every
- * channel, and the inbound reader that turns what people send back into
+ * Prompts put to people: the dispatcher that delivers and closes them on the
+ * channels that carry them, and the inbound reader that turns what people send back into
  * answers. Both reach the bus only through `Bus`, as any subscriber would.
  */
 @Module({})
 export class InteractionsModule {
   static register(
     settings: InteractionSettings,
-    channels: () => readonly NotificationChannel[],
+    channels: () => readonly ChannelInstance[],
   ): DynamicModule {
     return {
       module: InteractionsModule,
@@ -96,7 +96,7 @@ export class InteractionsModule {
           useFactory: (
             bus: Bus,
             store: InteractionStore,
-            running: readonly NotificationChannel[],
+            running: readonly ChannelInstance[],
             clock: Clock,
           ) => new Dispatcher(bus, store, running, settings, clock, log),
           inject: [Bus, INTERACTION_STORE, CHANNELS, CLOCK],

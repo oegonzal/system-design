@@ -3,7 +3,7 @@ import { Test } from '@nestjs/testing';
 import { ensureDatabase } from '@sysdesign/db';
 
 import { CHANNEL_DEFINITIONS } from '../channels';
-import type { NotificationChannel } from '../channels/port';
+import type { ChannelInstance } from '../channels/port';
 import { SPEC_NOW } from '../channels/testing';
 import { CLOCK, type Clock } from '../common/clock';
 import { notificationsConfigFromEnv, PACKAGE_ROOT } from '../config';
@@ -22,7 +22,7 @@ const FIXED_CLOCK: Clock = () => SPEC_NOW;
  */
 export async function bootApp(
   options: {
-    channels?: readonly NotificationChannel[];
+    channels?: readonly ChannelInstance[];
     interactions?: Partial<InteractionSettings>;
   } = {},
 ): Promise<{ app: INestApplication; url: string }> {

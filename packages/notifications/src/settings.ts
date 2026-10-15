@@ -21,7 +21,7 @@ type SettingsKind = 'bus' | 'interactions' | 'channels';
 export interface NotificationsSettings {
   bus: BusSettings;
   interactions: InteractionSettings;
-  /** One entry per channel to run; a channel runs exactly when its entry is present. */
+  /** One entry per channel kind to run, listing the instances it runs. */
   channels: ChannelSettings;
   /** Where each kind's settings came from, as a path from the working directory. */
   sources: Readonly<Record<SettingsKind, string>>;

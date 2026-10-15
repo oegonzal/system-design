@@ -1,7 +1,8 @@
 import { INTERACTION_TOPICS, type InteractionPrompt } from '@sysdesign/contracts';
 
 import { inMemoryBus } from '../bus/testing';
-import { FakeChannel, promptOf, SPEC_NOW as NOW } from '../channels/testing';
+import type { ChannelInstance } from '../channels/port';
+import { carrying, FakeChannel, promptOf, SPEC_NOW as NOW } from '../channels/testing';
 import { DISPATCHER_SUBSCRIPTION, Dispatcher, sweepInteractions } from './dispatcher';
 import { Inbound } from './inbound';
 import type { InteractionSettings } from './settings';
@@ -16,7 +17,7 @@ const SETTINGS: InteractionSettings = {
   sweepEveryMs: null,
 };
 
-function harness(channels: FakeChannel[]) {
+function harness(channels: ChannelInstance[]) {
   let now = NOW;
   const clock = () => now;
   const { bus, subscriptions } = inMemoryBus(clock);
@@ -37,11 +38,8 @@ function harness(channels: FakeChannel[]) {
     advance: (ms: number) => {
       now = new Date(now.getTime() + ms);
     },
-    put: (prompt: InteractionPrompt) =>
-      bus.publish(
-        { topic: INTERACTION_TOPICS.prompted, source: 'spec', payload: prompt },
-        'anyone',
-      ),
+    put: (prompt: InteractionPrompt, source = 'spec') =>
+      bus.publish({ topic: INTERACTION_TOPICS.prompted, source, payload: prompt }, 'anyone'),
     withdraw: (prompt: InteractionPrompt, note: string) =>
       bus.publish(
         {
@@ -55,10 +53,10 @@ function harness(channels: FakeChannel[]) {
 }
 
 describe('the dispatcher', () => {
-  it('[NTF-4] delivers a prompt once on every channel, however often its event comes round', async () => {
+  it('[NTF-4] delivers a prompt once on every channel that carries it, however often its event comes round', async () => {
     const phone = new FakeChannel('phone');
     const desk = new FakeChannel('desk');
-    const { dispatcher, inbound, put } = harness([phone, desk]);
+    const { dispatcher, inbound, put } = harness(carrying('spec', phone, desk));
     await dispatcher.start(inbound);
     const prompt = promptOf();
     const event = await put(prompt);
@@ -75,7 +73,9 @@ describe('the dispatcher', () => {
     const down = new FakeChannel('down');
     const up = new FakeChannel('up');
     down.failures = 10;
-    const { dispatcher, inbound, put, warnings, subscriptions } = harness([down, up]);
+    const { dispatcher, inbound, put, warnings, subscriptions } = harness(
+      carrying('spec', down, up),
+    );
     await dispatcher.start(inbound);
     const first = promptOf();
     const second = promptOf();
@@ -96,7 +96,7 @@ describe('the dispatcher', () => {
   it('[NTF-6] closes every delivery with the answer, again when a withdrawal says it went unused, and not again for a replay', async () => {
     const phone = new FakeChannel('phone');
     const desk = new FakeChannel('desk');
-    const { dispatcher, inbound, put, withdraw } = harness([phone, desk]);
+    const { dispatcher, inbound, put, withdraw } = harness(carrying('spec', phone, desk));
     await dispatcher.start(inbound);
     const prompt = promptOf();
     await put(prompt);
@@ -124,7 +124,7 @@ describe('the dispatcher', () => {
 
   it('[NTF-6] withdraws a prompt past its time, which then closes wherever it was delivered', async () => {
     const phone = new FakeChannel('phone');
-    const { dispatcher, inbound, put, bus, store, advance } = harness([phone]);
+    const { dispatcher, inbound, put, bus, store, advance } = harness(carrying('spec', phone));
     await dispatcher.start(inbound);
     const prompt = promptOf({ expiresAt: new Date(NOW.getTime() + 60_000).toISOString() });
     await put(prompt);
@@ -141,6 +141,36 @@ describe('the dispatcher', () => {
     expect(
       await sweepInteractions(bus, store, SETTINGS, new Date(later.getTime() + 61_000)),
     ).toEqual({ expired: 0, purged: 1 });
+    await dispatcher.stop();
+  });
+
+  it('[NTF-11] puts a prompt only on the channels that carry its publisher, and opens one no channel carries for no one', async () => {
+    const north = new FakeChannel('north');
+    const south = new FakeChannel('south');
+    const both = new FakeChannel('both');
+    const { dispatcher, inbound, put, withdraw, store, warnings } = harness([
+      ...carrying('north-desk', north),
+      ...carrying('south-desk', south),
+      { channel: both, carries: ['north-desk', 'south-desk'] },
+    ]);
+    await dispatcher.start(inbound);
+    const fromNorth = promptOf();
+    const fromSouth = promptOf();
+    const fromWest = promptOf();
+    await put(fromNorth, 'north-desk');
+    await put(fromSouth, 'south-desk');
+    await put(fromWest, 'west-desk');
+    await until(() => both.delivered.length === 2 && warnings.length === 1);
+
+    expect(north.delivered.map((p) => p.id)).toEqual([fromNorth.id]);
+    expect(south.delivered.map((p) => p.id)).toEqual([fromSouth.id]);
+    expect(both.delivered.map((p) => p.id)).toEqual([fromNorth.id, fromSouth.id]);
+    expect(warnings).toEqual(['no channel carries prompts from west-desk']);
+
+    // Opened all the same, so an answer given elsewhere still closes it.
+    expect(store.records.get(fromWest.id)?.state).toBe('open');
+    await withdraw(fromWest, 'answered at the terminal: Male');
+    await until(() => store.records.get(fromWest.id)?.state === 'withdrawn');
     await dispatcher.stop();
   });
 });

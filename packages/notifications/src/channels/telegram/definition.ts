@@ -28,14 +28,18 @@ export const TELEGRAM: ChannelDefinition<TelegramSettings> = {
   id: 'telegram',
   settings: telegramSettingsSchema,
   env: {
-    token: { name: 'TELEGRAM_API_KEY', required: true },
-    chatId: { name: 'TELEGRAM_CHAT_ID', required: false },
+    /** The bot's token. Telegram takes one poller per token, so no two instances share one. */
+    token: { required: true, distinct: true },
+    /** The bot's username, which the token must belong to; unset, the token's bot goes unchecked. */
+    bot: { required: false, distinct: false },
+    /** The one chat the instance serves; unset, it answers /start with the id to set. */
+    chatId: { required: false, distinct: false },
   },
-  create: ({ settings, env, log }) =>
+  create: ({ id, settings, env, variables, log }) =>
     new TelegramChannel(
       new HttpBotApi(env['token'] ?? '', settings.requestTimeoutMs),
       settings,
-      env['chatId'] ?? null,
+      { id, chatId: env['chatId'] ?? null, bot: env['bot'] ?? null, variables },
       log,
     ),
 };

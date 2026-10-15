@@ -1,22 +1,25 @@
 import { INTERACTION_TOPICS, type InteractionPrompt } from '@sysdesign/contracts';
 
 import { inMemoryBus } from '../bus/testing';
-import { FakeChannel, promptOf, SPEC_NOW as NOW } from '../channels/testing';
+import type { ChannelInstance } from '../channels/port';
+import { carrying, FakeChannel, promptOf, SPEC_NOW as NOW } from '../channels/testing';
 import { Dispatcher } from './dispatcher';
 import { Inbound } from './inbound';
 import { InMemoryInteractionStore } from './testing';
 
-/** Prompts delivered on one fake channel, the dispatcher's consumer never started: each event handled by hand. */
-async function delivered(...prompts: InteractionPrompt[]) {
+/** Prompts put, each by its publisher, on the channels given: the dispatcher's consumer never started, each event handled by hand. */
+async function dispatched(
+  channels: ChannelInstance[],
+  ...prompts: (readonly [prompt: InteractionPrompt, publisher: string])[]
+) {
   const clock = () => NOW;
   const { bus, log } = inMemoryBus(clock);
   const store = new InMemoryInteractionStore();
-  const phone = new FakeChannel('phone');
   const inbound = new Inbound(bus, store, clock);
   const dispatcher = new Dispatcher(
     bus,
     store,
-    [phone],
+    channels,
     {
       pullWaitMs: 10,
       eventsPerPull: 10,
@@ -28,17 +31,21 @@ async function delivered(...prompts: InteractionPrompt[]) {
     clock,
     { log: () => undefined, warn: () => undefined },
   );
-  await phone.start(inbound);
-  for (const prompt of prompts) {
+  for (const { channel } of channels) await channel.start(inbound);
+  for (const [prompt, source] of prompts) {
     await dispatcher.handle(
-      await bus.publish(
-        { topic: INTERACTION_TOPICS.prompted, source: 'spec', payload: prompt },
-        'anyone',
-      ),
+      await bus.publish({ topic: INTERACTION_TOPICS.prompted, source, payload: prompt }, 'anyone'),
     );
   }
   const answers = () => log.events.filter((event) => event.topic === INTERACTION_TOPICS.answered);
-  return { phone, store, answers };
+  return { store, answers };
+}
+
+/** Prompts delivered on one fake channel. */
+async function delivered(...prompts: InteractionPrompt[]) {
+  const phone = new FakeChannel('phone');
+  const put = prompts.map((prompt) => [prompt, 'spec'] as const);
+  return { phone, ...(await dispatched(carrying('spec', phone), ...put)) };
 }
 
 describe('what people send back', () => {
@@ -99,5 +106,30 @@ describe('what people send back', () => {
       kind: 'refused',
       text: 'Nothing is waiting for an answer.',
     });
+  });
+
+  it('[NTF-11] keeps two channels that reach one address apart: a reply answers only what its own channel showed', async () => {
+    // Two bots in one person's private chats reach that person at one chat id.
+    const north = new FakeChannel('north', 'person-1');
+    const south = new FakeChannel('south', 'person-1');
+    const fromNorth = promptOf({ title: 'North' });
+    const fromSouth = promptOf({ title: 'South' });
+    const { answers } = await dispatched(
+      [...carrying('north-desk', north), ...carrying('south-desk', south)],
+      [fromNorth, 'north-desk'],
+      [fromSouth, 'south-desk'],
+    );
+
+    expect(await north.send('b', 'n1')).toEqual({ kind: 'accepted', text: 'Taken: b: Female.' });
+    expect(await south.send('a', 's1')).toEqual({ kind: 'accepted', text: 'Taken: a: Male.' });
+    expect(
+      answers().map((event) => {
+        const answer = event.payload as { promptId: string; via: { channel: string } };
+        return [answer.promptId, answer.via.channel];
+      }),
+    ).toEqual([
+      [fromNorth.id, 'north'],
+      [fromSouth.id, 'south'],
+    ]);
   });
 });

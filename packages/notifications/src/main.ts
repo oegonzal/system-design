@@ -2,7 +2,7 @@ import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 
 import { AppModule } from './app/app.module';
-import { CHANNEL_DEFINITIONS } from './channels';
+import { CHANNEL_DEFINITIONS, describeChannels } from './channels';
 import { notificationsConfigFromEnv, PACKAGE_ROOT } from './config';
 import { readSettings } from './settings';
 
@@ -31,8 +31,7 @@ async function bootstrap(): Promise<void> {
       .map(([kind, source]) => `${kind} ${source}`)
       .join(', ')}`,
   );
-  const running = Object.keys(settings.channels);
-  logger.log(`channels: ${running.length === 0 ? 'none' : running.join(', ')}`);
+  logger.log(`channels: ${describeChannels(settings.channels)}`);
 }
 
 bootstrap().catch((error: unknown) => {

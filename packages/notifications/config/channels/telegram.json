@@ -1,11 +1,31 @@
 {
   "telegram": {
-    "pollTimeoutSeconds": 25,
-    "requestTimeoutMs": 15000,
-    "maxRetryAfterMs": 30000,
-    "conflictBackoffMs": 15000,
-    "errorBackoffMs": 5000,
-    "maxChoiceButtons": 24,
-    "buttonsPerRow": 6
+    "settings": {
+      "pollTimeoutSeconds": 25,
+      "requestTimeoutMs": 15000,
+      "maxRetryAfterMs": 30000,
+      "conflictBackoffMs": 15000,
+      "errorBackoffMs": 5000,
+      "maxChoiceButtons": 24,
+      "buttonsPerRow": 6
+    },
+    "instances": {
+      "telegram.job-application": {
+        "carries": ["browser-session"],
+        "env": {
+          "token": "JOBAPPLICATION_TELEGRAM_API_KEY",
+          "bot": "JOBAPPLICATION_TELEGRAM_BOT_ID",
+          "chatId": "TELEGRAM_CHAT_ID"
+        }
+      },
+      "telegram.govcon": {
+        "carries": ["govcon"],
+        "env": {
+          "token": "GOVCON_TELEGRAM_API_KEY",
+          "bot": "GOVCON_TELEGRAM_BOT_ID",
+          "chatId": "TELEGRAM_CHAT_ID"
+        }
+      }
+    }
   }
 }

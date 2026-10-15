@@ -1,16 +1,17 @@
 import { resolve } from 'node:path';
 
+import type { InstanceSettings } from './channels';
 import type { ChannelDefinition } from './channels/port';
 import type { NotificationsSettings } from './settings';
 
 /**
  * The service's configuration, declared once. Every variable it reads is
- * named here as data with its fallback — its own, and each chosen channel's,
- * which that channel's definition declares — and read by the one function
- * below, which refuses by name anything it cannot use. Everything else the
- * service is configured with is a file in the package's own `config/`, read
- * by `settings.ts`. Nothing else in the package reads the environment:
- * `config.spec.ts` holds it to that.
+ * named as data — its own here with its fallback, and each channel
+ * instance's in the chosen channels file, bound to the keys its kind
+ * declares — and read by the one function below, which refuses by name
+ * anything it cannot use. Everything else the service is configured with is a
+ * file in the package's own `config/`, read by `settings.ts`. Nothing else in
+ * the package reads the environment: `config.spec.ts` holds it to that.
  */
 
 /** The package itself — `dist/..` as built, `src/..` under test — whose `config/` holds the settings. */
@@ -29,7 +30,7 @@ export class NotificationsConfigError extends Error {
 export interface NotificationsConfig {
   port: number;
   settings: NotificationsSettings;
-  /** Each chosen channel's variables, under the keys its definition declares them by. */
+  /** Each running instance's variables, by its id, under the keys its kind declares. */
   channelEnv: Readonly<Record<string, Readonly<Record<string, string | undefined>>>>;
 }
 
@@ -38,11 +39,60 @@ const set = (env: NodeJS.ProcessEnv, name: string): string | undefined => {
   return value === undefined || value.trim() === '' ? undefined : value.trim();
 };
 
+type Instances = readonly (readonly [id: string, instance: InstanceSettings])[];
+
+/** One instance's variables under its kind's keys; one its kind requires, left unset, is refused by name. */
+function instanceEnv(
+  env: NodeJS.ProcessEnv,
+  definition: ChannelDefinition,
+  id: string,
+  instance: InstanceSettings,
+  source: string,
+): Record<string, string | undefined> {
+  const values: Record<string, string | undefined> = {};
+  for (const [key, variable] of Object.entries(definition.env)) {
+    const name = instance.env[key] ?? key;
+    const value = set(env, name);
+    if (value === undefined && variable.required) {
+      throw new NotificationsConfigError(
+        `${source} runs ${id}, which needs ${name}: set it, or choose channels "none"`,
+      );
+    }
+    values[key] = value;
+  }
+  return values;
+}
+
+/** Two instances of a kind reading one value it holds distinct are refused, by their variables and never by the value. */
+function refuseShared(
+  definition: ChannelDefinition,
+  instances: Instances,
+  channelEnv: Readonly<Record<string, Readonly<Record<string, string | undefined>>>>,
+  source: string,
+): void {
+  for (const [key, variable] of Object.entries(definition.env)) {
+    if (!variable.distinct) continue;
+    const holders = new Map<string, { id: string; name: string }>();
+    for (const [id, instance] of instances) {
+      const value = channelEnv[id]?.[key];
+      if (value === undefined) continue;
+      const name = instance.env[key] ?? key;
+      const other = holders.get(value);
+      if (other !== undefined) {
+        throw new NotificationsConfigError(
+          `${source}: ${other.id} and ${id} read one ${definition.id} ${key}, through ${other.name} and ${name}; each needs its own`,
+        );
+      }
+      holders.set(value, { id, name });
+    }
+  }
+}
+
 /**
- * The one read of the environment: the port, and the variables of every
- * channel the settings choose. A port that is not one, and a chosen channel
- * missing a variable it requires, are refused here by name, before anything
- * boots.
+ * The one read of the environment: the port, and the variables every chosen
+ * instance binds. A port that is not one, an instance missing a variable its
+ * kind requires, and two instances reading one value their kind holds
+ * distinct are refused here by name — never by value — before anything boots.
  */
 export function notificationsConfigFromEnv(
   settings: NotificationsSettings,
@@ -55,20 +105,14 @@ export function notificationsConfigFromEnv(
       `${NOTIFICATIONS_ENV.port.name} must be a port number, got ${JSON.stringify(port)}`,
     );
   }
+  const source = settings.sources.channels;
   const channelEnv: Record<string, Record<string, string | undefined>> = {};
   for (const definition of definitions) {
-    if (settings.channels[definition.id] === undefined) continue;
-    const values: Record<string, string | undefined> = {};
-    for (const [key, variable] of Object.entries(definition.env)) {
-      const value = set(env, variable.name);
-      if (value === undefined && variable.required) {
-        throw new NotificationsConfigError(
-          `${settings.sources.channels} runs ${definition.id}, which needs ${variable.name}: set it, or choose channels "none"`,
-        );
-      }
-      values[key] = value;
+    const instances: Instances = Object.entries(settings.channels[definition.id]?.instances ?? {});
+    for (const [id, instance] of instances) {
+      channelEnv[id] = instanceEnv(env, definition, id, instance, source);
     }
-    channelEnv[definition.id] = values;
+    refuseShared(definition, instances, channelEnv, source);
   }
   return { port: Number(port), settings, channelEnv };
 }

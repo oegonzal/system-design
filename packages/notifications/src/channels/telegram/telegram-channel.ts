@@ -21,6 +21,21 @@ export interface TelegramSettings extends ButtonLimits {
   errorBackoffMs: number;
 }
 
+/** Which bot and chat one instance serves, and the variables it binds to them, which it names in what it says. */
+export interface TelegramInstance {
+  id: string;
+  /** The one chat it serves; null until one is named. */
+  chatId: string | null;
+  /** The username its token must belong to; null leaves the token's bot unchecked. */
+  bot: string | null;
+  /** The variable bound to each of `token`, `bot` and `chatId`. */
+  variables: Readonly<Record<string, string>>;
+}
+
+/** A username as Telegram compares one: without its `@`, in any case. */
+const handle = (username: string): string =>
+  (username.startsWith('@') ? username.slice(1) : username).toLowerCase();
+
 /** Telegram's limit on the text a button press is answered with. */
 const CALLBACK_ANSWER_MAX = 200;
 /** The statuses that say the token itself was refused. */
@@ -40,18 +55,20 @@ const sleep = (ms: number, signal?: AbortSignal): Promise<void> =>
   });
 
 /**
- * Telegram as a channel: one bot, one chat. Prompts go to the chat named by
- * TELEGRAM_CHAT_ID as messages with a button per letter and per command;
+ * Telegram as a channel instance: one bot, one chat. Prompts go to the chat
+ * its instance names as messages with a button per letter and per command;
  * what the person types or presses there goes to the service as it is, a
  * press exactly as typing it would. With no chat named, the bot answers
  * `/start` with the chat id to name and delivers nothing; with one named,
- * every other chat is ignored. Updates are long-polled, each confirmed only by
- * the next poll once it was handled. A second poller on the same token is
- * waited out, a rate limit waited out within its cap, and a refused edit
- * taken as an edit there is nothing more to do for.
+ * every other chat is ignored. A token that belongs to another bot than the
+ * one its instance names never starts polling. Updates are long-polled, each
+ * confirmed only by the next poll once it was handled. A second poller on the
+ * same token is waited out, a rate limit waited out within its cap, and a
+ * refused edit taken as an edit there is nothing more to do for.
  */
 export class TelegramChannel implements NotificationChannel {
-  readonly id = 'telegram';
+  readonly id: string;
+  private readonly chatId: string | null;
   private sink: InboundSink | null = null;
   private stopping: AbortController | null = null;
   private polling: Promise<void> | null = null;
@@ -60,11 +77,15 @@ export class TelegramChannel implements NotificationChannel {
   constructor(
     private readonly api: BotApi,
     private readonly settings: TelegramSettings,
-    private readonly chatId: string | null,
+    private readonly instance: TelegramInstance,
     private readonly log: ChannelLog,
-  ) {}
+  ) {
+    this.id = instance.id;
+    this.chatId = instance.chatId;
+  }
 
   async start(sink: InboundSink): Promise<void> {
+    const { bot } = this.instance;
     try {
       this.username = (await this.api.getMe()).username;
     } catch (error) {
@@ -73,18 +94,24 @@ export class TelegramChannel implements NotificationChannel {
         error.status !== null &&
         TOKEN_REFUSED.has(error.status)
       ) {
-        throw new Error(`Telegram refused TELEGRAM_API_KEY: ${error.description}`);
+        throw new Error(`Telegram refused ${this.named('token')}: ${error.description}`);
       }
-      this.log.warn(`Telegram unreachable at start, polling anyway: ${String(error)}`);
+      const unchecked = bot === null ? '' : ` with ${this.named('bot')} unchecked`;
+      this.log.warn(`Telegram unreachable at start, polling anyway${unchecked}: ${String(error)}`);
+    }
+    if (bot !== null && this.username !== null && handle(bot) !== handle(this.username)) {
+      throw new Error(
+        `${this.named('token')} belongs to @${this.username}, not ${this.named('bot')} @${handle(bot)}`,
+      );
     }
     this.sink = sink;
     this.stopping = new AbortController();
     this.polling = this.poll(this.stopping.signal);
-    const bot = this.username === null ? 'the bot' : `@${this.username}`;
+    const shown = this.username === null ? 'the bot' : `@${this.username}`;
     this.log.log(
       this.chatId === null
-        ? `unpaired: send /start to ${bot} for the chat id to set as TELEGRAM_CHAT_ID`
-        : `serving one chat as ${bot}`,
+        ? `unpaired: send /start to ${shown} for the chat id to set as ${this.named('chatId')}`
+        : `serving one chat as ${shown}`,
     );
   }
 
@@ -221,7 +248,7 @@ export class TelegramChannel implements NotificationChannel {
     if (this.chatId === null) {
       await this.api.sendMessage(
         chat,
-        `This chat's id is <code>${escapeHtml(chat)}</code>. Set <code>TELEGRAM_CHAT_ID=${escapeHtml(chat)}</code> where the notifications service reads its environment, and restart it: questions will arrive here.`,
+        `This chat's id is <code>${escapeHtml(chat)}</code>. Set <code>${escapeHtml(this.named('chatId'))}=${escapeHtml(chat)}</code> where the notifications service reads its environment, and restart it: questions will arrive here.`,
         null,
       );
     } else if (chat === this.chatId) {
@@ -238,6 +265,11 @@ export class TelegramChannel implements NotificationChannel {
       this.log.warn(`reply ${message.ref} not taken: ${String(error)}`);
       return { kind: 'refused', text: 'That could not be taken just now: send it again.' };
     }
+  }
+
+  /** The variable the instance binds to a key, as the channel names it in what it says. */
+  private named(key: 'token' | 'bot' | 'chatId'): string {
+    return this.instance.variables[key] ?? key;
   }
 
   /** A command addressed to this bot by name — `/blank@bot` — is the command itself. */

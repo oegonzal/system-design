@@ -31,15 +31,20 @@ async function until(holds: () => boolean, ms = 3_000): Promise<void> {
   }
 }
 
-function channel(chatId: string | null = '42') {
+/** The variables a spec instance binds. */
+const VARIABLES = { token: 'SPEC_TOKEN', bot: 'SPEC_BOT', chatId: 'SPEC_CHAT' };
+
+function channel(chatId: string | null = '42', bot: string | null = null) {
   const api = new FakeBotApi();
   const warnings: string[] = [];
   const notes: string[] = [];
   const sink = new RecordingSink();
-  const telegram = new TelegramChannel(api, SETTINGS, chatId, {
-    log: (message) => notes.push(message),
-    warn: (message) => warnings.push(message),
-  });
+  const telegram = new TelegramChannel(
+    api,
+    SETTINGS,
+    { id: 'chat.spec', chatId, bot, variables: VARIABLES },
+    { log: (message) => notes.push(message), warn: (message) => warnings.push(message) },
+  );
   return { api, sink, telegram, warnings, notes };
 }
 
@@ -78,9 +83,9 @@ describe('the Telegram channel', () => {
     await until(() => api.offsets.includes(6));
     await telegram.stop();
     expect(sink.received).toEqual([
-      { channel: 'telegram', address: '42', ref: 'm1001', inReplyTo: '101', text: 'b' },
-      { channel: 'telegram', address: '42', ref: 'qcb2', inReplyTo: '101', text: '/blank' },
-      { channel: 'telegram', address: '42', ref: 'm1005', inReplyTo: null, text: '/blank' },
+      { channel: 'chat.spec', address: '42', ref: 'm1001', inReplyTo: '101', text: 'b' },
+      { channel: 'chat.spec', address: '42', ref: 'qcb2', inReplyTo: '101', text: '/blank' },
+      { channel: 'chat.spec', address: '42', ref: 'm1005', inReplyTo: null, text: '/blank' },
     ]);
     // A press from another chat is answered, and taken nowhere.
     expect(api.answered).toEqual([
@@ -111,7 +116,7 @@ describe('the Telegram channel', () => {
     const unpaired = channel(null);
     await unpaired.telegram.start(unpaired.sink);
     expect(unpaired.notes).toEqual([
-      'unpaired: send /start to @spec_bot for the chat id to set as TELEGRAM_CHAT_ID',
+      'unpaired: send /start to @spec_bot for the chat id to set as SPEC_CHAT',
     ]);
     expect(await unpaired.telegram.deliver(promptOf())).toEqual([]);
     unpaired.api.push(typedUpdate(1, 99, '/start'), typedUpdate(2, 99, 'b'));
@@ -119,7 +124,7 @@ describe('the Telegram channel', () => {
     await unpaired.telegram.stop();
     expect(unpaired.api.sent[0]).toMatchObject({
       chatId: '99',
-      html: expect.stringContaining('TELEGRAM_CHAT_ID=99'),
+      html: expect.stringContaining('SPEC_CHAT=99'),
     });
     expect(unpaired.sink.received).toEqual([]);
 
@@ -159,13 +164,35 @@ describe('the Telegram channel', () => {
     const refused = channel();
     refused.api.fail('getMe', 401, 'Unauthorized');
     await expect(refused.telegram.start(refused.sink)).rejects.toThrow(
-      'Telegram refused TELEGRAM_API_KEY: Unauthorized',
+      'Telegram refused SPEC_TOKEN: Unauthorized',
     );
     const offline = channel();
     offline.api.fail('getMe', null, 'unreachable');
     await offline.telegram.start(offline.sink);
     expect(offline.warnings).toEqual([
       'Telegram unreachable at start, polling anyway: BotApiError: telegram getMe: unreachable',
+    ]);
+    await offline.telegram.stop();
+  });
+
+  it('[NTF-12] never starts polling on a token that belongs to another bot than the one its instance names', async () => {
+    const wrong = channel('42', 'other_bot');
+    await expect(wrong.telegram.start(wrong.sink)).rejects.toThrow(
+      'SPEC_TOKEN belongs to @spec_bot, not SPEC_BOT @other_bot',
+    );
+    expect(wrong.api.offsets).toEqual([]);
+
+    // Telegram compares usernames without their @, in any case.
+    const right = channel('42', '@Spec_Bot');
+    await right.telegram.start(right.sink);
+    expect(right.notes).toEqual(['serving one chat as @spec_bot']);
+    await right.telegram.stop();
+
+    const offline = channel('42', 'spec_bot');
+    offline.api.fail('getMe', null, 'unreachable');
+    await offline.telegram.start(offline.sink);
+    expect(offline.warnings).toEqual([
+      'Telegram unreachable at start, polling anyway with SPEC_BOT unchecked: BotApiError: telegram getMe: unreachable',
     ]);
     await offline.telegram.stop();
   });

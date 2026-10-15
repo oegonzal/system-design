@@ -14,7 +14,7 @@ import {
   truncateTestTables,
 } from '@sysdesign/db';
 
-import { FakeChannel, promptOf } from '../channels/testing';
+import { carrying, FakeChannel, promptOf } from '../channels/testing';
 import { until } from '../interactions/testing';
 import { bootApp } from './testing';
 
@@ -39,7 +39,10 @@ describe('the notifications HTTP surface', () => {
   const phone = new FakeChannel('phone');
 
   beforeAll(async () => {
-    ({ app, url } = await bootApp({ channels: [phone], interactions: { pullWaitMs: 100 } }));
+    ({ app, url } = await bootApp({
+      channels: carrying('spec', phone),
+      interactions: { pullWaitMs: 100 },
+    }));
   });
 
   afterAll(async () => {

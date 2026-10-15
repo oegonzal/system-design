@@ -9,7 +9,7 @@ import {
 } from '@sysdesign/contracts';
 
 import { UnknownSubscription, type Bus } from '../bus';
-import type { ChannelLog, InboundSink, NotificationChannel } from '../channels/port';
+import type { ChannelInstance, ChannelLog, InboundSink } from '../channels/port';
 import { SERVICE_SOURCE } from './inbound';
 import { outcomeText } from './outcome';
 import type { InteractionStore } from './ports';
@@ -53,14 +53,16 @@ const pause = (ms: number, signal: AbortSignal): Promise<void> =>
   });
 
 /**
- * Puts each prompt in front of people on every channel the service runs, and
- * shows on every message it sent how the prompt ended. It consumes the
- * interaction topics as one subscriber of the bus: a prompt is opened once and
- * delivered once per channel however often its event comes round; an answer,
- * a withdrawal or an expiry closes every delivery, and a withdrawal after an
- * answer marks that answer unused. A channel that keeps failing is tried the
- * declared number of times and then passed over with a warning, and its event
- * acknowledged, so it never holds back the events behind it.
+ * Puts each prompt in front of people on every channel that carries its
+ * publisher, and shows on every message it sent how the prompt ended. It
+ * consumes the interaction topics as one subscriber of the bus: a prompt is
+ * opened once and delivered once per carrying channel however often its event
+ * comes round — a prompt no channel carries is opened all the same, so an
+ * answer given elsewhere still closes it; an answer, a withdrawal or an
+ * expiry closes every delivery, and a withdrawal after an answer marks that
+ * answer unused. A channel that keeps failing is tried the declared number of
+ * times and then passed over with a warning, and its event acknowledged, so it
+ * never holds back the events behind it.
  */
 export class Dispatcher {
   private readonly stopping = new AbortController();
@@ -69,7 +71,7 @@ export class Dispatcher {
   constructor(
     private readonly bus: Bus,
     private readonly store: InteractionStore,
-    private readonly channels: readonly NotificationChannel[],
+    private readonly channels: readonly ChannelInstance[],
     private readonly settings: InteractionSettings,
     private readonly now: () => Date,
     private readonly log: ChannelLog,
@@ -78,14 +80,14 @@ export class Dispatcher {
   /** Subscribes, starts every channel handing what people send to the sink, then consumes until stopped. */
   async start(sink: InboundSink): Promise<void> {
     await this.subscribe();
-    for (const channel of this.channels) await channel.start(sink);
+    for (const { channel } of this.channels) await channel.start(sink);
     this.running = this.consume();
   }
 
   async stop(): Promise<void> {
     this.stopping.abort();
     await this.running;
-    for (const channel of this.channels) await channel.stop();
+    for (const { channel } of this.channels) await channel.stop();
   }
 
   /** One event's effect, tried the declared number of times; the event is acknowledged either way. */
@@ -157,9 +159,16 @@ export class Dispatcher {
     await this.store.open(prompt, at);
     const record = await this.store.find(prompt.id);
     if (record === null || record.state !== 'open') return;
+    const carrying = this.channels
+      .filter(({ carries }) => carries.includes(source))
+      .map(({ channel }) => channel);
+    if (carrying.length === 0) {
+      this.log.warn(`no channel carries prompts from ${source}`);
+      return;
+    }
     const reached = new Set((await this.store.deliveries(prompt.id)).map((d) => d.channel));
     await eachOnItsOwn(
-      this.channels.filter((channel) => !reached.has(channel.id)),
+      carrying.filter((channel) => !reached.has(channel.id)),
       async (channel) => {
         const deliveries = await channel.deliver(prompt);
         for (const delivery of deliveries) {
@@ -187,7 +196,9 @@ export class Dispatcher {
       showing,
       async (delivery) => {
         // A channel no longer run has no message to edit.
-        const channel = this.channels.find((candidate) => candidate.id === delivery.channel);
+        const channel = this.channels.find(
+          (candidate) => candidate.channel.id === delivery.channel,
+        )?.channel;
         if (channel === undefined) return;
         await channel.close(delivery, record.prompt, text);
         await this.store.markClosed(delivery.id, at);

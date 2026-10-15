@@ -389,8 +389,10 @@ only what is new. Each new alert is published on its declared topic
 the notifications bus at `NOTIFICATIONS_URL`,
 and one digest per warm — "N spending alerts for Enfav LLC", at most ten
 lines and a count of the rest, one "Noted" button, expiring after seven
-days — is published as a prompt, which is what the Telegram channel
-renders. Only what was published is recorded, so a bus that cannot be
+days — is published as a prompt, which govcon's own Telegram bot renders:
+the notifications service puts a prompt only on the bot that carries its
+publisher, so a digest never reaches the job-application bot (see
+`packages/notifications/README.md`). Only what was published is recorded, so a bus that cannot be
 reached is one warning and the same alerts are raised next warm.
 
 **Where the rest are.** The table keeps what was published with each alert,

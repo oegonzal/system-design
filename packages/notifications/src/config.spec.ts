@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import { z } from 'zod';
 
+import type { ChannelSettings } from './channels';
 import type { ChannelDefinition } from './channels/port';
 import {
   NOTIFICATIONS_ENV,
@@ -19,13 +20,13 @@ const sources = (dir: string): string[] =>
     return /\.ts$/.test(entry) && !/\.spec\.ts$/.test(entry) ? [path] : [];
   });
 
-/** A channel declared the way every channel is, for the spec alone. */
+/** A channel kind declared the way every kind is, for the spec alone. */
 const PAGER: ChannelDefinition = {
   id: 'pager',
   settings: z.strictObject({}),
   env: {
-    token: { name: 'PAGER_TOKEN', required: true },
-    room: { name: 'PAGER_ROOM', required: false },
+    token: { required: true, distinct: true },
+    room: { required: false, distinct: false },
   },
   create: () => {
     throw new Error('never built here');
@@ -33,7 +34,17 @@ const PAGER: ChannelDefinition = {
 };
 
 const shipped = readSettings(PACKAGE_ROOT);
-const running = (channels: Record<string, unknown>) => ({ ...shipped, channels });
+const running = (channels: ChannelSettings) => ({ ...shipped, channels });
+/** Pager instances by id, each binding its own token and room. */
+const pagers = (instances: Record<string, { token: string; room: string }>) =>
+  running({
+    pager: {
+      settings: {},
+      instances: Object.fromEntries(
+        Object.entries(instances).map(([id, env]) => [id, { carries: ['spec'], env }]),
+      ),
+    },
+  });
 
 describe('the service configuration', () => {
   it('[NTF-9] declares its variables once with their fallbacks, and reads them nowhere else', () => {
@@ -51,15 +62,36 @@ describe('the service configuration', () => {
     expect(readers).toEqual(['config.ts']);
   });
 
-  it('[NTF-9] reads the variables of the channels it runs, by the keys their definitions declare, and refuses a missing one by name', () => {
-    const env = { PAGER_TOKEN: 'abc', PAGER_ROOM: '' };
-    expect(notificationsConfigFromEnv(running({ pager: {} }), [PAGER], env).channelEnv).toEqual({
-      pager: { token: 'abc', room: undefined },
+  it('[NTF-9] reads the variables each instance binds, under the keys its kind declares, and refuses a missing one by name', () => {
+    const desk = pagers({ 'pager.desk': { token: 'DESK_TOKEN', room: 'DESK_ROOM' } });
+    const env = { DESK_TOKEN: 'abc', DESK_ROOM: '' };
+    expect(notificationsConfigFromEnv(desk, [PAGER], env).channelEnv).toEqual({
+      'pager.desk': { token: 'abc', room: undefined },
     });
-    // A channel the settings do not run reads nothing, and needs nothing.
+    // A kind the settings do not run reads nothing, and needs nothing.
     expect(notificationsConfigFromEnv(running({}), [PAGER], {}).channelEnv).toEqual({});
-    expect(() => notificationsConfigFromEnv(running({ pager: {} }), [PAGER], {})).toThrow(
-      /runs pager, which needs PAGER_TOKEN: set it, or choose channels "none"$/,
+    expect(() => notificationsConfigFromEnv(desk, [PAGER], {})).toThrow(
+      /runs pager\.desk, which needs DESK_TOKEN: set it, or choose channels "none"$/,
     );
+  });
+
+  it('[NTF-12] refuses two instances reading one value their kind holds distinct, naming their variables and never the value', () => {
+    const two = pagers({
+      'pager.desk': { token: 'DESK_TOKEN', room: 'ROOM' },
+      'pager.field': { token: 'FIELD_TOKEN', room: 'ROOM' },
+    });
+    // One room behind both is no conflict; one token behind both is.
+    const apart = { DESK_TOKEN: 'one', FIELD_TOKEN: 'two', ROOM: 'r' };
+    expect(Object.keys(notificationsConfigFromEnv(two, [PAGER], apart).channelEnv)).toEqual([
+      'pager.desk',
+      'pager.field',
+    ]);
+    const shared = () =>
+      notificationsConfigFromEnv(two, [PAGER], { DESK_TOKEN: 'secret-1', FIELD_TOKEN: 'secret-1' });
+    expect(shared).toThrow(NotificationsConfigError);
+    expect(shared).toThrow(
+      /: pager\.desk and pager\.field read one pager token, through DESK_TOKEN and FIELD_TOKEN; each needs its own$/,
+    );
+    expect(shared).not.toThrow(/secret-1/);
   });
 });

@@ -2,7 +2,13 @@ import { randomUUID } from 'node:crypto';
 
 import type { InteractionPrompt } from '@sysdesign/contracts';
 
-import type { ChannelDelivery, InboundSink, InboundVerdict, NotificationChannel } from './port';
+import type {
+  ChannelDelivery,
+  ChannelInstance,
+  InboundSink,
+  InboundVerdict,
+  NotificationChannel,
+} from './port';
 
 /**
  * The instant the specs' fixtures are written against. A spec that drives the
@@ -79,3 +85,9 @@ export class FakeChannel implements NotificationChannel {
     return this.sink.receive({ channel: this.id, address: this.address, ref, inReplyTo, text });
   }
 }
+
+/** Channels as the service runs them, each carrying the one publisher named. */
+export const carrying = (
+  publisher: string,
+  ...channels: NotificationChannel[]
+): ChannelInstance[] => channels.map((channel) => ({ channel, carries: [publisher] }));

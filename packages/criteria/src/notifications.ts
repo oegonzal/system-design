@@ -24,7 +24,7 @@ export const NOTIFICATIONS_CRITERIA: readonly Criterion[] = [
   {
     id: 'NTF-4',
     statement:
-      'A prompt is opened once and delivered once per channel however often its event is replayed or the service restarts; a channel that fails is retried within declared bounds and then passed over, never holding back the events behind it.',
+      'A prompt is opened once and delivered once per channel that carries it however often its event is replayed or the service restarts; a channel that fails is retried within declared bounds and then passed over, never holding back the events behind it.',
   },
   {
     id: 'NTF-5',
@@ -49,12 +49,22 @@ export const NOTIFICATIONS_CRITERIA: readonly Criterion[] = [
   {
     id: 'NTF-9',
     statement:
-      'Every variable the service reads is declared once — its own and each chosen channel’s — and every setting is a file chosen by name; a chosen channel missing a variable it requires refuses boot naming it, and nothing else in the package reads the environment.',
+      'Every variable the service reads is declared once — its own in its configuration, each chosen channel instance’s bound in the chosen channels file — and every setting is a file chosen by name; a chosen instance missing a variable its kind requires refuses boot naming it, and nothing else in the package reads the environment.',
   },
   {
     id: 'NTF-10',
     statement:
       'The service is layered bus, interactions, channels, each folder reaching another only through its declared door; a channel is a folder plus one registration line, and no other file names it.',
+  },
+  {
+    id: 'NTF-11',
+    statement:
+      'A prompt is delivered only on the channel instances that carry its publisher, as its event’s source names it; one no instance carries is opened all the same, so an answer given elsewhere closes it, and reaches no channel, with a warning; a reply answers only what its own channel showed, even where two channels reach one address.',
+  },
+  {
+    id: 'NTF-12',
+    statement:
+      'A channel kind runs as the instances its settings declare, each under its own id within the bound an answer names its channel by, carrying at least one publisher and binding a variable to every key its kind declares; boot refuses, naming variables and never values, two instances reading one value the kind holds distinct, and a Telegram token that belongs to another bot than the one its instance names never polls.',
   },
   // Notifications client (packages/notifications-client)
   {
