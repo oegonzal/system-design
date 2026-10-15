@@ -1,14 +1,20 @@
 ---
 import Container from './Container.astro';
+import Eyebrow from './Eyebrow.astro';
 
-/** A titled band of the page: a section landmark labelled by its own heading. */
+/**
+ * A titled band of the page: a section landmark labelled by its own heading,
+ * with an eyebrow above it when the band has one; plain, muted, or the navy
+ * brand band, which prints as plain.
+ */
 interface Props {
   id: string;
   title: string;
-  tone?: 'plain' | 'muted';
+  eyebrow?: string;
+  tone?: 'plain' | 'muted' | 'brand';
 }
 
-const { id, title, tone = 'plain' } = Astro.props;
+const { id, title, eyebrow, tone = 'plain' } = Astro.props;
 const headingId = `${id}-title`;
 ---
 
@@ -18,9 +24,13 @@ const headingId = `${id}-title`;
   class:list={[
     'py-14 sm:py-20 print:py-1',
     tone === 'muted' && 'bg-surface-muted print:bg-transparent',
+    tone === 'brand' && 'surface-brand bg-brand text-on-brand print:bg-transparent print:text-ink',
   ]}
 >
   <Container>
+    {eyebrow !== undefined && <Eyebrow tone={tone === 'brand' ? 'brand' : 'light'} class="mb-2"
+      >{eyebrow}</Eyebrow
+    >}
     <h2 id={headingId} class="text-2xl font-bold tracking-tight sm:text-3xl print:text-base">
       {title}
     </h2>

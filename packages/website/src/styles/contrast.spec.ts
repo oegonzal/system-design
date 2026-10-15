@@ -19,9 +19,11 @@ const EDGE = 3;
 
 /**
  * Every pairing a component may draw, as [foreground, background, minimum]:
- * the palette's contract. Teal (`accent`) is text on white only, since on a
- * panel it reads below AA, which is what `accent-strong` is for; on a band,
- * `accent-bright`. A text pairing also serves as an outline on that surface.
+ * the palette's contract. Teal (`accent`) is a rule, rail or dot on a light
+ * surface and never text there, since on a muted band it reads at the AA
+ * line and on a panel below it: as text it is `accent-strong` on a light
+ * surface and `accent-bright` on a band. A text pairing also serves as an
+ * outline on that surface.
  */
 const PAIRINGS: [string, string, number][] = [
   ['ink', 'surface', TEXT],
@@ -33,7 +35,6 @@ const PAIRINGS: [string, string, number][] = [
   ['link', 'surface', TEXT],
   ['link', 'surface-muted', TEXT],
   ['link', 'surface-tint', TEXT],
-  ['accent', 'surface', TEXT],
   ['accent-strong', 'surface', TEXT],
   ['accent-strong', 'surface-muted', TEXT],
   ['accent-strong', 'surface-tint', TEXT],
@@ -45,7 +46,8 @@ const PAIRINGS: [string, string, number][] = [
   ['accent-bright', 'brand-strong', TEXT],
   ['on-brand', 'accent', TEXT],
   ['brand', 'accent-bright', TEXT],
-  // Rules and rails that carry meaning on a muted band or a panel.
+  // Rules, rails and dots that carry meaning on a light surface.
+  ['accent', 'surface', EDGE],
   ['accent', 'surface-muted', EDGE],
   ['accent', 'surface-tint', EDGE],
 ];
@@ -87,6 +89,7 @@ describe('palette', () => {
 
   it('would refuse teal as text on a panel, which is why accent-strong exists', () => {
     expect(contrast(token('accent'), token('surface-tint'))).toBeLessThan(TEXT);
+    expect(contrast(token('accent'), token('surface-muted'))).toBeLessThan(TEXT + 0.01);
     expect(contrast(token('accent-strong'), token('surface-tint'))).toBeGreaterThanOrEqual(TEXT);
   });
 });

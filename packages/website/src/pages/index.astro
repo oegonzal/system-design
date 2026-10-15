@@ -2,12 +2,15 @@
 import iconArt from '../assets/icon.svg';
 import Button from '../components/Button.astro';
 import CtaBand from '../components/CtaBand.astro';
+import FactValue from '../components/FactValue.astro';
+import ItemList from '../components/ItemList.astro';
+import NumberedCard from '../components/NumberedCard.astro';
 import PageHeader from '../components/PageHeader.astro';
 import Registration from '../components/Registration.astro';
 import Section from '../components/Section.astro';
-import ServiceCard from '../components/ServiceCard.astro';
+import Steps from '../components/Steps.astro';
 import { COMPANY } from '../data/company';
-import { SERVICES } from '../data/services';
+import { ENGAGEMENTS, SERVICES } from '../data/services';
 import { CLOSING_CTA, PRIMARY_ACTION, SITE } from '../data/site';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { organizationGraph } from '../lib/structured-data';
@@ -45,6 +48,22 @@ const steps = [
     text: 'You receive typed, tested, documented code, with the observability and runbooks to operate it.',
   },
 ];
+
+/** Why the AI work holds up: the principles, as they apply to an agentic workflow. */
+const assurance = [
+  {
+    title: 'Measured on every change',
+    text: 'Critics and evaluators judge each AI step against declared criteria, beside the automated tests and schema validation the rest of the software gets, so quality is measured rather than assumed.',
+  },
+  {
+    title: 'Traceable by design',
+    text: 'Typed JSON contracts, retries and evaluations leave a record of what each workflow decided and why, for the reviewer who has to trust it.',
+  },
+  {
+    title: 'People where they belong',
+    text: 'Human review steps, acceptance tests and documented human-in-the-loop controls, scoped on approved data, as appropriate to the work.',
+  },
+];
 ---
 
 <BaseLayout
@@ -53,43 +72,75 @@ const steps = [
   structuredData={structuredData}
 >
   <PageHeader
-    title="Agentic AI and workflow automation, built to production standards."
+    eyebrow="Agentic AI + workflow automation"
+    title="Agentic AI and workflow automation, engineered for production."
     lede="From document-heavy operations to controlled AI workflows, connected systems and measurable engineering outcomes."
   >
     <div class="mt-8 flex flex-wrap gap-3 print:hidden">
       <Button href={PRIMARY_ACTION.href} variant="solid">{PRIMARY_ACTION.action}</Button>
       <Button href="/government/" variant="outline">Government contracting</Button>
     </div>
+    <dl class="mt-10 grid gap-6 border-t border-on-brand/20 pt-6 text-sm sm:grid-cols-3">
+      <div>
+        <dt class="font-semibold text-on-brand">Registered federal supplier</dt>
+        <dd class="mt-1 text-on-brand-soft"><Registration /></dd>
+      </div>
+      <div>
+        <dt class="font-semibold text-on-brand">Founder-led engineering</dt>
+        <dd class="mt-1 text-on-brand-soft">
+          Led by a full-stack engineer with more than ten years of production experience.
+        </dd>
+      </div>
+      <div>
+        <dt class="font-semibold text-on-brand">How we deliver</dt>
+        <dd class="mt-1 text-on-brand-soft"><FactValue fact={COMPANY.delivery} /></dd>
+      </div>
+    </dl>
   </PageHeader>
 
-  <Section id="services" title="What we build">
-    <ul class="grid gap-6 sm:grid-cols-2">
-      {SERVICES.map((service) => <li>
-        <ServiceCard service={service} />
-      </li>)}
-    </ul>
-  </Section>
-
-  <Section id="approach" title="How we work" tone="muted">
-    <ol class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-      {steps.map((step, index) => <li class="rounded-xl border border-line bg-surface p-6">
-        <p class="text-sm font-semibold text-ink-soft">Step {index + 1}</p>
-        <h3 class="mt-1 text-lg font-semibold">{step.title}</h3>
-        <p class="mt-3 leading-7 text-ink-soft">{step.text}</p>
-      </li>)}
+  <Section id="services" eyebrow="Four service lines" title="What we build">
+    <ol class="grid gap-6 sm:grid-cols-2">
+      {SERVICES.map((service, index) => (
+        <NumberedCard
+          index={index + 1}
+          title={service.title}
+          text={service.line}
+          href={`/services/#${service.id}`}
+          items={{ label: 'What you get', entries: service.deliverables.slice(0, 2) }}
+        />
+      ))}
     </ol>
   </Section>
 
-  <Section id="government" title="For government buyers and prime contractors">
-    <div class="flex flex-col items-start gap-6 lg:flex-row lg:items-center lg:justify-between">
-      <div class="max-w-2xl">
-        <p class="text-lg leading-8 text-ink-soft">
-          Enfav LLC offers agentic AI and software engineering to government agencies, directly or
-          as a subcontractor and teaming partner to prime contractors.
-        </p>
-        <p class="mt-3 font-semibold"><Registration /></p>
+  <Section id="engagements" eyebrow="Bounded engagements" title="Ways to engage" tone="muted">
+    <Steps steps={ENGAGEMENTS} />
+  </Section>
+
+  <Section id="approach" eyebrow="From outcome to handover" title="How we work">
+    <Steps steps={steps} />
+  </Section>
+
+  <Section
+    id="assurance"
+    eyebrow="Evaluation-driven AI"
+    title="Why it holds up in production"
+    tone="brand"
+  >
+    <ItemList items={assurance} tone="brand" />
+  </Section>
+
+  <Section id="government" title="For government buyers and prime contractors" tone="muted">
+    <div class="rounded-r-xl border-l-4 border-accent bg-surface-tint p-6 sm:p-8">
+      <div class="flex flex-col items-start gap-6 lg:flex-row lg:items-center lg:justify-between">
+        <div class="max-w-2xl">
+          <p class="text-lg leading-8 text-ink-soft">
+            Enfav LLC offers agentic AI and software engineering to government agencies, directly or
+            as a subcontractor and teaming partner to prime contractors.
+          </p>
+          <p class="mt-3 font-semibold"><Registration /></p>
+        </div>
+        <Button href="/government/">Read the capability statement</Button>
       </div>
-      <Button href="/government/">Read the capability statement</Button>
     </div>
   </Section>
 

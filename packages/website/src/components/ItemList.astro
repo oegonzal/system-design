@@ -1,16 +1,30 @@
 ---
-/** Titled items — a title and a line of text each — in two columns from `sm` up and on paper. */
+/**
+ * Titled items — a title and a line of text each — in two columns from `sm`
+ * up and on paper, or three on the brand band, where the text is light.
+ */
 interface Props {
   items: readonly { readonly title: string; readonly text: string }[];
+  tone?: 'light' | 'brand';
 }
 
-const { items } = Astro.props;
+const { items, tone = 'light' } = Astro.props;
 ---
 
-<ul class="grid gap-x-10 gap-y-4 sm:grid-cols-2 print:grid-cols-2 print:gap-x-6 print:gap-y-1">
+<ul
+  class:list={[
+    'grid gap-x-10 gap-y-4 print:grid-cols-2 print:gap-x-6 print:gap-y-1',
+    tone === 'brand' ? 'sm:grid-cols-3' : 'sm:grid-cols-2',
+  ]}
+>
   {items.map((item) => <li class="break-inside-avoid">
     <p class="font-semibold print:text-sm">{item.title}</p>
-    <p class="mt-1 leading-7 text-ink-soft print:mt-0 print:text-xs print:leading-snug">
+    <p
+      class:list={[
+        'mt-1 leading-7 print:mt-0 print:text-xs print:leading-snug',
+        tone === 'brand' ? 'text-on-brand-soft print:text-ink-soft' : 'text-ink-soft',
+      ]}
+    >
       {item.text}
     </p>
   </li>)}
