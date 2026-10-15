@@ -24,9 +24,11 @@ import {
   actionLocation,
   actionRefs,
   CLAIMING_ACTION_KINDS,
-  describeIdentity,
+  describeForbiddenCut,
+  describeTakenCut,
   matchesRecord,
   MUTATING_ACTION_KINDS,
+  ON_RECORD_TAKEN,
   PAGE_REPLACING_ACTION_KINDS,
   PAGE_REPLACING_WAITS,
   TERMINAL_ACTION_KINDS,
@@ -279,17 +281,27 @@ const facetsFault = (action: StepAction, index: StepIndex): string | null => {
 /**
  * A unit on record as forbidden is never started: the identities an advisor
  * put in the index are compared to the claim by the one key every process
- * uses, and the record's own note is said back with the alternative, so the
- * next plan knows why and what instead.
+ * uses, and the record's own note is said back with the alternative, in the
+ * words the session's refusal and the Limits use, so the next plan knows why
+ * and what instead.
  */
 const forbiddenFault = (action: StepAction, index: StepIndex): string | null => {
   if (action.kind !== 'taskStart') return null;
   const hit = index.unitsForbidden.find((unit) => matchesRecord(action.facets, unit.identity));
-  if (hit === undefined) return null;
-  return `taskStart names ${describeIdentity(hit.identity)}, a unit on record as forbidden${
-    hit.note === '' ? '' : ` (${hit.note})`
-  }: it is never started — choose another item`;
+  return hit === undefined ? null : describeForbiddenCut(hit);
 };
+
+/**
+ * A taskStart's declaration that it takes a unit on record is held to the
+ * exception the mission declares, from the index alone: cut where the mission
+ * declares none, and where every stance it declares is withheld by a control
+ * this page lists. Which unit it takes, and whether that unit is on record at
+ * all, is the session's check against the whole record.
+ */
+const takenFault = (action: StepAction, index: StepIndex): string | null =>
+  action.kind === 'taskStart' && action[ON_RECORD_TAKEN] === true
+    ? describeTakenCut(index.onRecordTaken)
+    : null;
 
 const limits: Rule = (plan, index) => {
   const elements = new Map(index.elements.map((element) => [element.ref, element]));
@@ -342,6 +354,8 @@ const limits: Rule = (plan, index) => {
     if (facets !== null) problems.push(problem('high', facets, at));
     const forbidden = forbiddenFault(action, index);
     if (forbidden !== null) problems.push(problem('high', forbidden, at));
+    const taken = takenFault(action, index);
+    if (taken !== null) problems.push(problem('high', taken, at));
     // Past a page replacement every action is already refused above; the
     // stale-claim rule says what a replacement rule did not.
     const stale = replaced === null ? staleClaimFault(action, mutated) : null;

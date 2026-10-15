@@ -1,3 +1,4 @@
+import { ON_RECORD_TAKEN } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline } from '../../core/describe-pipeline';
@@ -123,6 +124,12 @@ describe('the browser-step pipeline', () => {
     );
     expect(rendered).toContain('[action.3] askFields e1, e2 — questions about the subject');
     expect(stepPlanOutput.schema.safeParse(plan).success).toBe(true);
+    // A unit's identity and the declaration that takes it on record are what the engines check: the judges read both.
+    const declared = samplePlan([taskStart('x', [{ name: 'company', value: 'Acme' }], true)]);
+    expect(stepPlanOutput.render(declared)).toContain(
+      '[action.1] taskStart "x" at https://jobs.example.test/apply/42 · company="Acme" · onRecordTaken',
+    );
+    expect(stepPlanOutput.render(plan)).not.toContain(ON_RECORD_TAKEN);
   });
 
   it('[QL-6] the plan a model answers with contains no number', () => {

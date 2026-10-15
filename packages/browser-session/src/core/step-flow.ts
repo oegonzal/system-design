@@ -1,10 +1,12 @@
 import {
+  ENGINE_OBJECTORS,
   observationFingerprint,
   type PageObservation,
   type PlanReadout,
   routePlan,
   SETTLING_CRITERION_KINDS,
   type StepPlan,
+  type UnitsOnRecord,
 } from '@sysdesign/contracts';
 
 import type { EngineContext } from './engine-context';
@@ -42,9 +44,6 @@ function settleExpectation(ctx: EngineContext, observation: PageObservation): vo
   pushHistory(state, pending.action, 'failed', unmetNote(pending));
   ctx.fail('expectation-unmet');
 }
-
-/** Who objected when nothing named a finding or a problem: the controller's own reason. */
-const CONTROLLER = 'controller';
 
 const planPayload = (readout: PlanReadout, decided: Decided<StepPlan>, advice: AdviceRecord) => ({
   assessment: readout.plan?.assessment ?? null,
@@ -161,7 +160,7 @@ function recordPlan(
       ? readout.objections
       : readout.reason === null
         ? []
-        : [{ step: state.step, from: CONTROLLER, at: [], detail: readout.reason }],
+        : [{ step: state.step, from: ENGINE_OBJECTORS.controller, at: [], detail: readout.reason }],
   );
   ctx.record({
     kind: 'step-plan',
@@ -241,16 +240,17 @@ function settlePasses(
   state.pendingPass = ids.length === 0 ? null : { ids, scope };
 }
 
-/** The executable prefix run against the page, and what it passed held for the next observation. */
+/** The executable prefix run against the page — every taskStart held to the record the plan was composed with — and what it passed held for the next observation. */
 async function executePlan(
   ctx: EngineContext,
   decided: Decided<StepPlan>,
   readout: PlanReadout & { plan: StepPlan },
   observation: PageObservation,
+  onRecord: UnitsOnRecord,
 ): Promise<Termination | null> {
   const { state } = ctx;
   const before = { open: state.tasks.open !== null, closed: tasksClosed(state) };
-  const executed = await executeActions(ctx, decided, readout, observation);
+  const executed = await executeActions(ctx, decided, readout, observation, onRecord);
   if (executed.termination !== null) return executed.termination;
   settlePasses(ctx, readout, executed, before);
   return null;
@@ -276,6 +276,7 @@ export async function step(ctx: EngineContext): Promise<Termination | null> {
     planned.decided,
     { ...readout, plan: readout.plan },
     observation,
+    planned.advice.onRecord,
   );
   return ended ?? rails(ctx);
 }

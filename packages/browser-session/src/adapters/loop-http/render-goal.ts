@@ -2,6 +2,8 @@ import {
   composeStepGoal,
   stopsOf,
   stopsOnPage,
+  takenOf,
+  takenOnPage,
   GOAL_BUDGET_BYTES,
   GoalBudgetExceeded,
   textBytes,
@@ -132,13 +134,14 @@ function attempt(
 }
 
 export function composeStepGoalWithinBudget(
-  page: Omit<StepGoalInput, 'stops'>,
+  page: Omit<StepGoalInput, 'stops' | 'taken'>,
   budget = GOAL_BUDGET_BYTES,
 ): ComposedGoal {
   // Read from the page as the browser read it, before any rung below reduces it.
   const input: StepGoalInput = {
     ...page,
     stops: stopsOnPage(stopsOf(page.mission), page.observation),
+    taken: takenOnPage(takenOf(page.mission), page.observation),
   };
   const { observation: full, rung } = snapshotFitted(input, input.observation, budget);
   const trimmed = trimmedContext(full);

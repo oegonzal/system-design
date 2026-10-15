@@ -8,6 +8,7 @@
 import { z } from 'zod';
 
 import { bounded } from '../bounds';
+import { quoted } from '../text';
 import {
   UNIT_FACET_NAME_MAX_LENGTH,
   UNIT_FACET_VALUE_MAX_LENGTH,
@@ -35,6 +36,10 @@ export const unitFacetsSchema = bounded.list(UNIT_FACETS_BOUND, unitFacetSchema,
 
 /** The facets a record names a unit by: at least one. */
 export const unitIdentitySchema = bounded.list(UNIT_FACETS_BOUND, unitFacetSchema, { min: 1 });
+
+/** An identity as the goal names it: `company "Acme"`, each facet in turn. */
+export const describeIdentity = (identity: readonly UnitFacet[]): string =>
+  identity.map((facet) => `${facet.name} ${quoted(facet.value)}`).join(' · ');
 
 /**
  * A value as the key compares it: trimmed, Unicode-normalised, lower-cased

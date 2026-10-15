@@ -329,15 +329,23 @@ export const stepHistoryEntrySchema = z.strictObject({
 export type StepHistoryEntry = z.infer<typeof stepHistoryEntrySchema>;
 
 /**
- * One reason a plan did not run, as the objector put it. A critic's finding
- * and a validator's problem are both objections: the next plan has to answer
- * either, so both travel the same way. A plan-level objection names nothing
- * in `at`.
+ * The engine's own objectors, beside the lenses and validators of the loop:
+ * the controller, when nothing named a finding or a problem and only its
+ * reason remains; the session, when it refuses an action itself. Declared
+ * once, so a reader of a session's objections can enumerate who may object.
+ */
+export const ENGINE_OBJECTORS = { controller: 'controller', session: 'session' } as const;
+
+/**
+ * One reason a plan did not run, as the objector put it. A critic's finding,
+ * a validator's problem and the engine's own refusal are all objections: the
+ * next plan has to answer any of them, so all travel the same way. A
+ * plan-level objection names nothing in `at`.
  */
 export const stepObjectionSchema = z.strictObject({
   /** The session step whose plan drew it. */
   step: z.number().int().min(1),
-  /** Who objected: a critic's finding type, or a validator's id. */
+  /** Who objected: a critic's finding type, a validator's or a criterion's id, or one of `ENGINE_OBJECTORS`. */
   from: bounded.id(OBJECTION_FROM_MAX_LENGTH),
   /** Where in the refused plan it sat, as the objector located it. */
   at: bounded.list(OBJECTION_AT_BOUND, bounded.id(OBJECTION_AT_MAX_LENGTH)),

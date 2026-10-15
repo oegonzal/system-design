@@ -160,6 +160,7 @@ describe('composeStepGoal', () => {
       },
       pageUnchanged: false,
       stops: [],
+      taken: [],
       onRecord: NO_UNITS_ON_RECORD,
       // The longest hand-off the page section can carry: a long element name, and a full plan held past it.
       lastStep: {

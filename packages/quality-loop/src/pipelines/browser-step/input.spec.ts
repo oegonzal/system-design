@@ -17,6 +17,8 @@ import {
   stepGoalInput,
   stopsOf,
   stopsOnPage,
+  takenOf,
+  takenOnPage,
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
@@ -105,6 +107,7 @@ describe('the browser-step input codec', () => {
       // The fixture mission declares no unit identity, and no advisor was asked.
       unitFacets: [],
       unitsForbidden: [],
+      onRecordTaken: [],
     });
   });
 
@@ -143,6 +146,7 @@ describe('the browser-step input codec', () => {
       pageUnchanged: false,
       lastStep: null,
       stops: stopsOnPage(stopsOf(MISSION_FIXTURE), observation),
+      taken: takenOnPage(takenOf(MISSION_FIXTURE), observation),
       onRecord: NO_UNITS_ON_RECORD,
     });
     expect(textBytes(goal)).toBeLessThan(GOAL_BUDGET_BYTES);

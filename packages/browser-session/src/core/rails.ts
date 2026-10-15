@@ -36,6 +36,8 @@ export const STEP_FAILURE_EVENTS = [
   'action-failed',
   'expectation-unmet',
   'plan-not-executed',
+  /** A taskStart the session refused against the record it was composed with: no unit opened, and the plan stopped there. */
+  'unit-refused',
 ] as const;
 export type StepFailureEvent = (typeof STEP_FAILURE_EVENTS)[number];
 

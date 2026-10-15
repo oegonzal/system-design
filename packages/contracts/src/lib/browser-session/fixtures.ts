@@ -6,6 +6,7 @@
  */
 import type { DocumentChunk } from '../quality-loop/document-digest';
 import { DOCUMENT_RULES } from '../quality-loop/document-digest';
+import { takenOf, takenOnPage } from '../units/mission-taken';
 import { NO_UNITS_ON_RECORD } from '../units/record';
 import type { AnsweringSettings } from './answering';
 import type { ObservedElement, PageObservation, TaskLedgerSummary } from './observation.schema';
@@ -218,6 +219,13 @@ export const MISSION_WITH_IDENTITY = `${MISSION_FIXTURE}
 - company: the company as the listing names it, beside the title.
 `;
 
+/** The fixture mission that also declares when a unit on record to avoid may be taken: not while the listing page offers a next page. */
+export const MISSION_WITH_TAKEN = `${MISSION_WITH_IDENTITY}
+## Taking a unit on record
+
+- avoid unless "Next page": a listing at a company on record to avoid is taken only when no next page is listed.
+`;
+
 export function resumeChunk(): DocumentChunk {
   return {
     kind: 'resume',
@@ -250,6 +258,7 @@ export const stepGoalInput = (overrides: Partial<StepGoalInput> = {}): StepGoalI
     pageUnchanged: false,
     lastStep: null,
     stops: stopsOnPage(stopsOf(mission), observation),
+    taken: takenOnPage(takenOf(mission), observation),
     onRecord: NO_UNITS_ON_RECORD,
     ...overrides,
   };

@@ -18,14 +18,14 @@ the session publishes what happened, and the record moves.
 
 ## Who knows what
 
-| Party                                | Knows                                                                                       | Says                                                                                                                                                | Never knows                              |
-| ------------------------------------ | ------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
-| Mission (`goals/*.md`)               | which facts identify a unit (`## Unit identity`: `company`) and who advises (`## Advisors`) | the procedure: page forward before a company on record is taken again                                                                               | where any service runs                   |
-| Environment                          | where each advisor runs (`UNIT_ADVISOR_URLS`)                                               | —                                                                                                                                                   | what an advisor's facets mean            |
-| Advisor (`packages/job-application`) | the record: one row per unit, keyed by the identity the mission declared                    | `GET /advisor`: who it is and which facets it keeps the record by; `POST /advice`: the units on record for a subject, each with a stance and a note | what a page, a card or a plan is         |
-| Session (`browser-session`)          | which advisors the mission names, and their answers                                         | the goal — units to avoid as prose, units forbidden in the index — and the events                                                                   | what `company` means; it copies a name   |
-| Loop (`quality-loop`)                | the index fields `unitFacets` and `unitsForbidden`                                          | a cut at `action.N`, with the advisor's note                                                                                                        | what a company or an application is      |
-| Record (`job_application`)           | every unit opened or closed, by the engine's unit id                                        | —                                                                                                                                                   | the session's rows; it reads events only |
+| Party                                | Knows                                                                                                                                                                                       | Says                                                                                                                                                | Never knows                              |
+| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- |
+| Mission (`goals/*.md`)               | which facts identify a unit (`## Unit identity`: `company`), who advises (`## Advisors`) and when a unit on record may still be taken (`## Taking a unit on record`: `avoid unless "Next"`) | the procedure: page forward before a company on record is taken again                                                                               | where any service runs                   |
+| Environment                          | where each advisor runs (`UNIT_ADVISOR_URLS`)                                                                                                                                               | —                                                                                                                                                   | what an advisor's facets mean            |
+| Advisor (`packages/job-application`) | the record: one row per unit, keyed by the identity the mission declared                                                                                                                    | `GET /advisor`: who it is and which facets it keeps the record by; `POST /advice`: the units on record for a subject, each with a stance and a note | what a page, a card or a plan is         |
+| Session (`browser-session`)          | which advisors the mission names, and their answers                                                                                                                                         | the goal — units to avoid as prose, units forbidden in the index — the refusal of a `taskStart` at any unit on record, and the events               | what `company` means; it copies a name   |
+| Loop (`quality-loop`)                | the index fields `unitFacets`, `unitsForbidden` and `onRecordTaken`                                                                                                                         | a cut at `action.N`, with the advisor's note, or for a declaration the mission never granted or this page withholds                                 | what a company or an application is      |
+| Record (`job_application`)           | every unit opened or closed, by the engine's unit id                                                                                                                                        | —                                                                                                                                                   | the session's rows; it reads events only |
 
 ## A taskStart refused
 
@@ -51,14 +51,25 @@ record                     session                                  loop
   │                          ◀─ the run and its validation report ─────────────┤
   │                          ├─ run action.1–2; the objection reaches the next
   │                          │  plan, which chooses another company
+  │                          ├─ at any taskStart that runs: refusedOnRecord against
+  │                          │  every unit answered — Globex (avoid) is refused unless
+  │                          │  the mission declares the exception and the plan
+  │                          │  declares onRecordTaken: true; Acme (forbid) whatever
+  │                          │  either declares — the plan stops there, the history
+  │                          │  keeps the fact and the next plan's objection the reason
 ```
 
 Where it lives: `contracts/src/lib/units/identity.ts` (`identityKey`,
 `matchesRecord` — one key, shared by the validator and the record),
 `contracts/src/lib/browser-session/step-index.ts` (`unitFacets`,
-`unitsForbidden`), `quality-loop/src/pipelines/browser-step/validators.ts`
-(`facetsFault`, `forbiddenFault`), `browser-session/src/core/unit-advice.ts`
-(`recallAdvice`). How the lenses are run over that goal and where a cut
+`unitsForbidden`, `onRecordTaken`), `contracts/src/lib/units/mission-taken.ts`
+(`takenOf`, `takenOnPage` — the exception as declared and as the page bears on
+it), `contracts/src/lib/browser-session/step-record.ts` (`refusedOnRecord`,
+the rule per stance from `UNIT_STANCE_TAKEN`, phrased once for the session,
+the validator and the Limits), `quality-loop/src/pipelines/browser-step/validators.ts`
+(`facetsFault`, `forbiddenFault`, `takenFault`),
+`browser-session/src/core/unit-advice.ts` (`recallAdvice`),
+`browser-session/src/core/step-executor.ts` (the check at `taskStart`). How the lenses are run over that goal and where a cut
 becomes a decision: [`lens-debate.md`](lens-debate.md) §1–§2.
 
 ## What happened, back to the record
@@ -83,16 +94,28 @@ session: `RUNBOOK.md`, "Scattering applications across companies", and
 
 ## What is guaranteed, and what is only advised
 
-Only one thing is cut deterministically: a `taskStart` whose declared
-identity matches a unit on record as `forbid` — under the shipped policy, a
-unit in progress in another live session. A company applied to within the
-window is `avoid`: prose the planner and the judges read, and the mission's
-procedure says to page forward before any such company is taken again. The
-third guard is the page's own: a card the page marks as applied to (the
+Two things are enforced deterministically. The loop's validator cuts a
+`taskStart` whose declared identity matches a unit on record as `forbid` —
+under the shipped policy, a unit in progress in another live session — and
+one declaring `onRecordTaken: true` where the mission declares no exception or
+where this page lists the control the mission ties it to (the shipped
+mission's `- avoid unless "Next"`: a next page of results is listed; measured
+over 263 recorded results pages, 249 listed that button). The session then
+holds every `taskStart` that runs to the whole record the step was composed
+with — every unit the advisor answered, not the `UNITS_ON_RECORD_BOUND` the
+goal had room to list: a forbidden unit is refused all the same, and a company
+applied to within the window (`avoid`) is refused unless the mission declares
+the exception and the plan declares `onRecordTaken: true`; the refusal opens no
+unit, stops the plan there and is carried into the next goal. Measured
+2026-10-14 before this check: 43 companies on record, 40 rendered, and the
+planner opened one of the three cut as "not on the avoid-list". The mission's
+procedure still says to page forward before any such company is taken again.
+The third guard is the page's own: a card the page marks as applied to (the
 mission's `## Marks`) is passed over, and a listing opened anyway closes
 `already-done`, which reaches the record as `submitted-before`. So "never
-twice" is exact for a unit another session holds, strong for a company on
-record, and measured rather than assumed for the rest: over the live sessions
+twice" is exact for a unit another session holds, exact for a company on
+record unless the mission's exception is open on the page and the plan says it
+knows, and measured rather than assumed for the rest: over the live sessions
 since the record existed, five applications and zero companies in common with
 it.
 

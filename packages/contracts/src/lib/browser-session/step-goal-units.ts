@@ -8,15 +8,16 @@
  * twice" had nothing to rest on.
  */
 import { quoted } from '../text';
+import { describeIdentity } from '../units/identity';
 import type { UnitOnRecord, UnitsOnRecord } from '../units/record';
 import {
   UNIT_STANCE_MEANINGS,
-  UNIT_STANCES,
+  UNIT_STANCE_ON_RECORD,
+  UNIT_STANCES_STRONGEST_FIRST,
   UNITS_ON_RECORD_BOUND,
   type UnitStance,
 } from '../units/vocab';
 import type { TaskLedgerSummary } from './observation.schema';
-import { describeIdentity } from './step-limits';
 import { TASK_OUTCOME_SPENDS, TASK_OUTCOMES } from './vocab';
 
 /** A unit as the goal names it: its label, and its identity when it declared one. */
@@ -55,33 +56,43 @@ const ledgerLines = (ledger: TaskLedgerSummary): string[] => [
 ];
 
 /**
- * The units on record from earlier sessions, forbidden ones first, each by
+ * The units on record from earlier sessions, strongest stance first, each by
  * its identity and the advisor's note, within the rendered bound; the rest
- * counted with what the advisor itself left out. The goal budget has no slack
- * to give, so a line is one unit and a bound is a bound.
+ * counted, apart from what the advisor itself left out. The goal budget has
+ * no slack to give, so a line is one unit and a bound is a bound — and the
+ * bound is the rendering's alone: the session holds a taskStart to every unit
+ * on record, listed here or not (`refusedOnRecord`), which the Limits say
+ * once (`onRecordLimit`); the heading names the stance in a few words and
+ * repeats no rule.
  */
 const onRecordLines = (onRecord: UnitsOnRecord): string[] => {
   if (onRecord.units.length === 0 && onRecord.omitted === 0) return [];
   const byStance = (stance: UnitStance): UnitOnRecord[] =>
     onRecord.units.filter((unit) => unit.stance === stance);
-  /** Forbidden first: what the validator will cut is what the planner must read first. */
-  const stances: readonly UnitStance[] = [...UNIT_STANCES].reverse();
-  const ordered = stances.flatMap(byStance);
+  /** Strongest first: what is never started is what the planner must read first. */
+  const ordered = UNIT_STANCES_STRONGEST_FIRST.flatMap(byStance);
   const shown = ordered.slice(0, UNITS_ON_RECORD_BOUND.target);
-  const notShown = ordered.length - shown.length + onRecord.omitted;
-  const lines = stances.flatMap((stance) => {
+  const cut = ordered.length - shown.length;
+  const lines = UNIT_STANCES_STRONGEST_FIRST.flatMap((stance) => {
     const units = shown.filter((unit) => unit.stance === stance);
     return units.length === 0
       ? []
       : [
-          `- On record from earlier sessions, ${stance === 'forbid' ? 'forbidden' : 'to avoid'} (${UNIT_STANCE_MEANINGS[stance]}):`,
+          `- On record from earlier sessions ${UNIT_STANCE_ON_RECORD[stance]} (${UNIT_STANCE_MEANINGS[stance]}):`,
           ...units.map(
             (unit) =>
               `  - ${describeIdentity(unit.identity)}${unit.note === '' ? '' : ` — ${unit.note}`}`,
           ),
         ];
   });
-  return [...lines, ...(notShown > 0 ? [`  (${notShown} more on record not listed)`] : [])];
+  return [
+    ...lines,
+    ...(cut > 0 ? [`  (${cut} more on record not listed)`] : []),
+    // What the advisor counted past its own bound it did not name, and nothing here can refuse.
+    ...(onRecord.omitted > 0
+      ? [`  (${onRecord.omitted} more on record the advisor counted and did not name)`]
+      : []),
+  ];
 };
 
 /** The whole Units of work section: this session's units, then the record's. */

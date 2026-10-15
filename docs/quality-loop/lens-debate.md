@@ -86,8 +86,9 @@ All three lenses run in one wave: none is shown another's answer (section 2 says
    7. `## Units of work` — `ct/browser-session/step-goal-units.ts` `unitsLines`: the open and
       closed units with their declared identity, then the units on record by stance;
    8. `## Progress` — `progressLines`;
-   9. `## Limits` — `ct/browser-session/step-limits.ts` `limitsLines`: each rule the validators
-      enforce, said once;
+   9. `## Limits` — `ct/browser-session/step-limits.ts` `limitsLines`: each rule the validators or
+      the session enforce, said once — the record line is the session's own check at taskStart,
+      with the mission's exception as this page bears on it;
    10. last, the fenced `## Index` (`ct/browser-session/step-index.ts` `indexOf`), which only the
        validators read.
 

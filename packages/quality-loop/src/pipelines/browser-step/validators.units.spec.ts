@@ -1,4 +1,10 @@
-import { MISSION_FIXTURE, MISSION_WITH_IDENTITY, type UnitOnRecord } from '@sysdesign/contracts';
+import {
+  formObservation,
+  MISSION_FIXTURE,
+  MISSION_WITH_IDENTITY,
+  MISSION_WITH_TAKEN,
+  type UnitOnRecord,
+} from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { click, samplePlan, stepGoal, taskStart } from './testing';
@@ -82,7 +88,7 @@ describe('the browser-step validators on a unit’s declared identity', () => {
         severity: 'high',
         locationRefs: ['action.1'],
         message:
-          'taskStart names company "Globex", a unit on record as forbidden (in progress in another session): it is never started — choose another item',
+          'taskStart names company "Globex" (in progress in another session), a unit on record as forbidden: such a unit is never started; choose another item',
       },
     ]);
     expect(problems(samplePlan([taskStart('Senior Engineer at Acme', acme)]), goal).limits).toEqual(
@@ -95,5 +101,40 @@ describe('the browser-step validators on a unit’s declared identity', () => {
     // A plan with no taskStart is untouched by either rule.
     expect(problems(samplePlan([click('e3')]), goal).limits).toEqual([]);
     expect(goal).not.toBe(stepGoal(undefined, undefined, MISSION_FIXTURE));
+  });
+
+  it('[QL-66] a taskStart declaring it takes a unit on record is cut where the mission declares no exception, and where this page lists the control the mission ties the exception to; where the exception is open it runs, which unit it takes being the session’s to check', () => {
+    const taking = taskStart('Senior Engineer at Acme', acme, true);
+    expect(problems(samplePlan([taking]), declared).limits).toEqual([
+      {
+        severity: 'high',
+        locationRefs: ['action.1'],
+        message:
+          'taskStart declares onRecordTaken: the mission declares no exception for a unit on record, so none may be taken — choose another item',
+      },
+    ]);
+    // The listing page lists the "Next page" button the fixture mission ties the exception to.
+    expect(
+      problems(samplePlan([taking]), stepGoal(undefined, undefined, MISSION_WITH_TAKEN)).limits,
+    ).toEqual([
+      {
+        severity: 'high',
+        locationRefs: ['action.1'],
+        message:
+          'taskStart declares onRecordTaken on a page that lists "Next page": the mission withholds its exception while the page does — choose another item',
+      },
+    ]);
+    // The form page lists none: the declaration stands, whatever the record says of the unit.
+    expect(
+      problems(samplePlan([taking]), stepGoal(formObservation(), undefined, MISSION_WITH_TAKEN))
+        .limits,
+    ).toEqual([]);
+    // A taskStart declaring nothing is held to no exception.
+    expect(
+      problems(
+        samplePlan([taskStart('Senior Engineer at Acme', acme)]),
+        stepGoal(undefined, undefined, MISSION_WITH_TAKEN),
+      ).limits,
+    ).toEqual([]);
   });
 });

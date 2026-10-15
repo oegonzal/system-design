@@ -6,7 +6,13 @@
  * element on one page. The schema is the contract's — the session reads the
  * accepted plan back with the same one.
  */
-import { stepPlanSchema, type StepAction, type StepPlan, quotedJson } from '@sysdesign/contracts';
+import {
+  ON_RECORD_TAKEN,
+  stepPlanSchema,
+  type StepAction,
+  type StepPlan,
+  quotedJson,
+} from '@sysdesign/contracts';
 
 import { numbered, numberedSection, type OutputShape } from '../../core/contracts';
 
@@ -32,10 +38,12 @@ export function describeAction(action: StepAction): string {
     case 'askFields':
       return `askFields ${action.refs.join(', ')}`;
     case 'taskStart':
-      // The identity the validator holds the claim to, printed so the judges grade what it checks.
+      // The identity the validator holds the claim to, and the declaration the
+      // session holds it to against the record, printed so the judges grade
+      // what the engines check.
       return `taskStart ${quotedJson(action.label)} at ${action.url}${action.facets
         .map((facet) => ` · ${facet.name}=${quotedJson(facet.value)}`)
-        .join('')}`;
+        .join('')}${action[ON_RECORD_TAKEN] === true ? ` · ${ON_RECORD_TAKEN}` : ''}`;
     case 'taskDone':
       return `taskDone ${action.outcome}${action.detail.length > 0 ? ` — ${action.detail}` : ''}`;
     case 'terminate':

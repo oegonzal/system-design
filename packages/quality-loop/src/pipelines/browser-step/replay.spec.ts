@@ -8,6 +8,8 @@ import {
   type ValidationReport,
   stopsOf,
   stopsOnPage,
+  takenOf,
+  takenOnPage,
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
@@ -61,6 +63,7 @@ const goalOf = (recorded: RecordedStep): string =>
     pageUnchanged: false,
     lastStep: null,
     stops: stopsOnPage(stopsOf(MISSION_FIXTURE), recorded.observation),
+    taken: takenOnPage(takenOf(MISSION_FIXTURE), recorded.observation),
     onRecord: NO_UNITS_ON_RECORD,
   });
 

@@ -444,10 +444,15 @@ first two are missing:
    `BROWSER_SESSION_SUBJECT` — since the record is kept per subject.
 3. **The mission.** `## Unit identity` declares the fact a unit is known by
    (`- company: the company as the pane names it`), `## Advisors` names
-   `job-application`, and the per-unit procedure says what to do with a company
-   on record: prefer a card at another company, page forward before repeating,
-   never start a unit at a company in progress in another session (that one the
-   loop's validator cuts regardless).
+   `job-application`, `## Taking a unit on record` says when a company on
+   record to avoid may still be taken (`- avoid unless "Next": …` — not while
+   a next page is listed; the loop's validator cuts a `taskStart` declaring
+   `onRecordTaken: true` while the page lists that button), and the per-unit
+   procedure says what to do with a company on record: prefer a card at another
+   company, page forward before repeating. The session refuses a `taskStart` at
+   a company on record to avoid unless the plan declares `onRecordTaken: true`
+   under that exception; one at a company in progress in another session the
+   loop's validator cuts and the session refuses regardless.
 
 Backfill first, or the record starts empty: `pnpm browser-session sessions`
 and `show <id>` list every recorded unit with its label; enter each company

@@ -113,6 +113,10 @@ describe('the advisors a mission names', () => {
       { script, mission: `${MISSION_WITH_IDENTITY}\n${ADVISORS_HEADING}\n\n- Record\n` },
       /a line under ## Advisors is not an advisor/,
     );
+    await refused(
+      { script, mission: `${MISSION}\n## Taking a unit on record\n\n- forbid: never.\n` },
+      /a line under ## Taking a unit on record is not an exception/,
+    );
     // A described advisor the mission does not name is never asked.
     const unnamed = new ScriptedAdvisor({ id: 'other', facets: ['company'] }, [ACME]);
     await refused(

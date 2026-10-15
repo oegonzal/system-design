@@ -9,6 +9,7 @@ import { quoted } from '../text';
 import type { SuccessCriterion } from '../quality-loop/evidence';
 import { GOAL_BUDGET_BYTES, renderIndexSection, withinBudget } from '../quality-loop/goal-index';
 import { unitFacetsOf } from '../units/mission-identity';
+import type { TakenOnPage } from '../units/mission-taken';
 import { forbiddenOf, type UnitsOnRecord } from '../units/record';
 import type { RanAction } from './action-identity';
 import { marksOf, marksOn, type Mark } from './mission-marks';
@@ -64,6 +65,13 @@ export interface StepGoalInput extends StepPageState {
    * terminate is never cut for words a reduced snapshot dropped.
    */
   stops: readonly StopOnPage[];
+  /**
+   * The exceptions the mission declares for taking a unit on record, and
+   * whether this page lists the control each is tied to — read from the page
+   * as the browser read it, before any fitting, for the same reason as the
+   * stops: a rung that drops elements must never read as the control's absence.
+   */
+  taken: readonly TakenOnPage[];
   /** The units an advisor put on record from earlier sessions; none when no advisor was asked. */
   onRecord: UnitsOnRecord;
 }
@@ -331,8 +339,20 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
     ...section('## Objections to answer', objectionLines(input.objections)),
     ...section('## Units of work', unitsLines(input.ledger, input.onRecord)),
     ...section('## Progress', progressLines(input.progress)),
-    ...section('## Limits', limitsLines({ marks, stops, causes, unitFacets, forbidden })),
-    renderIndexSection(indexOf(input, marks, stops, causes, { facets: unitFacets, forbidden })),
+    ...section(
+      '## Limits',
+      limitsLines({
+        marks,
+        stops,
+        causes,
+        unitFacets,
+        onRecord: input.onRecord,
+        taken: input.taken,
+      }),
+    ),
+    renderIndexSection(
+      indexOf(input, marks, stops, causes, { facets: unitFacets, forbidden, taken: input.taken }),
+    ),
   ].join('\n');
   return withinBudget(goal, budget);
 }

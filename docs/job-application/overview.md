@@ -9,7 +9,11 @@ declares what identifies a unit (`## Unit identity`: the company), names its
 advisor (`## Advisors`: `job-application`), and the session composes what the
 advisor answers into every goal — the companies to avoid as prose the planner
 and the judges read, the units in progress elsewhere into the goal's index,
-where the loop's limits validator cuts a `taskStart` naming one.
+where the loop's limits validator cuts a `taskStart` naming one — and holds
+every `taskStart` to the whole record it was composed with, listed in the goal
+or not: one at a company on record to avoid is refused unless the mission
+declares the exception (`## Taking a unit on record`) and the plan declares
+`onRecordTaken: true`.
 
 ## Why it is shaped this way
 
@@ -26,11 +30,16 @@ same way:
 /advisor` answers `{id, facets}` — who the advisor is and which declared
   facets it keeps its record by; `POST /advice {subject, asker, facets}`
   answers `{advisor, units, omitted}` — one unit per identity, each with a
-  stance (`forbid`: never started, the validator cuts a `taskStart` naming it;
-  `avoid`: prefer another item, the mission's prose says when one may still be
-  taken) and a note in the advisor's words. The session renders a bounded
-  number and counts the rest; the bound both sides read is
-  `ADVICE_UNITS_BOUND`, so a request carries no limit.
+  stance (`forbid`: never started, the validator cuts a `taskStart` naming it
+  and the session refuses one all the same; `avoid`: prefer another item, and
+  the session refuses a `taskStart` at one unless the mission's `## Taking a
+unit on record` declares the exception and the plan declares `onRecordTaken:
+true` — a declaration the validator cuts while the page lists the control
+  the mission ties the exception to) and a note
+  in the advisor's words. The session renders a bounded number and counts the
+  rest, and checks every unit answered at `taskStart`, rendered or not; the
+  bound both sides read is `ADVICE_UNITS_BOUND`, so a request carries no
+  limit.
 - **The session's events** (`session.started`, `session.unit.opened`,
   `session.unit.closed`, `session.ended`), declared on the notifications bus
   and carrying the task row's own id, the unit's declared facets and the

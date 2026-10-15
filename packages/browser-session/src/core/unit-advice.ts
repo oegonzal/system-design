@@ -3,6 +3,7 @@ import {
   marksOf,
   NO_UNITS_ON_RECORD,
   stopsOf,
+  takenOf,
   unitFacetsOf,
   type AdvisorDescriptor,
   type UnitAdvice,
@@ -20,9 +21,11 @@ import type { EngineContext, RunSessionOptions, SessionDeps } from './engine-con
  * by. All of that is resolved before the session opens a row, and a mission
  * that names an advisor nobody runs is refused like a bad flag. Then, before
  * every plan, each advisor is asked what is on record: its answer is rendered
- * for the planner and the judges, and the units it forbids go into the goal's
- * index for the validator to cut. The engine compares declared facts by key
- * and never learns what any of them means.
+ * for the planner and the judges, the units it forbids go into the goal's
+ * index for the validator to cut, and every unit it answered is held against
+ * each taskStart by the session (`refusedOnRecord`), whatever the goal had
+ * room to list. The engine compares declared facts by key and never learns
+ * what any of them means.
  */
 
 /** Why an advisor gave no answer; the first three are transient and ridden out. */
@@ -122,6 +125,7 @@ function declaredOf(mission: string): { facets: string[]; advisors: string[] } {
   try {
     marksOf(mission);
     stopsOf(mission);
+    takenOf(mission);
     return { facets: unitFacetsOf(mission), advisors: advisorsOf(mission) };
   } catch (error) {
     throw new SessionRefused(describeError(error).message);

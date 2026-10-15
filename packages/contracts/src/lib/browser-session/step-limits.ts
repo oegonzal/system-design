@@ -1,15 +1,17 @@
 /**
- * The Limits a step goal states: what the validators refuse, said to the
- * model as rules, each beside the measurement that made it a rule. One
- * declared list rendered in order; a line about the mission's marks or stop
- * words appears only when the mission declares some.
+ * The Limits a step goal states: what the validators refuse, and what the
+ * session refuses at taskStart against the record, said to the model as
+ * rules, each beside the measurement that made it a rule. One declared list
+ * rendered in order; a line about the mission's marks, stop words or units on
+ * record appears only when there are some.
  */
 import { quoted } from '../text';
-import type { UnitFacet } from '../units/identity';
-import type { UnitOnRecord } from '../units/record';
+import type { TakenOnPage } from '../units/mission-taken';
+import type { UnitsOnRecord } from '../units/record';
 import type { Mark } from './mission-marks';
 import type { StopOnPage } from './mission-stops';
 import { ACTIONS_BOUND } from './step-plan.schema';
+import { onRecordLimit } from './step-record';
 
 /** What the mission declared, and what the record holds, that a Limits line may depend on. */
 export interface LimitFacts {
@@ -19,13 +21,11 @@ export interface LimitFacts {
   causes: readonly string[];
   /** The facts the mission's Unit identity declares, by name. */
   unitFacets: readonly string[];
-  /** The units on record as forbidden. */
-  forbidden: readonly UnitOnRecord[];
+  /** The units on record the goal was composed with — every one the advisors answered, whatever the goal lists. */
+  onRecord: UnitsOnRecord;
+  /** The exceptions the mission declares for taking a unit on record, as this page bears on them. */
+  taken: readonly TakenOnPage[];
 }
-
-/** An identity as the goal names it: `company "Acme"`, each facet in turn. */
-export const describeIdentity = (identity: readonly UnitFacet[]): string =>
-  identity.map((facet) => `${facet.name} ${quoted(facet.value)}`).join(' · ');
 
 interface Limit {
   /** Absent for a line every goal carries. */
@@ -90,12 +90,15 @@ const STEP_LIMITS: readonly Limit[] = [
     line: ({ unitFacets }) =>
       `- A taskStart carries each fact the mission's Unit identity declares — ${unitFacets.join(', ')} — once, with its value exactly as this page names it, and no other fact.`,
   },
+  // The record is enforced whole, whatever the goal had room to list. Measured
+  // 2026-10-14: 43 units on record, 40 rendered, and the planner opened one of
+  // the three cut as "not on the list" — the record's rule has to be stated as
+  // the session's, not the listing's, or the listing's edge reads as its end.
+  // One line for every stance the record holds: a goal at the budget has no
+  // byte to say a rule twice, and each byte here is taken from the page.
   {
-    when: ({ forbidden }) => forbidden.length > 0,
-    line: ({ forbidden }) =>
-      `- A unit on record as forbidden is never started: a taskStart naming ${forbidden
-        .map((unit) => describeIdentity(unit.identity))
-        .join(' or ')} is cut. Choose another item.`,
+    when: ({ onRecord }) => onRecord.units.length > 0,
+    line: ({ onRecord, taken }) => onRecordLimit(onRecord, taken),
   },
   {
     when: ({ causes }) => causes.length > 0,

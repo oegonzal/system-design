@@ -1,12 +1,22 @@
 import {
+  actionLocation,
   CLOSED_TASKS_BOUND,
+  describeOnRecordRefusal,
+  ENGINE_OBJECTORS,
   MISSION_STOP,
+  noteOnRecordRefusal,
+  noteOnRecordTaken,
+  ON_RECORD_TAKEN,
+  refusedOnRecord,
   stopsOf,
+  takenStancesOf,
   TASK_OUTCOME_STATUS,
+  unitOnRecordFor,
   type PageObservation,
   type PlanReadout,
   type StepAction,
   type StepPlan,
+  type UnitsOnRecord,
 } from '@sysdesign/contracts';
 
 import { captureAfter, touchedName } from './capture';
@@ -20,12 +30,14 @@ import {
   type Decided,
   type Termination,
 } from './ports';
+import type { StepFailureEvent } from './rails';
 import { labelledScreenshot } from './session-dump';
 import { unitClosedEvent, unitOpenedEvent } from './session-events';
 import {
   clearObjections,
   describeAction,
   pushHistory,
+  pushObjections,
   touchedBy,
   type OpenTask,
 } from './session-state';
@@ -34,22 +46,50 @@ import {
  * Running the unfaulted prefix of a plan, action by action. A browser action
  * goes to the browser and leaves its promise pending for the next
  * observation; the engine's own events — units of work opening and closing,
- * fields asked, a screenshot, the end — are handled here. The first
- * `ActionFailed` — a browser action's or a field fill's — stops the plan and
- * counts one failed step. The history records what happened, each action
- * once; what the plan proposed and did not run is the last step's `held`,
- * which the next goal states beside the page it was held for.
+ * fields asked, a screenshot, the end — are handled here. The first fault —
+ * a browser action's `ActionFailed`, a field fill's, or a taskStart the
+ * record refuses — stops the plan and counts one failed step. The history
+ * records what happened, each action once; what the plan proposed and did not
+ * run is the last step's `held`, which the next goal states beside the page it
+ * was held for.
  */
 
-function openTask(
+/**
+ * A unit opens for the item the plan names — unless the record the step was
+ * composed with refuses it. Every unit the advisors answered is checked, never
+ * only the ones the goal had room to list: measured 2026-10-14, a goal
+ * rendered 40 of 43 units on record, and the planner opened one of the three
+ * cut as "not on the list". A refusal is the plan's to answer on the next
+ * page, so it is carried once as an objection, the history keeping the fact.
+ * True when the record refused the unit and the plan stops; false when it
+ * opened, or when one was open already and the plan goes on.
+ */
+function openTaskUnlessRefused(
   ctx: EngineContext,
   action: Extract<StepAction, { kind: 'taskStart' }>,
   label: string,
-): void {
+  position: number,
+  onRecord: UnitsOnRecord,
+): boolean {
   const { state, deps, queue } = ctx;
   if (state.tasks.open !== null) {
     pushHistory(state, label, 'not-executed', 'a unit of work is already open');
-    return;
+    return false;
+  }
+  // The stances the mission's exception names are the only ones a declaration lifts a refusal for.
+  const declared = takenStancesOf(ctx.mission);
+  const refused = refusedOnRecord(action, onRecord, declared);
+  if (refused !== null) {
+    pushHistory(state, label, 'not-executed', noteOnRecordRefusal(refused));
+    pushObjections(state, [
+      {
+        step: state.step,
+        from: ENGINE_OBJECTORS.session,
+        at: [actionLocation(position)],
+        detail: describeOnRecordRefusal(refused, declared),
+      },
+    ]);
+    return true;
   }
   const task: OpenTask = {
     id: crypto.randomUUID(),
@@ -75,7 +115,17 @@ function openTask(
     }),
   );
   ctx.events.publish(unitOpenedEvent(ctx, task));
-  pushHistory(state, label, 'ok', null);
+  // A declaration is recorded as data whether it took a unit on record or named
+  // one the record never held: the next plan and the dump read what it did.
+  pushHistory(
+    state,
+    label,
+    'ok',
+    action[ON_RECORD_TAKEN] === true
+      ? noteOnRecordTaken(unitOnRecordFor(action.facets, onRecord))
+      : null,
+  );
+  return false;
 }
 
 async function closeTask(
@@ -113,20 +163,30 @@ async function closeTask(
   pushHistory(state, label, 'ok', null);
 }
 
-/** One of the engine's own events; true when it failed and the plan must stop. */
+/** What one engine event did to the step: the failure it counts, if any, and whether the operator stopped the session. */
+interface Performed {
+  failure: StepFailureEvent | null;
+  stopped: boolean;
+}
+
+const RAN: Performed = { failure: null, stopped: false };
+
+/** One of the engine's own events, at its position in the plan, against the record the plan was composed with. */
 async function perform(
   ctx: EngineContext,
   action: Exclude<StepAction, BrowserAction | { kind: 'terminate' }>,
   label: string,
+  position: number,
   observation: PageObservation,
-): Promise<{ failed: boolean; stopped: boolean }> {
+  onRecord: UnitsOnRecord,
+): Promise<Performed> {
   const { deps, state } = ctx;
   switch (action.kind) {
     case 'screenshot': {
       const bytes = await deps.browser.screenshot(null);
       ctx.dumpFiles('screenshot', [labelledScreenshot(state.step, action.label, bytes)]);
       pushHistory(state, label, 'ok', null);
-      return { failed: false, stopped: false };
+      return RAN;
     }
     case 'askFields': {
       const outcome = await askFields(ctx, action.refs, observation);
@@ -134,17 +194,20 @@ async function perform(
       // A /stop the operator typed is theirs; a stop the stopping signal brought was named by
       // whoever raised it — Ctrl-C marks the session itself, and the time limit is the rails' to report.
       if (outcome.stopped && !ctx.stopping.aborted) state.operatorStopped = true;
-      return { failed: outcome.failed, stopped: outcome.stopped };
+      return { failure: outcome.failed ? 'action-failed' : null, stopped: outcome.stopped };
     }
-    case 'taskStart':
-      openTask(ctx, action, label);
-      return { failed: false, stopped: false };
+    case 'taskStart': {
+      // The actions after a refused taskStart were planned for a unit that
+      // never opened: they do not run, as nothing runs past a refused click.
+      const refused = openTaskUnlessRefused(ctx, action, label, position, onRecord);
+      return { failure: refused ? 'unit-refused' : null, stopped: false };
+    }
     case 'taskDone':
       await closeTask(ctx, action, label);
-      return { failed: false, stopped: false };
+      return RAN;
     case 'done':
       pushHistory(state, label, 'ok', null);
-      return { failed: false, stopped: false };
+      return RAN;
   }
 }
 
@@ -186,22 +249,24 @@ export interface Executed {
 
 /**
  * The actions before the first faulted one, in order, stopping at the first
- * the page refuses; a termination when the plan declared one. What did not
- * run goes into the history with why — and the failure count moves once per
- * step, whichever action failed.
+ * the page refuses or the record refuses; a termination when the plan
+ * declared one. What did not run goes into the history with why — and the
+ * failure count moves once per step, whichever action failed. `onRecord` is
+ * the record the plan was composed with: every unit the advisors answered.
  */
 export async function executeActions(
   ctx: EngineContext,
   decided: Decided<StepPlan>,
   readout: PlanReadout & { plan: StepPlan },
   observation: PageObservation,
+  onRecord: UnitsOnRecord,
 ): Promise<Executed> {
   const { state } = ctx;
   const actions = readout.plan.actions;
   const prefix = actions.slice(0, readout.executePrefix);
   /** Where the prefix stopped: the index after the last action attempted. */
   let next = 0;
-  let failed = false;
+  let failure: StepFailureEvent | null = null;
   for (const action of prefix) {
     next += 1;
     const label = describeAction(action, observation);
@@ -228,15 +293,16 @@ export async function executeActions(
       };
     }
     if (isBrowserAction(action)) {
-      failed = await act(ctx, action, label, observation);
+      failure = (await act(ctx, action, label, observation)) ? 'action-failed' : null;
     } else {
-      const outcome = await perform(ctx, action, label, observation);
+      const outcome = await perform(ctx, action, label, next - 1, observation, onRecord);
       if (outcome.stopped) return { termination: null, ranWhole: false, ranOk: next - 1 };
-      failed = outcome.failed;
+      failure = outcome.failure;
     }
-    if (failed) break;
+    if (failure !== null) break;
   }
-  if (failed) ctx.fail('action-failed');
+  const failed = failure !== null;
+  if (failure !== null) ctx.fail(failure);
   else state.consecutiveFailures = 0;
 
   // Every action the plan proposed ran, and none failed: the objections are spent.

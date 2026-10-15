@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { takenOf, takenOnPage } from '../units/mission-taken';
 import { NO_UNITS_ON_RECORD } from '../units/record';
 import { emptyLedger, listingObservation, MISSION_FIXTURE, stepGoalInput } from './fixtures';
 import { MissionMarkMalformed } from './mission-marks';
@@ -75,6 +76,7 @@ describe('the Limits a step goal states', () => {
       pageUnchanged,
       lastStep: { ran: ran.length, touched: ran, held: [] },
       stops: stopsOnPage(stopsOf(MISSION_FIXTURE), listingObservation()),
+      taken: takenOnPage(takenOf(MISSION_FIXTURE), listingObservation()),
       onRecord: NO_UNITS_ON_RECORD,
     });
     const unchanged = composeStepGoal(input(true));

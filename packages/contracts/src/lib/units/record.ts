@@ -3,7 +3,8 @@
  * it: each unit by its identity, the stance the record takes on it, and a
  * note in the advisor's words. The composer renders a bounded number and
  * counts the rest; the forbidden ones also go into the goal's index for the
- * validator.
+ * validator; and the session holds a taskStart to every one of them, listed
+ * or not (`refusedOnRecord`).
  */
 import { z } from 'zod';
 

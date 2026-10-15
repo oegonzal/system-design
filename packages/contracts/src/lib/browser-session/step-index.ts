@@ -10,8 +10,9 @@ import { z } from 'zod';
 import { bounded } from '../bounds';
 import { readFencedIndex } from '../quality-loop/goal-index';
 import { unitIdentitySchema } from '../units/identity';
+import { TAKEN_CONTROL_MAX_LENGTH, type TakenOnPage } from '../units/mission-taken';
 import type { UnitOnRecord } from '../units/record';
-import { UNIT_FACET_NAME_MAX_LENGTH, UNIT_NOTE_BOUND } from '../units/vocab';
+import { UNIT_FACET_NAME_MAX_LENGTH, UNIT_NOTE_BOUND, UNIT_STANCES } from '../units/vocab';
 import { STEP_ACTION_KINDS } from './action-effects';
 import { refNowOf, type RanAction } from './action-identity';
 import { ELEMENT_KINDS } from './element-kind';
@@ -154,13 +155,32 @@ export const stepIndexSchema = z.strictObject({
   unitsForbidden: z
     .array(z.strictObject({ identity: unitIdentitySchema, note: bounded.text(UNIT_NOTE_BOUND) }))
     .default([]),
+  /**
+   * The exceptions the mission declares for taking a unit on record (`## Taking
+   * a unit on record`): each stance, the control it ties the exception to, and
+   * whether this page lists it. A taskStart declaring `onRecordTaken` is cut
+   * when the mission declares no exception, or when every stance it declares
+   * is withheld by a control this page lists; which unit it takes is the
+   * session's to check against the whole record. Written only when the
+   * mission declares any.
+   */
+  onRecordTaken: z
+    .array(
+      z.strictObject({
+        stance: z.enum(UNIT_STANCES),
+        control: bounded.id(TAKEN_CONTROL_MAX_LENGTH, { min: 1 }).nullable(),
+        shown: z.boolean(),
+      }),
+    )
+    .default([]),
 });
 export type StepIndex = z.infer<typeof stepIndexSchema>;
 
-/** What the goal declares about units beyond this session, for the index: the facet names, and the forbidden identities. */
+/** What the goal declares about units beyond this session, for the index: the facet names, the forbidden identities, and the exceptions as this page bears on them. */
 export interface UnitFacts {
   facets: readonly string[];
   forbidden: readonly UnitOnRecord[];
+  taken: readonly TakenOnPage[];
 }
 
 /** The first `OPTIONS_SHOWN` options, then a count of those the page offers past them, so a cut list never reads as the whole. */
@@ -219,6 +239,7 @@ export const indexOf = (
         })),
       }
     : {}),
+  ...(units.taken.length > 0 ? { onRecordTaken: [...units.taken] } : {}),
 });
 
 /** The index this codec wrote, or null for a goal that is not a browser step. */

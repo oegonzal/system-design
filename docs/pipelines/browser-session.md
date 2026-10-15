@@ -128,8 +128,19 @@ pnpm browser-session show <sessionId>                    # each unit with its id
 What to read: `advice.json` per step — `answered` on every step, or `stale`
 with the step the advice is from and the fault that opened the streak; the
 goal in the run dump (`static/runs/<runId>/01-goal.md`) renders the units on
-record under `## Units of work` by stance and lists the forbidden ones in its
-index; a `taskStart` naming one is cut by the limits validator and the next
-plan's objection says so. `manifest.json` lists `unsentEvents` when the bus
-was down past `busRecovery.windowMs` at the close; `replay-events <id>` sends
-a session's events again from its rows.
+record under `## Units of work` by stance — `UNITS_ON_RECORD_BOUND` of them,
+the rest counted — and lists the forbidden ones in its index; a `taskStart`
+naming one is cut by the limits validator and the next plan's objection says
+so, as is one declaring `onRecordTaken: true` where the mission declares no
+exception (`## Taking a unit on record`) or the page lists the control the
+mission ties it to. The session then holds every `taskStart` to the whole
+record the step was composed with, listed or not: one at a unit on record to
+avoid is refused unless the mission declares the exception and the plan
+declares `onRecordTaken: true`, a forbidden one whatever either declares. A
+refusal is in the step's log line (`unit-refused`) and in the next step's goal
+(its run's `01-goal.md`: the history's `not-executed` entry with the fact, the
+objection at `action.N` with the reason); `plan.json` is the plan as read back
+before it ran, so its `executePrefix` is the validator's, not the session's.
+`manifest.json` lists `unsentEvents` when the bus was down past
+`busRecovery.windowMs` at the close; `replay-events <id>` sends a session's
+events again from its rows.

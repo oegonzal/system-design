@@ -28,6 +28,14 @@ export const DETAIL_BOUND = bound(300);
 export const SCREENSHOT_LABEL_BOUND = bound(120);
 /** The most criteria one action may say it serves: a step of a procedure, rarely two. */
 export const SERVES_BOUND = bound(4, 'list');
+/**
+ * The one key a taskStart declares to take a unit on record: the plan says it
+ * knows the unit is on record, and the mission's `## Taking a unit on record`
+ * says for which stance and under what it is allowed. Declared once, beside
+ * the schema, and read by the session's check (`refusedOnRecord`), the limits
+ * validator, the goal's Limits and the refusal the next plan answers.
+ */
+export const ON_RECORD_TAKEN = 'onRecordTaken';
 
 const ref = z
   .string()
@@ -118,8 +126,23 @@ export const stepActionSchema = z.discriminatedUnion('kind', [
     url: url(),
     // The unit's identity as declared facts, so a record beyond this session
     // can name it without reading the label. Required and empty when the
-    // mission declares none: a strict endpoint refuses an optional property.
+    // mission declares none: a strict endpoint takes no optional property as
+    // the contract writes it — the one optional key below reaches the model
+    // through `modelSchema`, required and nullable.
     facets: unitFacetsSchema,
+    // Declared when the unit is on record and the plan takes it under the
+    // exception the mission declares; the session refuses the taskStart
+    // otherwise, whatever the goal had room to list, and the limits validator
+    // cuts a declaration the mission never granted or this page withholds.
+    // Optional in the contract and absent by default; `modelSchema` shows it to
+    // the model as required and nullable, and the lenient parse reads a null
+    // back as absent.
+    [ON_RECORD_TAKEN]: z
+      .boolean()
+      .describe(
+        'True when this unit is on record to avoid and the plan takes it under the exception the mission declares for that; null otherwise.',
+      )
+      .optional(),
     ...common,
   }),
   z.strictObject({

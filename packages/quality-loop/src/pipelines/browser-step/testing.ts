@@ -10,6 +10,7 @@ import {
   listingObservation,
   MISSION_FIXTURE,
   NO_UNITS_ON_RECORD,
+  ON_RECORD_TAKEN,
   type PageObservation,
   type StepAction,
   type StepPlan,
@@ -60,14 +61,17 @@ export const askFields = (refs: string[], reason = 'questions about the subject'
   serves: [],
 });
 
+/** A taskStart with the unit's identity; `declared` when the plan says it takes a unit on record to avoid. */
 export const taskStart = (
   label = 'Senior Engineer at Acme',
   facets: UnitFacet[] = [],
+  declared = false,
 ): StepAction => ({
   kind: 'taskStart',
   label,
   url: 'https://jobs.example.test/apply/42',
   facets,
+  ...(declared ? { [ON_RECORD_TAKEN]: true } : {}),
   reason: 'one application begins',
   expect: null,
   serves: [],

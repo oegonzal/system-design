@@ -313,7 +313,7 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-66',
     statement:
-      'The browser-step limits validator holds a taskStart to the unit identity its goal declares, from the index alone: one that lacks a declared fact, names one the mission does not declare or names one twice is cut at that action, and one whose facets match an identity the index lists as forbidden is cut with the record’s note and the alternative said back — while a unit merely to avoid is prose for the planner and never a validator’s fact.',
+      'The browser-step limits validator holds a taskStart to the unit identity its goal declares, from the index alone: one that lacks a declared fact, names one the mission does not declare or names one twice is cut at that action, and one whose facets match an identity the index lists as forbidden is cut with the record’s note and the alternative said back in the words the session’s refusal uses; one declaring it takes a unit on record is cut where the index says the mission declares no exception, or that this page lists the control the exception is tied to — while which unit it takes is the session’s check, and a unit merely to avoid stays prose for the planner.',
   },
   {
     id: 'QL-41',
