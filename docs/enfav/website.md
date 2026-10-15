@@ -780,10 +780,11 @@ openssl s_client -connect enfav.com:443 -servername enfav.com </dev/null   # Ver
 ## Content upkeep
 
 1. **Registration facts.** The SAM.gov details in `src/data/company.ts` are the entity record's,
-   verbatim, and the organization date is the state filing's. SAM.gov registration lasts a year:
-   after each renewal, set `samRegistration.expires` to the new date, or the site goes on stating
-   one that has passed (today 2027-09-26). Re-check the rest whenever the registration changes. To
-   read the record:
+   verbatim, except that the NAICS list leaves out the registration's manufacturing and
+   industrial-design codes, which the owner keeps off the site; the organization date is the state
+   filing's. SAM.gov registration lasts a year: after each renewal, set `samRegistration.expires` to
+   the new date, or the site goes on stating one that has passed (today 2027-09-26). Re-check the
+   rest whenever the registration changes. To read the record:
 
    ```bash
    pnpm govcon entities lookup <UEI> --json

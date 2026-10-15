@@ -58,8 +58,10 @@ const address = verified<PostalAddress>({
  * Every company fact the site states, and only these.
  *
  * The registration details are the SAM.gov entity record's (the owner's
- * record, 2026-10-15), copied verbatim but for the PSC titles' letter case;
- * the organization date is the state filing's. Never fill the NAICS or PSC codes from
+ * record, 2026-10-15), copied verbatim but for the PSC titles' letter case,
+ * and the NAICS list leaves out the registration's manufacturing and
+ * industrial-design codes (326199, 332710, 541420), which the owner keeps off
+ * the site; the organization date is the state filing's. Never fill the NAICS or PSC codes from
  * packages/govcon/src/profiles/enfav.ts: that file is the scope govcon
  * searches, not what Enfav is registered under.
  *
@@ -85,15 +87,12 @@ export const COMPANY: Company = {
   employees: verified('1 employee'),
   naics: verified([
     { code: '541511', title: 'Custom Computer Programming Services', primary: true },
-    { code: '326199', title: 'All Other Plastics Product Manufacturing' },
-    { code: '332710', title: 'Machine Shops' },
     { code: '513210', title: 'Software Publishers' },
     {
       code: '518210',
       title:
         'Computing Infrastructure Providers, Data Processing, Web Hosting, and Related Services',
     },
-    { code: '541420', title: 'Industrial Design Services' },
     { code: '541512', title: 'Computer Systems Design Services' },
     { code: '541519', title: 'Other Computer Related Services' },
     {
