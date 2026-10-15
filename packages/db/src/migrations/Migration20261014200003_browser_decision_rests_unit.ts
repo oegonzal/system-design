@@ -2,6 +2,8 @@ import { Migration } from '@mikro-orm/migrations';
 
 const EARLIER = ['stated', 'restated', 'derived', 'mapped', 'inferred', 'composed', 'policy', 'none'];
 const UNIT = 'unit';
+/** The words in the entity's declared order — the check is compared as text, so the order is part of the schema. */
+const WITH_UNIT = [...EARLIER.slice(0, -1), UNIT, ...EARLIER.slice(-1)];
 const quoted = (words: readonly string[]): string => words.map((word) => `'${word}'`).join(', ');
 
 /**
@@ -14,7 +16,7 @@ const quoted = (words: readonly string[]): string => words.map((word) => `'${wor
  */
 export class Migration20261014200003_browser_decision_rests_unit extends Migration {
   override up(): void | Promise<void> {
-    this.restsCheck([...EARLIER, UNIT]);
+    this.restsCheck(WITH_UNIT);
   }
 
   override down(): void | Promise<void> {
