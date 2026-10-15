@@ -2,8 +2,8 @@
      Shapes only, no text or fonts, so every machine renders the same pixels.
      Colours mirror the tokens in src/styles/global.css. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
-  <rect width="1200" height="630" fill="#0b3558" />
-  <g stroke="#2a6596" stroke-width="4" stroke-linecap="round">
+  <rect width="1200" height="630" fill="#11243d" />
+  <g stroke="#2b6b7a" stroke-width="4" stroke-linecap="round">
     <line x1="820" y1="200" x2="960" y2="170" />
     <line x1="960" y1="170" x2="1080" y2="250" />
     <line x1="820" y1="200" x2="900" y2="330" />
@@ -11,20 +11,20 @@
     <line x1="900" y1="330" x2="1000" y2="440" />
     <line x1="1080" y1="250" x2="1000" y2="440" />
   </g>
-  <g fill="#c9d8e6">
+  <g fill="#d9e7ef">
     <circle cx="820" cy="200" r="14" />
     <circle cx="960" cy="170" r="14" />
     <circle cx="1080" cy="250" r="14" />
     <circle cx="900" cy="330" r="14" />
   </g>
-  <circle cx="1000" cy="440" r="18" fill="#3fb6c4" />
+  <circle cx="1000" cy="440" r="18" fill="#5ad5d6" />
   <g transform="translate(100 150) scale(2.1875)">
     <rect width="64" height="64" rx="14" fill="#ffffff" fill-opacity="0.08" />
     <rect x="17" y="16" width="8" height="32" fill="#ffffff" />
     <rect x="17" y="16" width="28" height="8" fill="#ffffff" />
     <rect x="17" y="28" width="21" height="8" fill="#ffffff" />
     <rect x="17" y="40" width="28" height="8" fill="#ffffff" />
-    <circle cx="47" cy="32" r="4.5" fill="#3fb6c4" />
+    <circle cx="47" cy="32" r="4.5" fill="#5ad5d6" />
   </g>
   <g transform="translate(100 360) scale(0.8)" fill="#ffffff">
     <rect x="0" y="0" width="24" height="120" />
@@ -41,5 +41,5 @@
     <rect x="354" y="74" width="44" height="22" />
     <polygon points="448,0 472,0 498,86 524,0 548,0 510,120 486,120" />
   </g>
-  <rect x="100" y="490" width="160" height="8" rx="4" fill="#3fb6c4" />
+  <rect x="100" y="490" width="160" height="8" rx="4" fill="#5ad5d6" />
 </svg>

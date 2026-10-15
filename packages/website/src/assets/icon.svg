@@ -1,10 +1,10 @@
 <!-- The Enfav mark, full-bleed for the apple-touch icon (iOS rounds the corners itself).
      Colours mirror the brand, on-brand and accent tokens in src/styles/global.css. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 64 64">
-  <rect width="64" height="64" fill="#0b3558" />
+  <rect width="64" height="64" fill="#11243d" />
   <rect x="17" y="16" width="8" height="32" fill="#ffffff" />
   <rect x="17" y="16" width="28" height="8" fill="#ffffff" />
   <rect x="17" y="28" width="21" height="8" fill="#ffffff" />
   <rect x="17" y="40" width="28" height="8" fill="#ffffff" />
-  <circle cx="47" cy="32" r="4.5" fill="#3fb6c4" />
+  <circle cx="47" cy="32" r="4.5" fill="#5ad5d6" />
 </svg>

@@ -14,22 +14,33 @@
   --font-sans:
     ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
 
-  /* Text — every pairing below holds WCAG AA (4.5:1) on surface and surface-muted. */
-  --color-ink: #0c1a2a;
-  --color-ink-soft: #3d4b5c;
-  --color-link: #0a4f9c;
+  /*
+   * The capability statement's palette. Every pairing a component may draw is
+   * declared in contrast.spec.ts and held at WCAG AA there; a token no pairing
+   * names is not usable.
+   */
 
-  /* Surfaces */
+  /* Text */
+  --color-ink: #0b192a;
+  --color-ink-soft: #465a70;
+  --color-link: #066a75;
+
+  /* Surfaces: white, the muted band, the tinted panel, and the hairline between them. */
   --color-surface: #ffffff;
-  --color-surface-muted: #f3f6fa;
-  --color-line: #d5dde7;
+  --color-surface-muted: #f7f9fb;
+  --color-surface-tint: #eff6f8;
+  --color-line: #d9e7ef;
 
-  /* Brand: the dark band behind the hero, CTAs and footer; text on it is white. */
-  --color-brand: #0b3558;
-  --color-brand-strong: #082742;
-  --color-accent: #3fb6c4;
+  /* Brand: the navy bands behind the hero, CTAs and footer; text on them is white. */
+  --color-brand: #11243d;
+  --color-brand-strong: #0b192a;
   --color-on-brand: #ffffff;
-  --color-on-brand-soft: #c9d8e6;
+  --color-on-brand-soft: #d9e7ef;
+
+  /* Accent: teal, as text on white and as rules; strong on a panel; bright on a band. */
+  --color-accent: #087f8c;
+  --color-accent-strong: #066a75;
+  --color-accent-bright: #5ad5d6;
 
   /* Type on paper: the capability statement's dense data, and its closing note. */
   --text-print-data: 0.6875rem;

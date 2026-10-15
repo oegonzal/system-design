@@ -17,6 +17,9 @@ export const SITE = {
   locale: 'en_US',
 } as const;
 
+/** The line under the wordmark, as the capability statement heads itself. */
+export const TAGLINE = 'AI workflow systems';
+
 /** The site's primary action: the home page leads with it, and the closing call to action ends on it. */
 export const PRIMARY_ACTION = { href: '/contact/', action: 'Start a conversation' } as const;
 

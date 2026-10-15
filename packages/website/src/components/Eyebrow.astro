@@ -1,0 +1,19 @@
+---
+/** A small-caps label above a heading: teal on a light surface, bright teal on a brand band. */
+interface Props {
+  tone?: 'light' | 'brand';
+  class?: string;
+}
+
+const { tone = 'light', class: className } = Astro.props;
+---
+
+<p
+  class:list={[
+    'text-sm font-semibold tracking-wide uppercase',
+    tone === 'brand' ? 'text-accent-bright print:text-ink-soft' : 'text-accent',
+    className,
+  ]}
+>
+  <slot />
+</p>

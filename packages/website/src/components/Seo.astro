@@ -3,7 +3,7 @@ import { getImage } from 'astro:assets';
 
 import iconArt from '../assets/icon.svg';
 import ogArt from '../assets/og.svg';
-import { SITE } from '../data/site';
+import { SITE, TAGLINE } from '../data/site';
 import type { PageMeta } from '../lib/page';
 import { serializeJsonLd } from '../lib/structured-data';
 
@@ -45,7 +45,7 @@ const ogImage = new URL(og.src, site).href;
 <meta property="og:image" content={ogImage} />
 <meta property="og:image:width" content={String(OG_IMAGE.width)} />
 <meta property="og:image:height" content={String(OG_IMAGE.height)} />
-<meta property="og:image:alt" content={`${SITE.name} — ${SITE.description}`} />
+<meta property="og:image:alt" content={`${SITE.name} — ${TAGLINE}`} />
 <meta name="twitter:card" content="summary_large_image" />
 <meta name="twitter:title" content={title} />
 <meta name="twitter:description" content={description} />

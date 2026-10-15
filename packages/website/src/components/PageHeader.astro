@@ -1,5 +1,6 @@
 ---
 import Container from './Container.astro';
+import Eyebrow from './Eyebrow.astro';
 
 /** The brand band that opens every page: the page's one <h1> and its lede. */
 interface Props {
@@ -15,11 +16,7 @@ const { title, lede, eyebrow } = Astro.props;
   class="surface-brand bg-brand text-on-brand print:bg-transparent print:text-ink print:[--focus-ring:var(--color-ink)]"
 >
   <Container class="py-14 sm:py-20 print:pt-0 print:pb-1">
-    {eyebrow && <p
-      class="text-sm font-semibold tracking-wide text-accent uppercase print:text-ink-soft"
-    >
-      {eyebrow}
-    </p>}
+    {eyebrow && <Eyebrow tone="brand">{eyebrow}</Eyebrow>}
     <h1
       class="mt-2 max-w-3xl text-4xl font-bold tracking-tight sm:text-5xl print:mt-0 print:text-2xl"
     >
