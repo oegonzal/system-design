@@ -31,6 +31,11 @@ export default [
   {
     files: ['**/*.astro'],
     plugins: { '@typescript-eslint': tsEslint },
-    rules: { '@typescript-eslint/no-unused-vars': unusedBindings },
+    rules: {
+      '@typescript-eslint/no-unused-vars': unusedBindings,
+      // A list styled without markers keeps its list semantics in WebKit only
+      // with the role stated, so `role="list"` on an ol or ul is not redundant here.
+      'astro/jsx-a11y/no-redundant-roles': ['error', { ol: ['list'], ul: ['list'] }],
+    },
   },
 ];

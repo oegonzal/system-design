@@ -1,5 +1,5 @@
 ---
-import { numeral } from '../lib/format';
+import Numeral from './Numeral.astro';
 
 /** Numbered steps across the page: each a numeral, a title and a line, on a teal rail. */
 interface Props {
@@ -9,11 +9,9 @@ interface Props {
 const { steps } = Astro.props;
 ---
 
-<ol class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+<ol role="list" class="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
   {steps.map((step, index) => <li class="border-l-2 border-accent pl-5">
-    <p aria-hidden="true" class="text-sm font-bold tracking-wide text-accent-strong tabular-nums">
-      {numeral(index + 1)}
-    </p>
+    <Numeral index={index + 1} />
     <h3 class="mt-1 text-lg font-semibold">{step.title}</h3>
     <p class="mt-2 leading-7 text-ink-soft">{step.text}</p>
   </li>)}

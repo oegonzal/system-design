@@ -22,7 +22,7 @@ const { items, tone = 'light' } = Astro.props;
     class:list={[
       'break-inside-avoid',
       tone === 'panel' &&
-        'rounded-xl border border-line bg-surface-tint p-5 print:rounded-none print:border-0 print:bg-transparent print:p-0',
+        'rounded-xl border border-line bg-surface-tint p-6 print:rounded-none print:border-0 print:bg-transparent print:p-0',
     ]}
   >
     <p class="font-semibold print:text-sm">{item.title}</p>

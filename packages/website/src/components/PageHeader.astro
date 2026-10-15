@@ -4,8 +4,8 @@ import Eyebrow from './Eyebrow.astro';
 
 /**
  * The brand band that opens every page: the page's one <h1> and its lede,
- * with whatever the page puts under them, and, where the page gives one, a
- * figure beside them from `lg` up.
+ * with whatever the page puts under them, a figure beside them from `lg` up
+ * where the page gives one, and, below both, whatever it puts there.
  */
 interface Props {
   title: string;
@@ -15,6 +15,7 @@ interface Props {
 
 const { title, lede, eyebrow } = Astro.props;
 const figure = Astro.slots.has('figure');
+const after = Astro.slots.has('after');
 ---
 
 <div class="surface-brand bg-brand text-on-brand print:bg-transparent print:text-ink">
@@ -43,5 +44,8 @@ const figure = Astro.slots.has('figure');
         <slot name="figure" />
       </div>}
     </div>
+    {after && <div class="mt-10 print:hidden">
+      <slot name="after" />
+    </div>}
   </Container>
 </div>

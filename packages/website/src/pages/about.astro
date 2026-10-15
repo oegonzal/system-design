@@ -31,13 +31,13 @@ const principles = [
 ];
 
 // The page names the founder through the facts; the bio (founder.ts) restates the name and the year as copy.
-const description = `Enfav LLC is an AI-focused software engineering company founded in ${yearOf(COMPANY.organized.value)} by ${COMPANY.founder.name.value}, a full-stack engineer with ten-plus years of production experience.`;
+const description = `Enfav LLC was founded in ${yearOf(COMPANY.organized.value)} by ${COMPANY.founder.name.value}, ${FOUNDER.summary}.`;
 ---
 
 <BaseLayout title="About — Enfav LLC" description={description}>
   <PageHeader title="About Enfav" lede={SITE.summary} />
 
-  <Section id="principles" eyebrow="How we work" title="Principles">
+  <Section id="principles" title="Principles">
     <ItemList items={principles} tone="panel" />
   </Section>
 
@@ -55,14 +55,11 @@ const description = `Enfav LLC is an AI-focused software engineering company fou
   <Section id="experience" eyebrow="Newest first" title="Prior professional experience">
     <div data-employment-list>
       <p data-employment-note class="max-w-3xl text-ink-soft">{FOUNDER.experienceNote}</p>
-      <ol class="mt-8 space-y-10">
-        {FOUNDER.experience.map((job) => <li
-          data-employment
-          class="relative border-l-2 border-accent pl-6"
-        >
+      <ol role="list" class="mt-8 border-l-2 border-accent">
+        {FOUNDER.experience.map((job) => <li data-employment class="relative pl-6 pb-10 last:pb-0">
           <span
             aria-hidden="true"
-            class="absolute top-1.5 -left-1.5 size-3 rounded-full bg-accent"
+            class="absolute top-1.5 -left-2 size-3 rounded-full bg-accent"
           ></span>
           <h3 class="text-lg font-semibold" data-employer>{job.employer}</h3>
           <p class="text-ink-soft">
@@ -79,7 +76,7 @@ const description = `Enfav LLC is an AI-focused software engineering company fou
 
   <Section id="systems" eyebrow="Not client work" title="Founder-developed AI systems" tone="muted">
     <p class="max-w-3xl text-ink-soft">{FOUNDER.systemsNote}</p>
-    <ol class="mt-6 grid gap-6 sm:grid-cols-2">
+    <ol role="list" class="mt-6 grid gap-6 sm:grid-cols-2">
       {FOUNDER.systems.map(({ title, text }, index) => (
         <NumberedCard index={index + 1} title={title} text={text} />
       ))}

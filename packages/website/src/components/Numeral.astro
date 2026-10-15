@@ -1,0 +1,17 @@
+---
+import { numeral } from '../lib/format';
+
+/** The two-digit numeral of a numbered item, as decoration: the list it sits in carries the order. */
+interface Props {
+  index: number;
+}
+
+const { index } = Astro.props;
+---
+
+<p
+  aria-hidden="true"
+  class="text-sm font-bold tracking-wide text-accent-strong tabular-nums print:hidden"
+>
+  {numeral(index)}
+</p>

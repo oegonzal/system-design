@@ -188,7 +188,7 @@ operators and declared once as the `@theme` tokens in `src/styles/global.css`: n
 at WCAG AA (text 4.5:1, outlines and meaningful edges 3:1), and fails on a token no pairing names, so
 a new colour is checked before it is drawn; axe then checks the rendered pages. Components take
 colours only through those tokens' utilities, and never a raw value. The type is the system stack (no
-third-party fetch, no font file to license), with the statement's hierarchy: a small-caps eyebrow
+third-party fetch, no font file to license), with the statement's hierarchy: an uppercase eyebrow
 (`Eyebrow`), display headings, slate ledes. Lists the statement numbers are numbered here
 (`NumberedCard`, `Steps`, `lib/format.ts`); the hero's node-graph figure (`HeroFigure`) is the
 link-preview image's motif drawn inline, shown only where the page has a column for it and never on

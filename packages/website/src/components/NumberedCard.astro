@@ -1,11 +1,12 @@
 ---
-import { numeral } from '../lib/format';
+import Numeral from './Numeral.astro';
 
 /**
  * One item of a numbered list, as the capability statement counts its service
  * lines: the numeral, a title (a link when `href` is given), a line, and
  * optionally a labelled list of what it covers. An `<li>`: the caller's `<ol>`
- * carries the order, so the numeral is decoration.
+ * carries the order, so the numeral is decoration. The title is an `h3`, or an
+ * `h4` under a group heading of its own.
  */
 interface Props {
   index: number;
@@ -13,21 +14,18 @@ interface Props {
   text: string;
   href?: string;
   items?: { readonly label: string; readonly entries: readonly string[] };
+  heading?: 'h3' | 'h4';
 }
 
-const { index, title, text, href, items } = Astro.props;
+const { index, title, text, href, items, heading = 'h3' } = Astro.props;
+const Heading = heading;
 ---
 
 <li
-  class="flex h-full flex-col rounded-xl border border-line bg-surface p-6 break-inside-avoid print:rounded-none print:border-0 print:p-0"
+  class="flex h-full flex-col rounded-xl border border-line bg-surface-tint p-6 break-inside-avoid print:rounded-none print:border-0 print:p-0"
 >
-  <p
-    aria-hidden="true"
-    class="text-sm font-bold tracking-wide text-accent-strong tabular-nums print:hidden"
-  >
-    {numeral(index)}
-  </p>
-  <h3 class="mt-2 text-lg font-semibold print:mt-0 print:text-sm">
+  <Numeral index={index} />
+  <Heading class="mt-2 text-lg font-semibold print:mt-0 print:text-sm">
     {href === undefined ? (
       title
     ) : (
@@ -38,15 +36,12 @@ const { index, title, text, href, items } = Astro.props;
         {title}
       </a>
     )}
-  </h3>
+  </Heading>
   <p class="mt-2 leading-7 text-ink-soft print:mt-0 print:text-xs print:leading-snug">{text}</p>
   {items !== undefined && <div class="mt-4">
     <p class="text-xs font-semibold tracking-wide text-ink-soft uppercase">{items.label}</p>
-    <ul class="mt-2 space-y-1.5 text-sm leading-6 text-ink-soft">
-      {items.entries.map((entry) => <li class="flex gap-2">
-        <span aria-hidden="true" class="mt-2.5 size-1.5 shrink-0 rounded-full bg-accent"></span>
-        <span>{entry}</span>
-      </li>)}
+    <ul class="mt-2 list-disc space-y-1.5 pl-5 text-sm leading-6 text-ink-soft marker:text-accent">
+      {items.entries.map((entry) => <li>{entry}</li>)}
     </ul>
   </div>}
 </li>

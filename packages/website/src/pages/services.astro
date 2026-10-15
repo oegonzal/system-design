@@ -1,6 +1,7 @@
 ---
 import Container from '../components/Container.astro';
 import CtaBand from '../components/CtaBand.astro';
+import Numeral from '../components/Numeral.astro';
 import PageHeader from '../components/PageHeader.astro';
 import Section from '../components/Section.astro';
 import Steps from '../components/Steps.astro';
@@ -8,7 +9,6 @@ import TechnologyList from '../components/TechnologyList.astro';
 import { ENGAGEMENTS, engagementOf, SERVICES, TECHNOLOGY } from '../data/services';
 import { CLOSING_CTA } from '../data/site';
 import BaseLayout from '../layouts/BaseLayout.astro';
-import { numeral } from '../lib/format';
 
 const lines = SERVICES.map((service) => ({ service, fit: engagementOf(service) }));
 ---
@@ -18,54 +18,53 @@ const lines = SERVICES.map((service) => ({ service, fit: engagementOf(service) }
   description="Agentic workflow engineering, document intelligence and RAG, systems and data integration, and AI-assisted QA and browser automation."
 >
   <PageHeader
-    eyebrow="Services"
+    eyebrow="Core service lines"
     title="Services"
     lede="How we put AI and modern software into production, and bounded ways to start."
   />
 
   <Container class="py-14 sm:py-20">
-    <div class="divide-y divide-line">
-      {lines.map(({ service, fit }, index) => <section
-        id={service.id}
-        aria-labelledby={`${service.id}-title`}
-        class="grid gap-6 py-10 first:pt-0 last:pb-0 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:gap-12"
-      >
-        <div>
-          <p
-            aria-hidden="true"
-            class="text-sm font-bold tracking-wide text-accent-strong tabular-nums"
-          >
-            {numeral(index + 1)}
-          </p>
-          <h2 id={`${service.id}-title`} class="mt-2 text-2xl font-bold tracking-tight">
-            {service.title}
-          </h2>
-          <p class="mt-4 text-lg leading-8 text-ink-soft">{service.summary}</p>
-          <p
-            class="mt-5 rounded-md border border-line bg-surface-tint px-4 py-3 text-sm leading-6 text-ink-soft"
-          >
-            <span class="font-semibold text-ink">A way to start — {fit.title}:</span>
-            {fit.text}
-          </p>
-        </div>
-        <div>
-          <h3 class="text-sm font-semibold tracking-wide text-ink-soft uppercase">Deliverables</h3>
-          <ul class="mt-3 space-y-2 leading-7">
-            {service.deliverables.map((deliverable) => <li class="flex gap-3">
-              <span aria-hidden="true" class="mt-3 size-1.5 shrink-0 rounded-full bg-accent"></span>
-              <span>{deliverable}</span>
-            </li>)}
-          </ul>
-        </div>
-      </section>)}
-    </div>
+    <ol role="list" class="divide-y divide-line">
+      {lines.map(({ service, fit }, index) => <li class="py-10 first:pt-0 last:pb-0">
+        <section
+          id={service.id}
+          aria-labelledby={`${service.id}-title`}
+          class="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] lg:gap-12"
+        >
+          <div>
+            <Numeral index={index + 1} />
+            <h2
+              id={`${service.id}-title`}
+              class="mt-2 text-2xl font-bold tracking-tight sm:text-3xl"
+            >
+              {service.title}
+            </h2>
+            <p class="mt-4 text-lg leading-8 text-ink-soft">{service.summary}</p>
+            <p
+              class="mt-5 rounded-md border border-line bg-surface-tint px-4 py-3 text-sm leading-6 text-ink-soft"
+            >
+              <span class="font-semibold text-ink">A way to start — {fit.title}:</span>
+              {fit.text}
+            </p>
+          </div>
+          <div>
+            <h3 class="text-sm font-semibold tracking-wide text-ink-soft uppercase">
+              Deliverables
+            </h3>
+            <ul class="mt-3 list-disc space-y-2 pl-5 leading-7 marker:text-accent">
+              {service.deliverables.map((deliverable) => <li>{deliverable}</li>)}
+            </ul>
+          </div>
+        </section>
+      </li>)}
+    </ol>
   </Container>
 
   <Section id="engagements" eyebrow="Bounded engagements" title="Ways to engage" tone="muted">
     <Steps steps={ENGAGEMENTS} />
   </Section>
 
-  <Section id="technology" eyebrow="Applied technology" title="What we build with">
+  <Section id="technology" title="Applied technology">
     <TechnologyList areas={TECHNOLOGY} />
   </Section>
 

@@ -3,7 +3,7 @@
      Colours mirror the tokens in src/styles/global.css. -->
 <svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
   <rect width="1200" height="630" fill="#11243d" />
-  <g stroke="#2b6b7a" stroke-width="4" stroke-linecap="round">
+  <g stroke="#087f8c" stroke-width="4" stroke-linecap="round">
     <line x1="820" y1="200" x2="960" y2="170" />
     <line x1="960" y1="170" x2="1080" y2="250" />
     <line x1="820" y1="200" x2="900" y2="330" />

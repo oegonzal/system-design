@@ -21,6 +21,8 @@ interface Founder {
   readonly name: string;
   readonly title: string;
   readonly bio: readonly string[];
+  /** The founder in one line, as the home page's proof strip and the about page's description state it. */
+  readonly summary: string;
   /** Newest first, one employer per entry. */
   readonly experience: readonly Employment[];
   /** What every list of that experience says it is, wherever it appears. */
@@ -44,6 +46,8 @@ interface Founder {
 export const FOUNDER: Founder = {
   name: 'Oscar Gonzalez',
   title: 'Founder & Chief Software Engineer',
+  // Full-stack roles Sep 2015 – Jul 2026.
+  summary: 'a full-stack engineer with more than ten years of production experience',
   bio: [
     // Organized 2025-10-24 (the state filing); "Founded an AI-focused engineering company" (Enfav LLC, Jul 2026 – present).
     'Oscar founded Enfav LLC in 2025 to bring production-grade AI automation and software engineering to commercial and public-sector teams, and personally leads its engineering work.',

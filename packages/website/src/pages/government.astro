@@ -11,25 +11,10 @@ import Section from '../components/Section.astro';
 import TechnologyList from '../components/TechnologyList.astro';
 import { COMPANY, COMPANY_DETAILS } from '../data/company';
 import { FOUNDER } from '../data/founder';
-import { ENGAGEMENTS, SERVICES, TECHNOLOGY } from '../data/services';
+import { ENGAGEMENTS, SERVICES, TECHNOLOGY, USE_CASES } from '../data/services';
 import { SITE } from '../data/site';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { formatYears, yearOf } from '../lib/dates';
-
-const useCases = [
-  {
-    title: 'Document and case intake',
-    text: 'Classify submissions, extract fields, validate them against rules and route exceptions to a reviewer.',
-  },
-  {
-    title: 'Knowledge and policy retrieval',
-    text: 'Traceable internal search over approved documentation, with citations and human review.',
-  },
-  {
-    title: 'Operations workflow integration',
-    text: 'Records and status synchronized across APIs, databases and existing administrative systems.',
-  },
-];
 
 const riskControls = [
   {
@@ -71,7 +56,7 @@ const host = new URL(SITE.origin).host;
   </Container>
 
   <Section id="service-lines" eyebrow="What Enfav builds" title="Core service lines">
-    <ol class="grid gap-6 sm:grid-cols-2 print:grid-cols-2 print:gap-x-6 print:gap-y-1">
+    <ol role="list" class="grid gap-6 sm:grid-cols-2 print:grid-cols-2 print:gap-x-6 print:gap-y-1">
       {SERVICES.map(({ title, line }, index) => (
         <NumberedCard index={index + 1} title={title} text={line} />
       ))}
@@ -84,7 +69,7 @@ const host = new URL(SITE.origin).host;
     title="Engagements for prime contractors"
     tone="muted"
   >
-    <ol class="grid gap-6 sm:grid-cols-2 print:grid-cols-2 print:gap-x-6 print:gap-y-1">
+    <ol role="list" class="grid gap-6 sm:grid-cols-2 print:grid-cols-2 print:gap-x-6 print:gap-y-1">
       {ENGAGEMENTS.map(({ title, text }, index) => (
         <NumberedCard index={index + 1} title={title} text={text} />
       ))}
@@ -98,25 +83,28 @@ const host = new URL(SITE.origin).host;
   </Section>
 
   <Section id="delivery-evidence" title="Delivery evidence" tone="muted">
-    <p class="max-w-3xl leading-7 text-ink-soft print:max-w-none print:text-xs print:leading-snug">
+    <p
+      class="max-w-3xl leading-7 text-ink-soft print:max-w-none print:break-after-avoid print:text-xs print:leading-snug"
+    >
       Enfav LLC was organized in {yearOf(COMPANY.organized.value)} and has no federal contract past
       performance yet.
     </p>
-    <h3 class="mt-8 text-lg font-semibold print:mt-1 print:text-sm">
+    <h3 class="mt-8 text-lg font-semibold print:mt-1 print:text-base">
       Founder-developed AI systems
     </h3>
     <p class="mt-1 text-sm text-ink-soft print:mt-0 print:break-after-avoid print:text-xs">
       {FOUNDER.systemsNote}
     </p>
     <ol
+      role="list"
       class="mt-3 grid gap-4 sm:grid-cols-2 print:mt-0.5 print:grid-cols-2 print:gap-x-6 print:gap-y-1"
     >
       {FOUNDER.systems.map(({ title, text }, index) => (
-        <NumberedCard index={index + 1} title={title} text={text} />
+        <NumberedCard index={index + 1} title={title} text={text} heading="h4" />
       ))}
     </ol>
     <div data-employment-list class="mt-8 print:mt-1">
-      <h3 class="text-lg font-semibold print:text-sm">Prior employment</h3>
+      <h3 class="text-lg font-semibold print:text-base">Prior employment</h3>
       <p
         data-employment-note
         class="mt-1 text-sm text-ink-soft print:mt-0 print:break-after-avoid print:text-xs"
@@ -143,7 +131,7 @@ const host = new URL(SITE.origin).host;
   </Section>
 
   <Section id="use-cases" title="Illustrative use cases">
-    <ItemList items={useCases} />
+    <ItemList items={USE_CASES} />
   </Section>
 
   <Section id="delivery-risk" title="How Enfav reduces delivery risk" tone="muted">

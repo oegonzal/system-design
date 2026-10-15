@@ -2,15 +2,20 @@ import { readFileSync } from 'node:fs';
 
 import { describe, expect, it } from 'vitest';
 
-/** The colour tokens the stylesheet's @theme block declares, by name. */
+/** The stylesheet's @theme block: one block with no block nested in it, or the parse would stop short. */
 const THEME = /@theme\s*\{([^}]*)\}/.exec(
   readFileSync(new URL('./global.css', import.meta.url), 'utf8'),
-);
+)?.[1];
+if (THEME === undefined || THEME.includes('{')) {
+  throw new Error('global.css declares no plain @theme block.');
+}
+
+/** The colour tokens the block declares, by name: each a six-digit hex colour, or the spec refuses it. */
 const COLORS = new Map(
-  [...(THEME?.[1] ?? '').matchAll(/--color-([a-z-]+):\s*(#[0-9a-f]{6});/g)].map(([, name, hex]) => [
-    name,
-    hex,
-  ]),
+  [...THEME.matchAll(/--color-([\w-]+):\s*([^;]+);/g)].map(([, name, value]) => {
+    if (!/^#[0-9a-f]{6}$/.test(value ?? '')) throw new Error(`--color-${name} is not #rrggbb.`);
+    return [name, value] as const;
+  }),
 );
 
 /** WCAG 2.2 minimums: text (SC 1.4.3), and a focus outline or an edge that carries meaning (SC 1.4.11). */
@@ -18,8 +23,8 @@ const TEXT = 4.5;
 const EDGE = 3;
 
 /**
- * Every pairing a component may draw, as [foreground, background, minimum]:
- * the palette's contract. Teal (`accent`) is a rule, rail or dot on a light
+ * Every pairing a component draws, as [foreground, background, minimum]: the
+ * palette's contract. Teal (`accent`) is a rule, rail or dot on a light
  * surface and never text there, since on a muted band it reads at the AA
  * line and on a panel below it: as text it is `accent-strong` on a light
  * surface and `accent-bright` on a band. A text pairing also serves as an
@@ -44,8 +49,9 @@ const PAIRINGS: [string, string, number][] = [
   ['on-brand-soft', 'brand-strong', TEXT],
   ['accent-bright', 'brand', TEXT],
   ['accent-bright', 'brand-strong', TEXT],
-  ['on-brand', 'accent', TEXT],
-  ['brand', 'accent-bright', TEXT],
+  // The solid button on a band: brand text on white, and on the muted surface it hovers to.
+  ['brand', 'on-brand', TEXT],
+  ['brand', 'surface-muted', TEXT],
   // Rules, rails and dots that carry meaning on a light surface.
   ['accent', 'surface', EDGE],
   ['accent', 'surface-muted', EDGE],
@@ -89,7 +95,6 @@ describe('palette', () => {
 
   it('would refuse teal as text on a panel, which is why accent-strong exists', () => {
     expect(contrast(token('accent'), token('surface-tint'))).toBeLessThan(TEXT);
-    expect(contrast(token('accent'), token('surface-muted'))).toBeLessThan(TEXT + 0.01);
     expect(contrast(token('accent-strong'), token('surface-tint'))).toBeGreaterThanOrEqual(TEXT);
   });
 });

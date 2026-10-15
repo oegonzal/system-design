@@ -11,7 +11,8 @@ import Registration from '../components/Registration.astro';
 import Section from '../components/Section.astro';
 import Steps from '../components/Steps.astro';
 import { COMPANY } from '../data/company';
-import { ENGAGEMENTS, SERVICES } from '../data/services';
+import { FOUNDER } from '../data/founder';
+import { ENGAGEMENTS, HEADLINE_DELIVERABLES, SERVICES, USE_CASES } from '../data/services';
 import { CLOSING_CTA, PRIMARY_ACTION, SITE } from '../data/site';
 import BaseLayout from '../layouts/BaseLayout.astro';
 import { organizationGraph } from '../lib/structured-data';
@@ -50,18 +51,18 @@ const steps = [
   },
 ];
 
-/** Why the AI work holds up: the principles, as they apply to an agentic workflow. */
-const assurance = [
+/** How delivery risk is reduced, as the capability statement states it, in an agentic workflow's terms. */
+const riskControls = [
   {
     title: 'Measured on every change',
-    text: 'Critics and evaluators judge each AI step against declared criteria, beside the automated tests and schema validation the rest of the software gets, so quality is measured rather than assumed.',
+    text: 'Critics and evaluators run on every change against the acceptance criteria, beside the automated tests and schema validation the rest of the software gets, so quality is measured rather than assumed.',
   },
   {
     title: 'Traceable by design',
     text: 'Typed JSON contracts, retries and evaluations leave a record of what each workflow decided and why, for the reviewer who has to trust it.',
   },
   {
-    title: 'People where they belong',
+    title: 'Human review where it matters',
     text: 'Human review steps, acceptance tests and documented human-in-the-loop controls, scoped on approved data, as appropriate to the work.',
   },
 ];
@@ -81,58 +82,70 @@ const assurance = [
       <Button href={PRIMARY_ACTION.href} variant="solid">{PRIMARY_ACTION.action}</Button>
       <Button href="/government/" variant="outline">Government contracting</Button>
     </div>
-    <dl class="mt-10 grid gap-6 border-t border-on-brand/20 pt-6 text-sm sm:grid-cols-3">
+    <HeroFigure slot="figure" />
+    <dl slot="after" class="grid gap-6 border-t border-on-brand/20 pt-6 text-sm sm:grid-cols-3">
       <div>
         <dt class="font-semibold text-on-brand">Registered federal supplier</dt>
         <dd class="mt-1 text-on-brand-soft"><Registration /></dd>
       </div>
       <div>
         <dt class="font-semibold text-on-brand">Founder-led engineering</dt>
-        <dd class="mt-1 text-on-brand-soft">
-          Led by a full-stack engineer with more than ten years of production experience.
-        </dd>
+        <dd class="mt-1 text-on-brand-soft">Led by {FOUNDER.summary}.</dd>
       </div>
       <div>
         <dt class="font-semibold text-on-brand">How we deliver</dt>
         <dd class="mt-1 text-on-brand-soft"><FactValue fact={COMPANY.delivery} /></dd>
       </div>
     </dl>
-    <HeroFigure slot="figure" />
   </PageHeader>
 
   <Section id="services" eyebrow="Four service lines" title="What we build">
-    <ol class="grid gap-6 sm:grid-cols-2">
+    <ol role="list" class="grid gap-6 sm:grid-cols-2">
       {SERVICES.map((service, index) => (
         <NumberedCard
           index={index + 1}
           title={service.title}
           text={service.line}
           href={`/services/#${service.id}`}
-          items={{ label: 'What you get', entries: service.deliverables.slice(0, 2) }}
+          items={{
+            label: 'What you get',
+            entries: service.deliverables.slice(0, HEADLINE_DELIVERABLES),
+          }}
         />
       ))}
     </ol>
   </Section>
 
-  <Section id="engagements" eyebrow="Bounded engagements" title="Ways to engage" tone="muted">
-    <Steps steps={ENGAGEMENTS} />
+  <Section
+    id="use-cases"
+    eyebrow="Document-heavy operations"
+    title="Illustrative use cases"
+    tone="muted"
+  >
+    <ItemList items={USE_CASES} tone="panel" />
   </Section>
 
-  <Section id="approach" eyebrow="From outcome to handover" title="How we work">
+  <Section id="engagements" eyebrow="Bounded engagements" title="Ways to engage">
+    <ItemList items={ENGAGEMENTS} tone="panel" />
+  </Section>
+
+  <Section id="approach" eyebrow="From outcome to handover" title="How we work" tone="muted">
     <Steps steps={steps} />
   </Section>
 
   <Section
-    id="assurance"
-    eyebrow="Evaluation-driven AI"
-    title="Why it holds up in production"
+    id="delivery-risk"
+    eyebrow="Evaluation + governance"
+    title="How Enfav reduces delivery risk"
     tone="brand"
   >
-    <ItemList items={assurance} tone="brand" />
+    <ItemList items={riskControls} tone="brand" />
   </Section>
 
-  <Section id="government" title="For government buyers and prime contractors" tone="muted">
-    <div class="rounded-r-xl border-l-4 border-accent bg-surface-tint p-6 sm:p-8">
+  <Section id="government" title="For government buyers and prime contractors">
+    <div
+      class="rounded-xl border border-line border-l-4 border-l-accent bg-surface-tint p-6 sm:p-8"
+    >
       <div class="flex flex-col items-start gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div class="max-w-2xl">
           <p class="text-lg leading-8 text-ink-soft">

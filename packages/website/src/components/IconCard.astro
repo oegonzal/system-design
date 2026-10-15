@@ -1,10 +1,10 @@
 ---
 /**
- * A tinted card led by a line icon — drawn inline from a declared set, hidden
+ * A tinted card led by a line icon — drawn in the markup from a declared set, hidden
  * from assistive technology — with the caller's content under it.
  */
 interface Props {
-  icon: 'mail' | 'landmark';
+  icon: keyof typeof ICONS;
 }
 
 const { icon } = Astro.props;

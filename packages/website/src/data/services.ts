@@ -2,7 +2,7 @@
 type EngagementId = 'prototype' | 'knowledge-pipeline' | 'modernization' | 'qa-sprint';
 
 /** One line of work Enfav offers. */
-export interface Service {
+interface Service {
   /** The anchor on /services/ and the key cards link to. */
   readonly id: string;
   /** The engagement that fits this line first. */
@@ -12,8 +12,12 @@ export interface Service {
   readonly line: string;
   /** The full description on /services/. */
   readonly summary: string;
+  /** What the line delivers, the headline ones first: a card shows the first HEADLINE_DELIVERABLES. */
   readonly deliverables: readonly string[];
 }
+
+/** How many of a line's deliverables a card shows. */
+export const HEADLINE_DELIVERABLES = 2;
 
 /**
  * The service lines, in the order every page lists them, as the capability
@@ -79,7 +83,7 @@ export const SERVICES: readonly Service[] = [
 ];
 
 /** A bounded unit of work a buyer can scope and contract for. */
-export interface Engagement {
+interface Engagement {
   readonly id: EngagementId;
   readonly title: string;
   readonly text: string;
@@ -116,6 +120,22 @@ export const engagementOf = (service: Service): Engagement => {
     throw new Error(`No engagement "${service.engagement}" is declared.`);
   return engagement;
 };
+
+/** Where the work fits, as the capability statement illustrates it: examples, not past work. */
+export const USE_CASES = [
+  {
+    title: 'Document and case intake',
+    text: 'Classify submissions, extract fields, validate them against rules and route exceptions to a reviewer.',
+  },
+  {
+    title: 'Knowledge and policy retrieval',
+    text: 'Traceable internal search over approved documentation, with citations and human review.',
+  },
+  {
+    title: 'Operations workflow integration',
+    text: 'Records and status synchronized across APIs, databases and existing administrative systems.',
+  },
+] as const;
 
 /** The technology the services are built with, by area. */
 interface TechnologyArea {
