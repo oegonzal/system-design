@@ -24,6 +24,7 @@ describe('the pipeline registry', () => {
       'memory-architecture',
       'design-prompt',
       'browser-step',
+      'tool-step',
       'field-answer',
       'answer-suggestions',
       'document-digest',

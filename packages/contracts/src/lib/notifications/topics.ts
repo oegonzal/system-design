@@ -4,7 +4,24 @@ import {
   designStartedSchema,
   designStoredSchema,
 } from '../agentic-system/events';
+import {
+  GMAIL_TOPICS,
+  gmailDraftCreatedSchema,
+  gmailLabelsChangedSchema,
+  gmailMessageReceivedSchema,
+} from '../gmail/events';
+import {
+  GOOGLE_CALENDAR_TOPICS,
+  calendarEventSchema,
+  calendarInvitationSchema,
+} from '../google-calendar/events';
 import { ALERT_DECLARATIONS } from '../govcon/alerts';
+import {
+  TOOL_SESSION_TOPICS,
+  toolSessionFinishedSchema,
+  toolSessionStartedSchema,
+  toolSessionSteppedSchema,
+} from '../tool-session/events';
 import {
   SESSION_TOPICS,
   sessionEndedSchema,
@@ -40,6 +57,22 @@ export const NOTIFICATION_TOPICS: Readonly<Record<string, TopicDeclaration>> = {
   [DESIGN_TOPICS.started]: { schema: designStartedSchema, publishedBy: 'anyone' },
   [DESIGN_TOPICS.revised]: { schema: designRevisedSchema, publishedBy: 'anyone' },
   [DESIGN_TOPICS.stored]: { schema: designStoredSchema, publishedBy: 'anyone' },
+  // What a tool session says happened, whichever program ran it.
+  [TOOL_SESSION_TOPICS.started]: { schema: toolSessionStartedSchema, publishedBy: 'anyone' },
+  [TOOL_SESSION_TOPICS.stepped]: { schema: toolSessionSteppedSchema, publishedBy: 'anyone' },
+  [TOOL_SESSION_TOPICS.finished]: { schema: toolSessionFinishedSchema, publishedBy: 'anyone' },
+  // What the mailbox service saw arrive, drafted and relabelled.
+  [GMAIL_TOPICS.messageReceived]: { schema: gmailMessageReceivedSchema, publishedBy: 'anyone' },
+  [GMAIL_TOPICS.draftCreated]: { schema: gmailDraftCreatedSchema, publishedBy: 'anyone' },
+  [GMAIL_TOPICS.labelsChanged]: { schema: gmailLabelsChangedSchema, publishedBy: 'anyone' },
+  // What the calendar service saw change, and the invitations it found waiting.
+  [GOOGLE_CALENDAR_TOPICS.eventCreated]: { schema: calendarEventSchema, publishedBy: 'anyone' },
+  [GOOGLE_CALENDAR_TOPICS.eventUpdated]: { schema: calendarEventSchema, publishedBy: 'anyone' },
+  [GOOGLE_CALENDAR_TOPICS.eventCancelled]: { schema: calendarEventSchema, publishedBy: 'anyone' },
+  [GOOGLE_CALENDAR_TOPICS.invitationReceived]: {
+    schema: calendarInvitationSchema,
+    publishedBy: 'anyone',
+  },
   // What govcon's daily warm found, for whoever keeps a record; the digest it also prompts is what reaches a person.
   ...Object.fromEntries(
     Object.values(ALERT_DECLARATIONS).map(({ topic, schema }): [string, TopicDeclaration] => [

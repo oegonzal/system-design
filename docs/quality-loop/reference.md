@@ -63,7 +63,7 @@ refuses to start without a model login before Nest loads.
 | Folder           | What it is                                                                      |
 | ---------------- | ------------------------------------------------------------------------------- |
 | `core/`          | The engine. Pure: no Nest, no clock, no filesystem, no env vars, no randomness. |
-| `pipelines/`     | The ten pipelines, one folder each, plus the registry.                          |
+| `pipelines/`     | The twelve pipelines, one folder each, plus the registry.                       |
 | `orchestrators/` | Compositions that run several pipelines in order, declared as data.             |
 | `modules/`       | The NestJS layer: HTTP routes, Postgres, Qdrant, the model client.              |
 | `cli/`           | The two command-line entry points, `run` and `replay`.                          |
@@ -205,27 +205,27 @@ diagnostic, never evidence.
 These are pure and import nothing from vitest, so they compile under the app tsconfig even though
 only specs use them.
 
-## `pipelines/` — the ten pipelines
+## `pipelines/` — the twelve pipelines
 
 ### The folder layout, once
 
 Every pipeline is `src/pipelines/<id>/` and repeats the same shape.
 
-| File                 | Always  | What it is                                                                               |
-| -------------------- | ------- | ---------------------------------------------------------------------------------------- |
-| `definition.ts`      | yes     | The exported `PipelineDefinition`. Pure data apart from its imports.                     |
-| `lenses/*.md`        | yes     | One markdown persona per stage, imported `?raw`. The filename is the lens id.            |
-| `output.ts`          | yes     | The output shape: a zod schema, `locate` for positional ids, `render`.                   |
-| `definition.spec.ts` | yes     | Validity, a JSON-round-trippable summary, personas long enough to be real.               |
-| `input.ts`           | 6 of 10 | A codec, when the goal is more than a prompt. Renders a typed input to markdown.         |
-| `validators.ts`      | 8 of 10 | Deterministic checks, each gating `block`, `cut` or `warn`. Never read prose.            |
-| `testing.ts`         | 8 of 10 | Pure sample builders shared by the folder's specs.                                       |
-| `run.spec.ts`        | 8 of 10 | An end-to-end loop spec over a fake model.                                               |
-| `controller.ts`      | 1 of 10 | Only when the pipeline has a decision rule of its own (`system-design-canvas`).          |
-| `from-run.ts`        | 2 of 10 | A finished run becomes the next pipeline's input (the experience and knowledge digests). |
-| `refound.ts`         | 1 of 10 | Only `browser-step`: the pipeline's `refoundEvidence` pass.                              |
+| File                 | Always   | What it is                                                                               |
+| -------------------- | -------- | ---------------------------------------------------------------------------------------- |
+| `definition.ts`      | yes      | The exported `PipelineDefinition`. Pure data apart from its imports.                     |
+| `lenses/*.md`        | yes      | One markdown persona per stage, imported `?raw`. The filename is the lens id.            |
+| `output.ts`          | yes      | The output shape: a zod schema, `locate` for positional ids, `render`.                   |
+| `definition.spec.ts` | yes      | Validity, a JSON-round-trippable summary, personas long enough to be real.               |
+| `input.ts`           | 8 of 12  | A codec, when the goal is more than a prompt. Renders a typed input to markdown.         |
+| `validators.ts`      | 10 of 12 | Deterministic checks, each gating `block`, `cut` or `warn`. Never read prose.            |
+| `testing.ts`         | 10 of 12 | Pure sample builders shared by the folder's specs.                                       |
+| `run.spec.ts`        | 9 of 12  | An end-to-end loop spec over a fake model.                                               |
+| `controller.ts`      | 1 of 12  | Only when the pipeline has a decision rule of its own (`system-design-canvas`).          |
+| `from-run.ts`        | 2 of 12  | A finished run becomes the next pipeline's input (the experience and knowledge digests). |
+| `refound.ts`         | 1 of 12  | Only `browser-step`: the pipeline's `refoundEvidence` pass.                              |
 
-### The ten
+### The twelve
 
 **`system-design/`** — produces a structured design answer (summary, assumptions, components, flows,
 data model, tradeoffs, risks, capacity) from a markdown prompt, for a person practising. Four
@@ -268,6 +268,19 @@ the page apart, failed a gating criterion it cites. The only pipeline that decla
 session — a unit a domain's record forbids — reaches those validators and comes back as an event:
 [`domain-rules.md`](domain-rules.md).
 
+**`tool-step/`** — produces one plan of tool calls for the state in front of a tool session: an
+assessment and the calls up to the first whose outcome must be seen, or the one question the
+session puts to its operator, or the finish on a declared stop cause. The generalisation of
+`browser-step` over whatever tools a program declares — a mailbox's, a calendar's — none of which
+the pipeline names: its goal is composed by the session (mission, tools, observations, recent
+calls, objections, progress, limits, index), the tools' parameters travel as JSON schema in the
+index and a call's arguments as one JSON object in a string, and two `cut` validators hold a plan
+to the index — a listed tool, arguments that fit, nothing after an irreversible or approval-gated
+call, a finish on a declared cause once something was observed. The same two critics, one
+evaluator and cited corroboration as `browser-step`, with caps seeded from its measurements until
+a tool-step run is recorded. The read-back both share lives in the contracts
+(`lib/quality-loop/read-back.ts`).
+
 **`field-answer/`** — answers every field of one form page about the session's subject from the
 evidence the goal lists, routing a field no evidence settles to the operator. A `block` references
 validator and a `warn` limits validator; its evaluator runs after the critics, shown what they
@@ -284,7 +297,7 @@ read its index, and three warnings withhold or keep an item as each declares.
 
 ### The registry
 
-`pipelines/index.ts` imports the ten definitions, erases their type parameter and exports `PIPELINES`
+`pipelines/index.ts` imports the twelve definitions, erases their type parameter and exports `PIPELINES`
 keyed by id. Exactly one place consumes it: `modules/runs/pipelines.module.ts`, which provides it as
 `PIPELINES_TOKEN`. Adding a pipeline is a folder, one line in `index.ts`, and one line in the ordered
 list in `index.spec.ts`. Nothing in `core/` changes.

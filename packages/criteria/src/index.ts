@@ -9,6 +9,8 @@
  */
 import type { Criterion } from './criterion';
 import { BROWSER_SESSION_CRITERIA } from './browser-session';
+import { GMAIL_CRITERIA } from './gmail';
+import { GOOGLE_CALENDAR_CRITERIA } from './google-calendar';
 import { GOVCON_CRITERIA } from './govcon';
 import { JOB_APPLICATION_CRITERIA } from './job-application';
 import { NOTIFICATIONS_CRITERIA } from './notifications';
@@ -16,6 +18,7 @@ import { QUALITY_LOOP_CRITERIA } from './quality-loop';
 import { QUALITY_LOOP_CLIENTS_CRITERIA } from './quality-loop-clients';
 import { SITE_CRITERIA } from './site';
 import { STUDIO_CRITERIA } from './studio';
+import { TOOL_SESSION_CRITERIA } from './tool-session';
 import { WEB_CRITERIA } from './web';
 
 export type { Criterion } from './criterion';
@@ -30,4 +33,7 @@ export const CRITERIA: readonly Criterion[] = [
   ...NOTIFICATIONS_CRITERIA,
   ...JOB_APPLICATION_CRITERIA,
   ...SITE_CRITERIA,
+  ...TOOL_SESSION_CRITERIA,
+  ...GMAIL_CRITERIA,
+  ...GOOGLE_CALENDAR_CRITERIA,
 ];

@@ -21,7 +21,9 @@ const ENGINE = [
   'packages/browser-session/config',
   'packages/contracts/src/lib/browser-session',
   'packages/contracts/src/lib/units',
+  'packages/contracts/src/lib/tool-session',
   'packages/quality-loop/src/pipelines/browser-step',
+  'packages/quality-loop/src/pipelines/tool-step',
   'packages/quality-loop/src/pipelines/field-answer',
   'packages/quality-loop/src/pipelines/answer-suggestions',
   'packages/quality-loop/src/pipelines/document-digest',
@@ -33,7 +35,18 @@ const ENGINE = [
  * pursue, and the channel the operator is reached on beyond the terminal —
  * the session asks the notifications service, which alone knows its channels.
  */
-const FORBIDDEN = ['linkedin', 'duckduckgo', 'easy apply', 'applicant', 'recruiter', 'telegram'];
+const FORBIDDEN = [
+  'linkedin',
+  'duckduckgo',
+  'easy apply',
+  'applicant',
+  'recruiter',
+  'telegram',
+  'gmail',
+  'google',
+  'calendar',
+  'inbox',
+];
 /** Where a concrete example belongs: a spec, a spec's builder, a fixture module or a recorded fixture. */
 const EXAMPLE = /(\.spec\.ts$|testing(-[a-z]+)?\.ts$|\.testing\.ts$|\/fixtures(\/|\.ts$))/;
 

@@ -50,3 +50,6 @@ export * from './lib/agentic-system';
 export * from './lib/units';
 export * from './lib/browser-session';
 export * from './lib/notifications';
+export * from './lib/tool-session';
+export * from './lib/gmail';
+export * from './lib/google-calendar';
