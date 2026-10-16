@@ -57,32 +57,6 @@ export const TASK_LABEL_BOUND = bound(200);
 export const CLOSED_TASKS_BOUND = bound(10, 'list');
 
 /**
- * What the session carries forward about a plan that did not run: one entry
- * per objection, each kept whole.
- *
- * Sized from the live browser-step runs of 2026-10-03, where rationales
- * measured 245–600 characters (mean 398, p90 550) at 1–4 objections per plan,
- * and the loop caps a rationale at 900 before it is ever written here — so
- * nothing this holds is cut. That is the whole point of the bound. These
- * objections used to travel in a history entry's `note`, which is 300
- * characters and belongs to one action: the same plan-level text was copied
- * once per action, each copy cut at 300, and the cut landed on the clause
- * that said what to do instead. Measured live, a producer was handed ten
- * entries carrying two distinct objections, every copy ending mid-sentence
- * before its remedy, and five actions of duplication filled `HISTORY_MAX`
- * and evicted the record of what the session had actually done. It then
- * proposed the same plan three times and the session stopped at its failure
- * rail.
- */
-export const OBJECTIONS_BOUND = bound(6, 'list');
-/** The most objections the session keeps at once, however many plans are refused in a row. */
-export const OBJECTIONS_MAX = 16;
-export const OBJECTION_FROM_MAX_LENGTH = 60;
-export const OBJECTION_AT_BOUND = bound(8, 'list');
-export const OBJECTION_AT_MAX_LENGTH = 40;
-export const OBJECTION_DETAIL_BOUND = bound(900);
-
-/**
  * A ref exactly as Playwright's snapshot minted it, with nothing read into its
  * shape. `e12` for a node in the page's own document, `f1e7` for one inside a
  * frame, and whatever a later version mints: the session carries the token and
@@ -335,24 +309,6 @@ export type StepHistoryEntry = z.infer<typeof stepHistoryEntrySchema>;
  * once, so a reader of a session's objections can enumerate who may object.
  */
 export const ENGINE_OBJECTORS = { controller: 'controller', session: 'session' } as const;
-
-/**
- * One reason a plan did not run, as the objector put it. A critic's finding,
- * a validator's problem and the engine's own refusal are all objections: the
- * next plan has to answer any of them, so all travel the same way. A
- * plan-level objection names nothing in `at`.
- */
-export const stepObjectionSchema = z.strictObject({
-  /** The session step whose plan drew it. */
-  step: z.number().int().min(1),
-  /** Who objected: a critic's finding type, a validator's or a criterion's id, or one of `ENGINE_OBJECTORS`. */
-  from: bounded.id(OBJECTION_FROM_MAX_LENGTH),
-  /** Where in the refused plan it sat, as the objector located it. */
-  at: bounded.list(OBJECTION_AT_BOUND, bounded.id(OBJECTION_AT_MAX_LENGTH)),
-  /** What was said, in the objector's own words and not a word shorter. */
-  detail: bounded.text(OBJECTION_DETAIL_BOUND, { min: 1 }),
-});
-export type StepObjection = z.infer<typeof stepObjectionSchema>;
 
 export const taskLedgerSummarySchema = z.strictObject({
   openTask: z

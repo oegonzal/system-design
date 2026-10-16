@@ -90,9 +90,3 @@ export const ACTION_LOCATION = /^action\.(\d+)$/;
 /** One suggestion of one field: `field.2.1` is the second field's first suggestion. */
 export const suggestionLocation = (field: number, suggestion: number): string =>
   `field.${field + 1}.${suggestion + 1}`;
-
-/** The zero-based position a location names, or null for another location. */
-export function positionOf(location: string, grammar: RegExp): number | null {
-  const match = grammar.exec(location);
-  return match === null ? null : Number(match[1]) - 1;
-}

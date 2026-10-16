@@ -19,7 +19,6 @@ export * from './answer-suggestions.schema';
 export * from './field-goal';
 export * from './field-goal-terms';
 export * from './form-retrieval-report';
-export * from './read-back';
 export * from './route-plan';
 export * from './route-fields';
 export * from './guidance';

@@ -1,6 +1,6 @@
 import {
+  bestIterationOf,
   parseLenient,
-  type IterationTrace,
   type OrchestrationRunDto,
   type QualityRunDto,
 } from '@sysdesign/contracts';
@@ -112,13 +112,6 @@ export async function awaitOrchestration(
     }
     await pace.sleep(pace.pollEveryMs);
   }
-}
-
-/** The iteration the run judged best, looked up by its number — never by its index. */
-export function bestIterationOf(run: QualityRunDto): IterationTrace | null {
-  const trace = run.trace;
-  if (trace === null) return null;
-  return trace.iterations.find((it) => it.iteration === trace.bestIteration) ?? null;
 }
 
 /**

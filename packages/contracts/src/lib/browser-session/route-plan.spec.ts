@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
 import { type ValidationReport } from '../quality-loop/evidence';
+import { judgedRun as judged, type RunShape } from '../quality-loop/run-fixtures';
 import { routePlan } from './route-plan';
-import { judgedRun } from './read-back.testing';
 import { ASSESSMENT_BOUND, type StepPlan } from './step-plan.schema';
+
+const judgedRun = (shape: RunShape) => judged('browser-step', shape);
 
 const plan: StepPlan = {
   assessment: 'A listing page; open the first result.',

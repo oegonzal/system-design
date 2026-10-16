@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
 import { GOAL_BUDGET_BYTES, GoalBudgetExceeded, textBytes } from '../quality-loop/goal-index';
+import {
+  OBJECTION_AT_BOUND,
+  OBJECTION_DETAIL_BOUND,
+  OBJECTIONS_BOUND,
+  type Objection,
+} from '../quality-loop/read-back';
 import { NO_UNITS_ON_RECORD } from '../units/record';
 import {
   dialogObservation,
@@ -13,15 +19,11 @@ import {
 import {
   CLOSED_TASKS_BOUND,
   ELEMENTS_BOUND,
-  OBJECTION_AT_BOUND,
-  OBJECTION_DETAIL_BOUND,
-  OBJECTIONS_BOUND,
   type ObservedElement,
   OPTIONS_SHOWN,
   type PageObservation,
   pageObservationSchema,
   type StepHistoryEntry,
-  type StepObjection,
   TASK_LABEL_BOUND,
 } from './observation.schema';
 import { composeStepGoal, renderElementLine, type StepGoalInput } from './step-goal';
@@ -42,14 +44,14 @@ const goalOf = (
   observation: PageObservation,
   history: readonly StepHistoryEntry[] = [],
   ledger = emptyLedger(),
-  objections: readonly StepObjection[] = [],
+  objections: readonly Objection[] = [],
 ) =>
   composeStepGoal(
     stepGoalInput({ observation, history, ledger, objections, progress: NO_PROGRESS }),
   );
 
 /** One objection at its declared ceiling, as a maximal goal would carry it. */
-const maximalObjection = (step: number): StepObjection => ({
+const maximalObjection = (step: number): Objection => ({
   step,
   from: 'misread_page',
   at: Array.from({ length: OBJECTION_AT_BOUND.target }, (_, i) => `action.${i + 1}`),

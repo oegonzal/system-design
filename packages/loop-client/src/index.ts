@@ -18,7 +18,6 @@ export {
   awaitOrchestration,
   awaitRun,
   bestArtifact,
-  bestIterationOf,
   DEFAULT_POLL_EVERY_MS,
   type AwaitOptions,
 } from './await-run';

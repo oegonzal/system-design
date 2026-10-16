@@ -34,6 +34,7 @@ const SCHEMA_FILES = [
   'packages/contracts/src/lib/star-stories.ts',
   'packages/contracts/src/lib/quality-loop/evidence.ts',
   'packages/contracts/src/lib/quality-loop/lessons.ts',
+  'packages/contracts/src/lib/quality-loop/read-back.ts',
   'packages/contracts/src/lib/browser-session/field-answers.schema.ts',
   'packages/contracts/src/lib/browser-session/answer-suggestions.schema.ts',
   'packages/contracts/src/lib/browser-session/observation.schema.ts',

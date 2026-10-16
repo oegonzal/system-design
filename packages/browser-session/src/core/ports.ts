@@ -1,5 +1,5 @@
 import type {
-  StepObjection,
+  Objection,
   Admission,
   AnswerSuggestions,
   BrowserDecisionKind,
@@ -169,7 +169,7 @@ export interface StepInput {
   history: readonly StepHistoryEntry[];
   ledger: TaskLedgerSummary;
   /** Why the plans before this one did not run, newest first. */
-  objections: readonly StepObjection[];
+  objections: readonly Objection[];
   criteria: readonly SuccessCriterion[];
   /**
    * Whether this page is the one the last plan was made against. On an

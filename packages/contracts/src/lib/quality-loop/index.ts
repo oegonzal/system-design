@@ -18,6 +18,7 @@ export * from './recall';
 export * from './panel';
 export * from './router';
 export * from './goal-index';
+export * from './read-back';
 export * from './admission';
 export * from './document-digest';
 export * from './document-memory';

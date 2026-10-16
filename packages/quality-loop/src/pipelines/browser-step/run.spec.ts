@@ -110,7 +110,7 @@ describe('the browser-step loop', () => {
     expect(readout.plan).toEqual(samplePlan());
     expect(readout.executable).toBe(false);
     expect(readout.executePrefix).toBe(0);
-    expect(readout.reason).toContain('the first action was faulted');
+    expect(readout.reason).toContain('action.1 was faulted');
     // What blocked travels as the objections: the finding, and the criterion it was borne out by.
     expect(readout.objections.map((objection) => objection.from)).toEqual(['missed_stop', 'c2']);
   });

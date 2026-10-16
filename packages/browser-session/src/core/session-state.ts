@@ -16,7 +16,7 @@ import {
   type SessionRailsDto,
   type StepAction,
   type StepHistoryEntry,
-  type StepObjection,
+  type Objection,
   type StepPlan,
   type TaskLedgerSummary,
   type TaskOutcome,
@@ -72,7 +72,7 @@ export interface SessionState {
    * Kept while the page stays the one they were raised on, and until a plan
    * runs every action it proposed: a plan for a new page answers that page.
    */
-  objections: StepObjection[];
+  objections: Objection[];
   /**
    * The open unit, how many have opened, how many closed by each outcome, and
    * the closed ones by label and outcome — the most recent `CLOSED_TASKS_BOUND`,
@@ -290,7 +290,7 @@ export const ledgerSummaryOf = (
  * note's 300 characters, and `HISTORY_MAX` entries of duplication evicting
  * the record of what the session had actually done.
  */
-export function pushObjections(state: SessionState, objections: readonly StepObjection[]): void {
+export function pushObjections(state: SessionState, objections: readonly Objection[]): void {
   state.objections.unshift(
     ...objections.map((objection) => ({
       step: objection.step,

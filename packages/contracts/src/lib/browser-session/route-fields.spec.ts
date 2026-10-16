@@ -5,8 +5,10 @@ import { ANSWER_REASON_BOUND, type FieldAnswers } from './field-answers.schema';
 import { fieldSpecOf, type FieldSpec } from './field-goal';
 import { answeringFixture, formObservation } from './fixtures';
 import { type WithheldRef } from './pipelines';
+import { judgedRun as judged, type RunShape } from '../quality-loop/run-fixtures';
 import { routeFields, type FieldsDecision } from './route-fields';
-import { judgedRun } from './read-back.testing';
+
+const judgedRun = (shape: RunShape) => judged('field-answer', shape);
 
 const fields = () =>
   formObservation()

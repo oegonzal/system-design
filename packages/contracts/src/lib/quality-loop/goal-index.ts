@@ -2,9 +2,9 @@
  * A composed goal's bookkeeping rides on the goal itself, as the LAST fenced
  * JSON block, so the loop's validators read the index the composer wrote and
  * never parse prose. The composers live outside the loop — the studio, the
- * browser session, the document ingester — so the fence and its reader are
- * declared here, where every program can reach them; the loop's own copy in
- * `core/contracts/goal-index.ts` is pinned equal by a spec there.
+ * browser session, the document ingester, a tool session — so the fence and
+ * its reader are declared here, where every program can reach them, and the
+ * loop's prompting stage strips the index with the same reader.
  */
 import type { ZodType } from 'zod';
 
@@ -14,7 +14,7 @@ export const GOAL_INDEX_FENCE_CLOSE = '\n```';
 /**
  * The engine's goal budget. A composer that renders past it would have every
  * stage read a clipped goal while the validators read the whole one, so a
- * composer refuses instead; the loop's `GOAL_MAX_BYTES` is pinned equal.
+ * composer refuses instead; the loop's HTTP edge refuses the same budget.
  */
 export const GOAL_BUDGET_BYTES = 64_000;
 

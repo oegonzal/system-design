@@ -8,6 +8,7 @@
 import { quoted } from '../text';
 import type { SuccessCriterion } from '../quality-loop/evidence';
 import { GOAL_BUDGET_BYTES, renderIndexSection, withinBudget } from '../quality-loop/goal-index';
+import { objectionLines, type Objection } from '../quality-loop/read-back';
 import { unitFacetsOf } from '../units/mission-identity';
 import type { TakenOnPage } from '../units/mission-taken';
 import { forbiddenOf, type UnitsOnRecord } from '../units/record';
@@ -16,11 +17,9 @@ import { marksOf, marksOn, type Mark } from './mission-marks';
 import { stopsOf, type StopOnPage } from './mission-stops';
 import {
   inScope,
-  OBJECTIONS_BOUND,
   type ObservedElement,
   type PageObservation,
   type StepHistoryEntry,
-  type StepObjection,
   type TaskLedgerSummary,
 } from './observation.schema';
 import { SETTLING_CRITERION_KINDS } from './pipelines';
@@ -56,7 +55,7 @@ export interface StepGoalInput extends StepPageState {
    * plan has to answer. Carried here rather than on the actions they were
    * about, so each one arrives whole and once.
    */
-  objections: readonly StepObjection[];
+  objections: readonly Objection[];
   progress: StepProgress;
   /**
    * The mission's stop words and whether the page shows them, read from the
@@ -117,26 +116,10 @@ const historyLines = (history: readonly StepHistoryEntry[]): string[] =>
           : `- ${entry.action} — ${entry.outcome}${note}`;
       });
 
-/**
- * The objections the next plan must answer: why the plans made on this page
- * did not run or were cut, newest first and each whole, by the position it
- * points at — never by the engine's step count or the id of the lens or
- * validator that raised it. Past the declared count the rest are counted
- * rather than cut, the way an observation counts the elements it does not list.
- */
-const objectionLines = (objections: readonly StepObjection[]): string[] => {
-  if (objections.length === 0) return ['(none — no plan made on this page has been refused)'];
-  const carried = objections.slice(0, OBJECTIONS_BOUND.target);
-  const lines = carried.map((objection) => {
-    const at = objection.at.length === 0 ? 'the plan as a whole' : objection.at.join(', ');
-    return `- ${at} — ${objection.detail}`;
-  });
-  const rest = objections.length - carried.length;
-  return [
-    'Why the plans made on this page did not run, or were cut, newest first:',
-    ...lines,
-    ...(rest === 0 ? [] : [`(${rest} older objection(s) not listed)`]),
-  ];
+/** The objections the next plan must answer, in the page's own terms: why the plans made on this page did not run or were cut. */
+const OBJECTION_WORDING = {
+  none: '(none — no plan made on this page has been refused)',
+  heading: 'Why the plans made on this page did not run, or were cut, newest first:',
 };
 
 /**
@@ -336,7 +319,7 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
     ...section('## Elements', elementsSection(observation, marks)),
     ...section('## Snapshot', snapshotLines(observation)),
     ...section('## Recent actions', historyLines(input.history)),
-    ...section('## Objections to answer', objectionLines(input.objections)),
+    ...section('## Objections to answer', objectionLines(input.objections, OBJECTION_WORDING)),
     ...section('## Units of work', unitsLines(input.ledger, input.onRecord)),
     ...section('## Progress', progressLines(input.progress)),
     ...section(

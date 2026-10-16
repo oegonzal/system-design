@@ -12,7 +12,8 @@ import {
   UNIT_STANCES_STRONGEST_FIRST,
   type UnitStance,
 } from '../units/vocab';
-import { HISTORY_NOTE_BOUND, OBJECTION_DETAIL_BOUND } from './observation.schema';
+import { OBJECTION_DETAIL_BOUND } from '../quality-loop/read-back';
+import { HISTORY_NOTE_BOUND } from './observation.schema';
 import { ON_RECORD_TAKEN } from './step-plan.schema';
 import {
   describeForbiddenCut,

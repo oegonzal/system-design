@@ -5,7 +5,8 @@ import { NO_UNITS_ON_RECORD } from '../units/record';
 import { emptyLedger, listingObservation, MISSION_FIXTURE, stepGoalInput } from './fixtures';
 import { MissionMarkMalformed } from './mission-marks';
 import { stopsOf, stopsOnPage } from './mission-stops';
-import { type PageObservation, type StepObjection } from './observation.schema';
+import { type Objection } from '../quality-loop/read-back';
+import { type PageObservation } from './observation.schema';
 import { composeStepGoal } from './step-goal';
 import { readStepIndex } from './step-index';
 import { ACTIONS_BOUND } from './step-plan.schema';
@@ -16,7 +17,7 @@ const goalOf = (
   observation: PageObservation,
   history = [],
   ledger = emptyLedger(),
-  objections: readonly StepObjection[] = [],
+  objections: readonly Objection[] = [],
 ) =>
   composeStepGoal(
     stepGoalInput({ observation, history, ledger, objections, progress: NO_PROGRESS }),
