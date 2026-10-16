@@ -579,10 +579,16 @@ Pairing, once per bot:
 2. Start the service — `pnpm notifications:serve`, or `tilt up` — and send
    `/start` to the bot in Telegram. Until its chat is named the bot serves no
    one: it answers `/start` with your chat id and delivers nothing.
-3. Put that id in `.env` under its chat variable and restart the service.
-   From then on the bot serves that chat alone and ignores every other. A
-   private chat's id is your own Telegram id, so every bot that serves you
-   privately reads the same `TELEGRAM_CHAT_ID`.
+3. Put that id in `.env` under its chat variable and start the serve task
+   again: `pnpm notifications:serve` afresh, or the Tilt resource restarted.
+   Saving `.env` alone is not enough, although it does restart the process:
+   nx loads `.env` into the environment it starts the task in, `node --watch`
+   restarts its child with that same environment, and Node's env file never
+   overrides a variable that is already set. So a value replaced in `.env`
+   reaches a service only with a new serve task, while a variable new to the
+   file arrives on the save. From then on the bot serves that chat alone and
+   ignores every other. A private chat's id is your own Telegram id, so every
+   bot that serves you privately reads the same `TELEGRAM_CHAT_ID`.
 
 Telegram takes one poller per bot token: run the service under Tilt or with
 `pnpm notifications:serve`, never both at once — the second is refused, and
