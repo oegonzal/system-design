@@ -18,7 +18,7 @@ import {
   type ThreadDetail,
   type ThreadSummary,
 } from '../ports';
-import { addressesOf, headerOf, textOf } from './mime';
+import { addressesOf, headerOf, snippetOf, textOf } from './mime';
 import { rawMessage, replySubject } from './rfc822';
 import {
   draftListSchema,
@@ -88,7 +88,7 @@ export class GmailRest implements MailboxPort {
       to: addressesOf(headerOf(headers, 'To')),
       subject: headerOf(headers, 'Subject') ?? '',
       date: dateOf(message),
-      snippet: message.snippet ?? '',
+      snippet: snippetOf(message.snippet),
       labels: message.labelIds ?? [],
     };
   }
@@ -126,7 +126,7 @@ export class GmailRest implements MailboxPort {
         from: latest?.from ?? '',
         messages: messages.length,
         date: latest?.date ?? '',
-        snippet: snippet ?? '',
+        snippet: snippetOf(snippet),
       });
     }
     return summaries;

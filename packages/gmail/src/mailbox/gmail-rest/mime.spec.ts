@@ -1,4 +1,4 @@
-import { addressesOf, headerOf, htmlToText, textOf } from './mime';
+import { addressesOf, headerOf, htmlToText, snippetOf, textOf } from './mime';
 import { encodedWord, rawMessage, replySubject } from './rfc822';
 
 const b64 = (text: string): string => Buffer.from(text, 'utf8').toString('base64url');
@@ -37,6 +37,14 @@ describe('a message’s text and a draft’s bytes', () => {
     expect(headerOf(headers, 'subject')).toBe('Hello');
     expect(headerOf(headers, 'FROM')).toBe('a@b');
     expect(headerOf(headers, 'To')).toBeNull();
+  });
+
+  it('[GML-3] reads a snippet as a person reads it: Gmail escapes it as HTML, and a preview is often padded with characters that draw nothing', () => {
+    expect(
+      snippetOf('Bowling, climbing &amp; more, easier on the wallet \u034F \u200C \u034F \u200C'),
+    ).toBe('Bowling, climbing & more, easier on the wallet');
+    expect(snippetOf('It&#39;s   here\u00AD\uFEFF &lt;soon&gt;')).toBe("It's here <soon>");
+    expect(snippetOf(undefined)).toBe('');
   });
 
   it('[GML-3] reads addresses as a header lists them, commas inside quotes and brackets kept', () => {

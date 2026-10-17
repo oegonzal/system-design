@@ -15,7 +15,7 @@ export const GMAIL_CRITERIA: readonly Criterion[] = [
   {
     id: 'GML-3',
     statement:
-      'A message’s text is its plain part, else its HTML part reduced to what a person reads; addresses are read off a header as it lists them; a draft is one RFC 822 message base64url-encoded, a reply threading itself under the message it answers by In-Reply-To and References, its subject prefixed once, a subject beyond ASCII encoded as RFC 2047 says, and no header value carrying a line break.',
+      'A message’s text is its plain part, else its HTML part reduced to what a person reads; a snippet, which Gmail writes HTML-escaped, is decoded with the characters that draw nothing removed; addresses are read off a header as it lists them; a draft is one RFC 822 message base64url-encoded, a reply threading itself under the message it answers by In-Reply-To and References, its subject prefixed once, a subject beyond ASCII encoded as RFC 2047 says, and no header value carrying a line break.',
   },
   {
     id: 'GML-4',

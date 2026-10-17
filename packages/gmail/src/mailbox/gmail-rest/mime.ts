@@ -33,24 +33,43 @@ const ENTITIES: Readonly<Record<string, string>> = {
   nbsp: ' ',
 };
 
+/** Character references as the characters they name; one the table does not name stays as written. */
+const decodeEntities = (text: string): string =>
+  text.replace(/&(#\d+|#x[0-9a-f]+|[a-z]+);/gi, (whole, entity: string) => {
+    if (entity.startsWith('#x') || entity.startsWith('#X')) {
+      return String.fromCodePoint(Number.parseInt(entity.slice(2), 16));
+    }
+    if (entity.startsWith('#')) return String.fromCodePoint(Number(entity.slice(1)));
+    return ENTITIES[entity.toLowerCase()] ?? whole;
+  });
+
 /** HTML as text: what a person reads, with the markup, the styles and the scripts gone and the entities decoded. */
 export function htmlToText(html: string): string {
-  return html
-    .replace(/<(style|script)[^>]*>[\s\S]*?<\/\1>/gi, '')
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/(p|div|tr|li|h[1-6])>/gi, '\n')
-    .replace(/<[^>]+>/g, '')
-    .replace(/&(#\d+|#x[0-9a-f]+|[a-z]+);/gi, (whole, entity: string) => {
-      if (entity.startsWith('#x') || entity.startsWith('#X')) {
-        return String.fromCodePoint(Number.parseInt(entity.slice(2), 16));
-      }
-      if (entity.startsWith('#')) return String.fromCodePoint(Number(entity.slice(1)));
-      return ENTITIES[entity.toLowerCase()] ?? whole;
-    })
+  return decodeEntities(
+    html
+      .replace(/<(style|script)[^>]*>[\s\S]*?<\/\1>/gi, '')
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(p|div|tr|li|h[1-6])>/gi, '\n')
+      .replace(/<[^>]+>/g, ''),
+  )
     .replace(/[ \t]+\n/g, '\n')
     .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
+
+/**
+ * Characters that draw nothing: Unicode's format characters (zero-width
+ * spaces and joiners, soft hyphens, byte-order marks) and the combining
+ * grapheme joiner, which a message's preview padding is often made of.
+ */
+const INVISIBLE = /[\p{Cf}͏]/gu;
+
+/** A snippet as a person reads it: Gmail writes its snippets HTML-escaped; decoded, invisible characters gone, spacing collapsed. */
+export const snippetOf = (snippet: string | undefined): string =>
+  decodeEntities(snippet ?? '')
+    .replace(INVISIBLE, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 /** The message's text: its first plain part, else its first HTML part as text, else nothing. */
 export function textOf(payload: MimePart | undefined): string {

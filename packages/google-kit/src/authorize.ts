@@ -26,11 +26,18 @@ export type Listen = (
   handle: (request: CallbackRequest) => string,
 ) => Promise<{ close(): Promise<void> }>;
 
+/**
+ * The loopback listener over node:http. A browser keeps its connection open
+ * after the page it was answered with, and a server's close waits for every
+ * open connection: the page asks the browser to close it, and closing drops
+ * whatever connection is still open, so the grant is answered the moment the
+ * code is exchanged rather than when the browser lets go.
+ */
 const nodeListen: Listen = (port, handle) =>
   new Promise((resolve, reject) => {
     const server = createServer((request: IncomingMessage, response: ServerResponse) => {
       const page = handle({ url: request.url ?? '/' });
-      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8' });
+      response.writeHead(200, { 'content-type': 'text/html; charset=utf-8', connection: 'close' });
       response.end(page);
     });
     server.once('error', reject);
@@ -39,6 +46,7 @@ const nodeListen: Listen = (port, handle) =>
         close: () =>
           new Promise((done, failed) => {
             server.close((error) => (error ? failed(error) : done()));
+            server.closeAllConnections();
           }),
       });
     });

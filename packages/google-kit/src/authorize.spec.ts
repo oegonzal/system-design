@@ -1,6 +1,30 @@
+import { Agent, get } from 'node:http';
+import { connect, createServer, type AddressInfo } from 'node:net';
+
 import { AUTH_ENDPOINT, authorize, ConsentFailed, type Listen } from './authorize';
 import { TOKEN_ENDPOINT } from './oauth';
 import { fakeGoogleFetch, json } from './testing';
+
+/** A port nothing listens on, found by binding one and letting it go. */
+const freePort = (): Promise<number> =>
+  new Promise((resolve, reject) => {
+    const probe = createServer();
+    probe.once('error', reject);
+    probe.listen(0, '127.0.0.1', () => {
+      const { port } = probe.address() as AddressInfo;
+      probe.close(() => resolve(port));
+    });
+  });
+
+/** The browser coming back: one GET over a connection it means to keep open. */
+const browserReturns = (url: string, agent: Agent): Promise<string> =>
+  new Promise((resolve, reject) => {
+    get(url, { agent }, (response) => {
+      let page = '';
+      response.on('data', (chunk: Buffer) => (page += chunk.toString()));
+      response.on('end', () => resolve(page));
+    }).on('error', reject);
+  });
 
 /** A listener that hands the handler the redirect a spec chooses, as if the browser came back with it. */
 const listening = (redirect: (consentUrl: URL) => string) => {
@@ -133,4 +157,39 @@ describe('consent', () => {
       ),
     ).rejects.toThrow('Google gave no refresh token');
   });
+
+  it('[GGL-4] answers the grant as soon as the code is exchanged, though the browser keeps connections to the listener open, one of them never used', async () => {
+    const port = await freePort();
+    const google = fakeGoogleFetch({
+      [`POST ${TOKEN_ENDPOINT}`]: () => json({ refresh_token: 'rt', scope: 's' }),
+    });
+    let announce: () => void = () => undefined;
+    const announced = new Promise<void>((resolve) => (announce = resolve));
+    const granted = authorize({
+      clientId: 'client',
+      clientSecret: 'secret',
+      scopes: ['s'],
+      port,
+      announce: () => announce(),
+      fetchImpl: google.fetch,
+      state: 'state-1',
+    });
+    await announced;
+    // A browser opens a spare connection ahead of need and may never send on it.
+    const spare = connect(port, '127.0.0.1');
+    await new Promise((resolve) => spare.once('connect', resolve));
+    const browser = new Agent({ keepAlive: true });
+    try {
+      const page = await browserReturns(
+        `http://127.0.0.1:${port}/callback?state=state-1&code=c`,
+        browser,
+      );
+      expect(page).toBe('Consent received. You may close this tab.');
+      // Before the listener let its connections go, this waited for the server's header timeout to drop the spare one.
+      await expect(granted).resolves.toMatchObject({ refreshToken: 'rt' });
+    } finally {
+      spare.destroy();
+      browser.destroy();
+    }
+  }, 3_000);
 });

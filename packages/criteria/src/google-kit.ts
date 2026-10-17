@@ -20,7 +20,7 @@ export const GOOGLE_KIT_CRITERIA: readonly Criterion[] = [
   {
     id: 'GGL-4',
     statement:
-      'Consent is obtained once for every program: a loopback listener on the declared port, the consent URL announced for the person to open, the state checked on the way back, the code exchanged for a refresh token, and the token written; a consent that yields no refresh token is refused rather than stored.',
+      'Consent is obtained once for every program: a loopback listener on the declared port, the consent URL announced for the person to open, the state checked on the way back, the code exchanged for a refresh token, and the token written as soon as it is granted, whatever connection the browser keeps open to the listener; a consent that yields no refresh token is refused rather than stored.',
   },
   {
     id: 'GGL-5',

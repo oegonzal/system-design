@@ -42,7 +42,8 @@ describe('the Gmail REST adapter', () => {
   it('[GML-4] lists a search’s threads from their messages’ headers asked for one by one, reads a message and a thread whole with their labels as names, and answers null for one Gmail does not have', async () => {
     const google = fakeGoogleFetch({
       ...labelsRoute,
-      [`GET ${GMAIL_API}/threads`]: () => json({ threads: [{ id: 't1', snippet: 'snip' }] }),
+      [`GET ${GMAIL_API}/threads`]: () =>
+        json({ threads: [{ id: 't1', snippet: 'snip &amp; more \u034F \u200C' }] }),
       [`GET ${GMAIL_API}/threads/t1`]: () =>
         json({
           id: 't1',
@@ -60,7 +61,7 @@ describe('the Gmail REST adapter', () => {
         from: 'Bob <bob@x.test>',
         messages: 2,
         date: '2026-10-16T09:00:00.000Z',
-        snippet: 'snip',
+        snippet: 'snip & more',
       },
     ]);
     expect(google.calls[0]?.url.searchParams.get('q')).toBe('from:ada');
