@@ -5,3 +5,4 @@ export * from './vocab';
 export * from './cycle';
 export * from './events';
 export * from './strategy';
+export * from './strategy-validator';
