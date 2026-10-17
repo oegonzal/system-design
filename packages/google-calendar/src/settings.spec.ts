@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { relative, resolve } from 'node:path';
 
 import { GoogleCalendarConfigError, PACKAGE_ROOT } from './config';
 import { readSettings, schedulingSettingsSchema } from './settings';
@@ -17,12 +18,15 @@ describe('the service settings', () => {
     expect(settings.scheduling.workingDays).toEqual([1, 2, 3, 4, 5]);
     expect(settings.calendar.listMax).toBeLessThanOrEqual(settings.calendar.listCeiling);
     expect(settings.calendar.suggestMax).toBeLessThanOrEqual(settings.calendar.suggestCeiling);
+    // Where each came from, as a path from wherever the process runs — the repo root or the package.
+    const shipped = (kind: string) =>
+      relative(process.cwd(), resolve(PACKAGE_ROOT, 'config', kind, 'standard.json'));
     expect(settings.sources).toEqual({
-      session: 'packages/google-calendar/config/session/standard.json',
-      watch: 'packages/google-calendar/config/watch/standard.json',
-      peers: 'packages/google-calendar/config/peers/standard.json',
-      scheduling: 'packages/google-calendar/config/scheduling/standard.json',
-      calendar: 'packages/google-calendar/config/calendar/standard.json',
+      session: shipped('session'),
+      watch: shipped('watch'),
+      peers: shipped('peers'),
+      scheduling: shipped('scheduling'),
+      calendar: shipped('calendar'),
     });
     const without = (kind: string) => (at: string) => {
       if (at.endsWith('engine.json'))

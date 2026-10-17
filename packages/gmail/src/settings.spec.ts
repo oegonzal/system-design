@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { relative, resolve } from 'node:path';
 
 import { PACKAGE_ROOT, GmailConfigError } from './config';
 import { readSettings } from './settings';
@@ -14,11 +15,14 @@ describe('the service settings', () => {
     });
     expect(settings.peers.peers).toEqual(['google-calendar']);
     expect(settings.mailbox.searchMax).toBeLessThanOrEqual(settings.mailbox.searchCeiling);
+    // Where each came from, as a path from wherever the process runs — the repo root or the package.
+    const shipped = (kind: string) =>
+      relative(process.cwd(), resolve(PACKAGE_ROOT, 'config', kind, 'standard.json'));
     expect(settings.sources).toEqual({
-      session: 'packages/gmail/config/session/standard.json',
-      watch: 'packages/gmail/config/watch/standard.json',
-      peers: 'packages/gmail/config/peers/standard.json',
-      mailbox: 'packages/gmail/config/mailbox/standard.json',
+      session: shipped('session'),
+      watch: shipped('watch'),
+      peers: shipped('peers'),
+      mailbox: shipped('mailbox'),
     });
     const without = (kind: string) => (at: string) => {
       if (at.endsWith('engine.json'))
