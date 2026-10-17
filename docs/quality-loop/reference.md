@@ -150,19 +150,21 @@ a decision.
 
 ### `core/loop/` — the iteration engine
 
-| File              | What it does                                                                          | Exports                                                 |
-| ----------------- | ------------------------------------------------------------------------------------- | ------------------------------------------------------- |
-| `run-pipeline.ts` | The loop: produce or adopt, validate, judge, normalise, decide, repeat.               | `runPipeline`, `runLoop`, `RunInput`, `RunDeps`         |
-| `iteration.ts`    | One iteration as named steps: produce or adopt, validate, judge, decide.              | `runIteration`                                          |
-| `briefing.ts`     | What the next ask is told about the attempt before: refusals and setbacks.            | `refusalsOf`, `setbacksOf`, `lostProduce`, `wasBlocked` |
-| `waves.ts`        | The critics, then any evaluator that consumes their findings; the normaliser between. | `runLensWaves`, `Judged`                                |
-| `materialize.ts`  | Definition plus model client becomes concrete stages.                                 | `materialize`, `materializeCriteria`                    |
-| `rubric.ts`       | Checks a supplied rubric could have been derived, before any row.                     | `rubricProblems`                                        |
-| `scoped-llm.ts`   | The recording twin of the model client, plus bounded concurrency.                     | `scopeLlm`, `mapConcurrent`                             |
+| File              | What it does                                                                          | Exports                                                              |
+| ----------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `run-pipeline.ts` | The loop: produce or adopt, validate, judge, normalise, decide, repeat.               | `runPipeline`, `runLoop`, `RunInput`, `RunDeps`, `IterationListener` |
+| `iteration.ts`    | One iteration as named steps: produce or adopt, validate, judge, decide.              | `runIteration`                                                       |
+| `briefing.ts`     | What the next ask is told about the attempt before: refusals and setbacks.            | `refusalsOf`, `setbacksOf`, `lostProduce`, `wasBlocked`              |
+| `waves.ts`        | The critics, then any evaluator that consumes their findings; the normaliser between. | `runLensWaves`, `Judged`                                             |
+| `materialize.ts`  | Definition plus model client becomes concrete stages.                                 | `materialize`, `materializeCriteria`                                 |
+| `rubric.ts`       | Checks a supplied rubric could have been derived, before any row.                     | `rubricProblems`                                                     |
+| `scoped-llm.ts`   | The recording twin of the model client, plus bounded concurrency.                     | `scopeLlm`, `mapConcurrent`                                          |
 
 A new iteration has to be strictly better to be crowned. An adopted iteration is cloned and runs no
 stage. The output shape's `normalize` is applied only to a produced artifact, never to a supplied
-one.
+one. How a host hooks into the loop — `RunDeps.onIteration` and the exchange sink, the recorder,
+heartbeat and janitor around them, and where the bus events are — is walked in
+[`lifecycle-and-hooks.md`](lifecycle-and-hooks.md).
 
 ### `core/outputs/` — reading a finished run
 
