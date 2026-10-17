@@ -82,6 +82,7 @@ export const sampleObservation = (overrides: Partial<ToolObservation> = {}): Too
 export const toolGoalInput = (overrides: Partial<ToolGoalInput> = {}): ToolGoalInput => ({
   mission: TOOL_MISSION_FIXTURE,
   now: '2026-10-16T12:00:00.000Z',
+  timeZone: 'UTC',
   tools: sampleTools(),
   observations: [],
   omittedObservations: 0,

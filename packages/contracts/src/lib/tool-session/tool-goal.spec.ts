@@ -49,7 +49,17 @@ describe('composeToolGoal', () => {
     expect(index?.tools[0]?.parameters['required']).toEqual(['query', 'limit']);
     // The model's view: the instant with its weekday, the tools one line each, no observation, no call, no objection.
     expect(between(goal, '## Now', '## Tools')).toContain(
-      'The time is 2026-10-16T12:00:00.000Z (Friday, UTC).',
+      'It is Friday 2026-10-16 12:00 in UTC (UTC+00:00), which is 2026-10-16T12:00:00.000Z in UTC.',
+    );
+    // The operator's evening is still their day, though UTC has moved on to the next.
+    const evening = composeToolGoal(
+      toolGoalInput({ now: '2026-10-17T03:55:00.000Z', timeZone: 'America/Los_Angeles' }),
+    );
+    expect(between(evening, '## Now', '## Tools')).toContain(
+      'It is Friday 2026-10-16 20:55 in America/Los_Angeles (UTC-07:00), which is 2026-10-17T03:55:00.000Z in UTC.',
+    );
+    expect(between(evening, '## Now', '## Tools')).toContain(
+      'Read "today", "tomorrow" and "this week" in America/Los_Angeles.',
     );
     expect(between(goal, '## Tools', '## Observations')).toContain(
       '- remove_item (irreversible, asks you first): Removes one item for good.',

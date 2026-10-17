@@ -235,6 +235,7 @@ export const sampleSettings = (
   observations: { keep: 8 },
   history: { keep: 12 },
   pollEveryMs: 1,
+  timeZone: 'UTC',
 });
 
 /** The deps a spec runs a session with, each a fake it can read afterwards. */

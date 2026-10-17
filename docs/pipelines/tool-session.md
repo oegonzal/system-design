@@ -54,7 +54,7 @@ Read: exit 0, the session `complete` by the mission's own cause
 `tool-step` run per step at
 `curl -s 'localhost:3003/runs?pipeline=tool-step' | jq '.data[] | {runId, finalDecision}'`;
 in a run's dump (`static/runs/<runId>/01-goal.md`) the goal carries the
-mission verbatim, `## Now` with the instant and its weekday, `## Tools` grouped
+mission verbatim, `## Now` with the time as your clock shows it, weekday included, and in UTC, `## Tools` grouped
 by provider (`From gmail:`, `From google-calendar:`), the observations of the
 calls before, and the index the validators read; `tool-session.finished` on
 the bus (`GET :3005/subscriptions/<probe>/events`) and a `Noted` message on

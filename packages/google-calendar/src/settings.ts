@@ -1,7 +1,7 @@
 import { relative, resolve } from 'node:path';
 
 import { CONFIG_DIR, ENGINE_FILE, readChosen, type ReadFile } from '@sysdesign/config-kit';
-import { recoverySchema } from '@sysdesign/contracts';
+import { recoverySchema, timeZoneSchema } from '@sysdesign/contracts';
 import { toolSessionSettingsSchema, type ToolSessionSettings } from '@sysdesign/tool-session';
 import { z } from 'zod';
 
@@ -32,25 +32,10 @@ export const peersSettingsSchema = z.strictObject({ peers: z.array(z.string().mi
 /** A time of day as the clock shows it, `HH:MM`. */
 const clockTime = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, 'a time of day as HH:MM');
 
-const timeZone = z
-  .string()
-  .min(1)
-  .refine(
-    (zone) => {
-      try {
-        new Intl.DateTimeFormat('en-US', { timeZone: zone });
-        return true;
-      } catch {
-        return false;
-      }
-    },
-    { message: 'an IANA time zone name the runtime knows' },
-  );
-
 /** When a meeting may be put: the time zone, the working hours and days, and the grid slots sit on. */
 export const schedulingSettingsSchema = z
   .strictObject({
-    timeZone,
+    timeZone: timeZoneSchema,
     workingHours: z.strictObject({ start: clockTime, end: clockTime }),
     /** Days of the week, Sunday 0 through Saturday 6. */
     workingDays: z.array(z.number().int().min(0).max(6)).min(1),

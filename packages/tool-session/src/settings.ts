@@ -1,4 +1,4 @@
-import { recoverySchema } from '@sysdesign/contracts';
+import { recoverySchema, timeZoneSchema } from '@sysdesign/contracts';
 import { z } from 'zod';
 
 /**
@@ -44,5 +44,7 @@ export const toolSessionSettingsSchema = z.strictObject({
   history: z.strictObject({ keep: positive }),
   /** How often a session asks after the run it is waiting on. */
   pollEveryMs: positive,
+  /** The operator's IANA time zone: each goal states the time in it, and a mission's relative dates are read in it. */
+  timeZone: timeZoneSchema,
 });
 export type ToolSessionSettings = z.infer<typeof toolSessionSettingsSchema>;

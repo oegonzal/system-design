@@ -15,5 +15,7 @@ describe('the session settings', () => {
       false,
     );
     expect(toolSessionSettingsSchema.safeParse({ ...settings, extra: true }).success).toBe(false);
+    const zone = toolSessionSettingsSchema.safeParse({ ...settings, timeZone: 'Mars/Olympus' });
+    expect(zone.success ? '' : zone.error.issues[0]?.path.join('.')).toBe('timeZone');
   });
 });

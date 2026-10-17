@@ -38,7 +38,7 @@ export const TOOL_SESSION_CRITERIA: readonly Criterion[] = [
   {
     id: 'TSS-7',
     statement:
-      'A session’s settings are one file a program ships — its rails, its recovery windows, how long it waits for the operator and how much of its observations and recent calls it keeps — read against one schema that refuses a file with a field missing or wrong by name.',
+      'A session’s settings are one file a program ships — its rails, its recovery windows, how long it waits for the operator, how much of its observations and recent calls it keeps, and the operator’s time zone each goal states the time in — read against one schema that refuses a file with a field missing or wrong by name.',
   },
   {
     id: 'TSS-9',
