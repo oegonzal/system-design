@@ -1,2 +1,3 @@
-// What the service says on the bus; its source arrives with the service itself.
+// The mailbox service's wire contract: its source, and what it says on the bus.
+export * from './vocab';
 export * from './events';

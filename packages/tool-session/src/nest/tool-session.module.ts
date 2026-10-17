@@ -19,7 +19,8 @@ import { ToolsController } from './tools.controller';
 export interface ToolSessionModuleOptions {
   /** The source the program publishes under; the channel that carries it is the person's. */
   service: string;
-  catalog: ToolCatalog;
+  /** The tools, or how to build them from the bus client the module provides — for tools that publish what they did. */
+  catalog: ToolCatalog | ((bus: BusClient) => ToolCatalog);
   /** Other programs whose tools join every session, by the URL each serves `/tools` at. */
   peers: readonly string[];
   loopUrl: string;
@@ -41,7 +42,12 @@ export class ToolSessionModule {
     return {
       module: ToolSessionModule,
       providers: [
-        { provide: ToolCatalog, useValue: options.catalog },
+        {
+          provide: ToolCatalog,
+          useFactory: (bus: BusClient) =>
+            typeof options.catalog === 'function' ? options.catalog(bus) : options.catalog,
+          inject: [BusClient],
+        },
         {
           provide: LoopClient,
           useFactory: () =>

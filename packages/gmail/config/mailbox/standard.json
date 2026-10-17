@@ -1,0 +1,10 @@
+{
+  "searchMax": 10,
+  "searchCeiling": 25,
+  "bodyMaxLength": 6000,
+  "messageInThreadMaxLength": 1500,
+  "recovery": {
+    "windowMs": 30000,
+    "pauseMs": 2000
+  }
+}

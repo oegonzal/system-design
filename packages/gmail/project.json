@@ -1,0 +1,27 @@
+{
+  "name": "gmail",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/gmail/src",
+  "projectType": "application",
+  "tags": ["type:app", "scope:node"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "parallel": true,
+        "commands": [
+          "vite build --watch --config packages/gmail/vite.config.ts",
+          "node --watch --watch-preserve-output --env-file-if-exists=.env packages/gmail/dist/main.js"
+        ]
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "cwd": "packages/gmail",
+        "commands": ["tsc --noEmit -p tsconfig.app.json", "tsc --noEmit -p tsconfig.spec.json"]
+      }
+    }
+  }
+}

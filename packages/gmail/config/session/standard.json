@@ -1,0 +1,15 @@
+{
+  "rails": {
+    "maxSteps": 30,
+    "maxMinutes": 60,
+    "maxConsecutiveRefusals": 3,
+    "maxFailedCalls": 3,
+    "maxBrainFaults": 3
+  },
+  "loopRecovery": { "windowMs": 60000, "pauseMs": 2000 },
+  "busRecovery": { "windowMs": 60000, "pauseMs": 2000 },
+  "operator": { "expiresAfterMs": 43200000, "pullWaitMs": 25000, "eventsPerPull": 20 },
+  "observations": { "keep": 12 },
+  "history": { "keep": 16 },
+  "pollEveryMs": 3000
+}

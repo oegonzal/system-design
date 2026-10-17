@@ -33,6 +33,14 @@
           "bot": "AGENTICSYSTEM_TELEGRAM_BOT_ID",
           "chatId": "TELEGRAM_CHAT_ID"
         }
+      },
+      "telegram.gmail": {
+        "carries": ["gmail"],
+        "env": {
+          "token": "GMAIL_TELEGRAM_API_KEY",
+          "bot": "GMAIL_TELEGRAM_BOT_ID",
+          "chatId": "TELEGRAM_CHAT_ID"
+        }
       }
     }
   }
