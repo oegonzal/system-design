@@ -45,7 +45,12 @@ export class InteractionClient {
     private readonly options: InteractionOptions,
   ) {}
 
-  async ask(prompt: InteractionPrompt, signal?: AbortSignal): Promise<InteractionAnswer> {
+  /** Asks, under the program's own source unless `source` names another's — the channel that carries it then shows the prompt. */
+  async ask(
+    prompt: InteractionPrompt,
+    signal?: AbortSignal,
+    source: string = this.options.source,
+  ): Promise<InteractionAnswer> {
     const name = `ask.${prompt.id}`;
     await this.bus.subscribe(name, {
       topics: [INTERACTION_TOPICS.answered, INTERACTION_TOPICS.withdrawn],
@@ -53,7 +58,7 @@ export class InteractionClient {
     try {
       await this.bus.publish({
         topic: INTERACTION_TOPICS.prompted,
-        source: this.options.source,
+        source,
         payload: prompt,
       });
       return await this.answerTo(prompt, name, signal);
@@ -61,7 +66,7 @@ export class InteractionClient {
       if (signal?.aborted !== true) throw error;
       await this.bus.publish({
         topic: INTERACTION_TOPICS.withdrawn,
-        source: this.options.source,
+        source,
         payload: { promptId: prompt.id, ...withdrawalOf(signal.reason) },
       });
       throw error instanceof BusCallAborted ? error : new BusCallAborted('ask');

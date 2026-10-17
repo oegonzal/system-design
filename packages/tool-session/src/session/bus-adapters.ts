@@ -11,7 +11,7 @@ import type { OperatorPort, SessionEventsPort, SessionLog } from './ports';
  * The session's events on the bus, under the program's source, one after
  * another: writes are chained and never awaited by the loop, so order is
  * kept and a slow bus never stalls a step; a failed publish is reported,
- * never thrown.
+ * never thrown; `flush` is what the program awaits when it shuts down.
  */
 export class BusSessionEvents implements SessionEventsPort {
   private chain: Promise<void> = Promise.resolve();
@@ -31,14 +31,19 @@ export class BusSessionEvents implements SessionEventsPort {
           this.log.warn(`${topic} was not published: ${String(error)}`);
         },
       );
+    return Promise.resolve();
+  }
+
+  flush(): Promise<void> {
     return this.chain;
   }
 }
 
 /**
  * The operator reached through the notifications service: a question goes
- * out as an interaction prompt on every channel that carries the program's
- * source, and the answer comes back as the event that names it; a notice is
+ * out as an interaction prompt on every channel that carries the source it
+ * is asked under — the program's own, or a peer's for a call of the peer's
+ * tool — and the answer comes back as the event that names it; a notice is
  * published and never waited for.
  */
 export class InteractionOperator implements OperatorPort {
@@ -48,8 +53,12 @@ export class InteractionOperator implements OperatorPort {
     private readonly source: string,
   ) {}
 
-  ask(prompt: InteractionPrompt, signal?: AbortSignal): Promise<InteractionAnswer> {
-    return this.interactions.ask(prompt, signal);
+  ask(
+    prompt: InteractionPrompt,
+    signal?: AbortSignal,
+    source?: string,
+  ): Promise<InteractionAnswer> {
+    return this.interactions.ask(prompt, signal, source);
   }
 
   async notify(prompt: InteractionPrompt): Promise<void> {

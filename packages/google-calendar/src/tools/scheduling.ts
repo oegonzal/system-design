@@ -3,9 +3,9 @@ import type { SchedulingSettings } from '../settings';
 
 /**
  * Free slots, deterministically: the instants of the window on the declared
- * grid, within the declared working hours and days of the declared time
- * zone, that no busy interval of any calendar asked touches. No model: a
- * slot is free or it is not.
+ * grid of the declared time zone's clock, within its working hours and days,
+ * that no busy interval of any calendar asked touches. No model: a slot is
+ * free or it is not.
  */
 export interface Slot {
   start: string;
@@ -27,6 +27,9 @@ const WEEKDAYS: Readonly<Record<string, number>> = {
   Sat: 6,
 };
 
+const MINUTE_MS = 60_000;
+const DAY_MINUTES = 24 * 60;
+
 /** The instant as the time zone's clock shows it: the weekday and the minutes since midnight. */
 function localOf(instant: Date, timeZone: string): Local {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -43,6 +46,15 @@ function localOf(instant: Date, timeZone: string): Local {
   };
 }
 
+/** How far the zone's clock runs ahead of UTC at the instant, in minutes; behind is negative. */
+function offsetMinutes(instant: Date, timeZone: string): number {
+  const local = localOf(instant, timeZone);
+  const utcMinutes = instant.getUTCHours() * 60 + instant.getUTCMinutes();
+  const dayApart = (local.weekday - instant.getUTCDay() + 7) % 7;
+  const days = dayApart === 1 ? 1 : dayApart === 6 ? -1 : 0;
+  return local.minutes - utcMinutes + days * DAY_MINUTES;
+}
+
 const minutesOf = (clock: string): number => {
   const [hours = '0', minutes = '0'] = clock.split(':');
   return Number(hours) * 60 + Number(minutes);
@@ -51,8 +63,11 @@ const minutesOf = (clock: string): number => {
 const overlaps = (start: number, end: number, busy: readonly BusyInterval[]): boolean =>
   busy.some((interval) => Date.parse(interval.start) < end && Date.parse(interval.end) > start);
 
-/** The first instant on the grid at or after `from`. */
-const onGrid = (from: number, slotMs: number): number => Math.ceil(from / slotMs) * slotMs;
+/** The first instant at or after `from` on the grid of the zone's own clock, whatever its offset from UTC. */
+function onLocalGrid(from: number, slotMs: number, timeZone: string): number {
+  const offsetMs = offsetMinutes(new Date(from), timeZone) * MINUTE_MS;
+  return Math.ceil((from + offsetMs) / slotMs) * slotMs - offsetMs;
+}
 
 export interface SuggestInput {
   window: { start: string; end: string };
@@ -63,16 +78,16 @@ export interface SuggestInput {
 
 /** The first `count` free slots of the window, in order; none when the window holds none. */
 export function suggestSlots(input: SuggestInput, scheduling: SchedulingSettings): Slot[] {
-  const slotMs = scheduling.slotMinutes * 60_000;
-  const durationMs = input.durationMinutes * 60_000;
+  const slotMs = scheduling.slotMinutes * MINUTE_MS;
+  const durationMs = input.durationMinutes * MINUTE_MS;
   const open = minutesOf(scheduling.workingHours.start);
   const close = minutesOf(scheduling.workingHours.end);
   const until = Date.parse(input.window.end);
   const slots: Slot[] = [];
   for (
-    let start = onGrid(Date.parse(input.window.start), slotMs);
+    let start = onLocalGrid(Date.parse(input.window.start), slotMs, scheduling.timeZone);
     start + durationMs <= until && slots.length < input.count;
-    start += slotMs
+    start = onLocalGrid(start + slotMs, slotMs, scheduling.timeZone)
   ) {
     const local = localOf(new Date(start), scheduling.timeZone);
     if (!scheduling.workingDays.includes(local.weekday)) continue;

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import {
   excerpt,
+  parseArguments,
   PROMPT_LIMITS,
   TOOL_SESSION_ORIGIN_KIND,
   type Ask,
@@ -34,20 +35,42 @@ const APPROVAL_CHOICES = [
 /** The one command a question offers beside an answer. */
 export const STOP_COMMAND = { id: 'stop', label: 'End the session' } as const;
 
-/** A call a person says yes or no to before it runs: the tool, what it does, the arguments and the plan's reason. */
+/** The details an approval has for the arguments, beside the tool's description and the plan's reason. */
+const ARGUMENT_DETAILS = PROMPT_LIMITS.details - 2;
+
+/** What is said when the arguments do not all fit the prompt whole: the person decides knowing that. */
+const CUT_NOTICE =
+  'Not every argument is shown whole here: say no and read the session if you need them all.';
+
+/**
+ * A call a person says yes or no to before it runs: the tool, what it does,
+ * each argument on a line of its own — so a long one cannot push a short,
+ * consequential one out of sight — and the plan's reason. When an argument
+ * is cut, or there are more than the prompt holds, the first line says so.
+ */
 export function approvalPrompt(
   call: ToolCall,
   tool: ToolDeclaration,
   origin: InteractionPrompt['origin'],
   expiresAt: Date,
 ): InteractionPrompt {
+  const parsed = parseArguments(call.argumentsJson);
+  const lines =
+    parsed === null
+      ? [`Arguments: ${call.argumentsJson}`]
+      : Object.entries(parsed).map(([key, value]) => `${key}: ${JSON.stringify(value)}`);
+  const cut =
+    lines.length > ARGUMENT_DETAILS ||
+    lines.some((line) => line.length > PROMPT_LIMITS.detailMaxLength);
+  const shown = lines.slice(0, cut ? ARGUMENT_DETAILS - 1 : ARGUMENT_DETAILS).map(detail);
   return {
     id: randomUUID(),
     origin,
     title: title(`Run ${call.tool}?`),
     details: [
+      ...(cut ? [CUT_NOTICE] : []),
       detail(tool.description),
-      detail(`Arguments: ${call.argumentsJson}`),
+      ...shown,
       detail(`Why: ${call.reason}`),
     ],
     choices: [...APPROVAL_CHOICES],

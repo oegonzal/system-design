@@ -68,6 +68,8 @@ export const historySchema = z.object({
   history: z
     .array(
       z.object({
+        /** The record's own id: where a walk cut short continues from. */
+        id: z.string(),
         messagesAdded: z
           .array(
             z.object({

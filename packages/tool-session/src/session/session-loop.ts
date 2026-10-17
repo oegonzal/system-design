@@ -115,10 +115,10 @@ async function steps(
   startedAt: Date,
 ): Promise<ToolSessionEnding> {
   for (let step = 1; ; step += 1) {
+    if (input.signal.aborted) return railEnding('stop-signal', 'told to stop before the step');
     const elapsedMs = deps.clock().getTime() - startedAt.getTime();
     const rail = trippedRail(state.counters, input.rails, step, elapsedMs);
     if (rail !== null) return railEnding(rail, railDetail(rail, state.counters, input.rails));
-    if (input.signal.aborted) return railEnding('stop-signal', 'told to stop before the step');
     const outcome = await runStep(deps, input, state, criteria, step);
     if (outcome !== 'continue') return outcome;
   }
@@ -231,7 +231,15 @@ async function runStep(
   }
   // Calls that ran, whatever they answered: a failure is the calls rail's to count, not the plans'.
   const ran = entry.calls.length;
-  if (readout.executePrefix === plan.calls.length) settle(state, criteria, readout.passed);
+  // What the evaluator passed is settled, and the objections answered, only by a
+  // plan that ran whole and whose every call answered ok: a call that failed, was
+  // refused, or was declined moved nothing, whatever the plan proposed.
+  const ranWhole =
+    entry.calls.length === plan.calls.length && entry.calls.every((call) => call.outcome === 'ok');
+  if (ranWhole) {
+    settle(state, criteria, readout.passed);
+    state.objections = [];
+  }
   if (plan.ask !== null) {
     const asked = await askQuestion(deps, input, state, plan.ask, entry, step);
     if (asked !== 'continue') {

@@ -46,6 +46,24 @@ describe('suggestSlots', () => {
     ]);
   });
 
+  it('[GCL-4] lays the grid on the zone’s own clock, so a zone half an hour off UTC gets slots on its hours, not UTC’s', () => {
+    // Monday 2026-10-19 in Kolkata (UTC+5:30): the working day opens at 09:00 there, 03:30Z.
+    expect(
+      suggestSlots(
+        {
+          window: { start: '2026-10-19T00:00:00.000Z', end: '2026-10-20T00:00:00.000Z' },
+          durationMinutes: 60,
+          busy: [],
+          count: 2,
+        },
+        { ...scheduling, timeZone: 'Asia/Kolkata', slotMinutes: 60 },
+      ),
+    ).toEqual([
+      slot('2026-10-19T03:30:00.000Z', '2026-10-19T04:30:00.000Z'),
+      slot('2026-10-19T04:30:00.000Z', '2026-10-19T05:30:00.000Z'),
+    ]);
+  });
+
   it('[GCL-4] fits the duration before the working day closes, starts a window off the grid at the next grid instant, and finds nothing on a weekend', () => {
     // 15:30 Pacific on the Monday: an hour fits at 15:30 and 16:00, not at 16:30.
     expect(

@@ -2,6 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import { TOOL_MISSION_FIXTURE, type ToolPlan, type ToolSessionRecord } from '@sysdesign/contracts';
 
 import { InMemoryMailbox, sampleMessage } from '../mailbox/testing';
+import { InboxWatch } from './app.module';
 import { bootApp } from './testing';
 
 type Envelope<T> = { data: T };
@@ -50,6 +51,8 @@ describe('the mailbox service over HTTP', () => {
 
   it('[GML-7] serves health, the ten tools, and a tool run directly', async () => {
     expect((await send('GET', '/health')).status).toBe(200);
+    // A process that does not serve watches nothing: the served one is the inbox's watcher.
+    expect(() => app.get(InboxWatch)).toThrow();
     const tools = await json<Envelope<{ name: string }[]>>(await send('GET', '/tools'));
     expect(tools.data.map((tool) => tool.name)).toHaveLength(10);
     const ran = await send('POST', '/tools/get_message', { arguments: { id: 'm1' } });

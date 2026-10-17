@@ -16,13 +16,19 @@ describe('an authorized request', () => {
     await expect(
       googleRequest(
         auth,
-        { method: 'GET', url: LIST, query: { q: 'from:x', max: 5, skip: undefined }, schema },
+        {
+          method: 'GET',
+          url: LIST,
+          query: { q: 'from:x', max: 5, skip: undefined, fields: ['id', 'name'] },
+          schema,
+        },
         google.fetch,
       ),
     ).resolves.toEqual({ items: [{ id: 'a' }] });
     const [call] = google.calls;
     expect(call?.headers['authorization']).toBe('Bearer token-1');
-    expect(call?.url.search).toBe('?q=from%3Ax&max=5');
+    // A list is the key repeated once per value, the way Google reads a repeated parameter.
+    expect(call?.url.search).toBe('?q=from%3Ax&max=5&fields=id&fields=name');
     await expect(
       googleRequest(auth, { method: 'DELETE', url: LIST, schema: z.null() }, google.fetch),
     ).resolves.toBeNull();

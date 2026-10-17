@@ -39,8 +39,8 @@ export const GMAIL_API = 'https://gmail.googleapis.com/gmail/v1/users/me';
 /** The headers a metadata read asks for: enough to list a message without its body. */
 const METADATA_HEADERS = ['From', 'To', 'Subject', 'Date', 'Message-ID', 'References'];
 
-/** How many history pages one poll walks before answering what it has. */
-const HISTORY_PAGES = 10;
+/** How many history pages one poll walks before answering what it has; the rest waits for the next. */
+const HISTORY_PAGES = 50;
 
 const dateOf = (message: MessageWire): string => {
   const header = headerOf(message.payload?.headers, 'Date');
@@ -115,7 +115,7 @@ export class GmailRest implements MailboxPort {
       const thread = await this.found({
         method: 'GET',
         url: `${GMAIL_API}/threads/${encodeURIComponent(id)}`,
-        query: { format: 'metadata', metadataHeaders: METADATA_HEADERS.join(',') },
+        query: { format: 'metadata', metadataHeaders: METADATA_HEADERS },
         schema: threadSchema,
       });
       const messages = (thread?.messages ?? []).map((message) => this.metadata(message));
@@ -139,7 +139,7 @@ export class GmailRest implements MailboxPort {
       query: { format: 'full' },
       schema: messageSchema,
     });
-    return message === null ? null : this.detail(message);
+    return message === null ? null : this.named(this.detail(message));
   }
 
   async getThread(id: string): Promise<ThreadDetail | null> {
@@ -152,8 +152,15 @@ export class GmailRest implements MailboxPort {
     if (thread === null) return null;
     return {
       id: thread.id,
-      messages: (thread.messages ?? []).map((message) => this.detail(message)),
+      messages: await Promise.all(
+        (thread.messages ?? []).map((message) => this.named(this.detail(message))),
+      ),
     };
+  }
+
+  /** A message with its labels as names, the way the port promises them and a plan copies them into a label call. */
+  private async named(message: MessageDetail): Promise<MessageDetail> {
+    return { ...message, labels: await this.names(message.labels) };
   }
 
   async createDraft(draft: DraftRequest): Promise<DraftSummary> {
@@ -249,11 +256,23 @@ export class GmailRest implements MailboxPort {
     });
   }
 
-  private labelNames(ids: readonly string[]): string[] {
+  /** Label ids as names, by the list read once; an id the list does not hold is read for again, then kept as it is. */
+  private async names(ids: readonly string[]): Promise<string[]> {
+    if (ids.length === 0) return [];
+    if (this.labelsByName === null) await this.listLabels();
+    let names = this.labelNames(ids);
+    if (names.includes(null)) {
+      await this.listLabels();
+      names = this.labelNames(ids);
+    }
+    return names.map((name, position) => name ?? (ids[position] as string));
+  }
+
+  private labelNames(ids: readonly string[]): (string | null)[] {
     const byId = new Map(
       [...(this.labelsByName?.values() ?? [])].map((label) => [label.id, label.name]),
     );
-    return ids.map((id) => byId.get(id) ?? id);
+    return ids.map((id) => byId.get(id) ?? null);
   }
 
   async modifyLabels(
@@ -274,20 +293,26 @@ export class GmailRest implements MailboxPort {
         body,
         schema: modifiedMessageSchema,
       });
-      return this.labelNames(modified.labelIds ?? []);
+      return this.names(modified.labelIds ?? []);
     }
     const modified = await this.call({ method: 'POST', url, body, schema: modifiedThreadSchema });
     const ids = new Set((modified.messages ?? []).flatMap((message) => message.labelIds ?? []));
-    return this.labelNames([...ids]);
+    return this.names([...ids]);
   }
 
   profile(): Promise<Profile> {
     return this.call({ method: 'GET', url: `${GMAIL_API}/profile`, schema: profileSchema });
   }
 
+  /**
+   * The messages added since the history id, and where to continue from:
+   * the mailbox's own history id once every page is read, else — the walk
+   * cut at the declared page count with pages left — the last record read,
+   * so the next poll continues from there and no page is skipped.
+   */
   async history(startHistoryId: string): Promise<HistoryPage | null> {
     const added: string[] = [];
-    let historyId = startHistoryId;
+    let lastRecord: string | null = null;
     let pageToken: string | undefined;
     for (let pages = 0; pages < HISTORY_PAGES; pages += 1) {
       const page = await this.found({
@@ -304,14 +329,14 @@ export class GmailRest implements MailboxPort {
       });
       if (page === null) return null;
       for (const entry of page.history ?? []) {
+        lastRecord = entry.id;
         for (const { message } of entry.messagesAdded ?? []) {
           if (!added.includes(message.id)) added.push(message.id);
         }
       }
-      historyId = page.historyId;
       pageToken = page.nextPageToken;
-      if (pageToken === undefined) break;
+      if (pageToken === undefined) return { messagesAdded: added, historyId: page.historyId };
     }
-    return { messagesAdded: added, historyId };
+    return { messagesAdded: added, historyId: lastRecord ?? startHistoryId };
   }
 }

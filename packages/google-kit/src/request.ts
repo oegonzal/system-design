@@ -39,7 +39,8 @@ export type GoogleMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 export interface GoogleCall<T> {
   method: GoogleMethod;
   url: string;
-  query?: Readonly<Record<string, string | number | boolean | undefined>>;
+  /** The query; a list is sent as the key repeated once per value, the way Google reads a repeated parameter. */
+  query?: Readonly<Record<string, string | number | boolean | readonly string[] | undefined>>;
   body?: unknown;
   schema: ZodType<T>;
   timeoutMs?: number;
@@ -64,7 +65,12 @@ interface Answer {
 const urlOf = (call: GoogleCall<unknown>): string => {
   const url = new URL(call.url);
   for (const [key, value] of Object.entries(call.query ?? {})) {
-    if (value !== undefined) url.searchParams.set(key, String(value));
+    if (value === undefined) continue;
+    if (Array.isArray(value)) {
+      for (const each of value) url.searchParams.append(key, each);
+    } else {
+      url.searchParams.set(key, String(value));
+    }
   }
   return url.toString();
 };

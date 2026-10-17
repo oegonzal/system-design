@@ -78,7 +78,7 @@ export async function bootApp(
   const operator = new FakeOperator(answers);
   const bus = new RecordingBus();
   const moduleRef = await Test.createTestingModule({
-    imports: [AppModule.register({ config: testConfig(), calendar })],
+    imports: [AppModule.register({ config: testConfig(), calendar, watch: false })],
   })
     .overrideProvider(LoopClient)
     .useValue(loop)

@@ -125,6 +125,15 @@ describe('asking a person through the bus', () => {
     });
   });
 
+  it('[NTC-2] asks under another source when the call names one, so the channel carrying that source shows the prompt', async () => {
+    const bus = new InMemoryBus();
+    const asking = new InteractionClient(bus, OPTIONS).ask(PROMPT, undefined, 'peer');
+    await until(() => bus.published.length === 1);
+    bus.serve(INTERACTION_TOPICS.answered, answerTo(PROMPT.id, 'female'));
+    expect(await asking).toEqual(answerTo(PROMPT.id, 'female'));
+    expect(bus.published[0]).toMatchObject({ topic: INTERACTION_TOPICS.prompted, source: 'peer' });
+  });
+
   it('[NTC-2] ends as expired when the service withdraws the prompt for its time', async () => {
     const bus = new InMemoryBus();
     const asking = new InteractionClient(bus, OPTIONS).ask(PROMPT);

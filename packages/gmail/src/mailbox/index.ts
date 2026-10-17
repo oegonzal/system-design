@@ -1,5 +1,6 @@
 // The mailbox: the port the tools and the watcher reach it by, and its Gmail REST filling.
 export { GMAIL_API, GmailRest } from './gmail-rest/client';
+export { addressOf } from './gmail-rest/mime';
 export {
   LabelUnknown,
   MAILBOX,

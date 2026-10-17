@@ -41,6 +41,11 @@ export const TOOL_SESSION_CRITERIA: readonly Criterion[] = [
       'A session’s settings are one file a program ships — its rails, its recovery windows, how long it waits for the operator and how much of its observations and recent calls it keeps — read against one schema that refuses a file with a field missing or wrong by name.',
   },
   {
+    id: 'TSS-9',
+    statement:
+      'The session’s events ride the bus queued one behind another and never awaited by the loop — a slow bus stalls no step, a refused publish is reported and never thrown, and the program flushes the queue as it shuts down; an approval is asked under the source of the program whose tool it is, so a peer’s write is approved on the peer’s own channel, and a notice goes out under the program’s own.',
+  },
+  {
     id: 'TSS-8',
     statement:
       'What the operator is asked is the notifications contracts’ prompt: an approval offers yes and no and nothing else, a question offers the plan’s options as choices and the person’s own words, and either carries the session as its origin; the answer is read back as the option chosen, the words typed, or the command to stop; and a session that ended is told as one notice.',

@@ -134,5 +134,14 @@ describe('a tool and the catalog', () => {
       new HttpToolProvider('http://dead.test', (() =>
         Promise.reject(new Error('ECONNREFUSED'))) as typeof fetch).tools(),
     ).rejects.toThrow(PeerUnreachable);
+    // A wrong URL that serves a page, or a peer that is down, is unreachable by name, never a 500.
+    answers.set('GET http://peer.test/tools', () => new Response('<html>', { status: 200 }));
+    await expect(new HttpToolProvider('http://peer.test', fetchImpl).tools()).rejects.toThrow(
+      'GET /tools answered something other than JSON',
+    );
+    answers.set('GET http://peer.test/tools', () => new Response('', { status: 503 }));
+    await expect(new HttpToolProvider('http://peer.test', fetchImpl).tools()).rejects.toThrow(
+      'GET /tools answered 503',
+    );
   });
 });

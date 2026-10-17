@@ -11,7 +11,7 @@ const headers = (values: Record<string, string>) =>
 const message = (id: string, threadId: string, extra: Record<string, string> = {}) => ({
   id,
   threadId,
-  labelIds: ['INBOX', 'UNREAD'],
+  labelIds: ['INBOX', 'UNREAD', 'Label_7'],
   snippet: 'Would Tuesday work?',
   internalDate: '1760605200000',
   payload: {
@@ -30,12 +30,18 @@ const message = (id: string, threadId: string, extra: Record<string, string> = {
 
 const LABELS = [
   { id: 'INBOX', name: 'INBOX', type: 'system' },
+  { id: 'UNREAD', name: 'UNREAD', type: 'system' },
   { id: 'Label_7', name: 'Clients', type: 'user' },
 ];
+const labelsRoute = { [`GET ${GMAIL_API}/labels`]: () => json({ labels: LABELS }) };
+
+/** The ids a history walk answers with: one record per page, the page named by its token. */
+const pageOf = (token: string | null): number => (token === null ? 0 : Number(token.slice(1)));
 
 describe('the Gmail REST adapter', () => {
-  it('[GML-4] lists a search’s threads from their messages’ headers, reads a message and a thread whole, and answers null for one Gmail does not have', async () => {
+  it('[GML-4] lists a search’s threads from their messages’ headers asked for one by one, reads a message and a thread whole with their labels as names, and answers null for one Gmail does not have', async () => {
     const google = fakeGoogleFetch({
+      ...labelsRoute,
       [`GET ${GMAIL_API}/threads`]: () => json({ threads: [{ id: 't1', snippet: 'snip' }] }),
       [`GET ${GMAIL_API}/threads/t1`]: () =>
         json({
@@ -60,6 +66,15 @@ describe('the Gmail REST adapter', () => {
     expect(google.calls[0]?.url.searchParams.get('q')).toBe('from:ada');
     expect(google.calls[0]?.url.searchParams.get('maxResults')).toBe('5');
     expect(google.calls[1]?.url.searchParams.get('format')).toBe('metadata');
+    // A repeated parameter, one per header: Gmail reads a comma-joined value as one header nobody sends.
+    expect(google.calls[1]?.url.searchParams.getAll('metadataHeaders')).toEqual([
+      'From',
+      'To',
+      'Subject',
+      'Date',
+      'Message-ID',
+      'References',
+    ]);
     expect(await gmail.getMessage('m1')).toEqual({
       id: 'm1',
       threadId: 't1',
@@ -68,17 +83,22 @@ describe('the Gmail REST adapter', () => {
       subject: 'Lunch',
       date: '2026-10-16T09:00:00.000Z',
       snippet: 'Would Tuesday work?',
-      labels: ['INBOX', 'UNREAD'],
+      labels: ['INBOX', 'UNREAD', 'Clients'],
       body: 'Would Tuesday work?',
       messageIdHeader: '<m1@x.test>',
       references: null,
     });
     expect(await gmail.getMessage('nope')).toBeNull();
-    expect((await gmail.getThread('t1'))?.messages.map((each) => each.id)).toEqual(['m1', 'm2']);
+    const thread = await gmail.getThread('t1');
+    expect(thread?.messages.map((each) => each.id)).toEqual(['m1', 'm2']);
+    expect(thread?.messages[1]?.labels).toEqual(['INBOX', 'UNREAD', 'Clients']);
+    // The label list was read once for every name.
+    expect(google.calls.filter((call) => call.url.pathname.endsWith('/labels'))).toHaveLength(1);
   });
 
   it('[GML-4] creates a draft in its thread with the original’s sender and subject by default, lists drafts, and refuses a reply to a message Gmail does not have', async () => {
     const google = fakeGoogleFetch({
+      ...labelsRoute,
       [`GET ${GMAIL_API}/messages/m1`]: () =>
         json(message('m1', 't1', { References: '<m0@x.test>' })),
       [`GET ${GMAIL_API}/messages/nope`]: () => googleError(404, 'notFound', 'nope'),
@@ -134,7 +154,7 @@ describe('the Gmail REST adapter', () => {
 
   it('[GML-4] lists labels, changes them by name through the ids the list gives, refuses a name there is no label for, reads the profile and walks the history', async () => {
     const google = fakeGoogleFetch({
-      [`GET ${GMAIL_API}/labels`]: () => json({ labels: LABELS }),
+      ...labelsRoute,
       [`POST ${GMAIL_API}/messages/m1/modify`]: () =>
         json({ id: 'm1', labelIds: ['INBOX', 'Label_7'] }),
       [`POST ${GMAIL_API}/threads/t1/modify`]: () =>
@@ -144,15 +164,24 @@ describe('the Gmail REST adapter', () => {
       [`GET ${GMAIL_API}/history`]: (call) =>
         call.url.searchParams.get('pageToken') === null
           ? json({
-              history: [{ messagesAdded: [{ message: { id: 'm5' } }, { message: { id: 'm5' } }] }],
-              historyId: '510',
+              history: [
+                {
+                  id: '501',
+                  messagesAdded: [{ message: { id: 'm5' } }, { message: { id: 'm5' } }],
+                },
+              ],
+              historyId: '512',
               nextPageToken: 'p2',
             })
-          : json({ history: [{ messagesAdded: [{ message: { id: 'm6' } }] }], historyId: '512' }),
+          : json({
+              history: [{ id: '507', messagesAdded: [{ message: { id: 'm6' } }] }],
+              historyId: '512',
+            }),
     });
     const gmail = new GmailRest(new FakeTokenSource(), google.fetch);
     expect(await gmail.listLabels()).toEqual([
       { id: 'INBOX', name: 'INBOX', type: 'system' },
+      { id: 'UNREAD', name: 'UNREAD', type: 'system' },
       { id: 'Label_7', name: 'Clients', type: 'user' },
     ]);
     expect(await gmail.modifyLabels('message', 'm1', ['clients'], [])).toEqual([
@@ -166,10 +195,29 @@ describe('the Gmail REST adapter', () => {
     expect(await gmail.modifyLabels('thread', 't1', [], ['Clients'])).toEqual(['INBOX', 'Clients']);
     await expect(gmail.modifyLabels('message', 'm1', ['Nope'], [])).rejects.toThrow(LabelUnknown);
     expect(await gmail.profile()).toEqual({ emailAddress: 'owner@x.test', historyId: '500' });
+    // Every page read: the cursor is the mailbox's own history id, the same on every page.
     expect(await gmail.history('500')).toEqual({ messagesAdded: ['m5', 'm6'], historyId: '512' });
     expect(google.calls.at(-2)?.url.searchParams.get('startHistoryId')).toBe('500');
     expect(google.calls.at(-2)?.url.searchParams.get('historyTypes')).toBe('messageAdded');
     google.routes[`GET ${GMAIL_API}/history`] = () => googleError(404, 'notFound', 'too old');
     expect(await gmail.history('1')).toBeNull();
+  });
+
+  it('[GML-4] a history walk cut at its page count continues from the last record read, never from the mailbox’s current id, so no page is skipped', async () => {
+    const google = fakeGoogleFetch({
+      [`GET ${GMAIL_API}/history`]: (call) => {
+        const page = pageOf(call.url.searchParams.get('pageToken'));
+        return json({
+          history: [{ id: String(500 + page), messagesAdded: [{ message: { id: `m${page}` } }] }],
+          historyId: '999',
+          nextPageToken: `p${page + 1}`,
+        });
+      },
+    });
+    const gmail = new GmailRest(new FakeTokenSource(), google.fetch);
+    const walked = await gmail.history('500');
+    expect(walked?.messagesAdded).toHaveLength(google.calls.length);
+    expect(walked?.historyId).toBe(String(500 + google.calls.length - 1));
+    expect(walked?.historyId).not.toBe('999');
   });
 });

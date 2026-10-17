@@ -2,6 +2,7 @@ import type { INestApplication } from '@nestjs/common';
 import { TOOL_MISSION_FIXTURE, type ToolPlan, type ToolSessionRecord } from '@sysdesign/contracts';
 
 import { InMemoryCalendar, sampleEvent } from '../calendar/testing';
+import { ChangeWatch } from './app.module';
 import { bootApp } from './testing';
 
 type Envelope<T> = { data: T };
@@ -44,6 +45,8 @@ describe('the calendar service over HTTP', () => {
 
   it('[GCL-7] serves health, the nine tools, and a tool run directly', async () => {
     expect((await send('GET', '/health')).status).toBe(200);
+    // A process that does not serve watches nothing: the served one is the calendar's watcher.
+    expect(() => app.get(ChangeWatch)).toThrow();
     const tools = await json<Envelope<{ name: string }[]>>(await send('GET', '/tools'));
     expect(tools.data.map((tool) => tool.name)).toHaveLength(9);
     const ran = await send('POST', '/tools/get_event', {

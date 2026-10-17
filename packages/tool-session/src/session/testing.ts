@@ -129,13 +129,20 @@ export type ScriptedAnswer =
 
 export class FakeOperator implements OperatorPort {
   readonly asked: InteractionPrompt[] = [];
+  /** The source each ask went out under, in the order of `asked`; null for the program's own. */
+  readonly sources: (string | null)[] = [];
   readonly notices: InteractionPrompt[] = [];
   private next = 0;
 
   constructor(private readonly answers: readonly ScriptedAnswer[] = []) {}
 
-  ask(prompt: InteractionPrompt, signal?: AbortSignal): Promise<InteractionAnswer> {
+  ask(
+    prompt: InteractionPrompt,
+    signal?: AbortSignal,
+    source?: string,
+  ): Promise<InteractionAnswer> {
     this.asked.push(prompt);
+    this.sources.push(source ?? null);
     const scripted = this.answers[this.next];
     this.next += 1;
     if (scripted === undefined) {
@@ -166,9 +173,15 @@ export class FakeOperator implements OperatorPort {
 
 export class FakeEvents implements SessionEventsPort {
   readonly published: { topic: string; payload: unknown }[] = [];
+  flushed = 0;
 
   publish(topic: string, payload: unknown): Promise<void> {
     this.published.push({ topic, payload });
+    return Promise.resolve();
+  }
+
+  flush(): Promise<void> {
+    this.flushed += 1;
     return Promise.resolve();
   }
 }

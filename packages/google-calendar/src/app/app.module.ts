@@ -46,10 +46,16 @@ export class ChangeWatch implements OnApplicationBootstrap, OnModuleDestroy {
   }
 }
 
-/** What the application is composed from beyond its config: the calendar, which `main` fills with Google's and a spec with memory. */
+/**
+ * What the application is composed from beyond its config: the calendar,
+ * which `main` fills with Google's and a spec with memory, and whether this
+ * process watches it — the served process does; a mission run from the
+ * command line beside it must not, or every change would be told twice.
+ */
 export interface AppModuleOptions {
   config: Omit<GoogleCalendarConfig, 'google'>;
   calendar: CalendarPort;
+  watch: boolean;
 }
 
 /**
@@ -59,7 +65,7 @@ export interface AppModuleOptions {
  */
 @Module({})
 export class AppModule {
-  static register({ config, calendar }: AppModuleOptions): DynamicModule {
+  static register({ config, calendar, watch }: AppModuleOptions): DynamicModule {
     const log = new Logger('Calendar');
     return {
       module: AppModule,
@@ -88,7 +94,7 @@ export class AppModule {
       providers: [
         { provide: CALENDAR, useValue: calendar },
         { provide: WATCH_SETTINGS, useValue: config.settings.watch },
-        ChangeWatch,
+        ...(watch ? [ChangeWatch] : []),
       ],
       controllers: [HealthController],
     };

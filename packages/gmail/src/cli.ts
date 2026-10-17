@@ -39,7 +39,9 @@ function mailboxOf(config: GmailConfig): GmailRest {
 }
 
 async function serve(config: GmailConfig): Promise<number> {
-  const app = await NestFactory.create(AppModule.register({ config, mailbox: mailboxOf(config) }));
+  const app = await NestFactory.create(
+    AppModule.register({ config, mailbox: mailboxOf(config), watch: true }),
+  );
   app.enableShutdownHooks();
   await app.listen(config.port);
   const logger = new Logger('Gmail');
@@ -93,8 +95,9 @@ export async function cli(
           ['run', ...rest],
           'gmail',
           async () => {
+            // One mission beside the served process: the inbox is its to watch, not this one's.
             const app = await NestFactory.createApplicationContext(
-              AppModule.register({ config, mailbox: mailboxOf(config) }),
+              AppModule.register({ config, mailbox: mailboxOf(config), watch: false }),
               { logger: ['error', 'warn'] },
             );
             return { registry: app.get(SessionRegistry), close: () => app.close() };

@@ -107,6 +107,11 @@ export async function executeCalls(
       note: outcome.outcome === 'ok' ? null : outcome.summary,
     });
     deps.log.info(`step ${step}: ${call.tool} — ${outcome.outcome}`);
+    // A stop that landed while the call ran ends the session here: the call is on
+    // record as it answered, and counts against no rail.
+    if (input.signal.aborted) {
+      return railEnding('stop-signal', `told to stop while ${call.tool} ran`);
+    }
     if (outcome.outcome === 'ok') {
       state.counters.failedCalls = 0;
     } else {
@@ -127,9 +132,10 @@ async function askApproval(
   step: number,
 ): Promise<ApprovalVerdict> {
   const prompt = approvalPrompt(call, tool, sessionOrigin(input.record), expiry(deps, input));
-  deps.log.info(`step ${step}: asking for approval of ${call.tool}`);
+  deps.log.info(`step ${step}: asking for approval of ${call.tool} on ${tool.provider}`);
   try {
-    const answer = await deps.operator.ask(prompt, input.signal);
+    // Asked under the tool's own program: a peer's write is approved on the peer's channel.
+    const answer = await deps.operator.ask(prompt, input.signal, tool.provider);
     return approved(answer) ? 'yes' : 'no';
   } catch (error) {
     if (input.signal.aborted || error instanceof BusCallAborted) return 'stopped';

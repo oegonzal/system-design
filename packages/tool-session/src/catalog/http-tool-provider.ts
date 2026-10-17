@@ -68,7 +68,13 @@ export class HttpToolProvider implements ToolProvider {
     if (response.status !== 200) {
       throw new PeerUnreachable(this.url, `GET /tools answered ${response.status}`);
     }
-    const listed = declarationsSchema.safeParse(await response.json());
+    let body: unknown;
+    try {
+      body = await response.json();
+    } catch {
+      throw new PeerUnreachable(this.url, 'GET /tools answered something other than JSON');
+    }
+    const listed = declarationsSchema.safeParse(body);
     if (!listed.success) {
       throw new PeerUnreachable(this.url, 'GET /tools answered something other than tools');
     }

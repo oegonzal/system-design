@@ -3,15 +3,21 @@ import type { LoopClient } from '@sysdesign/loop-client';
 
 import type { ToolCatalog } from '../catalog';
 
-/** The person the session answers to: asked and waited for, or told and not. */
+/**
+ * The person the session answers to: asked and waited for, or told and not.
+ * A question goes out under the program's own source unless `source` names
+ * another — a call of a peer's tool is approved on the peer's channel.
+ */
 export interface OperatorPort {
-  ask(prompt: InteractionPrompt, signal?: AbortSignal): Promise<InteractionAnswer>;
+  ask(prompt: InteractionPrompt, signal?: AbortSignal, source?: string): Promise<InteractionAnswer>;
   notify(prompt: InteractionPrompt): Promise<void>;
 }
 
-/** Where the session says what happened, for whoever keeps a record beyond it. */
+/** Where the session says what happened, for whoever keeps a record beyond it: queued, never waited for, and flushed at the end. */
 export interface SessionEventsPort {
   publish(topic: string, payload: unknown): Promise<void>;
+  /** Settles once everything published so far has been sent, or reported. */
+  flush(): Promise<void>;
 }
 
 export type Clock = () => Date;

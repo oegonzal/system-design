@@ -88,12 +88,13 @@ export class SessionRegistry {
     return this.held.get(id)?.done ?? null;
   }
 
-  /** Every running session told to stop, and every end awaited: the program is shutting down. */
+  /** Every running session told to stop, every end awaited, and every event sent: the program is shutting down. */
   async onModuleDestroy(): Promise<void> {
     for (const held of this.held.values()) {
       if (held.record.status === 'running') held.controller.abort(STOPPING);
     }
     await Promise.allSettled([...this.held.values()].map((held) => held.done));
+    await this.deps.events.flush();
   }
 
   private async catalogWithPeers(): Promise<ToolCatalog> {

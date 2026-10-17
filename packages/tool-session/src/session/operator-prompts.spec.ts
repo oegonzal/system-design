@@ -64,12 +64,32 @@ describe('what the operator is asked', () => {
     expect(prompt).toMatchObject({
       origin: { kind: 'tool-session', id: record.id, label: 'Keep the list tidy.' },
       title: 'Run remove_item?',
-      details: ['Removes one item for good.', 'Arguments: {"id":"i1"}', 'Why: marked for removal'],
+      details: ['Removes one item for good.', 'id: "i1"', 'Why: marked for removal'],
       freeText: null,
       commands: [],
       expiresAt: '2026-10-16T13:00:00.000Z',
     });
     expect(prompt.choices.map((choice) => choice.id)).toEqual(['yes', 'no']);
+    // Each argument on its own line: a long one cannot hide a short one that reaches other people.
+    const invite = approvalPrompt(
+      {
+        ...call,
+        tool: 'create_event',
+        argumentsJson: JSON.stringify({
+          summary: 'Sync',
+          description: 'd'.repeat(1_200),
+          attendees: ['ada@example.test'],
+        }),
+      },
+      { ...tool, name: 'create_event', effect: 'write' },
+      origin,
+      expiresAt,
+    );
+    expect(interactionPromptSchema.parse(invite)).toEqual(invite);
+    expect(invite.details[0]).toContain('Not every argument is shown whole');
+    expect(invite.details).toContain('attendees: ["ada@example.test"]');
+    expect(invite.details.some((line) => line.startsWith('description: "ddd'))).toBe(true);
+    expect(approvalPrompt(call, tool, origin, expiresAt).details[0]).not.toContain('shown whole');
     expect(approved({ promptId: prompt.id, reply: { kind: 'choice', choiceId: 'yes' }, via })).toBe(
       true,
     );

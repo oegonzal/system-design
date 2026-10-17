@@ -86,3 +86,13 @@ export function addressesOf(header: string | null): string[] {
   found.push(current);
   return found.map((each) => each.trim()).filter((each) => each !== '');
 }
+
+/** The bare address of the first mailbox a header names — what is inside its angle brackets, else the whole — lower-cased; null for none. */
+export function addressOf(header: string | null): string | null {
+  const [first] = addressesOf(header);
+  if (first === undefined) return null;
+  const open = first.lastIndexOf('<');
+  const close = first.lastIndexOf('>');
+  const bare = open !== -1 && close > open ? first.slice(open + 1, close) : first;
+  return bare.trim().toLowerCase();
+}

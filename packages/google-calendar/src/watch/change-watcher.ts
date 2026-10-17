@@ -2,6 +2,7 @@ import {
   GOOGLE_CALENDAR_SOURCE,
   GOOGLE_CALENDAR_TOPICS,
   INTERACTION_TOPICS,
+  ToldOnce,
   type InteractionPrompt,
 } from '@sysdesign/contracts';
 import { notedPrompt, type BusClient } from '@sysdesign/notifications-client';
@@ -15,8 +16,10 @@ import type { WatchSettings } from '../settings';
  * continues from the sync token — each event changed since said on the bus
  * as created, updated or cancelled, an invitation the account has not
  * answered said as one, and the person told of each poll's changes in one
- * notice. A token the calendar no longer honours starts the sync again from
- * now, and nothing is told twice.
+ * notice. One poll runs at a time; the token moves only once everything is
+ * told, so a poll that failed midway starts again from the same token and
+ * what it had told is remembered and passed over. A token the calendar no
+ * longer honours starts the sync again from now.
  */
 export interface WatchLog {
   info(line: string): void;
@@ -36,7 +39,20 @@ const TOPIC_OF = {
   invitation: GOOGLE_CALENDAR_TOPICS.invitationReceived,
 } as const satisfies Record<Change['kind'], string>;
 
+const WORD_OF: Record<Change['kind'], string> = {
+  created: 'New',
+  updated: 'Changed',
+  cancelled: 'Cancelled',
+  invitation: 'Invitation',
+};
+
+/** How many tellings are remembered against a retried poll. */
+const TOLD_KEEP = 1_000;
+
 const whenOf = (time: CalendarEvent['start']): string => time.dateTime ?? time.date ?? 'unset';
+
+/** One telling of an event as it stood: the same event changed again is another. */
+const keyOf = (event: CalendarEvent): string => `${event.id}@${event.updated ?? ''}`;
 
 /** What a change is, from the event as the sync returned it and when the watcher last looked. */
 export function changeOf(event: CalendarEvent, since: Date): Change {
@@ -55,6 +71,8 @@ export class ChangeWatcher {
   private syncToken: string | null = null;
   private since: Date;
   private timer: ReturnType<typeof setInterval> | null = null;
+  private inFlight: Promise<Change[]> | null = null;
+  private readonly told = new ToldOnce(TOLD_KEEP);
 
   constructor(
     private readonly calendar: CalendarPort,
@@ -83,6 +101,16 @@ export class ChangeWatcher {
     this.timer = null;
   }
 
+  /** One poll at a time: a tick that lands while one runs joins it. */
+  poll(): Promise<Change[]> {
+    if (this.inFlight === null) {
+      this.inFlight = this.pollOnce().finally(() => {
+        this.inFlight = null;
+      });
+    }
+    return this.inFlight;
+  }
+
   /** A full sync from now: every page walked for the token alone. */
   private async resync(): Promise<void> {
     this.since = this.clock();
@@ -103,32 +131,44 @@ export class ChangeWatcher {
     );
   }
 
-  /** One poll: what changed since the token, each said on the bus, all told in one notice. */
-  async poll(): Promise<Change[]> {
+  /** Every page since the token: the events changed, and the token the next sync continues from. */
+  private async changesSince(
+    syncToken: string,
+  ): Promise<{ changed: CalendarEvent[]; token: string | null }> {
+    const changed: CalendarEvent[] = [];
+    let token: string | null = null;
+    let pageToken: string | null = null;
+    do {
+      const page = await this.calendar.sync(this.settings.calendarId, {
+        syncToken,
+        pageToken,
+        timeMin: null,
+      });
+      changed.push(...page.events);
+      pageToken = page.nextPageToken;
+      token = page.nextSyncToken ?? token;
+    } while (pageToken !== null);
+    return { changed, token };
+  }
+
+  /** What changed since the token, each said on the bus, all told in one notice, then the token moved. */
+  private async pollOnce(): Promise<Change[]> {
     if (this.syncToken === null) {
       await this.resync();
       return [];
     }
-    const changed: CalendarEvent[] = [];
-    let pageToken: string | null = null;
+    let since: { changed: CalendarEvent[]; token: string | null };
     try {
-      do {
-        const page = await this.calendar.sync(this.settings.calendarId, {
-          syncToken: this.syncToken,
-          pageToken,
-          timeMin: null,
-        });
-        changed.push(...page.events);
-        pageToken = page.nextPageToken;
-        this.syncToken = page.nextSyncToken ?? this.syncToken;
-      } while (pageToken !== null);
+      since = await this.changesSince(this.syncToken);
     } catch (error) {
       if (!(error instanceof SyncTokenExpired)) throw error;
       this.log.warn('calendar watch: the sync token expired; starting again from now');
       await this.resync();
       return [];
     }
-    const changes = changed.map((event) => changeOf(event, this.since));
+    const changes = since.changed
+      .filter((event) => !this.told.has(keyOf(event)))
+      .map((event) => changeOf(event, this.since));
     for (const change of changes) {
       await this.bus.publish({
         topic: TOPIC_OF[change.kind],
@@ -152,24 +192,21 @@ export class ChangeWatcher {
         payload: this.notice(changes),
       });
     }
+    // Only now, with everything told: a poll that threw above starts again from the same token.
+    for (const change of changes) this.told.add(keyOf(change.event));
+    this.syncToken = since.token ?? this.syncToken;
     this.since = this.clock();
     return changes;
   }
 
   private notice(changes: readonly Change[]): InteractionPrompt {
     const now = this.clock();
-    const words: Record<Change['kind'], string> = {
-      created: 'New',
-      updated: 'Changed',
-      cancelled: 'Cancelled',
-      invitation: 'Invitation',
-    };
     return notedPrompt({
       origin: { kind: 'calendar-watch', id: this.settings.calendarId, label: 'calendar changes' },
       title: `${changes.length} calendar change${changes.length === 1 ? '' : 's'}`,
       details: changes.map(
         (change) =>
-          `${words[change.kind]}: ${change.event.summary || '(untitled)'} · ${whenOf(change.event.start)}${
+          `${WORD_OF[change.kind]}: ${change.event.summary || '(untitled)'} · ${whenOf(change.event.start)}${
             change.kind === 'invitation'
               ? ` · from ${change.event.organizer?.email ?? 'unknown'}`
               : ''

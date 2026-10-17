@@ -46,10 +46,16 @@ export class InboxWatch implements OnApplicationBootstrap, OnModuleDestroy {
   }
 }
 
-/** What the application is composed from beyond its config: the mailbox, which `main` fills with Gmail and a spec with memory. */
+/**
+ * What the application is composed from beyond its config: the mailbox,
+ * which `main` fills with Gmail and a spec with memory, and whether this
+ * process watches the inbox — the served process does; a mission run from
+ * the command line beside it must not, or every arrival would be told twice.
+ */
 export interface AppModuleOptions {
   config: Omit<GmailConfig, 'google'>;
   mailbox: MailboxPort;
+  watch: boolean;
 }
 
 /**
@@ -59,7 +65,7 @@ export interface AppModuleOptions {
  */
 @Module({})
 export class AppModule {
-  static register({ config, mailbox }: AppModuleOptions): DynamicModule {
+  static register({ config, mailbox, watch }: AppModuleOptions): DynamicModule {
     const log = new Logger('Gmail');
     return {
       module: AppModule,
@@ -86,7 +92,7 @@ export class AppModule {
       providers: [
         { provide: MAILBOX, useValue: mailbox },
         { provide: WATCH_SETTINGS, useValue: config.settings.watch },
-        InboxWatch,
+        ...(watch ? [InboxWatch] : []),
       ],
       controllers: [HealthController],
     };

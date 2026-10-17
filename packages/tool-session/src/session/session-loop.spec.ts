@@ -150,9 +150,15 @@ describe('the session loop', () => {
     expect(loop.starts.map((start) => start.maxIterations)).toEqual([1, 2]);
   });
 
-  it('[TSS-3] asks the operator before a call its tool declares approval for: no refuses the call, yes runs it, no answer ends the session', async () => {
+  it('[TSS-3] asks the operator before a call its tool declares approval for — on the tool’s own program — no refuses the call and settles nothing, yes runs it, no answer ends the session', async () => {
     const declined = run(
-      [{ artifact: plan([call('remove_item', { id: 'i1' })]) }, { artifact: finishing }],
+      [
+        {
+          artifact: plan([call('remove_item', { id: 'i1' })]),
+          criteria: [{ criterionId: 'c1', result: 'pass' }],
+        },
+        { artifact: finishing },
+      ],
       new FakeOperator([{ choice: 'no' }]),
     );
     const ended = await declined.done;
@@ -164,6 +170,10 @@ describe('the session loop', () => {
       }),
     ]);
     expect(declined.deps.operator.asked[0]?.title).toBe('Run remove_item?');
+    expect(declined.deps.operator.sources).toEqual(['fake']);
+    // A declined call moved nothing: what the evaluator passed on the plan stays open.
+    expect(declined.loop.starts[1]?.criteria?.map((c) => c.id)).toEqual(['c1', 'c2']);
+    expect(declined.loop.starts[1]?.goal).toContain('Satisfied earlier this session: none yet.');
     expect(ended.status).toBe('complete');
 
     const approvedRun = run(
@@ -207,16 +217,54 @@ describe('the session loop', () => {
     });
   });
 
-  it('[TSS-3] stops the prefix at the first call that failed, leaves the rest not executed, and ends as tools-failing after the declared count', async () => {
+  it('[TSS-3] stops the prefix at the first call that failed, leaves the rest not executed and settles nothing, and ends as tools-failing after the declared count', async () => {
     const { loop, done } = run([
-      { artifact: plan([call('flaky'), call('update_item', { id: 'i1' })]) },
+      {
+        artifact: plan([call('flaky'), call('update_item', { id: 'i1' })]),
+        criteria: [{ criterionId: 'c1', result: 'pass' }],
+      },
       { artifact: plan([call('flaky')]) },
     ]);
     const ended = await done;
     expect(ended.steps[0]?.calls.map((c) => [c.tool, c.outcome])).toEqual([['flaky', 'failed']]);
     expect(loop.starts[1]?.goal).toContain('not-executed (proposed, did not run): update_item');
     expect(loop.starts[1]?.goal).toContain('after flaky failed at call.1');
+    expect(loop.starts[1]?.criteria?.map((c) => c.id)).toEqual(['c1', 'c2']);
     expect(ended.ending?.cause).toBe('tools-failing');
+  });
+
+  it('[TSS-3] a plan that ran whole answers every objection before it: the next goal carries none', async () => {
+    const { loop, done } = run([
+      refusedWhole,
+      { artifact: plan([call('list_items')]) },
+      { artifact: finishing },
+    ]);
+    await done;
+    expect(loop.starts[1]?.goal).toContain('the list is empty already');
+    expect(loop.starts[2]?.goal).toContain('(none — no plan made at this step has been refused)');
+  });
+
+  it('[TSS-3] a stop that lands while a call runs ends the session as stop-signal with the call on record and no rail counted', async () => {
+    const controller = new AbortController();
+    const stopper = fakeTool('stopper', 'read', false, () => {
+      controller.abort();
+      return Promise.reject(new Error('aborted'));
+    });
+    const loop = new FakeLoopClient([{ artifact: plan([call('stopper')]) }], criteria);
+    const deps = fakeDeps(loop, [...tools(), stopper]);
+    const settings = sampleSettings({ maxFailedCalls: 1 });
+    const ended = await runSession(deps, {
+      record: record(),
+      rails: settings.rails,
+      settings,
+      signal: controller.signal,
+    });
+    expect(ended.ending).toEqual({
+      cause: 'stop-signal',
+      detail: 'told to stop while stopper ran',
+      status: 'stopped',
+    });
+    expect(ended.steps[0]?.calls.map((c) => [c.tool, c.outcome])).toEqual([['stopper', 'failed']]);
   });
 
   it('[TSS-3] a loop fault counts against its rail and the step says so; a cut plan runs up to the cut; a stop signal ends the session before the next step', async () => {

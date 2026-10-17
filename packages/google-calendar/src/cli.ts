@@ -45,7 +45,7 @@ function calendarOf(config: GoogleCalendarConfig): CalendarRest {
 
 async function serve(config: GoogleCalendarConfig): Promise<number> {
   const app = await NestFactory.create(
-    AppModule.register({ config, calendar: calendarOf(config) }),
+    AppModule.register({ config, calendar: calendarOf(config), watch: true }),
   );
   app.enableShutdownHooks();
   await app.listen(config.port);
@@ -100,8 +100,9 @@ export async function cli(
           ['run', ...rest],
           'google-calendar',
           async () => {
+            // One mission beside the served process: the calendar is its to watch, not this one's.
             const app = await NestFactory.createApplicationContext(
-              AppModule.register({ config, calendar: calendarOf(config) }),
+              AppModule.register({ config, calendar: calendarOf(config), watch: false }),
               { logger: ['error', 'warn'] },
             );
             return { registry: app.get(SessionRegistry), close: () => app.close() };
