@@ -42,6 +42,8 @@ export interface ToolProgress {
 export interface ToolGoalInput extends ToolStepState {
   /** The goal document, verbatim. */
   mission: string;
+  /** The instant the goal is composed at, as ISO 8601: a plan over instants has one to count from. */
+  now: string;
   tools: readonly ToolDeclaration[];
   /** Oldest first; the fit may leave the oldest out and count them. */
   observations: readonly ToolObservation[];
@@ -126,6 +128,14 @@ function progressLines(progress: ToolProgress): string[] {
   ];
 }
 
+/** When the plan is made, with the weekday: "tomorrow" and "this week" in a mission are read from here, never guessed. */
+const nowLine = (now: string): string => {
+  const weekday = new Intl.DateTimeFormat('en-US', { weekday: 'long', timeZone: 'UTC' }).format(
+    new Date(now),
+  );
+  return `The time is ${now} (${weekday}, UTC). An instant a tool takes is ISO 8601 with its offset; a tool that works in a time zone says so in its description.`;
+};
+
 /** A call as a label names it — a history line, a location a judge cites: the tool and its arguments, quoted. */
 export const callLabel = (tool: string, argumentsJson: string): string =>
   `${tool} ${quoted(argumentsJson)}`;
@@ -139,6 +149,7 @@ export function composeToolGoal(input: ToolGoalInput, budget = GOAL_BUDGET_BYTES
     // goal never doubles it.
     input.mission.trim(),
     '',
+    ...section('## Now', [nowLine(input.now)]),
     ...section('## Tools', toolLines(input.tools)),
     ...section('## Observations', observationLines(input)),
     ...section('## Recent calls', historyLines(input.history)),

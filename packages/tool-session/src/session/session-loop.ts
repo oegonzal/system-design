@@ -139,6 +139,7 @@ async function decide(
   const { record, settings, signal } = input;
   const composed = composeToolGoalWithinBudget({
     mission: record.mission,
+    now: deps.clock().toISOString(),
     tools: deps.catalog.declarations(),
     observations: state.observations,
     omittedObservations: state.droppedObservations,

@@ -1,0 +1,7 @@
+{
+  "listMax": 20,
+  "listCeiling": 50,
+  "suggestMax": 3,
+  "suggestCeiling": 10,
+  "recovery": { "windowMs": 30000, "pauseMs": 2000 }
+}

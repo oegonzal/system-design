@@ -21,6 +21,8 @@
 #   Notifications   → localhost:3005/health                         [k8s + docker]
 #   Job application → localhost:3006/health                         [k8s + docker]
 #   Agentic system  → localhost:3007/health                         [k8s + docker]
+#   Gmail           → localhost:3008/health                         [k8s + docker]
+#   Google Calendar → localhost:3009/health                         [k8s + docker]
 #   Frontend        → localhost:4200                                [local next dev]
 #   Quality loop UI → localhost:4201                                [local next dev]
 #   Govcon UI       → localhost:4202                                [local next dev]
@@ -37,6 +39,7 @@ include('./packages/notifications/Tiltfile')
 include('./packages/job-application/Tiltfile')
 include('./packages/agentic-system/Tiltfile')
 include('./packages/gmail/Tiltfile')
+include('./packages/google-calendar/Tiltfile')
 include('./packages/studio-ui/Tiltfile')
 include('./packages/quality-loop-ui/Tiltfile')
 include('./packages/govcon-ui/Tiltfile')

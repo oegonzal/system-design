@@ -81,6 +81,7 @@ export const sampleObservation = (overrides: Partial<ToolObservation> = {}): Too
 /** The goal input at the first step over the fixture mission and tools, with nothing observed, unless a spec says. */
 export const toolGoalInput = (overrides: Partial<ToolGoalInput> = {}): ToolGoalInput => ({
   mission: TOOL_MISSION_FIXTURE,
+  now: '2026-10-16T12:00:00.000Z',
   tools: sampleTools(),
   observations: [],
   omittedObservations: 0,

@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { assertTestDatabase, TEST_DATABASE_NAME } from '@sysdesign/db/test-database';
 import { LoopClient } from '@sysdesign/loop-client';
 import { BusClient } from '@sysdesign/notifications-client';
+import { RecordingBus } from '@sysdesign/notifications-client/testing';
 import { OPERATOR_PORT, SESSION_EVENTS } from '@sysdesign/tool-session';
 import {
   FakeEvents,
@@ -16,33 +17,6 @@ import {
 import type { GmailConfig } from '../config';
 import { InMemoryMailbox } from '../mailbox/testing';
 import { AppModule } from './app.module';
-
-/** A bus that records what was published and answers nothing else. */
-export class RecordingBus extends BusClient {
-  readonly published: { topic: string; source: string; payload: unknown }[] = [];
-  publish(request: { topic: string; source: string; payload: unknown }) {
-    this.published.push(request);
-    return Promise.resolve({
-      seq: String(this.published.length),
-      topic: request.topic,
-      source: request.source,
-      payload: request.payload,
-      publishedAt: '2026-10-16T12:00:00.000Z',
-    });
-  }
-  subscribe(): never {
-    throw new Error('the test bus takes no subscriptions');
-  }
-  pull(): never {
-    throw new Error('the test bus takes no pulls');
-  }
-  ack(): never {
-    throw new Error('the test bus takes no acks');
-  }
-  unsubscribe(): Promise<void> {
-    return Promise.resolve();
-  }
-}
 
 export const testConfig = (): Omit<GmailConfig, 'google'> => ({
   port: 0,

@@ -20,6 +20,7 @@
       "@sysdesign/llm": ["./packages/llm/src/index.ts"],
       "@sysdesign/loop-client": ["./packages/loop-client/src/index.ts"],
       "@sysdesign/notifications-client": ["./packages/notifications-client/src/index.ts"],
+      "@sysdesign/notifications-client/testing": ["./packages/notifications-client/src/testing.ts"],
       "@sysdesign/nest-kit": ["./packages/nest-kit/src/index.ts"],
       "@sysdesign/run-dump": ["./packages/run-dump/src/index.ts"],
       "@sysdesign/studio-testing": ["./packages/studio-testing/src/index.ts"],

@@ -21,6 +21,8 @@
     "agentic-system:serve": "nx run agentic-system:serve",
     "gmail:serve": "nx run gmail:serve",
     "gmail": "nx build gmail && node --env-file-if-exists=.env packages/gmail/dist/main.js",
+    "google-calendar:serve": "nx run google-calendar:serve",
+    "google-calendar": "nx build google-calendar && node --env-file-if-exists=.env packages/google-calendar/dist/main.js",
     "browser-session": "nx build browser-session && node --env-file-if-exists=.env packages/browser-session/dist/main.js",
     "memory-ingest": "nx build memory-ingest && node --env-file-if-exists=.env packages/memory-ingest/dist/main.js",
     "govcon-ui:serve": "nx run govcon-ui:serve",

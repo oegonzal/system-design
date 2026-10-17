@@ -21,6 +21,7 @@ describe('composeToolGoal', () => {
     const goal = composeToolGoal(toolGoalInput());
     const headings = [
       '# Mission',
+      '## Now',
       '## Tools',
       '## Observations',
       '## Recent calls',
@@ -46,7 +47,10 @@ describe('composeToolGoal', () => {
       ['remove_item', 'irreversible', true],
     ]);
     expect(index?.tools[0]?.parameters['required']).toEqual(['query', 'limit']);
-    // The model's view: the tools one line each, no observation, no call, no objection.
+    // The model's view: the instant with its weekday, the tools one line each, no observation, no call, no objection.
+    expect(between(goal, '## Now', '## Tools')).toContain(
+      'The time is 2026-10-16T12:00:00.000Z (Friday, UTC).',
+    );
     expect(between(goal, '## Tools', '## Observations')).toContain(
       '- remove_item (irreversible, asks you first): Removes one item for good.',
     );

@@ -1,0 +1,35 @@
+docker_build(
+    'google-calendar',
+    '../../',
+    dockerfile='../../docker/nest-app.Dockerfile',
+    build_args={'APP': 'google-calendar'},
+    only=[
+        './package.json',
+        './pnpm-lock.yaml',
+        './pnpm-workspace.yaml',
+        './nx.json',
+        './tsconfig.base.json',
+        './vite.nest.ts',
+        './packages/contracts',
+        './packages/nest-kit',
+        './packages/config-kit',
+        './packages/loop-client',
+        './packages/db',
+        './packages/notifications-client',
+        './packages/tool-session',
+        './packages/google-kit',
+        './packages/google-calendar',
+    ],
+)
+
+# The google-oauth secret is declared by the gmail Tiltfile; both services read it.
+k8s_yaml(['./k8s/local/deployment.yaml'])
+
+# Its sessions run on the loop and it talks to a person through the bus, so it starts once both are up.
+k8s_resource(
+    'google-calendar',
+    port_forwards=3009,
+    resource_deps=['quality-loop', 'notifications'],
+    labels=['backend'],
+    links=['http://localhost:3009/health']
+)

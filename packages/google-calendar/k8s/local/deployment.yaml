@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: google-calendar
+  labels:
+    app: google-calendar
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: google-calendar
+  template:
+    metadata:
+      labels:
+        app: google-calendar
+    spec:
+      containers:
+        - name: google-calendar
+          image: google-calendar
+          ports:
+            - containerPort: 3009
+          # The loop, the bus and the mailbox by their in-cluster Services: the
+          # localhost fallbacks would reach nothing inside the pod. Everything
+          # else is the package's own config/ files; the Google credentials come
+          # from the google-oauth secret the gmail Tiltfile declares.
+          env:
+            - name: QUALITY_LOOP_URL
+              value: http://quality-loop-service:3003
+            - name: NOTIFICATIONS_URL
+              value: http://notifications-service:3005
+            - name: GMAIL_URL
+              value: http://gmail-service:3008
+          envFrom:
+            - secretRef:
+                name: google-oauth
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: google-calendar-service
+spec:
+  selector:
+    app: google-calendar
+  ports:
+    - protocol: TCP
+      port: 3009
+      targetPort: 3009
+  # In-cluster only: the host reaches it through Tilt's port-forward.
+  type: ClusterIP

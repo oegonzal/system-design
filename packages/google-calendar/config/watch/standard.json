@@ -1,0 +1,1 @@
+{ "enabled": true, "pollEveryMs": 120000, "noticeTtlMs": 604800000, "calendarId": "primary" }

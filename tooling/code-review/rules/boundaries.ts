@@ -37,6 +37,8 @@ import type { ChangedFile } from './index';
  *   notifications  -> contracts, db, nest-kit, config-kit   the event bus, and the channels that put prompts to people
  *   job-application -> contracts, db, nest-kit, config-kit, notifications-client   the record of units a session applied to, and the advisor over it
  *   agentic-system -> contracts, db, nest-kit, config-kit, loop-client, notifications-client   designs agentic-memory architectures on the loop, keeps the cycle table, learns from the runs, and announces each cycle on the bus
+ *   gmail          -> contracts, nest-kit, config-kit, google-kit, tool-session, loop-client, notifications-client, db (the test-database guard only)   the mailbox as tools, and missions over them
+ *   google-calendar -> contracts, nest-kit, config-kit, google-kit, tool-session, loop-client, notifications-client, db (the test-database guard only)   the calendar as tools, and missions over them
  *   website        -> (nothing)         the Enfav marketing site, statically built with Astro; it imports no workspace package
  *   storybook      -> (anything)        the catalog host legitimately sees both sides
  *   studio-e2e     -> (anything)        drives the whole stack by definition
@@ -86,6 +88,26 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
     'config-kit',
     'loop-client',
     'notifications-client',
+  ],
+  gmail: [
+    'contracts',
+    'nest-kit',
+    'config-kit',
+    'google-kit',
+    'tool-session',
+    'loop-client',
+    'notifications-client',
+    'db',
+  ],
+  'google-calendar': [
+    'contracts',
+    'nest-kit',
+    'config-kit',
+    'google-kit',
+    'tool-session',
+    'loop-client',
+    'notifications-client',
+    'db',
   ],
   website: [],
   storybook: null,
