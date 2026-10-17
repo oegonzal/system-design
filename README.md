@@ -47,6 +47,8 @@ tilt up                 # stores → migrations → seed → api, quality loop, 
 | Govcon          | http://localhost:3004/health                         |
 | Notifications   | http://localhost:3005/health                         |
 | Job application | http://localhost:3006/health                         |
+| Gmail           | http://localhost:3008/health                         |
+| Google Calendar | http://localhost:3009/health                         |
 | Postgres        | localhost:5433 · `admin`/`admin` · db `sysdesign`    |
 | Qdrant          | http://localhost:6333                                |
 | Storybook       | `nx run storybook:storybook` → http://localhost:6006 |
@@ -87,35 +89,40 @@ model and how to bring your runs back in the future.
 Packages carry a `project.json` (no per-package `package.json`); every
 dependency is hoisted to the root and Nx is the single entry point.
 
-| Package                    | What it is                                                                                                                                     |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
-| `packages/contracts`       | Wire types, `as const` vocabularies and the zod schemas every layer derives from                                                               |
-| `packages/db`              | MikroORM entities, migrations, seed — shared by the API and the quality loop                                                                   |
-| `packages/config-kit`      | A program's configuration chosen by name: `config/engine.json` names one file per kind under `config/<kind>/`, read against its owner's schema |
-| `packages/llm`             | The one LLM seam: Claude Code on the subscription login (none, no boot), plus the embeddings port                                              |
-| `packages/nest-kit`        | Shared Nest plumbing: zod pipe, MikroORM root module, health, CORS, list paging, LIKE escaping                                                 |
-| `packages/design-system`   | Emotion tokens → semantic roles → primitives, contrast-asserted                                                                                |
-| `packages/studio-api`      | NestJS REST API: prompts, sessions, revisions, stories; grading and coaching through the loop                                                  |
-| `packages/run-dump`        | Run-folder plumbing every pipeline dumps through (`static/runs`)                                                                               |
-| `packages/quality-loop`    | Generic critic/evaluator/controller loop: pipelines as data, HTTP + CLI — grades the studio                                                    |
-| `packages/quality-loop-ui` | Next.js client for the quality loop: pick a prompt, run, watch, read the verdict                                                               |
-| `packages/govcon`          | SAM.gov contract opportunities: budgeted pull, Postgres store, deterministic leads (CLI + HTTP)                                                |
-| `packages/govcon-ui`       | Next.js client for govcon: pull, rank, read a lead's trace and description, watch the ledger                                                   |
-| `packages/website`         | The Enfav LLC marketing site: Astro + Tailwind, every page prerendered; every company detail is a declared fact                                |
-| `packages/notifications`   | The event bus over HTTP — declared topics, pulled subscriptions — and the channels (Telegram) that put prompts to you and bring answers back   |
-| `packages/job-application` | The record of units a browser session applied to, fed by the session's events, and the advisor it asks what is on record before each plan      |
-| `packages/web-kit`         | Shared web plumbing: Emotion SSR registry, HTTP request core, hooks, route table and announcer                                                 |
-| `packages/web-testing`     | Shared web spec harness: themed render, fetch stub, jsdom shims                                                                                |
-| `packages/studio-testing`  | The quality loop as a scriptable fake, behind studio-api's client fake and the e2e stub                                                        |
-| `packages/loop-client`     | The quality loop as one shared port: HTTP adapter, transport-agnostic errors, honest run awaiting                                              |
-| `packages/browser-session` | Playwright session driven by a markdown goal; every click, answer and stop is a quality-loop run                                               |
-| `packages/memory-ingest`   | Your documents chunked and handed to the loop, which digests them into facts in the memory store                                               |
-| `packages/studio-ui`       | Next.js app: canvas workspace, brief and narrative, feedback, coach, STAR repository                                                           |
-| `packages/storybook`       | Catalog host globbing sibling stories                                                                                                          |
-| `packages/studio-e2e`      | Playwright: requirement specs + the full practice-loop journey, against a stub quality loop                                                    |
-| `packages/website-e2e`     | Playwright + axe: every built page of the Enfav site, served by wrangler dev as Cloudflare serves it (or production)                           |
-| `packages/criteria`        | Completion criteria registry; tests claim ids like `[EVAL-1]` in titles                                                                        |
-| `tooling/`                 | Code-review pipeline (LLM critics + deterministic rules) + Storybook smoke + repo gates                                                        |
+| Package                         | What it is                                                                                                                                                                                                                |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `packages/contracts`            | Wire types, `as const` vocabularies and the zod schemas every layer derives from                                                                                                                                          |
+| `packages/db`                   | MikroORM entities, migrations, seed — shared by the API and the quality loop                                                                                                                                              |
+| `packages/config-kit`           | A program's configuration chosen by name: `config/engine.json` names one file per kind under `config/<kind>/`, read against its owner's schema                                                                            |
+| `packages/llm`                  | The one LLM seam: Claude Code on the subscription login (none, no boot), plus the embeddings port                                                                                                                         |
+| `packages/nest-kit`             | Shared Nest plumbing: zod pipe, MikroORM root module, health, CORS, list paging, LIKE escaping                                                                                                                            |
+| `packages/design-system`        | Emotion tokens → semantic roles → primitives, contrast-asserted                                                                                                                                                           |
+| `packages/studio-api`           | NestJS REST API: prompts, sessions, revisions, stories; grading and coaching through the loop                                                                                                                             |
+| `packages/run-dump`             | Run-folder plumbing every pipeline dumps through (`static/runs`)                                                                                                                                                          |
+| `packages/quality-loop`         | Generic critic/evaluator/controller loop: pipelines as data, HTTP + CLI — grades the studio                                                                                                                               |
+| `packages/quality-loop-ui`      | Next.js client for the quality loop: pick a prompt, run, watch, read the verdict                                                                                                                                          |
+| `packages/govcon`               | SAM.gov contract opportunities: budgeted pull, Postgres store, deterministic leads (CLI + HTTP)                                                                                                                           |
+| `packages/govcon-ui`            | Next.js client for govcon: pull, rank, read a lead's trace and description, watch the ledger                                                                                                                              |
+| `packages/website`              | The Enfav LLC marketing site: Astro + Tailwind, every page prerendered; every company detail is a declared fact                                                                                                           |
+| `packages/notifications`        | The event bus over HTTP — declared topics, pulled subscriptions — and the channels (Telegram) that put prompts to you and bring answers back                                                                              |
+| `packages/job-application`      | The record of units a browser session applied to, fed by the session's events, and the advisor it asks what is on record before each plan                                                                                 |
+| `packages/web-kit`              | Shared web plumbing: Emotion SSR registry, HTTP request core, hooks, route table and announcer                                                                                                                            |
+| `packages/web-testing`          | Shared web spec harness: themed render, fetch stub, jsdom shims                                                                                                                                                           |
+| `packages/studio-testing`       | The quality loop as a scriptable fake, behind studio-api's client fake and the e2e stub                                                                                                                                   |
+| `packages/loop-client`          | The quality loop as one shared port: HTTP adapter, transport-agnostic errors, honest run awaiting                                                                                                                         |
+| `packages/browser-session`      | Playwright session driven by a markdown goal; every click, answer and stop is a quality-loop run                                                                                                                          |
+| `packages/notifications-client` | The notifications bus as one port: its HTTP adapter, and asking a person through it and waiting for the answer as an event                                                                                                |
+| `packages/tool-session`         | A mission run as tool calls the loop decides, for any program that declares tools: the catalog, the session loop and its rails, the operator's prompts, `/sessions` and `/tools`                                          |
+| `packages/google-kit`           | Acting as you on a Google API: the OAuth consent, the token file, access tokens refreshed from it, the authorized request                                                                                                 |
+| `packages/gmail`                | Your mailbox as ten tools — search, read, draft, label, never send — and missions over them; new mail told on the bus and on its own bot                                                                                  |
+| `packages/google-calendar`      | Your calendar as nine tools — list, search, read, suggest a time deterministically, and create, change, answer or remove an event with your approval — and missions over them; changes told on the bus and on its own bot |
+| `packages/memory-ingest`        | Your documents chunked and handed to the loop, which digests them into facts in the memory store                                                                                                                          |
+| `packages/studio-ui`            | Next.js app: canvas workspace, brief and narrative, feedback, coach, STAR repository                                                                                                                                      |
+| `packages/storybook`            | Catalog host globbing sibling stories                                                                                                                                                                                     |
+| `packages/studio-e2e`           | Playwright: requirement specs + the full practice-loop journey, against a stub quality loop                                                                                                                               |
+| `packages/website-e2e`          | Playwright + axe: every built page of the Enfav site, served by wrangler dev as Cloudflare serves it (or production)                                                                                                      |
+| `packages/criteria`             | Completion criteria registry; tests claim ids like `[EVAL-1]` in titles                                                                                                                                                   |
+| `tooling/`                      | Code-review pipeline (LLM critics + deterministic rules) + Storybook smoke + repo gates                                                                                                                                   |
 
 ## How grading works
 

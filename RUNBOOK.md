@@ -37,9 +37,9 @@ There is one local stack, whichever launcher starts it:
   migrations and `pnpm db:seed` re-seeds the reference experiences; both are
   idempotent, and the seed never touches your sessions.
 - **The apps.** The API (3000), the quality loop (3003), govcon (3004),
-  notifications (3005), job-application (3006) and the three web clients
-  (4200, 4201, 4202) find the stores and one another at their defaults, so no
-  connection variable is set.
+  notifications (3005), job-application (3006), gmail (3008), google-calendar
+  (3009) and the three web clients (4200, 4201, 4202) find the stores and one
+  another at their defaults, so no connection variable is set.
 
 The launchers differ only in where the apps run:
 
@@ -567,6 +567,8 @@ and binds each one's variables, as set in `.env`:
 | --------------- | ----------------- | --------------------------------- | -------------------------------- | ------------------ |
 | job application | `browser-session` | `JOBAPPLICATION_TELEGRAM_API_KEY` | `JOBAPPLICATION_TELEGRAM_BOT_ID` | `TELEGRAM_CHAT_ID` |
 | govcon          | `govcon`          | `GOVCON_TELEGRAM_API_KEY`         | `GOVCON_TELEGRAM_BOT_ID`         | `TELEGRAM_CHAT_ID` |
+| gmail           | `gmail`           | `GMAIL_TELEGRAM_API_KEY`          | `GMAIL_TELEGRAM_BOT_ID`          | `TELEGRAM_CHAT_ID` |
+| google calendar | `google-calendar` | `GOOGLECALENDAR_TELEGRAM_API_KEY` | `GOOGLECALENDAR_TELEGRAM_BOT_ID` | `TELEGRAM_CHAT_ID` |
 
 Pairing, once per bot:
 
@@ -596,6 +598,62 @@ the service logs it and waits. Two bots bound to one token refuse boot for
 the same reason. A prompt nobody withdraws expires at the time
 its asker gave it; the bot then edits its message to say so.
 
+## Your mailbox and calendar as tools: the Google services
+
+`packages/gmail` (`:3008`) and `packages/google-calendar` (`:3009`) put your
+Gmail and Google Calendar behind declared tools and run missions over them the
+way the browser session runs a goal: every step is a `tool-step` run on the
+quality loop, every session start, step and finish is a bus event, and each
+service has its own Telegram bot (the table above). Gmail never sends: its
+writes are drafts and labels, and none asks you first. Every calendar write —
+an event created, changed, answered or removed — reaches other people, so each
+waits for your yes on the calendar bot before it runs.
+
+Setting up Google access, once:
+
+1. In Google Cloud, create a project (or pick one), enable the **Gmail API**
+   and the **Google Calendar API**, and configure the OAuth consent screen:
+   user type External, your own account as a test user, and publishing status
+   **In production** — a consent granted while the app is in Testing expires
+   after seven days, and the services would then refuse boot asking for a new
+   one. The "unverified app" interstitial is expected for personal use; choose
+   to continue.
+2. Create an OAuth client of type **Desktop app** and put its id and secret in
+   `.env` as `GOOGLE_OAUTH_CLIENT_ID` and `GOOGLE_OAUTH_CLIENT_SECRET`. The
+   variables, their defaults and the scopes are declared once, in
+   `packages/google-kit/src/env.ts`.
+3. Run `pnpm gmail authorize` (or `pnpm google-calendar authorize`; either asks
+   for both services' scopes). Open the printed URL in a browser signed in as
+   the account, consent, and the refresh token lands in
+   `static/google/oauth-token.json` (gitignored, mode 0600). A pod has no file
+   to read: Tilt builds the Secret `google-oauth` from
+   `GOOGLE_OAUTH_REFRESH_TOKEN` as well, so copy the token file's
+   `refreshToken` into `.env` under that name before `tilt up`; set, it wins
+   over the file.
+
+Then, with the loop (`:3003`) and the notifications service (`:3005`) up and
+`/start` sent to both bots:
+
+```bash
+pnpm gmail:serve                      # :3008 — the ten mailbox tools, the inbox watcher
+pnpm google-calendar:serve            # :3009 — the nine calendar tools, the change watcher
+curl -s localhost:3008/tools | jq -r '.data[].name'
+pnpm gmail run --goal packages/gmail/goals/smoke-inbox.md --max-steps 4
+pnpm google-calendar run --goal packages/google-calendar/goals/smoke-week.md --max-steps 4
+pnpm gmail run --goal packages/gmail/goals/meeting-from-thread.md --max-steps 8   # both services up: approval on Telegram before the event
+```
+
+A mission is a markdown file with `# Mission`, `## Procedure`, `## Stop
+conditions` (`- cause (complete|stopped): meaning`) and `## Never do`. Each
+service mounts the other's tools into every session (`config/peers/standard.json`,
+the peer at `GOOGLE_CALENDAR_URL` or `GMAIL_URL`), so one mission can read a
+thread, pick a time and draft the reply; `GET /tools` lists a service's own
+tools, and the peer's join the session's goal. Sessions live in memory —
+`GET /sessions`, `GET /sessions/:id`, `POST /sessions/:id/stop` — and the bus
+holds `tool-session.started|stepped|finished` for whoever subscribes. The live
+recipe, with what to read after each step, is
+[`docs/pipelines/tool-session.md`](./docs/pipelines/tool-session.md).
+
 ## Notes / gotchas
 
 - Port **5433** is the app's default (`packages/db/src/connection.ts`) and
@@ -609,14 +667,17 @@ its asker gave it; the bot then edits its message to say so.
   pod as on this machine, and govcon's `SAM_GOV_API_KEY` reaches its pod the
   same way, through the Secret `govcon-sam`; so do the Telegram variables,
   through `notifications-telegram`, which the notifications Tiltfile builds
-  from every variable the chosen channels file binds. With no token Tilt warns
-  and the loop's pod exits at boot with the loop's own message.
+  from every variable the chosen channels file binds, and the Google OAuth
+  client and refresh token through `google-oauth`, which the gmail Tiltfile
+  builds and both Google services read. With no token Tilt warns and the
+  loop's pod exits at boot with the loop's own message.
 - Under Tilt the loop's audit dumps land on the volume claim
   `quality-loop-runs`, mounted at its default `static/runs`, which outlives
   restarts and `tilt down`. Copy them out with
   `kubectl cp <quality-loop pod>:/app/static/runs <dir>`.
 - Under Tilt the host reaches the API (3000), the loop (3003), govcon (3004),
-  notifications (3005) and job-application (3006) through Tilt's port-forwards only; the Services are `ClusterIP`. They
+  notifications (3005), job-application (3006), gmail (3008) and
+  google-calendar (3009) through Tilt's port-forwards only; the Services are `ClusterIP`. They
   used to be `LoadBalancer`, which Docker Desktop's Kubernetes turns into a
   host-published container on the same port, racing Tilt's forward. A cluster
   that ran the old manifests may keep a Service stuck deleting, and then Tilt
