@@ -37,9 +37,10 @@ There is one local stack, whichever launcher starts it:
   migrations and `pnpm db:seed` re-seeds the reference experiences; both are
   idempotent, and the seed never touches your sessions.
 - **The apps.** The API (3000), the quality loop (3003), govcon (3004),
-  notifications (3005), job-application (3006), gmail (3008), google-calendar
-  (3009) and the three web clients (4200, 4201, 4202) find the stores and one
-  another at their defaults, so no connection variable is set.
+  notifications (3005), job-application (3006), agentic-system (3007), gmail
+  (3008), google-calendar (3009) and the three web clients (4200, 4201, 4202)
+  find the stores and one another at their defaults, so no connection variable
+  is set.
 
 The launchers differ only in where the apps run:
 
@@ -567,6 +568,7 @@ and binds each one's variables, as set in `.env`:
 | --------------- | ----------------- | --------------------------------- | -------------------------------- | ------------------ |
 | job application | `browser-session` | `JOBAPPLICATION_TELEGRAM_API_KEY` | `JOBAPPLICATION_TELEGRAM_BOT_ID` | `TELEGRAM_CHAT_ID` |
 | govcon          | `govcon`          | `GOVCON_TELEGRAM_API_KEY`         | `GOVCON_TELEGRAM_BOT_ID`         | `TELEGRAM_CHAT_ID` |
+| agentic system  | `agentic-system`  | `AGENTICSYSTEM_TELEGRAM_API_KEY`  | `AGENTICSYSTEM_TELEGRAM_BOT_ID`  | `TELEGRAM_CHAT_ID` |
 | gmail           | `gmail`           | `GMAIL_TELEGRAM_API_KEY`          | `GMAIL_TELEGRAM_BOT_ID`          | `TELEGRAM_CHAT_ID` |
 | google calendar | `google-calendar` | `GOOGLECALENDAR_TELEGRAM_API_KEY` | `GOOGLECALENDAR_TELEGRAM_BOT_ID` | `TELEGRAM_CHAT_ID` |
 
@@ -676,8 +678,8 @@ recipe, with what to read after each step, is
   restarts and `tilt down`. Copy them out with
   `kubectl cp <quality-loop pod>:/app/static/runs <dir>`.
 - Under Tilt the host reaches the API (3000), the loop (3003), govcon (3004),
-  notifications (3005), job-application (3006), gmail (3008) and
-  google-calendar (3009) through Tilt's port-forwards only; the Services are `ClusterIP`. They
+  notifications (3005), job-application (3006), agentic-system (3007), gmail
+  (3008) and google-calendar (3009) through Tilt's port-forwards only; the Services are `ClusterIP`. They
   used to be `LoadBalancer`, which Docker Desktop's Kubernetes turns into a
   host-published container on the same port, racing Tilt's forward. A cluster
   that ran the old manifests may keep a Service stuck deleting, and then Tilt

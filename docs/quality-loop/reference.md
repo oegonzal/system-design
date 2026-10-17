@@ -63,7 +63,7 @@ refuses to start without a model login before Nest loads.
 | Folder           | What it is                                                                      |
 | ---------------- | ------------------------------------------------------------------------------- |
 | `core/`          | The engine. Pure: no Nest, no clock, no filesystem, no env vars, no randomness. |
-| `pipelines/`     | The twelve pipelines, one folder each, plus the registry.                       |
+| `pipelines/`     | The thirteen pipelines, one folder each, plus the registry.                     |
 | `orchestrators/` | Compositions that run several pipelines in order, declared as data.             |
 | `modules/`       | The NestJS layer: HTTP routes, Postgres, Qdrant, the model client.              |
 | `cli/`           | The two command-line entry points, `run` and `replay`.                          |
@@ -205,7 +205,7 @@ diagnostic, never evidence.
 These are pure and import nothing from vitest, so they compile under the app tsconfig even though
 only specs use them.
 
-## `pipelines/` — the twelve pipelines
+## `pipelines/` — the thirteen pipelines
 
 ### The folder layout, once
 
