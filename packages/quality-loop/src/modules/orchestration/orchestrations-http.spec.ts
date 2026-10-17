@@ -246,6 +246,7 @@ describe('the orchestrations HTTP surface', () => {
       routes: [
         { id: 'system-design', description: expect.any(String) },
         { id: 'agentic-design', description: expect.any(String) },
+        { id: 'memory-architecture', description: expect.any(String) },
       ],
       pipeline: 'system-design',
       rationale: 'a system to design',
@@ -272,7 +273,7 @@ describe('the orchestrations HTTP surface', () => {
     expect(record.steps['classify']).toMatchObject({
       status: 'complete',
       note: 'a system to design',
-      counts: { routes: 2 },
+      counts: { routes: 3 },
       runIds: [],
     });
     expect(record.steps['judge']).toMatchObject({ status: 'complete', counts: { iterations: 1 } });

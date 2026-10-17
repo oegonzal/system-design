@@ -1,0 +1,32 @@
+docker_build(
+    'agentic-system',
+    '../../',
+    dockerfile='../../docker/nest-app.Dockerfile',
+    build_args={'APP': 'agentic-system'},
+    only=[
+        './package.json',
+        './pnpm-lock.yaml',
+        './pnpm-workspace.yaml',
+        './nx.json',
+        './tsconfig.base.json',
+        './vite.nest.ts',
+        './packages/contracts',
+        './packages/nest-kit',
+        './packages/config-kit',
+        './packages/loop-client',
+        './packages/db',
+        './packages/notifications-client',
+        './packages/agentic-system',
+    ],
+)
+
+k8s_yaml(['./k8s/local/deployment.yaml'])
+
+# It designs on the loop, so it starts once the loop is up.
+k8s_resource(
+    'agentic-system',
+    port_forwards=3007,
+    resource_deps=['quality-loop'],
+    labels=['backend'],
+    links=['http://localhost:3007/health']
+)

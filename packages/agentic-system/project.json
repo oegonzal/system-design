@@ -1,0 +1,27 @@
+{
+  "name": "agentic-system",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/agentic-system/src",
+  "projectType": "application",
+  "tags": ["type:app", "scope:node"],
+  "targets": {
+    "serve": {
+      "executor": "nx:run-commands",
+      "options": {
+        "parallel": true,
+        "commands": [
+          "vite build --watch --config packages/agentic-system/vite.config.ts",
+          "node --watch --watch-preserve-output --env-file-if-exists=.env packages/agentic-system/dist/main.js"
+        ]
+      }
+    },
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "cwd": "packages/agentic-system",
+        "commands": ["tsc --noEmit -p tsconfig.app.json", "tsc --noEmit -p tsconfig.spec.json"]
+      }
+    }
+  }
+}

@@ -11,6 +11,7 @@ import { DOCUMENT_DIGEST } from './document-digest/definition';
 import { EXPERIENCE_DIGEST } from './experience-digest/definition';
 import { FIELD_ANSWER } from './field-answer/definition';
 import { KNOWLEDGE_DIGEST } from './knowledge-digest/definition';
+import { MEMORY_ARCHITECTURE } from './memory-architecture/definition';
 import { MEMORY_RECALL } from './memory-recall/definition';
 import { SYSTEM_DESIGN } from './system-design/definition';
 import { SYSTEM_DESIGN_CANVAS } from './system-design-canvas/definition';
@@ -21,6 +22,7 @@ const declared: PipelineDefinition<unknown>[] = [
   MEMORY_RECALL as PipelineDefinition<unknown>,
   EXPERIENCE_DIGEST as PipelineDefinition<unknown>,
   SYSTEM_DESIGN_CANVAS as PipelineDefinition<unknown>,
+  MEMORY_ARCHITECTURE as PipelineDefinition<unknown>,
   DESIGN_PROMPT as PipelineDefinition<unknown>,
   BROWSER_STEP as PipelineDefinition<unknown>,
   FIELD_ANSWER as PipelineDefinition<unknown>,

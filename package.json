@@ -18,6 +18,7 @@
     "govcon:serve": "nx run govcon:serve",
     "notifications:serve": "nx run notifications:serve",
     "job-application:serve": "nx run job-application:serve",
+    "agentic-system:serve": "nx run agentic-system:serve",
     "browser-session": "nx build browser-session && node --env-file-if-exists=.env packages/browser-session/dist/main.js",
     "memory-ingest": "nx build memory-ingest && node --env-file-if-exists=.env packages/memory-ingest/dist/main.js",
     "govcon-ui:serve": "nx run govcon-ui:serve",

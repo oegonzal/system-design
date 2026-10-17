@@ -21,6 +21,7 @@ describe('the pipeline registry', () => {
       'memory-recall',
       'experience-digest',
       'system-design-canvas',
+      'memory-architecture',
       'design-prompt',
       'browser-step',
       'field-answer',
@@ -61,6 +62,7 @@ describe('the pipeline registry', () => {
       'system-design',
       'agentic-design',
       'system-design-canvas',
+      'memory-architecture',
     ]);
     expect(
       ids(registry.filter((definition) => reaches(definition) && !declares(definition))),

@@ -25,6 +25,7 @@ import { GovconTarget } from './entities/govcon-target.entity';
 import { Interaction } from './entities/interaction.entity';
 import { InteractionDelivery } from './entities/interaction-delivery.entity';
 import { JobApplication } from './entities/job-application.entity';
+import { MemoryDesignCycle } from './entities/memory-design-cycle.entity';
 import { MemoryEmbedding } from './entities/memory-embedding.entity';
 import { MemorySupport } from './entities/memory-support.entity';
 import { OrchestrationRun } from './entities/orchestration-run.entity';
@@ -88,6 +89,7 @@ export const ormOptions = {
     Interaction,
     InteractionDelivery,
     JobApplication,
+    MemoryDesignCycle,
   ],
   metadataProvider: ReflectMetadataProvider,
   namingStrategy: UnderscoreNamingStrategy,

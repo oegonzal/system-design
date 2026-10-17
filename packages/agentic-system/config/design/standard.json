@@ -1,0 +1,7 @@
+{
+  "pipeline": "memory-architecture",
+  "orchestrator": "memory-design",
+  "maxIterations": 3,
+  "recall": true,
+  "pollEveryMs": 3000
+}

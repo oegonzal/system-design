@@ -25,6 +25,14 @@
           "bot": "GOVCON_TELEGRAM_BOT_ID",
           "chatId": "TELEGRAM_CHAT_ID"
         }
+      },
+      "telegram.agentic-system": {
+        "carries": ["agentic-system"],
+        "env": {
+          "token": "AGENTICSYSTEM_TELEGRAM_API_KEY",
+          "bot": "AGENTICSYSTEM_TELEGRAM_BOT_ID",
+          "chatId": "TELEGRAM_CHAT_ID"
+        }
       }
     }
   }

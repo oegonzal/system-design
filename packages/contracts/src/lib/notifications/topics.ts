@@ -1,3 +1,9 @@
+import {
+  DESIGN_TOPICS,
+  designRevisedSchema,
+  designStartedSchema,
+  designStoredSchema,
+} from '../agentic-system/events';
 import { ALERT_DECLARATIONS } from '../govcon/alerts';
 import {
   SESSION_TOPICS,
@@ -30,6 +36,10 @@ export const NOTIFICATION_TOPICS: Readonly<Record<string, TopicDeclaration>> = {
   [SESSION_TOPICS.unitOpened]: { schema: sessionUnitOpenedSchema, publishedBy: 'anyone' },
   [SESSION_TOPICS.unitClosed]: { schema: sessionUnitClosedSchema, publishedBy: 'anyone' },
   [SESSION_TOPICS.ended]: { schema: sessionEndedSchema, publishedBy: 'anyone' },
+  // What the agentic-system service says happened to a memory-design cycle.
+  [DESIGN_TOPICS.started]: { schema: designStartedSchema, publishedBy: 'anyone' },
+  [DESIGN_TOPICS.revised]: { schema: designRevisedSchema, publishedBy: 'anyone' },
+  [DESIGN_TOPICS.stored]: { schema: designStoredSchema, publishedBy: 'anyone' },
   // What govcon's daily warm found, for whoever keeps a record; the digest it also prompts is what reaches a person.
   ...Object.fromEntries(
     Object.values(ALERT_DECLARATIONS).map(({ topic, schema }): [string, TopicDeclaration] => [

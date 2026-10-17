@@ -9,6 +9,7 @@ import {
 } from '@sysdesign/contracts';
 
 import { ORCHESTRATORS } from '../../orchestrators';
+import { MEMORY_DESIGN_ORCHESTRATOR_ID } from '../../orchestrators/memory-design/definition';
 import type { KnowledgePorts } from '../../orchestrators/knowledge/ports';
 import type { MemoryPorts } from '../../orchestrators/memory/ports';
 import type { RouterPorts } from '../../orchestrators/router/ports';
@@ -35,7 +36,9 @@ const host = (definition: unknown, ports: unknown): OrchestratorHost =>
  * declares none, like the two panels, is bound to nothing. The form and
  * document memory orchestrators declare a subset of the memory ports and are
  * bound to the same object, so one store and one embedding client serve all
- * three; the knowledge orchestrator adds the support store to that same set.
+ * three; the knowledge orchestrator adds the support store to that same set, and the
+ * memory-design orchestrator (the memory-architecture learning cycle) shares
+ * the knowledge ports.
  */
 @Module({
   imports: [RunsModule, OrchestrationRecordModule, MemoryModule, RouterModule, JanitorModule],
@@ -55,6 +58,7 @@ const host = (definition: unknown, ports: unknown): OrchestratorHost =>
           [DOCUMENT_MEMORY_ORCHESTRATOR_ID, memory],
           [ROUTER_ORCHESTRATOR_ID, router],
           [KNOWLEDGE_ORCHESTRATOR_ID, knowledge],
+          [MEMORY_DESIGN_ORCHESTRATOR_ID, knowledge],
         ]);
         return new Map(
           [...ORCHESTRATORS.values()].map((definition) => [

@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agentic-system
+  labels:
+    app: agentic-system
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: agentic-system
+  template:
+    metadata:
+      labels:
+        app: agentic-system
+    spec:
+      containers:
+        - name: agentic-system
+          image: agentic-system
+          ports:
+            - containerPort: 3007
+          # The loop and the bus by their in-cluster Services: the localhost
+          # fallbacks would reach nothing inside the pod. Everything else is the
+          # package's own config/ files; the stores are on the host.
+          env:
+            - name: QUALITY_LOOP_URL
+              value: http://quality-loop-service:3003
+            - name: NOTIFICATIONS_URL
+              value: http://notifications-service:3005
+          envFrom:
+            - configMapRef:
+                name: local-stores
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: agentic-system-service
+spec:
+  selector:
+    app: agentic-system
+  ports:
+    - protocol: TCP
+      port: 3007
+      targetPort: 3007
+  # In-cluster only: the host reaches it through Tilt's port-forward.
+  type: ClusterIP
