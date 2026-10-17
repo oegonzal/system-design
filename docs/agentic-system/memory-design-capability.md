@@ -154,7 +154,10 @@ The "application" layer; holds everything domain-specific so the engine does not
 - **The cycle** (`designs/`): read nothing from a studio — the goal is in the
   request; `coach(goal)` runs the `memory-architecture` pipeline (recall on),
   returns the run id; `learn(runId)` hands the finished run to the `memory-design`
-  orchestrator. No studio read, no canvas write-back.
+  orchestrator and waits for it. A cycle is `coached` only once the coach run
+  completed and `stored` only once the orchestration has stored its lessons; a
+  run or an orchestration that ends any other way fails the cycle, its note
+  naming how. No studio read, no canvas write-back.
 - **The catalog** (`catalog/`): declared reference data for the memory stack —
   each component's interface, operations, and the **memory types** it serves
   (`memoryTypes` / `componentsByMemoryType`). Decoupled from the studio canvas (no

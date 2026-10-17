@@ -63,4 +63,43 @@ describe('the design cycle', () => {
     await service.execute(started.id, goal);
     expect(await service.get(started.id)).toMatchObject({ status: 'failed', note: 'loop down' });
   });
+
+  /** A cycle over a loop whose runs and orchestrations end as `settled` says, and what it announced. */
+  async function cycleSettling(settled: ConstructorParameters<typeof FakeLoopClient>[0]) {
+    const loop = new FakeLoopClient(settled);
+    const events = new FakeEventSink();
+    const service = new DesignsService(
+      new InMemoryCycleStore(),
+      new MemoryDesignDriver(loop, settings),
+      events,
+      clock,
+    );
+    const started = await service.start(goal);
+    await service.execute(started.id, goal);
+    return {
+      loop,
+      cycle: await service.get(started.id),
+      announced: events.emitted.map((c) => c.status),
+    };
+  }
+
+  it('[AGS-3] is stored only once the orchestration has stored its lessons; one that fails fails the cycle', async () => {
+    const { cycle, announced } = await cycleSettling({ settled: { orchestration: 'failed' } });
+    expect(cycle).toMatchObject({
+      status: 'failed',
+      note: 'the memory-design orchestration learn-run-1 ended failed',
+    });
+    // Coached was true and was said; stored never was.
+    expect(announced).toEqual(['running', 'coached']);
+  });
+
+  it('[AGS-3] is coached only once the coach run completed; one that did not is never learned from', async () => {
+    const { loop, cycle, announced } = await cycleSettling({ settled: { run: 'failed' } });
+    expect(cycle).toMatchObject({
+      status: 'failed',
+      note: 'the coach run coach-run-1 ended failed',
+    });
+    expect(loop.fromRun).toEqual([]);
+    expect(announced).toEqual(['running']);
+  });
 });

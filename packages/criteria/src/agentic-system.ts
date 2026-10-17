@@ -15,7 +15,7 @@ export const AGENTIC_SYSTEM_CRITERIA: readonly Criterion[] = [
   {
     id: 'AGS-3',
     statement:
-      'A cycle coaches a memory strategy on the loop from its brief, hands the finished run to the memory-design orchestrator to learn from, and ends stored; any failure is recorded on the row and ends nothing else.',
+      'A cycle coaches a memory strategy on the loop from its brief and hands the finished run to the memory-design orchestrator to learn from; it is coached only once the coach run completed and stored only once the orchestration has stored its lessons, and a run or orchestration that ends any other way fails the cycle with how it ended, recorded on the row, ending nothing else.',
   },
   {
     id: 'AGS-4',

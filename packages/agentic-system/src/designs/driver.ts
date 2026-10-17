@@ -1,4 +1,4 @@
-import { awaitRun, type LoopClient } from '@sysdesign/loop-client';
+import { awaitOrchestration, awaitRun, type LoopClient } from '@sysdesign/loop-client';
 
 import type { DesignSettings } from './settings';
 
@@ -11,7 +11,10 @@ export interface Coached {
  * Drives the loop for one design cycle, and nothing else: it starts the coach
  * run with coach-only recall (a per-run flag, the one recall an orchestration
  * cannot carry), waits for it honestly by its heartbeat, and — separately —
- * hands the finished run to the memory-design orchestrator to digest and store.
+ * hands the finished run to the memory-design orchestrator to digest and store,
+ * waiting for that too. Each step answers only once its work has completed, so
+ * a cycle is never called coached, or stored, ahead of the fact; a run or an
+ * orchestration that ends any other way throws, naming how it ended.
  * A pure class the service composes; the module builds it from the loop client
  * and the settings.
  */
@@ -35,15 +38,29 @@ export class MemoryDesignDriver {
       maxIterations: this.settings.maxIterations,
       recall: this.settings.recall,
     });
-    await awaitRun(this.loop, started.runId, { pollEveryMs: this.settings.pollEveryMs });
+    const settled = await awaitRun(this.loop, started.runId, {
+      pollEveryMs: this.settings.pollEveryMs,
+    });
+    if (settled.status !== 'complete') {
+      throw new Error(`the coach run ${started.runId} ended ${settled.status}`);
+    }
     return { runId: started.runId };
   }
 
   /** Hand the finished coach run to the memory-design orchestrator; its id, for the record. */
   async learn(runId: string): Promise<string> {
-    const started = await this.loop.startOrchestrationFromRun(this.settings.orchestrator, {
-      runId,
+    const { orchestrationRunId } = await this.loop.startOrchestrationFromRun(
+      this.settings.orchestrator,
+      { runId },
+    );
+    const settled = await awaitOrchestration(this.loop, orchestrationRunId, {
+      pollEveryMs: this.settings.pollEveryMs,
     });
-    return started.orchestrationRunId;
+    if (settled.status !== 'complete') {
+      throw new Error(
+        `the ${this.settings.orchestrator} orchestration ${orchestrationRunId} ended ${settled.status}`,
+      );
+    }
+    return orchestrationRunId;
   }
 }

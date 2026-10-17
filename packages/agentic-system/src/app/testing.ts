@@ -48,7 +48,7 @@ export async function bootApp(options: { artifacts?: ReadonlyMap<string, unknown
   loop: FakeLoopClient;
 }> {
   await ensureDatabase();
-  const loop = new FakeLoopClient(options.artifacts);
+  const loop = new FakeLoopClient({ artifacts: options.artifacts });
   const moduleRef = await Test.createTestingModule({ imports: [AppModule.register(testConfig())] })
     .overrideProvider(LoopClient)
     .useValue(loop)
