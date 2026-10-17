@@ -4,9 +4,9 @@ import type { CyclePatch, MemoryDesignCycle } from '../cycle';
 import type { CycleStore } from '../ports';
 
 /**
- * Cycles in memory. The phase-one adapter, used until the `memory_design_cycle`
- * table lands; it holds copies in and out so a caller can never mutate a stored
- * row, which is the one property the MikroORM adapter must also keep.
+ * Cycles in memory, the store the service specs run on. It holds copies in and
+ * out so a caller can never mutate a stored row — the one property the MikroORM
+ * adapter keeps too.
  */
 @Injectable()
 export class InMemoryCycleStore implements CycleStore {
@@ -28,13 +28,5 @@ export class InMemoryCycleStore implements CycleStore {
     const merged = { ...row, ...patch };
     this.rows.set(id, merged);
     return Promise.resolve({ ...merged });
-  }
-
-  listBySession(sessionId: string): Promise<MemoryDesignCycle[]> {
-    return Promise.resolve(
-      [...this.rows.values()]
-        .filter((row) => row.sessionId === sessionId)
-        .map((row) => ({ ...row })),
-    );
   }
 }

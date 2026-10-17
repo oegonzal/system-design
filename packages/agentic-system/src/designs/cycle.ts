@@ -11,8 +11,8 @@ export type { MemoryDesignCycleDto, MemoryDesignCycleStatus };
 
 export interface MemoryDesignCycle {
   id: string;
-  /** The cycle's subject key, derived from the goal it designs for. */
-  sessionId: string;
+  /** The digest of the brief the cycle designs for; cycles over the same brief share it. */
+  goalDigest: string;
   status: MemoryDesignCycleStatus;
   /** The memory-architecture coach run; null until it starts. */
   designRunId: string | null;
@@ -24,14 +24,14 @@ export interface MemoryDesignCycle {
   updatedAt: Date;
 }
 
-/** The fields a running cycle advances through; `id`, `sessionId` and `startedAt` never change. */
+/** The fields a running cycle advances through; `id`, `goalDigest` and `startedAt` never change. */
 export type CyclePatch = Partial<
   Pick<MemoryDesignCycle, 'status' | 'designRunId' | 'orchestrationRunId' | 'note' | 'updatedAt'>
 >;
 
 export const cycleDto = (cycle: MemoryDesignCycle): MemoryDesignCycleDto => ({
   id: cycle.id,
-  sessionId: cycle.sessionId,
+  goalDigest: cycle.goalDigest,
   status: cycle.status,
   designRunId: cycle.designRunId,
   orchestrationRunId: cycle.orchestrationRunId,

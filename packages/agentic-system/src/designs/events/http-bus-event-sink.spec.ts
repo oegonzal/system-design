@@ -15,7 +15,7 @@ const clock = (): Date => new Date('2026-10-16T00:00:00Z');
 
 const cycle = (over: Partial<MemoryDesignCycle>): MemoryDesignCycle => ({
   id: 'c1',
-  sessionId: 's1',
+  goalDigest: 'g1',
   status: 'running',
   designRunId: null,
   orchestrationRunId: null,
@@ -61,7 +61,7 @@ describe('the design event sink', () => {
     const stored = bus.published.find((event) => event.topic === DESIGN_TOPICS.stored);
     expect(stored?.payload).toEqual({
       cycleId: 'c1',
-      sessionId: 's1',
+      goalDigest: 'g1',
       designRunId: 'run-1',
       orchestrationRunId: 'orch-1',
     });
@@ -72,7 +72,10 @@ describe('the design event sink', () => {
     expect(prompts.every((event) => event.source === 'agentic-system')).toBe(true);
     for (const event of prompts) {
       expect(interactionPromptSchema.safeParse(event.payload).success).toBe(true);
-      expect((event.payload as InteractionPrompt).origin.kind).toBe('design-cycle');
+      expect((event.payload as InteractionPrompt).origin).toMatchObject({
+        kind: 'design-cycle',
+        id: 'c1',
+      });
       expect((event.payload as InteractionPrompt).choices).toEqual([
         { id: 'noted', label: 'Noted', note: null },
       ]);

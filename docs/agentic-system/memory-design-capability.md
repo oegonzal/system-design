@@ -143,8 +143,8 @@ Service API with "facts / events / state / procedures aren't interchangeable".
 
 The "application" layer; holds everything domain-specific so the engine does not.
 
-- **`POST /designs { goal }`** records a cycle (its `session_id` column now holds
-  a goal-derived subject key — the shared DTO/table are unchanged) and fires the
+- **`POST /designs { goal }`** records a cycle keyed by `goalDigest` (the brief's
+  digest; the brief itself stays on the coach run) and fires the
   cycle off the request path. **`GET /designs/:id`** polls it. Read the finished
   strategy from the loop run named by the cycle's `designRunId`.
 - **The cycle** (`designs/`): read nothing from a studio — the goal is in the

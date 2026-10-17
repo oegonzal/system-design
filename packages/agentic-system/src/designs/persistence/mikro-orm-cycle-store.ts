@@ -29,18 +29,11 @@ export class MikroOrmCycleStore implements CycleStore {
     await em.flush();
     return cycleOf(row);
   }
-
-  async listBySession(sessionId: string): Promise<MemoryDesignCycle[]> {
-    const rows = await this.em
-      .fork()
-      .find(CycleRow, { sessionId }, { orderBy: { startedAt: 'desc' } });
-    return rows.map(cycleOf);
-  }
 }
 
 const cycleOf = (row: CycleRow): MemoryDesignCycle => ({
   id: row.id,
-  sessionId: row.sessionId,
+  goalDigest: row.goalDigest,
   status: row.status,
   designRunId: row.designRunId,
   orchestrationRunId: row.orchestrationRunId,

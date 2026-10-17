@@ -15,7 +15,12 @@
  * `structure` warns. A register no interface or workflow uses, and an interface
  * no workflow step exercises, are legal and judgeable, but every lens is told.
  */
-import type { ValidationProblem, ValidationReport, ValidatorGate } from '@sysdesign/contracts';
+import type {
+  MemoryStrategy,
+  ValidationProblem,
+  ValidationReport,
+  ValidatorGate,
+} from '@sysdesign/contracts';
 
 import {
   problem,
@@ -24,7 +29,6 @@ import {
   type TaskContract,
 } from '../../core/contracts';
 import type { Validator } from '../../core/ports';
-import type { MemoryStrategy } from './output';
 
 const COVERAGE_VALIDATOR_ID = 'coverage';
 

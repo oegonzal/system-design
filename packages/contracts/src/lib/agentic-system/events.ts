@@ -15,12 +15,13 @@ export const DESIGN_TOPICS = {
 /** How the agentic-system service names itself on the bus. */
 export const AGENTIC_SYSTEM_SOURCE = 'agentic-system';
 
-const base = { cycleId: z.string().min(1), sessionId: z.string().min(1) };
+/** Every event names its cycle and the brief it designs for, by the brief's digest. */
+const base = { cycleId: z.string().min(1), goalDigest: z.string().min(1) };
 
-/** A cycle began over a studio session's canvas. */
+/** A cycle began for a memory brief. */
 export const designStartedSchema = z.strictObject({ ...base });
 
-/** The coach improved the canvas and it was written back. */
+/** The coach run finished; its best iteration holds the memory strategy. */
 export const designRevisedSchema = z.strictObject({ ...base, designRunId: z.string().min(1) });
 
 /** The finished run was digested and stored as memory. */

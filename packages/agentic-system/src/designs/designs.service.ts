@@ -15,8 +15,8 @@ import { CYCLE_STORE, EVENT_SINK, type CycleStore, type DesignEventSink } from '
 const messageOf = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
 
-/** A stable subject key for a brief: the goal's digest, so the same brief groups its cycles. */
-const subjectKeyOf = (goal: string): string =>
+/** A brief's digest: cycles over the same brief share it, and the brief itself stays on the run. */
+const digestOf = (goal: string): string =>
   createHash('sha256').update(goal).digest('hex').slice(0, 32);
 
 /**
@@ -44,7 +44,7 @@ export class DesignsService {
     const now = this.clock();
     const cycle: MemoryDesignCycle = {
       id: randomUUID(),
-      sessionId: subjectKeyOf(goal),
+      goalDigest: digestOf(goal),
       status: 'running',
       designRunId: null,
       orchestrationRunId: null,
@@ -60,10 +60,6 @@ export class DesignsService {
   async get(id: string): Promise<MemoryDesignCycleDto | null> {
     const cycle = await this.store.find(id);
     return cycle === null ? null : cycleDto(cycle);
-  }
-
-  async listBySession(sessionId: string): Promise<MemoryDesignCycleDto[]> {
-    return (await this.store.listBySession(sessionId)).map(cycleDto);
   }
 
   /**

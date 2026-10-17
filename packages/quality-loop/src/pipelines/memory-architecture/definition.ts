@@ -21,6 +21,8 @@
  * earned by a criterion kind, so none can only fall (the dead-dimension trap
  * `system-design`'s soundness fell into).
  */
+import type { MemoryStrategy } from '@sysdesign/contracts';
+
 import { STANDARD } from '../../core/controllers';
 import type { PipelineDefinition } from '../../core/pipeline';
 import { STANDARD_SCORING } from '../../core/policy';
@@ -34,7 +36,7 @@ import deriveCriteria from './lenses/derive-criteria.md?raw';
 import evaluatorQualities from './lenses/evaluator.qualities.md?raw';
 import evaluatorRequirements from './lenses/evaluator.requirements.md?raw';
 import producer from './lenses/producer.md?raw';
-import { memoryStrategyOutput, type MemoryStrategy } from './output';
+import { memoryStrategyOutput } from './output';
 import { coverageValidator, referencesValidator } from './validators';
 
 /** The pipeline's id, named once so an orchestrator can fix its target to it. */

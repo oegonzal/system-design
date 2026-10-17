@@ -6,7 +6,7 @@ import type { DesignsService } from './designs.service';
 
 const dto = (over: Partial<MemoryDesignCycleDto> = {}): MemoryDesignCycleDto => ({
   id: 'c1',
-  sessionId: 's1',
+  goalDigest: 'g1',
   status: 'running',
   designRunId: null,
   orchestrationRunId: null,
@@ -16,7 +16,7 @@ const dto = (over: Partial<MemoryDesignCycleDto> = {}): MemoryDesignCycleDto => 
   ...over,
 });
 
-/** A controller exercised directly — the HTTP status and the Zod pipe are Nest's, specced when the boot harness lands with the table. */
+/** A controller exercised directly; its HTTP statuses and the Zod pipe are exercised through the booted app in `app/http.spec.ts`. */
 describe('the designs controller', () => {
   it('[AGS-4] starts a cycle from a brief and sets it going off the request path', async () => {
     const executed: string[] = [];

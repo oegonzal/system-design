@@ -1,4 +1,4 @@
-import { boundsAgainstMeasured } from '@sysdesign/contracts';
+import { boundsAgainstMeasured, type MemoryStrategy } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline } from '../../core/describe-pipeline';
@@ -6,7 +6,7 @@ import { validatePipeline } from '../../core/validate-pipeline';
 import { capsAgainstMeasured, deriverSchema } from '../../core/testing';
 import { MEMORY_ARCHITECTURE } from './definition';
 import measured from './measured.json';
-import { memoryStrategyOutput, type MemoryStrategy } from './output';
+import { memoryStrategyOutput } from './output';
 
 const CRITERION_KINDS = [
   'capability',

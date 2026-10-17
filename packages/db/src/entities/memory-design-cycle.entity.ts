@@ -6,13 +6,13 @@ const STATUSES = ['running', 'coached', 'stored', 'failed'] as const satisfies C
 
 /**
  * One memory-design cycle as the agentic-system service keeps it: the durable
- * state of one coach-and-learn pass over a studio session's canvas. `sessionId`
- * and the two run ids are plain columns, never foreign keys — the studio and
- * the quality loop are other services. Kept apart from their tables for the
- * same reason the job-application record is kept apart from the session's.
+ * state of one coach-and-learn pass over a memory brief. `goalDigest` and the
+ * two run ids are plain columns, never foreign keys — the brief is kept only as
+ * its digest and the quality loop is another service. Kept apart from the
+ * loop's tables for the same reason the job-application record is kept apart
+ * from the session's.
  */
 @Entity()
-@Index({ properties: ['sessionId'] })
 @Index({ properties: ['startedAt'] })
 @Check({
   name: 'memory_design_cycle_status_check',
@@ -22,9 +22,9 @@ export class MemoryDesignCycle {
   @PrimaryKey({ type: 'uuid' })
   id!: string;
 
-  /** The studio session whose canvas was designed. */
+  /** The digest of the brief the cycle designs for; cycles over the same brief share it. */
   @Property({ type: 'varchar', length: 80 })
-  sessionId!: string;
+  goalDigest!: string;
 
   @Property({ type: 'varchar', length: 20 })
   status!: Contracts.MemoryDesignCycleStatus;

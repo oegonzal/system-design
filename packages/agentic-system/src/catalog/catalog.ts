@@ -7,7 +7,7 @@
  * the design brief and lets a component state its interface. Naming vendors here
  * is the catalog's job; the engine's lenses (in quality-loop) name none.
  */
-import type { OperationKind } from '@sysdesign/contracts';
+import type { OperationKind, RegisterKind } from '@sysdesign/contracts';
 
 /** The layers of the architecture, from the application surface down to the stores. */
 export const MEMORY_LAYERS = [
@@ -27,20 +27,6 @@ export const MEMORY_LAYERS = [
   'observability',
 ] as const;
 export type MemoryLayer = (typeof MEMORY_LAYERS)[number];
-
-/**
- * The memory types a store can serve, the memory-architecture pipeline's own
- * register kinds. Declared here, not imported from quality-loop — the catalog's
- * boundary allows only contracts — so the two agree by this shared vocabulary.
- */
-export const MEMORY_TYPES = [
-  'working',
-  'episodic',
-  'semantic',
-  'procedural',
-  'relational',
-] as const;
-export type MemoryType = (typeof MEMORY_TYPES)[number];
 
 /** One operation a component exposes, in the shared operation-kind vocabulary. */
 export interface CatalogOperation {
@@ -62,8 +48,8 @@ export interface CatalogComponent {
   contributes: string;
   /** The operations this component declares — names an edge's `carries` may reference. */
   operations: readonly CatalogOperation[];
-  /** For a store, the memory types it serves; omitted on a component that stores no memory. */
-  memoryTypes?: readonly MemoryType[];
+  /** For a store, the memory types (the strategy's register kinds) it serves; omitted on a component that stores no memory. */
+  memoryTypes?: readonly RegisterKind[];
   /** Other components that fill the same layer, for the author weighing a choice. */
   alternatives?: readonly string[];
 }

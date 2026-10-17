@@ -3,7 +3,7 @@ import type { MemoryDesignCycle } from '../cycle';
 
 const cycle = (over: Partial<MemoryDesignCycle> = {}): MemoryDesignCycle => ({
   id: 'c1',
-  sessionId: 's1',
+  goalDigest: 'g1',
   status: 'running',
   designRunId: null,
   orchestrationRunId: null,
@@ -24,15 +24,7 @@ describe('the in-memory cycle store', () => {
     expect((await store.find('c1'))?.status).toBe('running');
 
     const merged = await store.update('c1', { status: 'coached', designRunId: 'run-1' });
-    expect(merged).toMatchObject({ status: 'coached', designRunId: 'run-1', sessionId: 's1' });
+    expect(merged).toMatchObject({ status: 'coached', designRunId: 'run-1', goalDigest: 'g1' });
     expect(await store.update('missing', { status: 'stored' })).toBeNull();
-  });
-
-  it('[AGS-2] lists a session’s cycles only', async () => {
-    const store = new InMemoryCycleStore();
-    await store.insert(cycle({ id: 'c1', sessionId: 's1' }));
-    await store.insert(cycle({ id: 'c2', sessionId: 's2' }));
-    await store.insert(cycle({ id: 'c3', sessionId: 's1' }));
-    expect((await store.listBySession('s1')).map((row) => row.id).sort()).toEqual(['c1', 'c3']);
   });
 });

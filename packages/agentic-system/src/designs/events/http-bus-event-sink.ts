@@ -16,20 +16,20 @@ import type { DesignEventSink } from '../ports';
 export const eventOf = (
   cycle: MemoryDesignCycle,
 ): { topic: string; payload: Record<string, string> } | null => {
-  const { id: cycleId, sessionId, designRunId, orchestrationRunId } = cycle;
+  const { id: cycleId, goalDigest, designRunId, orchestrationRunId } = cycle;
   switch (cycle.status) {
     case 'running':
-      return { topic: DESIGN_TOPICS.started, payload: { cycleId, sessionId } };
+      return { topic: DESIGN_TOPICS.started, payload: { cycleId, goalDigest } };
     case 'coached':
       return designRunId === null
         ? null
-        : { topic: DESIGN_TOPICS.revised, payload: { cycleId, sessionId, designRunId } };
+        : { topic: DESIGN_TOPICS.revised, payload: { cycleId, goalDigest, designRunId } };
     case 'stored':
       return designRunId === null || orchestrationRunId === null
         ? null
         : {
             topic: DESIGN_TOPICS.stored,
-            payload: { cycleId, sessionId, designRunId, orchestrationRunId },
+            payload: { cycleId, goalDigest, designRunId, orchestrationRunId },
           };
     default:
       return null;
@@ -74,7 +74,7 @@ export const designPromptOf = (cycle: MemoryDesignCycle, now: Date): Interaction
   if (line === null) return null;
   return {
     id: randomUUID(),
-    origin: { kind: 'design-cycle', id: cycle.sessionId, label: cycle.sessionId },
+    origin: { kind: 'design-cycle', id: cycle.id, label: `cycle ${cycle.id.slice(0, 8)}` },
     title: line.title,
     details: [line.detail],
     choices: [{ id: 'noted', label: 'Noted', note: null }],
