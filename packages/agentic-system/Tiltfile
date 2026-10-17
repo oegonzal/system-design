@@ -1,3 +1,5 @@
+load('../../tilt/dotenv.Tiltfile', 'env_secret')
+
 docker_build(
     'agentic-system',
     '../../',
@@ -16,15 +18,24 @@ docker_build(
         './packages/loop-client',
         './packages/db',
         './packages/notifications-client',
+        './packages/agentic-memory',
+        './packages/llm',
         './packages/agentic-system',
     ],
 )
+
+# The embedding settings memory spaces embed with, when there are any. Without
+# a key the service still serves its spaces, recall by meaning skipped and
+# saying why. A Secret of its own: the loop's also carries the Claude token,
+# which this service never needs.
+k8s_yaml(env_secret('agentic-system-embeddings', ['OPENAI_API_KEY', 'OPENAI_EMBEDDING_MODEL']))
 
 k8s_yaml(['./k8s/local/deployment.yaml'])
 
 # It designs on the loop, so it starts once the loop is up.
 k8s_resource(
     'agentic-system',
+    objects=['agentic-system-embeddings:secret'],
     port_forwards=3007,
     resource_deps=['quality-loop'],
     labels=['backend'],

@@ -71,9 +71,12 @@ a node/edge drawing.
 
 ## 3. The artifact — a memory strategy
 
-`packages/quality-loop/src/pipelines/memory-architecture/output.ts` defines it
-(modeled on the `agentic-design` pipeline's shape). Three load-bearing sections
-that must agree:
+Its schema, `memoryStrategySchema`, lives in
+`packages/contracts/src/lib/agentic-system/strategy.ts` (modeled on the
+`agentic-design` pipeline's shape) — the pipeline writes and judges a strategy,
+and the agentic-memory runtime executes one, so neither owns it alone; the
+pipeline's `output.ts` keeps where a judge finds each part. Three load-bearing
+sections that must agree:
 
 - **registers** — the memory the system keeps: `{ name, kind (the five above),
 term (short/long), holds, store, scope, metadata[], lifecycle }`.
@@ -89,9 +92,10 @@ Plus `summary`, `assumptions`, `safeguards { rule, mechanism }`, `tradeoffs`,
 `risks`. Interfaces and workflows are deliberately redundant: a step that invokes
 an operation no interface declares, or an interface on a register no register
 keeps, is a dangling reference the validators catch. **Validators**
-(`validators.ts`): `references` (block) — every reference resolves, no duplicate
-register; `coverage` (warn) — every register and interface is exercised by a
-workflow.
+(`validators.ts`): `references` (block) — the contract's
+`validateStrategyReferences` (every reference resolves, no duplicate register),
+the same rule the runtime compiles with; `coverage` (warn) — every register and
+interface is exercised by a workflow.
 
 ---
 
@@ -155,6 +159,10 @@ The "application" layer; holds everything domain-specific so the engine does not
   each component's interface, operations, and the **memory types** it serves
   (`memoryTypes` / `componentsByMemoryType`). Decoupled from the studio canvas (no
   node kinds). It names vendors because that is its content; the lenses name none.
+- **Memory spaces** (`memory/`): `POST /spaces { runId }` compiles a finished
+  run's strategy into a space the agentic-memory runtime executes — remember,
+  recall, update, invalidate, history and consolidate over Postgres and a Qdrant
+  projection. See [memory-runtime.md](memory-runtime.md).
 
 ---
 
@@ -201,6 +209,7 @@ pnpm notifications:serve              # :3005 (optional; Telegram + bus)
 #   loop UI run form → pick "memory-architecture" (brief-routable) → paste the brief
 #   OR  POST http://localhost:3007/designs { "goal": "<a memory brief>" }
 # read the strategy from the run:  GET http://localhost:3003/runs/<designRunId>
+# execute it:                       POST http://localhost:3007/spaces { "runId": "<designRunId>" }
 ```
 
 A ready brief is at `packages/quality-loop/prompts/agentic-memory/agentic-memory-service.md`.
@@ -229,15 +238,15 @@ First end-to-end run on the reframed pipeline, 2026-10-17 (`maxIterations 1`):
 
 ---
 
-## 11. Phase 2 — the runtime (sketch; deferred)
+## 11. The runtime — executing a strategy
 
-A new `@sysdesign/agentic-memory` package (mounted by agentic-system; not
-quality-loop, not the grading store) would **execute** a strategy: each register →
-a store adapter behind one `MemoryStore` port, each carrying a memory-type axis +
-`valid_from`/`valid_to`/`status`/ttl lifecycle metadata; each interface → a method
-of the typed Memory Service API; each workflow → an orchestrator (type-aware
-recall routing; the seven-step write/digest pipeline). It would not widen the
-loop's flat grading memory. Built only after reviewing phase-1 strategy output.
+Phase 2 is `packages/agentic-memory`, a library this service mounts at `/spaces`.
+It compiles a strategy's typed declarations — registers, interfaces and the
+consolidation route, never its prose — under a declared policy into a space, and
+runs the typed Memory Service over Postgres, the truth, and a Qdrant projection
+that is rebuilt from it. It is a separate bounded context from the loop's own
+grading memory, which it never reads or widens. How it works:
+[memory-runtime.md](memory-runtime.md).
 
 ---
 
@@ -246,9 +255,10 @@ loop's flat grading memory. Built only after reviewing phase-1 strategy output.
 - Pipeline: `packages/quality-loop/src/pipelines/memory-architecture/`
   (`output.ts`, `validators.ts`, `definition.ts`, `definition.spec.ts`,
   `measured.json`, `lenses/*.md`)
-- Service: `packages/agentic-system/` (`src/catalog/`, `src/designs/`)
+- Service: `packages/agentic-system/` (`src/catalog/`, `src/designs/`, `src/memory/`)
 - Orchestrator: `packages/quality-loop/src/orchestrators/memory-design/`
 - Brief: `packages/quality-loop/prompts/agentic-memory/agentic-memory-service.md`
 - Telegram binding: `packages/notifications/config/channels/telegram.json`
 - The rubric's source material: `docs/memory/memory-designing.md`
-- Phase-2 runtime (sketch): `packages/agentic-memory/` (not yet created)
+- The strategy's schema and reference rule: `packages/contracts/src/lib/agentic-system/{strategy,strategy-validator}.ts`
+- Runtime: `packages/agentic-memory/` ([memory-runtime.md](memory-runtime.md))

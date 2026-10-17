@@ -8,6 +8,7 @@
  * that is not registered, so a proof cannot point at nothing.
  */
 import type { Criterion } from './criterion';
+import { AGENTIC_MEMORY_CRITERIA } from './agentic-memory';
 import { AGENTIC_SYSTEM_CRITERIA } from './agentic-system';
 import { BROWSER_SESSION_CRITERIA } from './browser-session';
 import { GMAIL_CRITERIA } from './gmail';
@@ -40,4 +41,5 @@ export const CRITERIA: readonly Criterion[] = [
   ...GOOGLE_CALENDAR_CRITERIA,
   ...GOOGLE_KIT_CRITERIA,
   ...AGENTIC_SYSTEM_CRITERIA,
+  ...AGENTIC_MEMORY_CRITERIA,
 ];

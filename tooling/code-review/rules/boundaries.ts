@@ -36,7 +36,8 @@ import type { ChangedFile } from './index';
  *   memory-ingest  -> contracts, loop-client, studio-testing (specs only)   documents chunked and handed to the loop
  *   notifications  -> contracts, db, nest-kit, config-kit   the event bus, and the channels that put prompts to people
  *   job-application -> contracts, db, nest-kit, config-kit, notifications-client   the record of units a session applied to, and the advisor over it
- *   agentic-system -> contracts, db, nest-kit, config-kit, loop-client, notifications-client   designs agentic-memory architectures on the loop, keeps the cycle table, learns from the runs, and announces each cycle on the bus
+ *   agentic-memory -> contracts, db   a memory strategy executed: typed writes, hybrid recall, consolidation and the sweep, over Postgres and a Qdrant projection
+ *   agentic-system -> contracts, db, nest-kit, config-kit, loop-client, notifications-client, agentic-memory, llm (the embedding client only; completions stay on the loop)   designs agentic-memory strategies on the loop, keeps the cycle table, learns from the runs, announces each cycle on the bus, and serves memory spaces
  *   gmail          -> contracts, nest-kit, config-kit, google-kit, tool-session, loop-client, notifications-client, db (the test-database guard only)   the mailbox as tools, and missions over them
  *   google-calendar -> contracts, nest-kit, config-kit, google-kit, tool-session, loop-client, notifications-client, db (the test-database guard only)   the calendar as tools, and missions over them
  *   website        -> (nothing)         the Enfav marketing site, statically built with Astro; it imports no workspace package
@@ -63,6 +64,7 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
   'loop-client': ['contracts'],
   'google-kit': ['contracts'],
   'notifications-client': ['contracts'],
+  'agentic-memory': ['contracts', 'db'],
   'tool-session': ['contracts', 'nest-kit', 'loop-client', 'notifications-client', 'db'],
   'studio-testing': ['contracts', 'loop-client'],
   'studio-api': ['contracts', 'db', 'nest-kit', 'loop-client', 'studio-testing'],
@@ -88,6 +90,8 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
     'config-kit',
     'loop-client',
     'notifications-client',
+    'agentic-memory',
+    'llm',
   ],
   gmail: [
     'contracts',

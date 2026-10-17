@@ -1,0 +1,15 @@
+{
+  "scopeKeys": ["tenant", "project", "user"],
+  "terms": {
+    "short_term": { "ttlSeconds": 3600 },
+    "long_term": { "ttlSeconds": null }
+  },
+  "recall": {
+    "maxItems": 12,
+    "maxChars": 6000,
+    "weights": { "similarity": 0.45, "exact": 0.3, "recency": 0.15, "support": 0.1 },
+    "recencyHalfLifeDays": 30
+  },
+  "consolidation": { "minSupport": 3, "promoteAt": 3 },
+  "sweep": { "everyMs": 60000 }
+}

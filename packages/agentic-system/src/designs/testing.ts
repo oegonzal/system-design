@@ -16,11 +16,17 @@ const notUsed = (method: string): never => {
   throw new Error(`FakeLoopClient.${method} is not used in this spec`);
 };
 
-/** A loop that records the coach run it was asked for and answers it finished. */
+/**
+ * A loop that records the coach run it was asked for and answers it finished.
+ * Every run it is asked for has finished; one named in `artifacts` holds that
+ * artifact in its iteration — a memory strategy a space is made from — and
+ * any other holds none.
+ */
 export class FakeLoopClient extends LoopClient {
   readonly runs: StartQualityRunRequest[] = [];
   readonly fromRun: StartOrchestrationFromRunRequest[] = [];
   constructor(
+    private readonly artifacts: ReadonlyMap<string, unknown> = new Map(),
     private readonly runId = 'coach-run-1',
     private readonly orchestrationRunId = 'learn-run-1',
   ) {
@@ -38,7 +44,9 @@ export class FakeLoopClient extends LoopClient {
     return Promise.resolve({ runId: this.runId, status: 'running' });
   }
   getRun(runId: string): Promise<QualityRunDto | null> {
-    return Promise.resolve(fakeRun('memory-architecture', null, { runId }));
+    return Promise.resolve(
+      fakeRun('memory-architecture', this.artifacts.get(runId) ?? null, { runId }),
+    );
   }
   startOrchestrationFromRun(
     _orchestrator: string,

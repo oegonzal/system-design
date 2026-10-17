@@ -12,6 +12,8 @@ export * from './entities/interaction-delivery.entity';
 export * from './entities/interaction.entity';
 export * from './entities/job-application.entity';
 export * from './entities/memory-design-cycle.entity';
+export * from './entities/memory-record.entity';
+export * from './entities/memory-space.entity';
 export * from './entities/memory-embedding.entity';
 export * from './entities/memory-support.entity';
 export * from './entities/orchestration-run-child.entity';

@@ -47,6 +47,7 @@ tilt up                 # stores → migrations → seed → api, quality loop, 
 | Govcon          | http://localhost:3004/health                         |
 | Notifications   | http://localhost:3005/health                         |
 | Job application | http://localhost:3006/health                         |
+| Agentic system  | http://localhost:3007/health                         |
 | Gmail           | http://localhost:3008/health                         |
 | Google Calendar | http://localhost:3009/health                         |
 | Postgres        | localhost:5433 · `admin`/`admin` · db `sysdesign`    |
@@ -166,6 +167,7 @@ pnpm quality:start                         # quality-loop on :3003 + its web cli
 pnpm govcon:start                          # govcon on :3004 + its web client on :4202 (needs the db)
 pnpm notifications:serve                   # the event bus on :3005, polling one Telegram bot per purpose (needs the db)
 pnpm job-application:serve                 # the record of applications on :3006, fed by the bus; the advisor a browser session asks (needs the db)
+pnpm agentic-system:serve                  # memory strategies coached on the loop, and the memory spaces that execute them, on :3007 (needs the db; Qdrant for recall by meaning)
 pnpm website:serve                         # the Enfav LLC marketing site on :4203
 pnpm website:preview                       # the built site under wrangler dev on :4204: Cloudflare's routing, 404 page and headers
 pnpm website:deploy                        # build, then deploy to enfav.com with wrangler (read docs/enfav/website.md first)

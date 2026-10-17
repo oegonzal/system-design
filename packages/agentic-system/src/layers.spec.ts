@@ -5,14 +5,16 @@ import ts from 'typescript';
 
 /**
  * The service is layered — the component catalog, the design cycle it runs,
- * the composition root — and each folder reaches another only through its
- * declared door, read from every file's imports the way the compiler reads
- * them. A spec or a testing file may also take the fakes of a door its folder
- * reaches. The catalog names vendors on purpose (that is its content); only
- * the folder doors are enforced here.
+ * the memory spaces it serves, the composition root — and each folder reaches
+ * another only through its declared door, read from every file's imports the
+ * way the compiler reads them. A spec or a testing file may also take the
+ * fakes of a door its folder reaches. The catalog names vendors on purpose
+ * (that is its content); only the folder doors are enforced here. The memory
+ * layer takes its embedder from the composition root and never builds one, so
+ * the llm package is the root's alone.
  */
 const SRC = __dirname;
-const DOORS = ['catalog/index.ts', 'designs/index.ts'];
+const DOORS = ['catalog/index.ts', 'designs/index.ts', 'memory/index.ts'];
 /** The fakes that come with each door. */
 const FAKES: Readonly<Record<string, string>> = { 'designs/index.ts': 'designs/testing.ts' };
 const ALL_PACKAGES = ['*'];
@@ -33,6 +35,11 @@ const RULES: readonly Rule[] = [
     holds: under('designs'),
     reaches: (t) => under('designs')(t) || under('common')(t) || t === 'catalog/index.ts',
     packages: ['contracts', 'db', 'nest-kit', 'loop-client', 'notifications-client'],
+  },
+  {
+    holds: under('memory'),
+    reaches: (t) => under('memory')(t) || under('common')(t),
+    packages: ['contracts', 'db', 'nest-kit', 'loop-client', 'agentic-memory'],
   },
   {
     // The composition root and its specs: main, config, settings, the app.
@@ -109,6 +116,14 @@ describe('the layers', () => {
     expect(violations('common/clock.ts', ['../designs'])).toEqual([
       'common/clock.ts reaches designs/index.ts',
     ]);
+    // The embedder arrives by inversion of control: the memory layer never builds a model client.
+    expect(violations('memory/memory.module.ts', ['@sysdesign/llm'])).toEqual([
+      'memory/memory.module.ts imports @sysdesign/llm',
+    ]);
+    expect(violations('memory/spaces.service.ts', ['../designs'])).toEqual([
+      'memory/spaces.service.ts reaches designs/index.ts',
+    ]);
+    expect(violations('memory/memory.module.ts', ['@sysdesign/agentic-memory'])).toEqual([]);
     // A test file in the composition layer may take a door's fakes; the root reaches the doors.
     expect(violations('probe.spec.ts', ['./designs', './designs/testing'])).toEqual([]);
     expect(violations('designs/driver.ts', ['@sysdesign/loop-client'])).toEqual([]);

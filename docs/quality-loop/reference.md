@@ -238,6 +238,14 @@ wave one, three evaluators in wave two, every one of them sampled twice. Its pro
 does _not_ see the criteria. Every declared dimension earns from a criterion kind, which its spec
 asserts. The clean two-wave example.
 
+**`memory-architecture/`** — produces and coaches a strategy for an agentic-memory system from a
+brief: the registers it keeps (working, episodic, semantic, procedural, relational, each short- or
+long-term), the typed interfaces over them and the workflows whose steps name a declared operation.
+Its sibling is `agentic-design`, not the canvas pipeline. Six critics and two evaluators, six
+dimensions with `lifecycle` among them, the `STANDARD` controller. The strategy's schema and its
+reference rule live in contracts, because the agentic-memory runtime executes the same strategy; the
+pipeline keeps where a judge finds each part and a coverage warning of its own.
+
 **`memory-recall/`** — produces a memory pack: a verdict on each recalled chunk, the insight each
 kept chunk lends, and the needs nothing served. Written for the next producer in a memory
 orchestration, never for a person. Uses the `DIMENSION_FLOOR` controller, the only non-standard

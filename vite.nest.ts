@@ -75,12 +75,15 @@ export function nestBuildConfig(options: NestBuildOptions = {}) {
 }
 
 /**
- * The database a Nest app's suites run against: the disposable test database
- * unless the environment names one — a lane of its own, or CI's. Whatever it
- * names, `ensureDatabase` and `truncateTestTables` refuse anything that is not
- * a test database, so a `DB_NAME` pointing at real data stops the suite at
+ * The database a package's suites run against: the disposable test database
+ * unless the environment names one — a lane of its own, or CI's. A package
+ * whose suites empty tables another package's suites also fill names its own
+ * `lane`, so two suites run at once never truncate each other's rows. Whatever
+ * it names, `ensureDatabase` and `truncateTestTables` refuse anything that is
+ * not a test database, so a `DB_NAME` pointing at real data stops the suite at
  * boot rather than wiping it.
  */
-export function testDatabaseEnv(): { DB_NAME: string } {
-  return { DB_NAME: process.env['DB_NAME'] ?? TEST_DATABASE_NAME };
+export function testDatabaseEnv(lane?: string): { DB_NAME: string } {
+  const laneDatabase = lane === undefined ? TEST_DATABASE_NAME : `${TEST_DATABASE_NAME}_${lane}`;
+  return { DB_NAME: process.env['DB_NAME'] ?? laneDatabase };
 }

@@ -8,6 +8,8 @@
     "module": "esnext",
     "moduleResolution": "bundler",
     "paths": {
+      "@sysdesign/agentic-memory": ["./packages/agentic-memory/src/index.ts"],
+      "@sysdesign/agentic-memory/testing": ["./packages/agentic-memory/src/testing/index.ts"],
       "@sysdesign/config-kit": ["./packages/config-kit/src/index.ts"],
       "@sysdesign/contracts": ["./packages/contracts/src/index.ts"],
       "@sysdesign/criteria": ["./packages/criteria/src/index.ts"],

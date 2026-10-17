@@ -1,0 +1,18 @@
+{
+  "name": "agentic-memory",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/agentic-memory/src",
+  "projectType": "library",
+  "tags": ["type:shared", "scope:node"],
+  "// targets": "test is inferred from vite.config.ts by @nx/vite/plugin",
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "cwd": "packages/agentic-memory",
+        "commands": ["tsc --noEmit -p tsconfig.lib.json", "tsc --noEmit -p tsconfig.spec.json"]
+      }
+    }
+  }
+}

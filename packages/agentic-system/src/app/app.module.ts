@@ -4,11 +4,13 @@ import { DbModule, HealthController } from '@sysdesign/nest-kit';
 import { ClockModule } from '../common/clock';
 import type { AgenticSystemConfig } from '../config';
 import { DesignsModule } from '../designs';
+import { MemoryModule } from '../memory';
 
 /**
- * The composition root: the database, the clock, the design cycle wired to its
- * ports, and the routes — the design cycle's own and the health check. The one
- * place that reads the whole config and hands each layer only what it needs.
+ * The composition root: the database, the clock, the design cycle and the
+ * memory spaces wired to their ports, and the routes — each layer's own and the
+ * health check. The one place that reads the whole config and hands each layer
+ * only what it needs.
  */
 @Module({})
 export class AppModule {
@@ -22,6 +24,13 @@ export class AppModule {
           loopUrl: config.loopUrl,
           notificationsUrl: config.notificationsUrl,
           design: config.settings.design,
+        }),
+        MemoryModule.register({
+          loopUrl: config.loopUrl,
+          qdrantUrl: config.qdrantUrl,
+          embedder: config.embedder,
+          memory: config.settings.memory,
+          policySource: config.settings.policySource,
         }),
       ],
       controllers: [HealthController],

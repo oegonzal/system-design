@@ -1,27 +1,43 @@
 # agentic-system
 
-Designs and coaches **agentic-memory strategies** on the quality loop, and
-learns from each finished run. It is the "application + durable orchestration +
-human-approval" layer for the memory-design capability: it takes a memory
-brief, runs the loop's `memory-architecture` coach to generate and grade a
-strategy from it, and hands the finished run to the `memory-design`
-orchestrator to digest and store as memory.
+Designs and coaches **agentic-memory strategies** on the quality loop, learns
+from each finished run, and serves a finished strategy as a **memory space**. It
+is the "application + durable orchestration + human-approval" layer for the
+memory-design capability: it takes a memory brief, runs the loop's
+`memory-architecture` coach to generate and grade a strategy from it, and hands
+the finished run to the `memory-design` orchestrator to digest and store as
+memory. A settled run's strategy then becomes a space the
+`@sysdesign/agentic-memory` runtime executes — its registers the stores, its
+declared interfaces the only verbs it serves — over Postgres, with a Qdrant
+projection for recall by meaning.
 
-Nothing here judges or grades — that is the quality loop's engine. This service
-is the domain: the component catalog a memory design is drawn from, and the
-driver that moves a design cycle through the loop. The engine stays generic;
-every memory-specific thing lives here as declared data.
+Nothing here judges or grades — that is the quality loop's engine — and nothing
+here executes a strategy — that is the runtime. This service is the domain: the
+component catalog a memory design is drawn from, the driver that moves a design
+cycle through the loop, and the mount that wires the runtime to its stores, its
+embedder and HTTP. The engine stays generic; every memory-specific thing lives
+here as declared data.
 
 ## Routes
 
-| Method | Path           | What                                                                                                        |
-| ------ | -------------- | ----------------------------------------------------------------------------------------------------------- |
-| `POST` | `/designs`     | Start a design cycle from a memory brief (`{ goal }`); 202 with the cycle, which runs off the request path. |
-| `GET`  | `/designs/:id` | Read a cycle back: its status, the coach run, the orchestration that learned from it.                       |
-| `GET`  | `/health`      | Liveness.                                                                                                   |
+| Method | Path                      | What                                                                                                                         |
+| ------ | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `POST` | `/designs`                | Start a design cycle from a memory brief (`{ goal }`); 202 with the cycle, which runs off the request path.                  |
+| `GET`  | `/designs/:id`            | Read a cycle back: its status, the coach run, the orchestration that learned from it.                                        |
+| `POST` | `/spaces`                 | Make a memory space from a settled run's best strategy (`{ runId }`); 201 with the space and its compile report.             |
+| `GET`  | `/spaces/:id`             | Read a space back, its report compiled again from the snapshots it keeps.                                                    |
+| `POST` | `/spaces/:id/remember`    | Assert a typed memory in a register: inserted, unchanged (it says the same), or superseding the current one.                 |
+| `POST` | `/spaces/:id/update`      | Supersede an addressed, current record with a new version of the same identity.                                              |
+| `POST` | `/spaces/:id/invalidate`  | Close an addressed, current record with its reason.                                                                          |
+| `POST` | `/spaces/:id/recall`      | Recall by key (exact), by text (meaning), or by a time range alone; ranked, budgeted, each item with its factors and routes. |
+| `POST` | `/spaces/:id/consolidate` | Turn verified episodes in a scope into lessons, and lessons into playbooks, as the strategy routes them.                     |
+| `POST` | `/spaces/:id/history`     | Every version of an addressed record's identity, oldest first.                                                               |
+| `GET`  | `/health`                 | Liveness.                                                                                                                    |
 
 The coached strategy is the coach run's artifact; read it from the loop
-(`GET /runs/:id`), not from this service.
+(`GET /runs/:id`), not from this service. Every request and answer of the
+`/spaces` routes is a contract in `@sysdesign/contracts`
+(`lib/agentic-system/memory.ts`); a verb answers 200 with `{ data }`.
 
 ## How a cycle runs
 
@@ -33,6 +49,41 @@ The coached strategy is the coach run's artifact; read it from the loop
 2. **Learn**: hand the finished run to the `memory-design` orchestrator
    (`from-run`) to digest it into typed memory, faceted by the pipeline's own
    dimensions (retrieval, ingestion, scoping, …).
+
+## Memory spaces
+
+`POST /spaces` reads the run from the loop and its best iteration's strategy
+the way the loop kept it, then hands it to the runtime with the declared
+policy. The runtime compiles the strategy's typed declarations — never its
+prose — and keeps the space with snapshots of the strategy and the policy, so a
+space compiles the same on every load and does not change when the run or the
+policy file does; the space records which settings its policy came from
+(`policySource`, e.g. `memory/standard`). A request names its scope as the
+policy's scope keys, the first of them the partition every request carries; a
+memory is visible to a request whose scope contains its own.
+
+Every refusal answers one declared status, its body the framework's error shape
+plus the refusal's `code`, `message` and `issues` (`src/memory/refusals.ts`):
+
+| Status | Refusals                                                                                                                                                                                           |
+| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 404    | `run.not_found`, `space.not_found`, `record.not_found` (a record outside the caller's scope is not found too)                                                                                      |
+| 409    | `run.in_flight` (the run is still running), `record.not_current`, `conflict`                                                                                                                       |
+| 422    | `run.no_strategy`, `space.not_compiled`, `register.unknown`, `operation.undeclared`, `scope.invalid`, `candidate.invalid`, `metadata.undeclared`, `identity.mismatch`, `consolidation.unavailable` |
+
+A strategy that does not compile is 422 with `{ message, report }`, the report
+naming every problem. A body the contract does not accept is the pipe's 400,
+each offending path named; a loop that cannot be reached is 503, one too slow
+504, one that refuses 502.
+
+Postgres (`memory_space`, `memory_record`) is the truth; Qdrant holds a
+rebuildable projection, its collection bound to the embedding model and width.
+A sweep runs on the declared schedule across every space: it expires
+short-term records, removes the points of closed ones, and projects every
+current record not yet in the current collection — a write whose projection
+failed, or every record after the model changed. Without an embedding key the
+service still serves its spaces: recall by meaning is skipped and says so
+(`embedder_disabled`), while exact and temporal recall still run.
 
 ## The layer catalog
 
@@ -48,11 +99,25 @@ name none.
 
 ## Configuration
 
-`config/engine.json` names one file per kind under `config/<kind>/`
-(`config/design/standard.json`: the pipeline, the orchestrator, the coach
-iterations, whether to recall, the poll pace). Environment, read only in
-`src/config.ts`: `AGENTIC_SYSTEM_PORT` (3007), `QUALITY_LOOP_URL`,
-`NOTIFICATIONS_URL`.
+`config/engine.json` names one file per kind under `config/<kind>/`:
+
+- `config/design/standard.json`: the pipeline, the orchestrator, the coach
+  iterations, whether to recall, the poll pace.
+- `config/memory/standard.json`: the policy every new space snapshots — the
+  scope keys (the first is the partition), each term's time to live
+  (short-term memory must expire), the recall weights, budget and recency
+  half-life, the support a lesson and a playbook need — and, beside it, the
+  sweep's schedule (`sweep.everyMs`), which belongs to the process and is
+  never part of a snapshot. Editing the policy changes new spaces only. The
+  numbers are unmeasured starting values.
+
+Environment, read only in `src/config.ts`: `AGENTIC_SYSTEM_PORT` (3007),
+`QUALITY_LOOP_URL`, `NOTIFICATIONS_URL`, `QDRANT_URL` (`http://localhost:6333`).
+The embedder is built there too, by the llm package's own factory from its own
+variables, `OPENAI_API_KEY` and `OPENAI_EMBEDDING_MODEL`; without a key it is
+disabled and the boot log says why. The pod gets those two from the
+`agentic-system-embeddings` Secret the Tiltfile builds from the shell or
+`.env`, and `QDRANT_URL` from the `local-stores` ConfigMap.
 
 ## Notifications
 
@@ -65,4 +130,6 @@ dedicated Telegram instance `telegram.agentic-system`
 (`AGENTICSYSTEM_TELEGRAM_API_KEY`, `AGENTICSYSTEM_TELEGRAM_BOT_ID`). Without one
 the prompt is still recorded on the bus, just not pushed.
 
-Run: `pnpm agentic-system:serve` (needs the quality loop on `QUALITY_LOOP_URL`).
+Run: `pnpm agentic-system:serve` (needs the quality loop on `QUALITY_LOOP_URL`,
+Postgres migrated with `pnpm db:migrate`, and Qdrant on `QDRANT_URL` for recall
+by meaning).

@@ -1,0 +1,426 @@
+{
+  "summary": "The hardest part is keeping five differently-aged memories consistent across one transactional relational source of truth and a derived, swappable vector index: ephemeral working state, append-only episodes, correctable semantic facts, versioned procedures and connective relational edges each write, retrieve and expire on different clocks. Recall must never be similarity-only for an exact key, never surface a superseded fact, never half-write a fact without its vector, and never let a model's own output become trusted business memory. The strategy answers this with one atomic transaction per memory (relational row + vector row), recall routing that picks exact-key, temporal or vector paths before merging and budgeting, update/invalidate operations that supersede rather than destroy, and a consolidation path gated by a deterministic validator plus multi-episode confirmation before anything reaches a procedure. A tenant-scoped partition key, never a per-user collection, keeps isolation and rebuildability intact as the embedding model changes underneath it.",
+  "assumptions": [
+    "Working state is read back by the agent's own in-process runtime; remember's echoed output doubles as read-after-write, so no separate working-state recall interface is declared.",
+    "A 'lesson' is stored as a semantic_fact with kind=lesson rather than a sixth register, since once distilled it is just a durable fact.",
+    "Relational facts (contact-account, decision-supersedes-decision) use update as upsert: create if absent, supersede if present.",
+    "A deterministic validator (schema + business-rule engine) exists outside the Memory Service and is invoked synchronously before any consequential write commits.",
+    "The vector store is one collection per memory kind, partitioned by tenant_id in the payload, never a collection per tenant/user/document.",
+    "PII field-level retention policy is configured per tenant by an external compliance system; the Memory Service enforces it, not defines it.",
+    "Embedding dimension/model is fixed per deployment year; every vector row carries its model-version tag for safe dual-version cutover."
+  ],
+  "registers": [
+    {
+      "kind": "working",
+      "name": "working_state",
+      "term": "short_term",
+      "holds": "Current task objective, recent tool/API results, scratch reasoning state, pending-classification notes awaiting extraction",
+      "scope": "tenant_id + session/task_id",
+      "store": "In-memory/Redis-backed keyed store, TTL per entry; never vectorized",
+      "metadata": [
+        "tenant_id",
+        "task_id",
+        "session_id",
+        "kind=working",
+        "created_at",
+        "ttl_expires_at"
+      ],
+      "lifecycle": "TTL-expired on task completion or inactivity (default 1h); overwritten idempotently by (task_id,step_key); cleared once a derived fact/event is durably persisted"
+    },
+    {
+      "kind": "semantic",
+      "name": "semantic_fact",
+      "term": "long_term",
+      "holds": "Atomic (subject, predicate, value, validity, status) facts, preferences and distilled lessons; one current row per (subject,predicate) plus superseded history",
+      "scope": "tenant_id, narrowed by user_id or project_id",
+      "store": "Relational DB (source of truth) + versioned vector index (derived projection), partitioned by tenant_id",
+      "metadata": [
+        "tenant_id",
+        "user_or_project_id",
+        "subject",
+        "predicate",
+        "status",
+        "validity_window",
+        "kind",
+        "embedding_model_version"
+      ],
+      "lifecycle": "update supersedes (old row kept, status=superseded); invalidate tombstones + purges vector on forget request; reindexed online on embedding-model upgrade with no retrieval gap"
+    },
+    {
+      "kind": "episodic",
+      "name": "episodic_record",
+      "term": "long_term",
+      "holds": "Append-only events: action taken, context, outcome observed, timestamp, source; redaction tombstones for deleted subjects",
+      "scope": "tenant_id, narrowed by user_id or project_id",
+      "store": "Relational DB (append-only table, source of truth) + vector index of event summaries, partitioned by tenant_id",
+      "metadata": [
+        "tenant_id",
+        "user_or_project_id",
+        "subject",
+        "event_type",
+        "outcome",
+        "occurred_at",
+        "status",
+        "embedding_model_version"
+      ],
+      "lifecycle": "accrues until a count/age threshold triggers consolidation into a lesson; raw episodes retained but down-weighted after consolidation; redacted via append-only tombstone on deletion; reindexed online on model upgrade"
+    },
+    {
+      "kind": "procedural",
+      "name": "procedural_playbook",
+      "term": "long_term",
+      "holds": "Versioned tool-use/task recipes: trigger conditions, steps, validated success criteria; one active version plus full version history",
+      "scope": "tenant_id, optionally shared across a project",
+      "store": "Relational DB (versioned rows, source of truth) + vector index over current-version descriptions, partitioned by tenant_id",
+      "metadata": [
+        "tenant_id",
+        "project_id",
+        "playbook_name",
+        "version",
+        "status",
+        "promoted_from_lesson_id",
+        "embedding_model_version"
+      ],
+      "lifecycle": "promoted only from a lesson confirmed across multiple independent episodes via a deterministic validator; new version supersedes prior (history kept); deprecated versions excluded from recall; reindexed online"
+    },
+    {
+      "kind": "relational",
+      "name": "relational_graph",
+      "term": "long_term",
+      "holds": "Typed edges between entities (contact-account, decision-supersedes-decision, document-project) with validity window and provenance",
+      "scope": "tenant_id, narrowed by project_id",
+      "store": "Relational DB edge table (foreign keys, source of truth) + optional lightweight vector index over entity descriptions, partitioned by tenant_id",
+      "metadata": [
+        "tenant_id",
+        "project_id",
+        "subject_entity",
+        "relation_type",
+        "object_entity",
+        "status",
+        "valid_from",
+        "valid_to"
+      ],
+      "lifecycle": "update upserts: new edge if absent, supersede-and-keep-history if present; redacted on deletion request; exact-match recall never relies on similarity"
+    }
+  ],
+  "interfaces": [
+    {
+      "input": "task_id, session_id, tenant/user scope, note payload, source, observed_at",
+      "output": "ack with snapshot id and the stored current snapshot echoed back",
+      "register": "working_state",
+      "guarantee": "idempotent upsert keyed by (task_id, step_key); never vectorized; never crosses tenant scope; survives crash only until TTL, no silent duplication",
+      "operation": "remember"
+    },
+    {
+      "input": "tenant/user/project scope, subject, predicate, value, validity window, provenance, source",
+      "output": "fact id + version number",
+      "register": "semantic_fact",
+      "guarantee": "atomic write to relational row + vector row in one transaction (all-or-nothing); deduplicated by (tenant,subject,predicate,value-hash); embedded once per model version",
+      "operation": "remember"
+    },
+    {
+      "input": "query (NL text or exact subject+predicate key), scope, k, token_budget",
+      "output": "ranked, cited facts ≤ token_budget, each with subject/predicate/value/status/source",
+      "register": "semantic_fact",
+      "guarantee": "exact-key queries bypass vector search entirely; NL queries use metadata-filtered vector search; server enforces tenant isolation; zero uncited items; superseded facts excluded",
+      "operation": "recall"
+    },
+    {
+      "input": "fact id or subject+predicate key, new value, validity, provenance",
+      "output": "new fact id/version; prior fact id marked superseded",
+      "register": "semantic_fact",
+      "guarantee": "prior row retained for history, never destroyed; atomic status+row swap; consequential facts require a deterministic validator pass before commit",
+      "operation": "update"
+    },
+    {
+      "input": "fact id, or (tenant_id + subject) for a bulk forget request",
+      "output": "ack listing tombstoned fact ids",
+      "register": "semantic_fact",
+      "guarantee": "tombstoned in relational store and removed/filtered from vector index within the 30s freshness window; honored across both stores; idempotent on retry",
+      "operation": "invalidate"
+    },
+    {
+      "input": "tenant/user/project scope, event description, action, outcome, occurred_at, source",
+      "output": "episode id",
+      "register": "episodic_record",
+      "guarantee": "append-only, deduplicated by (tenant,subject,event-hash,occurred_at window); atomic write to relational + vector in one transaction",
+      "operation": "remember"
+    },
+    {
+      "input": "query (NL, time range, or subject), scope, k, token_budget",
+      "output": "ranked, cited episodes ≤ token_budget with outcome and timestamp",
+      "register": "episodic_record",
+      "guarantee": "temporal and subject filters are indexed, not similarity-only; tenant-isolated; zero uncited items",
+      "operation": "recall"
+    },
+    {
+      "input": "tenant/subject/time-window episode cluster, min-count threshold",
+      "output": "candidate lesson draft with citations to source episode ids, pending validator result",
+      "register": "episodic_record",
+      "guarantee": "deterministic validator must pass before any downstream write is trusted; source episodes never deleted, only down-weighted; idempotent per cluster-window",
+      "operation": "consolidate"
+    },
+    {
+      "input": "query (how-to/task-type) or playbook name, scope, k",
+      "output": "current active version (steps, trigger conditions), cited by playbook id+version",
+      "register": "procedural_playbook",
+      "guarantee": "only status=active versions returned unless history explicitly requested; tenant-isolated; zero uncited items",
+      "operation": "recall"
+    },
+    {
+      "input": "a lesson confirmed across ≥N independent episodes, deterministic validator result",
+      "output": "new playbook version id, prior version marked deprecated",
+      "register": "procedural_playbook",
+      "guarantee": "promotion occurs only after deterministic validation, never from raw model output alone; prior version retained for history; atomic version-bump",
+      "operation": "consolidate"
+    },
+    {
+      "input": "entity key (exact id) or traversal query (subject+relation), scope",
+      "output": "cited current edges (status=current) for the entity/traversal",
+      "register": "relational_graph",
+      "guarantee": "exact-match lookup, never similarity-only for identity queries; tenant-isolated; zero uncited items",
+      "operation": "recall"
+    },
+    {
+      "input": "subject_entity, relation_type, object_entity, validity window, provenance",
+      "output": "new or updated edge id; any prior edge for the same (subject,relation) marked superseded",
+      "register": "relational_graph",
+      "guarantee": "upsert semantics: create if absent, supersede-and-keep-history if present; atomic; consequential edges require deterministic validation before commit",
+      "operation": "update"
+    }
+  ],
+  "workflows": [
+    {
+      "kind": "recall_routing",
+      "name": "Query-type-aware recall routing",
+      "steps": [
+        {
+          "does": "If the query names an exact entity/opportunity id, resolve via exact-key lookup first, bypassing any vector search",
+          "register": "relational_graph",
+          "operation": "recall"
+        },
+        {
+          "does": "If the query is meaning-based, run a metadata-filtered vector search scoped to tenant/user/project and status=current",
+          "register": "semantic_fact",
+          "operation": "recall"
+        },
+        {
+          "does": "If the query references past events or a time window, run a temporal-filtered search over episodes",
+          "register": "episodic_record",
+          "operation": "recall"
+        },
+        {
+          "does": "If the query asks how a task is done, fetch the current active playbook version",
+          "register": "procedural_playbook",
+          "operation": "recall"
+        },
+        {
+          "does": "Merge all path results, re-rank by relevance+recency+status, trim to the token budget, attach citations to source id and timestamp",
+          "register": "semantic_fact",
+          "operation": "recall"
+        }
+      ]
+    },
+    {
+      "kind": "write_pipeline",
+      "name": "Capture-to-persist write pipeline",
+      "steps": [
+        {
+          "does": "Capture: buffer the raw tool/task observation tagged pending-kind, task id, source, timestamp",
+          "register": "working_state",
+          "operation": "remember"
+        },
+        {
+          "does": "Extract+resolve: deterministically parse candidate subject/predicate/value and look up any existing fact for (tenant,subject,predicate)",
+          "register": "semantic_fact",
+          "operation": "recall"
+        },
+        {
+          "does": "Reconcile: if a prior value exists and differs, supersede it; consequential facts pass a deterministic validator first",
+          "register": "semantic_fact",
+          "operation": "update"
+        },
+        {
+          "does": "Persist: if no prior fact exists, atomically write the new fact to relational store + vector index in one transaction, deduped by content hash",
+          "register": "semantic_fact",
+          "operation": "remember"
+        },
+        {
+          "does": "Maintain: log the capture-and-write as an episodic event for audit trail and future consolidation input",
+          "register": "episodic_record",
+          "operation": "remember"
+        },
+        {
+          "does": "Maintain: overwrite the task's working buffer entry to a cleared/TTL state now that the fact is durably persisted",
+          "register": "working_state",
+          "operation": "remember"
+        }
+      ]
+    },
+    {
+      "kind": "consolidation_promotion",
+      "name": "Episode-to-lesson-to-procedure promotion",
+      "steps": [
+        {
+          "does": "Gather the episode cluster for a subject/time-window exceeding the consolidation threshold",
+          "register": "episodic_record",
+          "operation": "recall"
+        },
+        {
+          "does": "Distill the cluster into a candidate lesson with citations to source episodes, run through the deterministic validator",
+          "register": "episodic_record",
+          "operation": "consolidate"
+        },
+        {
+          "does": "Persist the validated lesson as a new semantic fact (kind=lesson), citing source episode ids",
+          "register": "semantic_fact",
+          "operation": "remember"
+        },
+        {
+          "does": "Check the lesson's reuse/confirmation count across independent episodes to decide procedure-promotion eligibility",
+          "register": "semantic_fact",
+          "operation": "recall"
+        },
+        {
+          "does": "Promote the repeatedly-confirmed lesson into a new playbook version, prior version retained and marked deprecated",
+          "register": "procedural_playbook",
+          "operation": "consolidate"
+        },
+        {
+          "does": "Verify the new version publishes without conflicting an in-flight active version before marking it current",
+          "register": "procedural_playbook",
+          "operation": "recall"
+        }
+      ]
+    },
+    {
+      "kind": "expiry",
+      "name": "TTL, supersede-expiry and reindex sweep",
+      "steps": [
+        {
+          "does": "TTL sweep: clear/tombstone working entries past task completion or TTL via idempotent overwrite",
+          "register": "working_state",
+          "operation": "remember"
+        },
+        {
+          "does": "Locate stale/superseded facts past retention window or matching a tenant/subject deletion request",
+          "register": "semantic_fact",
+          "operation": "recall"
+        },
+        {
+          "does": "Tombstone matched facts in the relational store and purge/filter their vectors within the freshness window",
+          "register": "semantic_fact",
+          "operation": "invalidate"
+        },
+        {
+          "does": "Locate episodes belonging to the deletion-requested tenant/subject",
+          "register": "episodic_record",
+          "operation": "recall"
+        },
+        {
+          "does": "Append a redaction tombstone event for matched episodes; PII fields nulled, event shell retained for audit",
+          "register": "episodic_record",
+          "operation": "remember"
+        },
+        {
+          "does": "Mark edges touching the deleted subject as no-longer-current, superseded to a redacted target; change reaches the vector index on next reindex",
+          "register": "relational_graph",
+          "operation": "update"
+        },
+        {
+          "does": "On an embedding-model version bump, enumerate playbook versions due for re-embedding; rebuild proceeds online against the relational source with no retrieval gap",
+          "register": "procedural_playbook",
+          "operation": "recall"
+        }
+      ]
+    }
+  ],
+  "safeguards": [
+    {
+      "rule": "Retrieved memory is data, never instructions",
+      "mechanism": "Recall responses are returned as structured, non-executable fields (subject/predicate/value/citation); the prompt template never lets a memory item's text be parsed as a directive, and an imperative-pattern scanner strips directive-looking strings before injection"
+    },
+    {
+      "rule": "A model's output never becomes a consequential memory on its own",
+      "mechanism": "Write_pipeline's reconcile step routes any fact flagged business-state/authorization through a deterministic validator before persist/update commits; unvalidated output is held only in working_state"
+    },
+    {
+      "rule": "Recall never crosses a tenant boundary",
+      "mechanism": "Every operation is server-side scoped by the caller's authenticated tenant_id as a mandatory filter in the query layer, never an optional caller-supplied parameter"
+    },
+    {
+      "rule": "No half-written memory",
+      "mechanism": "Remember/update write the relational row and vector row in one transaction (outbox pattern); a background reconciler replays any failed vector write before the fact is recallable"
+    },
+    {
+      "rule": "Deletion reaches the vector index too",
+      "mechanism": "Invalidate writes a tombstone row and enqueues a vector-delete job consumed before the 30s freshness SLA; recall also filters out status≠current as a second guard"
+    },
+    {
+      "rule": "PII is retained only as policy allows",
+      "mechanism": "A field-level retention policy tags PII fields per memory kind; the expiry workflow redacts/nulls those fields on schedule or on request regardless of whether the business fact is retained"
+    },
+    {
+      "rule": "Embedding-model upgrades never create a retrieval gap",
+      "mechanism": "Re-index runs online, tagging rows with embedding_model_version; recall queries the new version once a tenant's backfill completes and falls back to relational-filtered search otherwise"
+    },
+    {
+      "rule": "No store or collection per user or document",
+      "mechanism": "A single partitioned relational schema and one vector collection per memory kind, partitioned by tenant_id in the payload, enforced at schema-creation time"
+    }
+  ],
+  "tradeoffs": [
+    {
+      "decision": "Relational DB is source of truth; vector index is derived and rebuildable",
+      "rationale": "Guarantees durability and lets embedding models be swapped without risking data loss",
+      "alternative": "Vector DB as primary store, accepting re-index risk and weaker transactional guarantees"
+    },
+    {
+      "decision": "Recall routes exact-key and NL queries to different paths before merging",
+      "rationale": "Meets the p95 latency and recall@10 targets; similarity-only search reliably misses exact-match lookups like opportunity status",
+      "alternative": "One universal vector search for all queries, simpler but unreliable for exact keys"
+    },
+    {
+      "decision": "Episodes are append-only and consolidated, never mutated or deleted in place",
+      "rationale": "Preserves audit trail and provenance while still capping what recall surfaces as current",
+      "alternative": "Mutate episodes in place, losing history but saving storage"
+    },
+    {
+      "decision": "Procedure promotion requires multi-episode confirmation plus a deterministic validator",
+      "rationale": "Stops one noisy or hallucinated lesson from becoming a trusted, repeatedly-executed playbook",
+      "alternative": "Promote on first validated lesson, faster but riskier"
+    },
+    {
+      "decision": "Working state is kept entirely out of the vector index",
+      "rationale": "It is short-lived and task-scoped; embedding it adds cost and staleness risk for data gone within minutes",
+      "alternative": "Embed working notes too for mid-task semantic recall, at extra cost and dedup complexity"
+    },
+    {
+      "decision": "One partitioned store per memory kind, not per tenant or document",
+      "rationale": "Keeps index count and ops overhead bounded as tenants scale from 500 to 5,000",
+      "alternative": "Per-tenant collections, simpler isolation but unmanageable at scale"
+    }
+  ],
+  "risks": [
+    {
+      "risk": "Vector-write lag after a relational commit briefly makes a new fact findable by exact key but not by meaning",
+      "mitigation": "Recall always falls back to relational-filtered search within the ≤30s freshness window until the vector row confirms"
+    },
+    {
+      "risk": "An embedding-model upgrade could create a temporary split-brain between old and new vector versions",
+      "mitigation": "Every vector is tagged with its model version; recall queries both during cutover and prefers the new one once a tenant's backfill completes"
+    },
+    {
+      "risk": "Over-eager consolidation could promote a lesson from a biased or small episode sample",
+      "mitigation": "Require a minimum independent-episode count plus deterministic validator before promotion; keep source episodes for audit/rollback"
+    },
+    {
+      "risk": "A deletion request could miss a citation already surfaced in a prior agent response",
+      "mitigation": "Citations carry a freshness token; downstream consumers must re-validate a citation's status before acting on it past the freshness window"
+    },
+    {
+      "risk": "Write-rate bursts (200/s) could starve the deterministic validator and back up reconciliation",
+      "mitigation": "Decouple persist from validate via an async outbox with backpressure; consequential writes block on validation, non-consequential writes proceed and reconcile async"
+    }
+  ]
+}

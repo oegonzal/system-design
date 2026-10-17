@@ -26,6 +26,8 @@ import { Interaction } from './entities/interaction.entity';
 import { InteractionDelivery } from './entities/interaction-delivery.entity';
 import { JobApplication } from './entities/job-application.entity';
 import { MemoryDesignCycle } from './entities/memory-design-cycle.entity';
+import { MemoryRecord } from './entities/memory-record.entity';
+import { MemorySpace } from './entities/memory-space.entity';
 import { MemoryEmbedding } from './entities/memory-embedding.entity';
 import { MemorySupport } from './entities/memory-support.entity';
 import { OrchestrationRun } from './entities/orchestration-run.entity';
@@ -90,6 +92,8 @@ export const ormOptions = {
     InteractionDelivery,
     JobApplication,
     MemoryDesignCycle,
+    MemorySpace,
+    MemoryRecord,
   ],
   metadataProvider: ReflectMetadataProvider,
   namingStrategy: UnderscoreNamingStrategy,

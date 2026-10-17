@@ -96,8 +96,11 @@ const WORKFLOW_KIND_USES: Record<WorkflowKind, string> = {
 const describe = <T extends string>(uses: Record<T, string>): string =>
   (Object.entries(uses) as [T, string][]).map(([key, use]) => `${key}: ${use}`).join(' | ');
 
+/** A register's name, as the strategy declares it and every reference to it is written. */
+export const REGISTER_NAME_BOUND = bound(40);
+
 /** A reference to a declared register, or the (operation, register) pair a step binds — short, so never trimmed. */
-const nameRef = (description: string) => bounded.text(bound(40), { min: 1, description });
+const nameRef = (description: string) => bounded.text(REGISTER_NAME_BOUND, { min: 1, description });
 
 export const memoryStrategySchema = z.strictObject({
   summary: bounded.text(bound(1600), {
