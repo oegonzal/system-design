@@ -1,0 +1,18 @@
+{
+  "name": "google-kit",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/google-kit/src",
+  "projectType": "library",
+  "tags": ["type:shared", "scope:node"],
+  "// targets": "test is inferred from vite.config.ts by @nx/vite/plugin",
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "cwd": "packages/google-kit",
+        "commands": ["tsc --noEmit -p tsconfig.lib.json", "tsc --noEmit -p tsconfig.spec.json"]
+      }
+    }
+  }
+}

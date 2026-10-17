@@ -25,6 +25,7 @@ import type { ChangedFile } from './index';
  *   quality-loop-ui -> contracts, design-system, web-kit, web-testing
  *   govcon-ui      -> contracts, design-system, web-kit, web-testing
  *   loop-client    -> contracts         the quality loop as one port, its HTTP adapter and the errors both raise
+ *   google-kit     -> contracts         Google's OAuth consent and refresh, the token file, and the authorized request
  *   studio-testing -> contracts, loop-client   the quality loop as a scriptable fake, shared by studio-api's specs and the e2e stub
  *   studio-api     -> contracts, db, nest-kit, loop-client, studio-testing (specs and the test folder only)
  *   quality-loop   -> contracts, db, llm, run-dump, nest-kit
@@ -58,6 +59,7 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
   'quality-loop-ui': ['contracts', 'design-system', 'web-kit', 'web-testing'],
   'govcon-ui': ['contracts', 'design-system', 'web-kit', 'web-testing'],
   'loop-client': ['contracts'],
+  'google-kit': ['contracts'],
   'notifications-client': ['contracts'],
   'tool-session': ['contracts', 'nest-kit', 'loop-client', 'notifications-client', 'db'],
   'studio-testing': ['contracts', 'loop-client'],

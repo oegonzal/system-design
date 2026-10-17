@@ -53,6 +53,7 @@ tooling/node_modules/
 /static/sessions/
 /static/browser-profiles/
 /static/memory-ingest/
+/static/google/
 
 # Playwright output
 test-output/

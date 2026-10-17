@@ -11,6 +11,7 @@ import type { Criterion } from './criterion';
 import { BROWSER_SESSION_CRITERIA } from './browser-session';
 import { GMAIL_CRITERIA } from './gmail';
 import { GOOGLE_CALENDAR_CRITERIA } from './google-calendar';
+import { GOOGLE_KIT_CRITERIA } from './google-kit';
 import { GOVCON_CRITERIA } from './govcon';
 import { JOB_APPLICATION_CRITERIA } from './job-application';
 import { NOTIFICATIONS_CRITERIA } from './notifications';
@@ -36,4 +37,5 @@ export const CRITERIA: readonly Criterion[] = [
   ...TOOL_SESSION_CRITERIA,
   ...GMAIL_CRITERIA,
   ...GOOGLE_CALENDAR_CRITERIA,
+  ...GOOGLE_KIT_CRITERIA,
 ];
