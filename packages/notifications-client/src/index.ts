@@ -14,3 +14,4 @@ export {
 } from './bus-errors';
 export { HttpBusClient, type HttpBusOptions } from './http-bus-client';
 export { InteractionClient, type InteractionOptions, type Withdrawal } from './interaction-client';
+export { NOTED, notedPrompt, type Notice } from './noted-prompt';

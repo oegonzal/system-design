@@ -14,7 +14,9 @@ describe('a tool as a program declares it', () => {
     const [list] = sampleTools();
     expect(list?.parameters['required']).toEqual(['query', 'limit']);
     expect(list?.parameters['$schema']).toBeUndefined();
-    expect(list?.parameters['additionalProperties']).toBe(false);
+    // What a caller sends is read with the declared keys alone: the reader treats an unstated
+    // `additionalProperties` as closed, and the schema never opens it.
+    expect(list?.parameters['additionalProperties']).not.toBe(true);
     for (const tool of sampleTools()) expect(toolDeclarationSchema.parse(tool)).toEqual(tool);
     expect(
       toolDeclarationSchema.safeParse({ ...list, name: 'List Items' }).success,

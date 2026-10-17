@@ -30,6 +30,7 @@ import type { ChangedFile } from './index';
  *   quality-loop   -> contracts, db, llm, run-dump, nest-kit
  *   govcon         -> contracts, db, nest-kit, notifications-client   SAM.gov opportunities: search, store, rank
  *   notifications-client -> contracts   the notifications bus as one port, its HTTP adapter, and asking a person through it
+ *   tool-session   -> contracts, nest-kit, loop-client, notifications-client, db (the test-database guard only)   a mission run as tool calls the loop decides, for any program that declares tools
  *   browser-session -> contracts, db, nest-kit, run-dump, loop-client, notifications-client, config-kit, studio-testing (specs only)   a Playwright session the loop decides for
  *   memory-ingest  -> contracts, loop-client, studio-testing (specs only)   documents chunked and handed to the loop
  *   notifications  -> contracts, db, nest-kit, config-kit   the event bus, and the channels that put prompts to people
@@ -58,6 +59,7 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
   'govcon-ui': ['contracts', 'design-system', 'web-kit', 'web-testing'],
   'loop-client': ['contracts'],
   'notifications-client': ['contracts'],
+  'tool-session': ['contracts', 'nest-kit', 'loop-client', 'notifications-client', 'db'],
   'studio-testing': ['contracts', 'loop-client'],
   'studio-api': ['contracts', 'db', 'nest-kit', 'loop-client', 'studio-testing'],
   'quality-loop': ['contracts', 'db', 'llm', 'run-dump', 'nest-kit'],

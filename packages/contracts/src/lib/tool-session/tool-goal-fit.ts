@@ -51,7 +51,12 @@ export function composeToolGoalWithinBudget(
 ): ComposedToolGoal {
   const full = attempt(input, budget);
   if (full !== null) {
-    return { goal: full, rung: 'full', bytes: textBytes(full), omittedObservations: 0 };
+    return {
+      goal: full,
+      rung: 'full',
+      bytes: textBytes(full),
+      omittedObservations: input.omittedObservations,
+    };
   }
   const shortened = { ...input, observations: excerpted(input.observations) };
   const brief = attempt(shortened, budget);
@@ -60,13 +65,13 @@ export function composeToolGoalWithinBudget(
       goal: brief,
       rung: 'observations-excerpted',
       bytes: textBytes(brief),
-      omittedObservations: 0,
+      omittedObservations: input.omittedObservations,
     };
   }
   let kept = shortened.observations;
   for (;;) {
     kept = kept.slice(Math.ceil(kept.length / 2));
-    const omitted = shortened.observations.length - kept.length;
+    const omitted = input.omittedObservations + shortened.observations.length - kept.length;
     const fewer = { ...shortened, observations: kept, omittedObservations: omitted };
     // With nothing left to leave out, the composer's own refusal is the answer.
     const goal = kept.length === 0 ? composeToolGoal(fewer, budget) : attempt(fewer, budget);

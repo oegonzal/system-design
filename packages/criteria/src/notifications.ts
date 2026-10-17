@@ -77,4 +77,9 @@ export const NOTIFICATIONS_CRITERIA: readonly Criterion[] = [
     statement:
       'Asking a person through the bus subscribes before it publishes the prompt, passes over every other prompt’s answer, returns its own and unsubscribes; a prompt the service expires ends the ask as expired, and an abort withdraws the prompt with the reason it carries, or as abandoned when it carries none.',
   },
+  {
+    id: 'NTC-3',
+    statement:
+      'A notice to a person is a prompt with one Noted choice and no other way to answer, built once for every program that tells rather than asks, every line cut to the prompt limits so the bus never refuses it, and published rather than asked, since nobody waits for a notice to be read.',
+  },
 ];

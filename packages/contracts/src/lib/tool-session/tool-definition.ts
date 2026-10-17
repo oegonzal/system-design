@@ -59,7 +59,10 @@ export function toolDeclarationOf(
     throw new ToolNameMalformed(tool.name);
   }
   // The dialect line says nothing a reader of the parameters needs, and every tool would repeat it.
-  const { $schema: _dialect, ...parameters } = z.toJSONSchema(tool.parameters) as JsonSchemaObject;
+  // What a caller sends: a parameter with a default or marked optional may be left out.
+  const { $schema: _dialect, ...parameters } = z.toJSONSchema(tool.parameters, {
+    io: 'input',
+  }) as JsonSchemaObject;
   return {
     name: tool.name,
     description: tool.description,

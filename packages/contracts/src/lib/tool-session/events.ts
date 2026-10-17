@@ -27,6 +27,7 @@ export const toolSessionStartedSchema = z.strictObject({
   title: z.string().min(1).max(SESSION_TITLE_MAX_LENGTH),
   startedAt: z.iso.datetime(),
 });
+export type ToolSessionStarted = z.infer<typeof toolSessionStartedSchema>;
 
 export const toolSessionSteppedSchema = z.strictObject({
   ...base,
@@ -44,6 +45,7 @@ export const toolSessionSteppedSchema = z.strictObject({
   /** Whether the step ended the session on a mission stop. */
   finished: z.boolean(),
 });
+export type ToolSessionStepped = z.infer<typeof toolSessionSteppedSchema>;
 
 export const toolSessionFinishedSchema = z.strictObject({
   ...base,
@@ -53,3 +55,4 @@ export const toolSessionFinishedSchema = z.strictObject({
   steps: z.number().int().min(0),
   endedAt: z.iso.datetime(),
 });
+export type ToolSessionFinished = z.infer<typeof toolSessionFinishedSchema>;
