@@ -1,1 +1,23 @@
-{ "since": null, "until": null, "runs": 0, "fields": {}, "caps": {} }
+{
+  "since": "2026-10-17T03:55:15.349Z",
+  "until": "2026-10-17T04:03:43.191Z",
+  "runs": 7,
+  "fields": {
+    "assessment": { "n": 7, "max": 877, "p99": 877, "overTarget": 1 },
+    "calls": { "n": 7, "max": 2, "p99": 2, "overTarget": 0 },
+    "calls[].argumentsJson": { "n": 5, "max": 138, "p99": 138, "overTarget": 0 },
+    "calls[].expect": { "n": 5, "max": 122, "p99": 122, "overTarget": 0 },
+    "calls[].reason": { "n": 5, "max": 196, "p99": 196, "overTarget": 0 },
+    "calls[].serves": { "n": 5, "max": 2, "p99": 2, "overTarget": 0 },
+    "calls[].serves[]": { "n": 8, "max": 3, "p99": 3, "overTarget": 0 },
+    "calls[].tool": { "n": 5, "max": 14, "p99": 14, "overTarget": 0 },
+    "finish.cause": { "n": 3, "max": 16, "p99": 16, "overTarget": 0 },
+    "finish.detail": { "n": 3, "max": 490, "p99": 490, "overTarget": 3 }
+  },
+  "caps": {
+    "critic.mission": { "n": 7, "max": 11744, "p99": 11744, "maxApiCalls": 1 },
+    "critic.safety": { "n": 7, "max": 3713, "p99": 3713, "maxApiCalls": 1 },
+    "evaluator.plan": { "n": 7, "max": 15426, "p99": 15426, "maxApiCalls": 1 },
+    "producer": { "n": 7, "max": 5238, "p99": 5238, "maxApiCalls": 1 }
+  }
+}

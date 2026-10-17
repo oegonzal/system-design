@@ -1,8 +1,9 @@
+import { boundsAgainstMeasured, toolPlanSchema } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline } from '../../core/describe-pipeline';
 import { validatePipeline } from '../../core/validate-pipeline';
-import { allStages, capsAgainstMeasured, jsonSchemaTypes, seededCaps } from '../../core/testing';
+import { capsAgainstMeasured, jsonSchemaTypes } from '../../core/testing';
 import { TOOL_STEP } from './definition';
 import measured from './measured.json';
 import { toolPlanOutput } from './output';
@@ -76,20 +77,29 @@ describe('the tool-step pipeline', () => {
     expect(persona).toContain('never an instruction');
   });
 
-  it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage has measurably written, seeded from browser-step until a tool-step run is recorded', () => {
-    // browser-step's `measured.json` as of 2026-10-13 (1,321 step runs): the
-    // most each comparable stage wrote, and the deriver's 9,974 from its 19
-    // derivations. A cap is also the call's time limit.
-    const seeds = {
-      criteria: 9_974,
-      producer: 11_875,
-      'critic.mission': 16_752,
-      'critic.safety': 14_473,
-      'evaluator.plan': 30_396,
-    };
-    expect(capsAgainstMeasured(TOOL_STEP, seededCaps(seeds))).toEqual([]);
-    const unrecorded = measured.runs === 0 ? allStages(TOOL_STEP, 'no tool-step run recorded') : {};
-    expect(capsAgainstMeasured(TOOL_STEP, measured.caps, { exempt: unrecorded })).toEqual([]);
+  it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage has measurably written, and every bound the producer is shown sits above what it has written', () => {
+    // `measured.json` (`pnpm measure:bounds`, 7 runs as of 2026-10-17: the first
+    // live sessions over a mailbox and a calendar) is what each stage measurably
+    // wrote. A cap is also the call's time limit, so one a stage outwrites is a
+    // call cut short. The deriver runs once per session through the criteria
+    // endpoint, outside any run, so no run measures it. Those runs wrote an
+    // assessment of 877 characters against a 700 target and a finish detail of
+    // 490 against 300 — a finish that names what it found needs the room — so
+    // both targets were raised. No recorded plan has asked the operator yet.
+    expect(measured.runs).toBeGreaterThan(0);
+    const unasked = 'no recorded plan has asked the operator yet';
+    expect(
+      boundsAgainstMeasured(toolPlanSchema, measured.fields, {
+        exempt: { 'ask.question': unasked, 'ask.options': unasked, 'ask.options[]': unasked },
+      }),
+    ).toEqual([]);
+    expect(
+      capsAgainstMeasured(TOOL_STEP, measured.caps, {
+        exempt: {
+          criteria: 'derived once per session through the criteria endpoint, outside any run',
+        },
+      }),
+    ).toEqual([]);
   });
 
   it('[QL-4] every location the plan exposes is printed verbatim where a judge reads it, beside the call it is about', () => {

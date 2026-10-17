@@ -15,7 +15,7 @@ import { CRITERION_ID_MAX_LENGTH } from '../quality-loop/evidence';
 import { TOOL_NAME_MAX_LENGTH } from './vocab';
 
 export const CALLS_BOUND = bound(8, 'list');
-export const TOOL_ASSESSMENT_BOUND = bound(700);
+export const TOOL_ASSESSMENT_BOUND = bound(900);
 export const CALL_REASON_BOUND = bound(240);
 export const CALL_EXPECT_BOUND = bound(200);
 export const CALL_SERVES_BOUND = bound(4, 'list');
@@ -23,7 +23,7 @@ export const ARGUMENTS_BOUND = bound(4000);
 export const ASK_QUESTION_BOUND = bound(160);
 export const ASK_OPTION_BOUND = bound(200);
 export const ASK_OPTIONS_BOUND = bound(8, 'list');
-export const FINISH_DETAIL_BOUND = bound(300);
+export const FINISH_DETAIL_BOUND = bound(600);
 
 export const toolCallSchema = z.strictObject({
   tool: bounded.id(TOOL_NAME_MAX_LENGTH, {
