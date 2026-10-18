@@ -48,6 +48,26 @@ const RUNTIME_OWNED = exemptAll(
   'the runtime’s write contract',
 );
 
+/**
+ * The bounds the digest owns in a slot no recorded digest has filled — a kind
+ * the spaces measured so far keep no register of — so they are unrecorded,
+ * not unmet. A kind leaves this the first time a recorded digest fills its
+ * slot, and its bounds are held from then on.
+ */
+const UNFILLED = exemptAll(
+  REGISTER_KINDS.filter(
+    (kind) =>
+      !Object.keys(declaredSizes(CANDIDATE_SCHEMAS[kind])).some((field) =>
+        Object.hasOwn(measured.fields, `memories[].${kind}.${field}`),
+      ),
+  ).flatMap((kind) =>
+    Object.keys(declaredSizes(MODEL_CANDIDATES[kind]))
+      .map((field) => `memories[].${kind}.${field}`)
+      .filter((path) => !Object.hasOwn(RUNTIME_OWNED, path)),
+  ),
+  'no recorded digest has filled this slot: no space measured keeps a register of its kind',
+);
+
 /** A kind's candidate fields as the runtime declares them, by name. */
 const runtimeShape = (kind: RegisterKind): Record<string, ZodType> => CANDIDATE_SCHEMAS[kind].shape;
 
@@ -244,7 +264,8 @@ describe('the register-digest pipeline', () => {
     // goals of the same size: the filing critic takes its usability critic's,
     // the governance critic its coverage critic's. A cap is also the call's
     // time limit, so one a stage outwrites is a call cut short. This
-    // pipeline's own runs replace the seeds through `measured.json`.
+    // pipeline's own runs are held through `measured.json` beside the seeds,
+    // which stand until its runs cover goals of the size they were measured on.
     const seeds = {
       criteria: 5_385,
       producer: 21_858,
@@ -283,7 +304,7 @@ describe('the register-digest pipeline', () => {
     const unrecorded = measured.runs === 0 ? exemptAll(declared, UNRECORDED) : {};
     expect(
       boundsAgainstMeasured(schemas, measured.fields, {
-        exempt: { ...unrecorded, ...RUNTIME_OWNED },
+        exempt: { ...unrecorded, ...RUNTIME_OWNED, ...UNFILLED },
       }),
     ).toEqual([]);
   });

@@ -1,1 +1,32 @@
-{ "since": null, "until": null, "runs": 0, "fields": {}, "caps": {} }
+{
+  "since": "2026-10-18T22:00:12.184Z",
+  "until": "2026-10-18T22:00:12.241Z",
+  "runs": 2,
+  "fields": {
+    "criteria": { "n": 2, "max": 9, "p99": 9, "overTarget": 0 },
+    "criteria[].statement": { "n": 16, "max": 292, "p99": 292, "overTarget": 0 },
+    "memories": { "n": 4, "max": 8, "p99": 8, "overTarget": 0 },
+    "memories[].episodic.action": { "n": 22, "max": 98, "p99": 98, "overTarget": 0 },
+    "memories[].episodic.occurredAt": { "n": 20, "max": 24, "p99": 24, "overTarget": 0 },
+    "memories[].episodic.outcome": { "n": 22, "max": 165, "p99": 165, "overTarget": 0 },
+    "memories[].episodic.situation": { "n": 22, "max": 70, "p99": 70, "overTarget": 0 },
+    "memories[].episodic.subject": { "n": 22, "max": 33, "p99": 33, "overTarget": 0 },
+    "memories[].evidence": { "n": 28, "max": 1, "p99": 1, "overTarget": 0 },
+    "memories[].register": { "n": 28, "max": 15, "p99": 15, "overTarget": 0 },
+    "memories[].semantic.predicate": { "n": 2, "max": 30, "p99": 30, "overTarget": 0 },
+    "memories[].semantic.subject": { "n": 2, "max": 28, "p99": 28, "overTarget": 0 },
+    "memories[].semantic.validFrom": { "n": 2, "max": 24, "p99": 24, "overTarget": 0 },
+    "memories[].semantic.value": { "n": 2, "max": 174, "p99": 174, "overTarget": 0 },
+    "memories[].working.key": { "n": 4, "max": 29, "p99": 29, "overTarget": 0 },
+    "memories[].working.value": { "n": 4, "max": 92, "p99": 92, "overTarget": 0 }
+  },
+  "caps": {
+    "criteria": { "n": 2, "max": 4278, "p99": 4278, "maxApiCalls": 1 },
+    "critic.filing": { "n": 8, "max": 18399, "p99": 18399, "maxApiCalls": 1 },
+    "critic.governance": { "n": 8, "max": 2527, "p99": 2527, "maxApiCalls": 1 },
+    "critic.grounding": { "n": 8, "max": 21150, "p99": 21150, "maxApiCalls": 1 },
+    "evaluator.capture": { "n": 8, "max": 2643, "p99": 2643, "maxApiCalls": 1 },
+    "evaluator.rules": { "n": 8, "max": 9221, "p99": 9221, "maxApiCalls": 1 },
+    "producer": { "n": 4, "max": 4201, "p99": 4201, "maxApiCalls": 1 }
+  }
+}
