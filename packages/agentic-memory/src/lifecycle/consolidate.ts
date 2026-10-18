@@ -19,6 +19,7 @@
  */
 import type {
   ConsolidationEntryDto,
+  ConsolidationRoute,
   ConsolidationResultDto,
   consolidateRequestSchema,
   MemoryLesson,
@@ -29,7 +30,7 @@ import type { z } from 'zod';
 import { byText } from '../order';
 import type { Closing, MemoryRecord } from '../ports';
 import { refuse } from '../refusal';
-import type { CompiledRegister, ConsolidationPlan } from '../space/compile';
+import type { CompiledRegister } from '../space/compile';
 import { canonicalScope } from '../space/scope';
 import { unproject } from '../write/projection';
 import { partitionOf, writeDerived, type Reconciled, type SpaceContext } from '../write/write';
@@ -179,7 +180,7 @@ const entryOf = (
 
 async function promote(
   ctx: SpaceContext,
-  plan: ConsolidationPlan & { playbooks: string },
+  plan: ConsolidationRoute & { playbooks: string },
   qualifying: readonly { group: LessonGroup; recordId: string }[],
   scope: RecordScope,
   partition: string,

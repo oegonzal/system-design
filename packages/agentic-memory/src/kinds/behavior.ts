@@ -1,9 +1,10 @@
 /**
  * A memory kind as declared data: the candidate it accepts, the fields its
  * identity is made of, the values an exact recall finds it by, the field its
- * valid time comes from, the text it is embedded and shown as, whether it is
- * projected into the vector index, and the role it plays in consolidation. The
- * engine reads these and nothing else about a kind, so a new kind or a changed
+ * valid time comes from, the text it is embedded and shown as, and whether it
+ * is projected into the vector index. (The role a kind plays in consolidation
+ * is design vocabulary, the contract's `CONSOLIDATION_ROLES`.) The engine reads
+ * these and nothing else about a kind, so a new kind or a changed
  * one is an entry in a registry, never an engine edit. The members are written
  * as methods so a behavior typed for its own candidate fits the registry.
  */
@@ -19,9 +20,6 @@ import type { ZodType } from 'zod';
 
 import { canonicalScope } from '../space/scope';
 
-/** What a register does in consolidation: its records are the evidence, it keeps the lessons, or the playbooks. */
-export type ConsolidationRole = 'source' | 'lesson' | 'playbook';
-
 export interface KindBehavior<C extends Record<string, unknown> = Record<string, unknown>> {
   readonly kind: RegisterKind;
   readonly candidate: ZodType<C>;
@@ -32,7 +30,6 @@ export interface KindBehavior<C extends Record<string, unknown> = Record<string,
   /** The field valid time comes from; null when it is the moment of recording. */
   readonly validFrom: (keyof C & string) | null;
   readonly projected: boolean;
-  readonly role: ConsolidationRole | null;
   text(candidate: C): string;
   /** A source's lesson, when the episode proposes one it verified. */
   lessonOf?(candidate: C): MemoryLesson | null;

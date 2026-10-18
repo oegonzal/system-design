@@ -48,8 +48,15 @@ not change when the run or the policy file does.
 - **Warnings** state what the space cannot serve, naming the register:
   `metadata.not_a_field` (an entry like `kind=working` is not a field name, so it
   is not filterable), `register.no_entry` (nothing can write into it),
-  `register.unread` (no recall), `operation.no_effect`, and the consolidation-route
-  warnings.
+  `register.unread` (no recall), `register.unforgettable` (long-term, and no
+  `invalidate`, so nothing it keeps can be forgotten), `operation.no_effect`, and the
+  consolidation-route warnings.
+- The warnings and the consolidation route come from one pure analysis in the
+  contracts, `analyzeStrategy`, over the typed declarations and the kind→role table
+  (`CONSOLIDATION_ROLES`: episodes are the evidence, semantic registers keep the
+  lessons, procedural registers keep the playbooks). The `memory-architecture`
+  pipeline runs the same analysis over every draft as its `executability`
+  validator, so the coach is told what would not run before a space is ever made.
 - The **consolidation route** is resolved by the role each kind declares — the
   register whose records are evidence (`consolidate` on an episodic register), the
   one lessons go to (`remember` on a semantic register), the one playbooks go to
@@ -61,10 +68,14 @@ Two specs make the no-prose rule mechanical: rewriting **every prose field** of 
 strategy compiles to the identical space, and **reversing every list** — registers,
 interfaces, workflows, steps — does too.
 
-The live strategy from 2026-10-17 compiles with exactly three warnings — working
-memory's `kind=working` entry, working memory being unread, and the relational
-register having no way in (it declares only `update` and `recall`) — and
-consolidation routed episodes → `semantic_fact` → `procedural_playbook`.
+The live strategy from 2026-10-17 compiles with six warnings — working memory's
+`kind=working` entry, working memory being unread, the relational register having
+no way in (it declares only `update` and `recall`), and three long-term registers
+that declare no `invalidate` — and consolidation routed episodes → `semantic_fact` →
+`procedural_playbook`. A later strategy that kept its lessons inside the episodic
+register "told apart by status" compiled with consolidation unavailable
+(`consolidation.no_lesson_target`): the typed kinds cannot place a lesson there,
+and the runtime does not guess.
 
 ## 3. The kinds, as data
 

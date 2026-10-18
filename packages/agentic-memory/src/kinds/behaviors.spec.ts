@@ -7,7 +7,7 @@ import { contentHashOf, defineBehavior } from './behavior';
 import { DEFAULT_BEHAVIORS } from './behaviors';
 
 describe('the memory kinds as data', () => {
-  it('[AGM-2] declares a behavior for every kind a strategy can keep, each by its identity, keys, valid time, projection and role', () => {
+  it('[AGM-2] declares a behavior for every kind a strategy can keep, each by its identity, keys, valid time and projection', () => {
     expect(Object.keys(DEFAULT_BEHAVIORS).sort()).toEqual([...REGISTER_KINDS].sort());
     const table = Object.fromEntries(
       REGISTER_KINDS.map((kind) => {
@@ -19,17 +19,16 @@ describe('the memory kinds as data', () => {
             behavior.keys.join('+'),
             behavior.validFrom,
             behavior.projected,
-            behavior.role,
           ],
         ];
       }),
     );
     expect(table).toEqual({
-      working: ['key', 'key', null, false, null],
-      episodic: ['', 'subject', 'occurredAt', true, 'source'],
-      semantic: ['subject+predicate', 'subject', 'validFrom', true, 'lesson'],
-      procedural: ['name', 'name', null, true, 'playbook'],
-      relational: ['subject+relation+object', 'subject+object', 'validFrom', false, null],
+      working: ['key', 'key', null, false],
+      episodic: ['', 'subject', 'occurredAt', true],
+      semantic: ['subject+predicate', 'subject', 'validFrom', true],
+      procedural: ['name', 'name', null, true],
+      relational: ['subject+relation+object', 'subject+object', 'validFrom', false],
     });
   });
 

@@ -5,7 +5,7 @@ export const AGENTIC_MEMORY_CRITERIA: readonly Criterion[] = [
   {
     id: 'AGM-1',
     statement:
-      'A space compiles from a strategy’s typed declarations and a policy alone: the same declarations compile to the same space whatever the prose says and in any order; a broken reference, a kind with no behavior, or a strategy that does not read creates no space; and metadata that is not a field, a register nothing can write or read, an operation with no effect, and a consolidation route that is missing or ambiguous are warnings naming the register.',
+      'A space compiles from a strategy’s typed declarations and a policy alone: the same declarations compile to the same space whatever the prose says and in any order; a broken reference, a kind with no behavior, or a strategy that does not read creates no space; and metadata that is not a field, a register nothing can write, read or forget, an operation with no effect, and a consolidation route that is missing or ambiguous are warnings naming the register, from the one analysis the design pipeline also runs.',
   },
   {
     id: 'AGM-2',

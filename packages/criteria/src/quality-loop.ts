@@ -370,4 +370,9 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
     statement:
       'Every pipeline whose artifact is a plan of positional parts is read back by one procedure in the contracts, parameterised by the plan schema, the location grammar, how to address a part and which plans are irrevocable: the best iteration by its number, the blockers from the decision’s own account, the cut point where they point — whole for one at the assessment or outside the grammar, the first faulted part otherwise — the objections the next plan must answer with each shortfall’s statement and reason, and the readout that runs an accepted plan whole, a cut plan up to the cut, nothing of an under-judged plan or of an irrevocable one the loop did not accept; a browser session’s actions and a tool session’s calls route through that one procedure and copy none of it.',
   },
+  {
+    id: 'QL-74',
+    statement:
+      'A memory strategy is checked before any lens reads it: a reference to a register or an operation it does not declare, or a register declared twice, blocks; a register or an interface no workflow exercises warns; and whatever the agentic-memory runtime cannot run as written warns too, judged by the runtime’s own analysis shared through the contracts — a consolidation it cannot route, a register nothing can write, read or forget, a consolidate with no effect, metadata that is not a field — so the coach revises against it in the runtime’s words.',
+  },
 ];

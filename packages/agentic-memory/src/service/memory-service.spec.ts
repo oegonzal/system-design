@@ -42,6 +42,9 @@ describe('the memory service', () => {
     expect(created.space.report.warnings.map(({ code }) => code)).toEqual([
       'metadata.not_a_field',
       'register.no_entry',
+      'register.unforgettable',
+      'register.unforgettable',
+      'register.unforgettable',
       'register.unread',
     ]);
     expect(await service.getSpace(created.space.id)).toEqual(created.space);

@@ -37,7 +37,7 @@ import evaluatorQualities from './lenses/evaluator.qualities.md?raw';
 import evaluatorRequirements from './lenses/evaluator.requirements.md?raw';
 import producer from './lenses/producer.md?raw';
 import { memoryStrategyOutput } from './output';
-import { coverageValidator, referencesValidator } from './validators';
+import { coverageValidator, executabilityValidator, referencesValidator } from './validators';
 
 /** The pipeline's id, named once so an orchestrator can fix its target to it. */
 export const MEMORY_ARCHITECTURE_ID = 'memory-architecture';
@@ -137,7 +137,7 @@ export const MEMORY_ARCHITECTURE: PipelineDefinition<MemoryStrategy> = {
     consumes: ['memories', 'setbacks'],
   },
 
-  validators: [referencesValidator, coverageValidator],
+  validators: [referencesValidator, coverageValidator, executabilityValidator],
   controller: STANDARD,
 
   critics: [

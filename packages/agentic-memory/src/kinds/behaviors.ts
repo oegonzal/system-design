@@ -24,7 +24,6 @@ const working = defineBehavior<CandidateOf<'working'>>({
   keys: ['key'],
   validFrom: null,
   projected: false,
-  role: null,
   text(candidate) {
     return `${candidate.key}: ${candidate.value}`;
   },
@@ -37,7 +36,6 @@ const semantic = defineBehavior<CandidateOf<'semantic'>>({
   keys: ['subject'],
   validFrom: 'validFrom',
   projected: true,
-  role: 'lesson',
   text(candidate) {
     return `${candidate.subject} — ${candidate.predicate}: ${candidate.value}`;
   },
@@ -58,7 +56,6 @@ const episodic = defineBehavior<CandidateOf<'episodic'>>({
   keys: ['subject'],
   validFrom: 'occurredAt',
   projected: true,
-  role: 'source',
   text(candidate) {
     const lesson = candidate.lesson === null ? '' : `; lesson: ${candidate.lesson.text}`;
     return `${candidate.subject} — ${candidate.situation}; ${candidate.action}; ${candidate.outcome}${lesson}`;
@@ -75,7 +72,6 @@ const procedural = defineBehavior<CandidateOf<'procedural'>>({
   keys: ['name'],
   validFrom: null,
   projected: true,
-  role: 'playbook',
   text(candidate) {
     const description = candidate.description === null ? '' : ` — ${candidate.description}`;
     return `${candidate.name}${description}: ${candidate.rules.map((rule) => rule.text).join('; ')}`;
@@ -95,7 +91,6 @@ const relational = defineBehavior<CandidateOf<'relational'>>({
   keys: ['subject', 'object'],
   validFrom: 'validFrom',
   projected: false,
-  role: null,
   text(candidate) {
     return `${candidate.subject} ${candidate.relation} ${candidate.object}`;
   },

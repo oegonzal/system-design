@@ -14,8 +14,16 @@
  *
  * `coverage` warns. A register no interface or workflow uses, and an interface
  * no workflow step exercises, are legal and judgeable, but every lens is told.
+ *
+ * `executability` warns. What the agentic-memory runtime cannot run as written
+ * — a consolidation it cannot route, a register nothing can write, read or
+ * forget, a consolidate with no effect, metadata that is not a field — by the
+ * runtime's own analysis (`analyzeStrategy`, shared through the contracts), so
+ * the strategy a coach writes is the strategy the runtime executes. A warning a
+ * producer is asked to act on, in the runtime's words, and every lens reads it.
  */
 import {
+  analyzeStrategy,
   operationHandle,
   validateStrategyReferences,
   type MemoryStrategy,
@@ -33,6 +41,7 @@ import {
 import type { Validator } from '../../core/ports';
 
 const COVERAGE_VALIDATOR_ID = 'coverage';
+const EXECUTABILITY_VALIDATOR_ID = 'executability';
 
 type Rule = (strategy: MemoryStrategy) => ValidationProblem[];
 
@@ -43,6 +52,8 @@ function check(
   contract: TaskContract<MemoryStrategy>,
   rule: Rule,
 ): ValidationReport {
+  // A rule only ever reads a parsed strategy: one the schema cannot read is the schema
+  // validator's to report, and judged here by no rule.
   const parsed = readArtifact(contract.output.schema, artifact);
   if (!parsed.ok) return { validatorId, gate, problems: [] };
   return { validatorId, gate, problems: rule(parsed.value) };
@@ -90,6 +101,15 @@ const coverage: Rule = ({ registers, interfaces, workflows }) => {
   return problems;
 };
 
+const executability: Rule = (strategy) =>
+  analyzeStrategy(strategy).warnings.map((warning) =>
+    problem(
+      'medium',
+      `the agentic-memory runtime cannot run this as written: ${warning.message}`,
+      warning.refs,
+    ),
+  );
+
 export const referencesValidator: Validator<MemoryStrategy> = {
   id: REFERENCES_VALIDATOR_ID,
   gate: 'block',
@@ -102,4 +122,11 @@ export const coverageValidator: Validator<MemoryStrategy> = {
   gate: 'warn',
   validate: (artifact, contract) =>
     check(COVERAGE_VALIDATOR_ID, 'warn', artifact, contract, coverage),
+};
+
+export const executabilityValidator: Validator<MemoryStrategy> = {
+  id: EXECUTABILITY_VALIDATOR_ID,
+  gate: 'warn',
+  validate: (artifact, contract) =>
+    check(EXECUTABILITY_VALIDATOR_ID, 'warn', artifact, contract, executability),
 };

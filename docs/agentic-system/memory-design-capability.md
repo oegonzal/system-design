@@ -95,7 +95,12 @@ keeps, is a dangling reference the validators catch. **Validators**
 (`validators.ts`): `references` (block) — the contract's
 `validateStrategyReferences` (every reference resolves, no duplicate register),
 the same rule the runtime compiles with; `coverage` (warn) — every register and
-interface is exercised by a workflow.
+interface is exercised by a workflow; `executability` (warn) — whatever the
+agentic-memory runtime cannot run as written (a consolidation it cannot route, a
+register nothing can write, read or forget, a consolidate with no effect, metadata
+that is not a field), by the runtime's own analysis, `analyzeStrategy` in the
+contracts. Its notes become remediations, so the coach revises against them in the
+runtime's words, and every lens reads them.
 
 ---
 

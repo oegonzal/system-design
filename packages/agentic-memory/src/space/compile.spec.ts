@@ -74,6 +74,11 @@ describe('compiling a strategy into a space', () => {
         message:
           'nothing can enter register relational_graph: it declares no remember and no consolidation writes it',
       },
+      // Three long-term registers declare no invalidate: what they keep can never be forgotten.
+      ...['episodic_record', 'procedural_playbook', 'relational_graph'].map((name) => ({
+        code: 'register.unforgettable',
+        message: `register ${name} keeps long-term memory and declares no invalidate, so nothing it keeps can be forgotten`,
+      })),
       {
         code: 'register.unread',
         message:

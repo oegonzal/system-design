@@ -23,6 +23,7 @@ import {
   type OperationVerb,
   type RegisterKind,
 } from './strategy';
+import { MEMORY_FIELD_NAME, type CompileWarning } from './executability';
 import { STRATEGY_FAULTS } from './strategy-validator';
 
 /** Where a stored memory is in its life. Only `active` is current, and only a current memory is recalled. */
@@ -75,24 +76,6 @@ export const COMPILE_PROBLEMS = [
   'register.kind_unsupported',
 ] as const;
 export type CompileProblem = (typeof COMPILE_PROBLEMS)[number];
-
-/** What a space compiles with, but a reader of it should know. */
-export const COMPILE_WARNINGS = [
-  'metadata.not_a_field',
-  'register.no_entry',
-  'register.unread',
-  'operation.no_effect',
-  'consolidation.no_workflow',
-  'consolidation.no_source',
-  'consolidation.no_lesson_target',
-  'consolidation.lessons_ambiguous',
-  'consolidation.playbooks_ambiguous',
-  'consolidation.no_playbook_target',
-] as const;
-export type CompileWarning = (typeof COMPILE_WARNINGS)[number];
-
-/** The one grammar for a field name: a scope key, a metadata field, a register's declared metadata entry. */
-export const MEMORY_FIELD_NAME = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
 
 const fieldName = z.string().regex(MEMORY_FIELD_NAME);
 const ref = (max: number) => bounded.id(max, { min: 1 });
