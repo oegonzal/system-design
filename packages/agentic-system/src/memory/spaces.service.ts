@@ -6,23 +6,7 @@ import {
 } from '@sysdesign/contracts';
 import { bestArtifact, type LoopClient } from '@sysdesign/loop-client';
 
-/**
- * Why a space cannot be made from a run: the loop has no such run, the run is
- * still going, or it holds no memory strategy that reads. The spaces service's
- * own vocabulary, beside the runtime's refusals; the HTTP door gives each one
- * declared status.
- */
-export type RunRefusal = 'run.not_found' | 'run.in_flight' | 'run.no_strategy';
-
-export class RunRefused extends Error {
-  constructor(
-    readonly code: RunRefusal,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'RunRefused';
-  }
-}
+import { HostRefused } from './host-refusal';
 
 /**
  * A memory space made from a design run: the run read from the loop, its best
@@ -43,16 +27,18 @@ export class SpacesService {
     runId: string,
   ): Promise<{ space: MemorySpaceDto } | { report: CompileReportDto }> {
     const run = await this.runs.getRun(runId);
-    if (run === null) throw new RunRefused('run.not_found', `the quality loop has no run ${runId}`);
+    if (run === null) {
+      throw new HostRefused('run.not_found', `the quality loop has no run ${runId}`);
+    }
     if (run.status === 'running') {
-      throw new RunRefused(
+      throw new HostRefused(
         'run.in_flight',
         `run ${runId} is still running; a space is made from a settled run`,
       );
     }
     const strategy = bestArtifact(run, memoryStrategySchema);
     if (strategy === null) {
-      throw new RunRefused('run.no_strategy', `run ${runId} holds no memory strategy that reads`);
+      throw new HostRefused('run.no_strategy', `run ${runId} holds no memory strategy that reads`);
     }
     return this.memory.createSpace({
       designRunId: runId,

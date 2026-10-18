@@ -1,11 +1,12 @@
 /**
  * The agentic-memory runtime's wire shapes: what a caller remembers, updates,
- * invalidates and recalls, what consolidation and a compile report answer, and
- * the vocabulary a stored row is checked against. A memory space is one memory
- * strategy made executable — its registers become stores, its declared
- * interfaces the only verbs it serves, its consolidation workflow the route a
- * lesson takes. The runtime (`@sysdesign/agentic-memory`) executes them, the
- * agentic-system service serves them over HTTP, and the db entity keeps the rows.
+ * invalidates and recalls, what a writer is briefed with, what consolidation
+ * and a compile report answer, and the vocabulary a stored row is checked
+ * against. A memory space is one memory strategy made executable — its
+ * registers become stores, its declared interfaces the only verbs it serves,
+ * its consolidation workflow the route a lesson takes. The runtime
+ * (`@sysdesign/agentic-memory`) executes them, the agentic-system service
+ * serves them over HTTP, and the db entity keeps the rows.
  *
  * A request names its scope as declared scope keys to values; the first key the
  * policy declares is the partition every request and every row carries. A memory
@@ -79,7 +80,8 @@ export type CompileProblem = (typeof COMPILE_PROBLEMS)[number];
 
 const fieldName = z.string().regex(MEMORY_FIELD_NAME);
 const ref = (max: number) => bounded.id(max, { min: 1 });
-const instant = z.iso.datetime({ offset: true });
+/** An instant with its offset, as every time a memory carries is written. */
+export const instantSchema = z.iso.datetime({ offset: true });
 /** Any register name a lenient read of a strategy can hold. */
 const registerRef = ref(keptAtMost(REGISTER_NAME_BOUND));
 
@@ -104,7 +106,7 @@ const semanticCandidateSchema = z.strictObject({
   subject: ref(160),
   predicate: ref(80),
   value: bounded.text(bound(800), { min: 1 }),
-  validFrom: instant.nullable(),
+  validFrom: instantSchema.nullable(),
 });
 
 const lessonSchema = z.strictObject({
@@ -120,7 +122,7 @@ const episodicCandidateSchema = z.strictObject({
   action: bounded.text(bound(400), { min: 1 }),
   outcome: bounded.text(bound(400), { min: 1 }),
   outcomeVerified: z.boolean(),
-  occurredAt: instant,
+  occurredAt: instantSchema,
   lesson: lessonSchema.nullable(),
 });
 
@@ -138,7 +140,7 @@ const relationalCandidateSchema = z.strictObject({
   subject: ref(160),
   relation: ref(80),
   object: ref(160),
-  validFrom: instant.nullable(),
+  validFrom: instantSchema.nullable(),
 });
 
 /** The candidate a register of each kind accepts — the typed memory a caller remembers. */
@@ -150,6 +152,20 @@ export const CANDIDATE_SCHEMAS = {
   relational: relationalCandidateSchema,
 } as const satisfies Record<RegisterKind, z.ZodType>;
 export type CandidateOf<K extends RegisterKind> = z.infer<(typeof CANDIDATE_SCHEMAS)[K]>;
+
+/**
+ * The candidate field each kind's valid time is declared in — when an event
+ * happened, or since when a fact holds — or null where it is the moment of
+ * recording. Declared once, beside the candidates it names, so the runtime and
+ * anything that asks a writer for a candidate date it by the same field.
+ */
+export const CANDIDATE_VALID_TIME = {
+  working: null,
+  episodic: 'occurredAt',
+  semantic: 'validFrom',
+  procedural: null,
+  relational: 'validFrom',
+} as const satisfies { [K in RegisterKind]: (keyof CandidateOf<K> & string) | null };
 
 export const createSpaceRequestSchema = z.strictObject({ runId: ref(80) });
 
@@ -183,8 +199,8 @@ export const recallRecordsRequestSchema = z
     registers: bounded.list(bound(8, 'list'), registerRef, { min: 1 }).nullable().default(null),
     key: ref(160).nullable().default(null),
     text: bounded.text(bound(1000), { min: 1 }).nullable().default(null),
-    since: instant.nullable().default(null),
-    until: instant.nullable().default(null),
+    since: instantSchema.nullable().default(null),
+    until: instantSchema.nullable().default(null),
     where: metadataSchema.default({}),
   })
   .refine(
@@ -326,6 +342,29 @@ export interface MemorySpaceDto {
   policySource: string;
   createdAt: IsoDateString;
   report: CompileReportDto;
+}
+
+/** A register a writer may remember into, and how it files what it keeps. */
+export interface WritableRegisterDto {
+  name: string;
+  kind: RegisterKind;
+  term: MemoryTerm;
+  /** What the space's strategy says the register holds. */
+  holds: string;
+  /** The candidate fields a current value is one per; empty for a kind that appends. */
+  identity: string[];
+  /**
+   * Identity values the register keeps for what consolidation writes into it.
+   * A memory that takes one reconciles with, and replaces, consolidation's of
+   * the same identity, and the write path does not refuse it: a writer is told
+   * them so it takes none.
+   */
+  reserved: { field: string; value: string }[];
+}
+
+/** What a writer is told before it remembers into a space: every register it may write. */
+export interface SpaceWriteBriefDto {
+  registers: WritableRegisterDto[];
 }
 
 export interface MemoryRefusalDto {

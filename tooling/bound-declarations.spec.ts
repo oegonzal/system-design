@@ -57,6 +57,7 @@ const SCHEMA_FILES = [
   'packages/quality-loop/src/core/outputs/experience-record.ts',
   'packages/quality-loop/src/pipelines/experience-digest/output.ts',
   'packages/quality-loop/src/pipelines/document-digest/output.ts',
+  'packages/quality-loop/src/pipelines/register-digest/output.ts',
   'packages/quality-loop/src/pipelines/memory-recall/input.ts',
   'packages/quality-loop/src/pipelines/memory-recall/output.ts',
   'packages/quality-loop/src/pipelines/experience-digest/input.ts',

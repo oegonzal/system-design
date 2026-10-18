@@ -26,12 +26,19 @@ import {
   renderGoal as renderKnowledge,
 } from '../../pipelines/knowledge-digest/input';
 import { fromRun, type RecalledItem } from '../../pipelines/knowledge-digest/from-run';
-import { completed, requestInput, runFailed, runTarget, skipped, storeReadiness } from '../common';
+import {
+  completed,
+  requestInput,
+  runFailed,
+  runTarget,
+  skipped,
+  storeReadiness,
+  UNADMITTED_REASON,
+} from '../common';
 import { bareGoal } from '../memory/recall/inject';
 import { originOf } from '../memory/store/index-memories';
 import type { MemoryHit } from '../memory/ports';
 import type { StepContext, StepResult } from '../runner/definition';
-import { UNADMITTED_REASON } from '../memory/unadmitted';
 import {
   readKnowledgeDigest,
   type KnownRef,

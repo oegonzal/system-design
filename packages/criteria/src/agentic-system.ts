@@ -42,4 +42,19 @@ export const AGENTIC_SYSTEM_CRITERIA: readonly Criterion[] = [
     statement:
       'POST /spaces compiles a space from a settled run’s best strategy and answers its report — an unknown run 404, a running one 409, one with no strategy or one that does not compile 422 naming why — and every memory verb is served with one declared status per refusal.',
   },
+  {
+    id: 'AGS-9',
+    statement:
+      'A digest is refused before any model call wherever its writes would be refused — an unknown space, one that no longer compiles, a scope the space does not declare — and when no register is left for it to write or its goal is past the engine’s budget; otherwise it starts one register-memory orchestration on a goal composed from the space’s write brief alone, under the declared iteration budget, and answers 202 with its id.',
+  },
+  {
+    id: 'AGS-10',
+    statement:
+      'A digest is read and remembered from the loop’s own record, never recomputed: its report is read with the contract the step wrote it by and answered as read; only the memories it endorsed are written, in report order, through the runtime’s write path under the scope and provenance its goal’s index carries, each answered with its outcome or its refusal, and a withheld memory never; a running digest answers 409, one without a readable report 422, another space’s or another orchestrator’s 404, and a refusal of the whole apply aborts it with nothing recorded.',
+  },
+  {
+    id: 'AGS-11',
+    statement:
+      'A digest is applied once: each apply is recorded with every item’s outcome, identically in Postgres and in memory, and a second apply — or one that loses the race to record — answers 409.',
+  },
 ];

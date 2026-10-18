@@ -81,9 +81,12 @@ and the runtime does not guess.
 
 Every kind is a declared behavior (`kinds/behaviors.ts`): its candidate schema,
 the fields its identity is made of, the values an exact recall finds it by, its
-valid-time field, its text template, whether it is projected, and its
-consolidation role. The engine reads these and nothing else, so a new or changed
-kind is a registry entry, not an engine edit.
+valid-time field, its text template, whether it is projected, and the identity
+values it keeps for the lessons consolidation writes into it. The engine reads
+these and nothing else, so a new or changed kind is a registry entry, not an
+engine edit. The role a kind plays in consolidation is the contracts'
+(`CONSOLIDATION_ROLES`), and so is the field its valid time comes from
+(`CANDIDATE_VALID_TIME`), which the digest reads too (§9).
 
 | kind       | identity                    | exact keys      | valid from              | projected | role      |
 | ---------- | --------------------------- | --------------- | ----------------------- | --------- | --------- |
@@ -96,6 +99,12 @@ kind is a registry entry, not an engine edit.
 A relation's identity includes its object, so several edges stand at once (an
 account's several contacts); an edge ends by invalidation. Relations and working
 state are found by key, never by similarity, so neither is embedded.
+
+The semantic register consolidation keeps its lessons in has one identity
+reserved: every lesson is written under the predicate `lesson`, so a writer's
+memory under it would reconcile with, and replace, the lesson of the same
+subject. The write brief names it on that register (§4), and a digest withholds a
+memory that takes it.
 
 ## 4. Writing
 
@@ -126,6 +135,14 @@ record outside the caller's scope, so a record's existence does not leak.
 Postgres is written first and is the truth. The record is then embedded and its
 point upserted; a projection that fails leaves the record unmarked for the sweep —
 exact and temporal recall still find it meanwhile.
+
+The runtime briefs a writer before it writes (`MemoryService.writeBrief`,
+`write/brief.ts`), and the brief writes nothing. It is refused as a write would
+be — a space not kept or not compiling, a scope the policy does not declare — and
+answers every register that declares `remember`, less the one consolidation
+promotes playbooks into (its versions are consolidation's): each with what its
+strategy says it holds, the fields it reconciles on, and the identities it keeps
+reserved. No route serves it on its own; a digest is composed from it (§9).
 
 ## 5. Recalling
 
@@ -205,35 +222,115 @@ finishes, recall by meaning has a gap; exact and temporal recall do not.
 
 ## 9. HTTP — `packages/agentic-system`, `/spaces`
 
-| route                          | does                                                                                                                                                              |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /spaces { runId }`       | compile a settled `memory-architecture` run's best strategy into a space — finished or failed, never still running; 201 with its report, or 422 with the problems |
-| `GET /spaces/:id`              | the space and its compile report                                                                                                                                  |
-| `POST /spaces/:id/remember`    | `{ register, scope, candidate, provenance, metadata }`                                                                                                            |
-| `POST /spaces/:id/update`      | `{ recordId, scope, candidate, provenance, metadata }`                                                                                                            |
-| `POST /spaces/:id/invalidate`  | `{ recordId, scope, reason }`                                                                                                                                     |
-| `POST /spaces/:id/history`     | `{ recordId, scope }` — every version                                                                                                                             |
-| `POST /spaces/:id/recall`      | `{ scope, key?, text?, since?, until?, registers?, where? }`                                                                                                      |
-| `POST /spaces/:id/consolidate` | `{ scope }`                                                                                                                                                       |
+| route                                      | does                                                                                                                                                                                                |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /spaces { runId }`                   | compile a settled `memory-architecture` run's best strategy into a space — finished or failed, never still running; 201 with its report, or 422 with the problems                                   |
+| `GET /spaces/:id`                          | the space and its compile report                                                                                                                                                                    |
+| `POST /spaces/:id/remember`                | `{ register, scope, candidate, provenance, metadata }`                                                                                                                                              |
+| `POST /spaces/:id/update`                  | `{ recordId, scope, candidate, provenance, metadata }`                                                                                                                                              |
+| `POST /spaces/:id/invalidate`              | `{ recordId, scope, reason }`                                                                                                                                                                       |
+| `POST /spaces/:id/history`                 | `{ recordId, scope }` — every version                                                                                                                                                               |
+| `POST /spaces/:id/recall`                  | `{ scope, key?, text?, since?, until?, registers?, where? }`                                                                                                                                        |
+| `POST /spaces/:id/consolidate`             | `{ scope }`                                                                                                                                                                                         |
+| `POST /spaces/:id/digests`                 | `{ title, parts: [{ label, at, text }], rules?, registers?, scope, provenance }` — digest a text into typed memories on the quality loop; 202 with the orchestration, which runs for minutes        |
+| `GET /spaces/:id/digests/:runId`           | the digest as the loop recorded it: the orchestration's status; the digest step's status, reason, note and counts; the run it opened; its report as read, or null; and the apply, once there is one |
+| `POST /spaces/:id/digests/:runId/remember` | no body — remember what the digest endorsed, once; 200 with each memory's outcome or refusal                                                                                                        |
 
 Every refusal has one declared status, its body carrying the refusal's `code`:
 
 - **404** — `space.not_found`, `record.not_found`, `run.not_found`, each naming
-  what is `missing` (`space`, `record`, `run`);
-- **409** — `record.not_current`, `conflict`, and `run.in_flight` (a run still
-  running has no settled strategy yet);
+  what is `missing` (`space`, `record`, `run`); a digest the loop does not have,
+  one another orchestrator ran, or one whose goal names another space is
+  `run.not_found` too, so a digest's existence does not leak across spaces;
+- **409** — `record.not_current`, `conflict`, `run.in_flight` (a run or a digest
+  still running has settled nothing yet), and `digest.applied` (the digest was
+  remembered already);
 - **422** — the rest: an undeclared verb, an invalid scope, candidate or metadata,
-  an unavailable consolidation, a space that no longer compiles, and
-  `run.no_strategy`;
+  an unavailable consolidation, a space that no longer compiles,
+  `run.no_strategy`, and a digest with no register left to write
+  (`digest.no_registers`, naming those the space lets a writer remember into),
+  one whose goal would not fit the engine's budget (`digest.too_large`), or one
+  whose step left no report that reads (`digest.no_report`, saying how the step
+  ended);
 - **400** — a body the request schema refuses, naming every offending path;
 - **502 / 503 / 504** — the quality loop refused, could not be reached, or was too
-  slow, when `POST /spaces` reads the run.
+  slow, when `POST /spaces` reads the run or a digest route starts or reads its
+  orchestration.
+
+### Digesting a text
+
+A program that owns a text — a conversation, a passage, a tool's result — hands
+it to a space already split into parts, each with the label and the time it
+declares; the host splits nothing and reads no prose. The text is digested on
+the quality loop, by the `register-memory` orchestrator over the
+`register-digest` pipeline, and checked at four points before anything is
+recorded:
+
+1. **Before any model call** (`POST …/digests`). The runtime briefs the
+   request's scope (§4), so a digest is refused wherever its writes would be; the
+   brief's registers are narrowed to the ones `registers` names, and `null` keeps
+   every one; and the goal is composed by the contracts codec
+   (`renderRegisterDigestGoal`): each part quoted under its `section.N` alias with
+   its label and time, each register with what it holds, the fields it reconciles
+   on and the identities it keeps reserved, the caller's rules, the limits, and
+   last the index — the only place the space, the scope and the provenance
+   appear, so no model is shown them and none can write them. One orchestration
+   starts on it under the declared budget (`REGISTER_DIGEST_MAX_ITERATIONS`), and
+   the host keeps nothing.
+2. **Before a row exists** (the loop). `register-memory` refuses a goal with no
+   register-digest index, and a request that hands in an output or a rubric.
+3. **Before anything is endorsed** (the loop's reader). The digest files each
+   memory in the runtime's own candidate shape. A confirmed finding of a type
+   that withholds, or a warning validator — a section the goal does not list, a
+   register it does not list, anything but one slot of that register's kind, a
+   candidate the runtime's strict schema refuses, a reserved identity — withholds
+   that memory alone. The step endorses the rest only from a run the engine admits,
+   whose every declared lens answered, and in which no safeguard criterion
+   settled `fail`; otherwise it endorses none and says why (`not-accepted`,
+   `no-rubric`, `no-artifact`, `judges-lost`, `safeguard-failed`), and it says
+   `no-memories` when nothing was left to endorse.
+4. **Before any write** (`POST …/remember`). The orchestration has settled, its
+   digest step completed with a report that reads, its index names this space,
+   and no apply of it is recorded. Each endorsed memory is then remembered in
+   report order under the index's scope and provenance, with no metadata, and
+   the apply is recorded once, after the writes (`memory_space_digest`).
+
+A refusal of one memory (`register.unknown`, `operation.undeclared`,
+`candidate.invalid`, `metadata.undeclared`) comes back as that memory's item,
+beside the others; a refusal of the whole apply (`space.not_found`,
+`space.not_compiled`, `scope.invalid`, `conflict`) aborts it with nothing
+recorded, so the apply can be sent again whole. A digest that endorsed nothing
+applies as an apply that wrote nothing. A withheld memory is reported by `GET`
+and never written. Nothing is held between the three calls — the loop's record
+is the job — so a host restart loses nothing; a loop that restarts mid-digest
+leaves its digest step closed as `interrupted`, `remember` answers 422, and
+digesting again is the recovery.
+
+What the caller owns:
+
+- **Provenance** is the text's own origin, `{ source, sourceRunId }`; the
+  orchestration and the digest run sit on the ledger row beside each record id.
+- **A text chunked into several digests** shares one `sourceRunId`, since
+  consolidation counts distinct source runs, and its chunks are applied in text
+  order, since supersession follows the order of the writes.
+- **A re-digest** of the same text is its owner's to prevent, as memory-ingest's
+  own ledger does for documents.
 
 ## 10. What is deliberately not here (yet)
 
-- **LLM digest.** `remember` takes typed memories. Extracting them from raw text is
-  the next round: a quality-loop pipeline whose output schema is these candidate
-  schemas, its endorsement reported, feeding this write path.
+- **Re-digest dedupe.** Nothing stops one text being digested twice; its owner
+  keeps that ledger. Under the same `sourceRunId` a reworded episode appends
+  beside the first and adds no support.
+- **Same identity within one digest.** Two endorsed memories of one identity are
+  both written, in report order, so the later supersedes the earlier, and the
+  apply's items show it (`superseded`). No validator looks for it; the ledger
+  measures it first.
+- **Supersession by valid time.** A write supersedes the current record whatever
+  their valid times, so applying an older text after a newer one rolls a fact
+  back. A valid-time rule belongs to a runtime round of its own.
+- **Digest metadata.** A digested memory is written with no metadata: a
+  strategy's metadata mixes system, scope and body fields, and nothing declares
+  which of them a text may ground.
 - **Measured defaults.** The policy's numbers are starting values, to be calibrated
   against recall@k / MRR on recorded traffic.
 - **Paged backfill.** A projection backfill reads every due record at once; a very
@@ -244,12 +341,23 @@ Every refusal has one declared status, its body carrying the refusal's `code`:
 ## 11. File map
 
 - Engine: `packages/agentic-memory/src/` — `space/` (policy, scope, compile),
-  `kinds/`, `write/`, `recall/`, `lifecycle/` (consolidate, sweep), `service/`
+  `kinds/`, `write/` (and the write brief, `brief.ts`), `recall/`, `lifecycle/`
+  (consolidate, sweep), `service/`
 - Adapters: `src/adapters/mikro-orm/` (Postgres), `src/adapters/qdrant/`
 - Fakes holding the same contract: `src/testing/` (and `record-store-contract.ts`,
   run against both stores)
-- Wire shapes and the record vocabulary: `packages/contracts/src/lib/agentic-system/memory.ts`
+- Wire shapes and the record vocabulary: `packages/contracts/src/lib/agentic-system/memory.ts`;
+  beside it, a digest's goal codec (`register-digest.ts`) and its step report and
+  host DTOs (`register-memory.ts`)
 - Tables: `memory_space`, `memory_record` (`packages/db`, migration
-  `Migration20261017100002_memory_space_and_record`)
+  `Migration20261017100002_memory_space_and_record`), and the digest apply ledger
+  `memory_space_digest` (`Migration20261018100001_memory_space_digest`)
 - Mount and policy: `packages/agentic-system/src/memory/`, `config/memory/standard.json`
-- Criteria: `AGM-1`…`AGM-10` (`packages/criteria/src/agentic-memory.ts`)
+- Digests: `packages/agentic-system/src/memory/digests/` — the service, the
+  controller, the ledger port, and in `persistence/` its Postgres and in-memory
+  adapters with the contract both run (`digest-ledger-contract.ts`); on the loop,
+  `packages/quality-loop/src/pipelines/register-digest/` and
+  `src/orchestrators/register-memory/`
+- Criteria: `AGM-1`…`AGM-11` (`packages/criteria/src/agentic-memory.ts`); the
+  mount's `AGS-8`…`AGS-11` (`agentic-system.ts`); the digest's goal, pipeline and
+  orchestrator, `QL-75`…`QL-78` (`quality-loop.ts`)

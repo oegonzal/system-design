@@ -81,7 +81,10 @@ here. Beside it:
 step should read that as part of the brief), `runTarget` (run a declared
 pipeline as the run's own deliverable: its failure is the orchestration's),
 `providedAsOutput` (the stand-in a provided run makes), `briefRoutes` (the
-registry's `brief` pipelines, as `{ id, description }`), and the
+registry's `brief` pipelines, as `{ id, description }`), `storeReadiness`
+(whether the store can be searched, which the memory recall and the form recall
+both ask first), `UNADMITTED_REASON` (the one table of reasons a step gives for
+a child it may not draw on), and the
 shapes every step adapter writes: `requestInput` (the request's own run
 inputs), `skipped`, `completed` (a child that ran to a trace) and
 `runFailed` (the step's failure in the child's words). The runner itself is

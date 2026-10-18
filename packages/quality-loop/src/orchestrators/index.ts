@@ -10,6 +10,7 @@ import { KNOWLEDGE } from './knowledge/definition';
 import type { OrchestratorDefinition } from './runner/definition';
 import { MEMORY } from './memory/definition';
 import { MEMORY_DESIGN } from './memory-design/definition';
+import { REGISTER_MEMORY } from './register-memory/definition';
 import { ROUTER } from './router/definition';
 import { SECOND_OPINION } from './second-opinion/definition';
 
@@ -24,6 +25,7 @@ const declared: Erased[] = [
   DOCUMENT_MEMORY as unknown as Erased,
   KNOWLEDGE as unknown as Erased,
   MEMORY_DESIGN as unknown as Erased,
+  REGISTER_MEMORY as unknown as Erased,
 ];
 
 export const ORCHESTRATORS: ReadonlyMap<string, Erased> = new Map(

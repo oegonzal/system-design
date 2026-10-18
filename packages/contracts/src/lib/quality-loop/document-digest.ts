@@ -8,7 +8,13 @@
 import { z } from 'zod';
 
 import { unitKeySchema } from '../units/identity';
-import { readFencedIndex, renderIndexSection, withinBudget } from './goal-index';
+import {
+  readFencedIndex,
+  renderIndexSection,
+  SECTION_ALIAS,
+  sectionAlias,
+  withinBudget,
+} from './goal-index';
 
 export const DOCUMENT_DIGEST_ID = 'document-digest';
 
@@ -99,10 +105,6 @@ export const UNIT_BOUND_SCOPES: readonly MemoryScope[] = MEMORY_SCOPES.filter(
  */
 export const isUnitBound = (scope: MemoryScope | undefined): boolean =>
   scope !== undefined && UNIT_BOUND_SCOPES.includes(scope);
-
-/** Engine-assigned: the part's position, never anything the model wrote. */
-export const sectionAlias = (position: number): string => `section.${position + 1}`;
-export const SECTION_ALIAS = /^section\.\d+$/;
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 

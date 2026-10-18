@@ -63,7 +63,7 @@ refuses to start without a model login before Nest loads.
 | Folder           | What it is                                                                      |
 | ---------------- | ------------------------------------------------------------------------------- |
 | `core/`          | The engine. Pure: no Nest, no clock, no filesystem, no env vars, no randomness. |
-| `pipelines/`     | The thirteen pipelines, one folder each, plus the registry.                     |
+| `pipelines/`     | The fourteen pipelines, one folder each, plus the registry.                     |
 | `orchestrators/` | Compositions that run several pipelines in order, declared as data.             |
 | `modules/`       | The NestJS layer: HTTP routes, Postgres, Qdrant, the model client.              |
 | `cli/`           | The two command-line entry points, `run` and `replay`.                          |
@@ -168,10 +168,12 @@ heartbeat and janitor around them, and where the bus events are — is walked in
 
 ### `core/outputs/` — reading a finished run
 
-| File             | What it does                                                         | Exports                             |
-| ---------------- | -------------------------------------------------------------------- | ----------------------------------- |
-| `run-outputs.ts` | The standard projections: best iteration, artifact, ledger, lessons. | `outputsOf`, `admits`, `RunOutputs` |
-| `reconcile.ts`   | Where several runs agreed and where they did not.                    | `reconcile`, `spread`               |
+| File                   | What it does                                                                                   | Exports                                                                                                           |
+| ---------------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| `run-outputs.ts`       | The standard projections: best iteration, artifact, ledger, lessons.                           | `outputsOf`, `admits`, `RunOutputs`                                                                               |
+| `reconcile.ts`         | Where several runs agreed and where they did not.                                              | `reconcile`, `spread`                                                                                             |
+| `withheld.ts`          | What a reader of a run withholds of the items it draws on, by the rules the pipeline declares. | `withheldOf`, `withheldItems`, `withholdingOf`, `WithheldItem`                                                    |
+| `experience-record.ts` | A finished run reduced to the facts a digest reasons over, and fitted to a goal budget.        | `experienceOf`, `trimExperience`, `fitToBudget`, `teachesNothingNew`, `Experience`, the record's schemas and caps |
 
 Everything downstream reads a finished run through here and never re-derives "the best iteration".
 `reconcile` reports disagreement and never judges it — a threshold would be policy, and policy lives
@@ -205,7 +207,7 @@ diagnostic, never evidence.
 These are pure and import nothing from vitest, so they compile under the app tsconfig even though
 only specs use them.
 
-## `pipelines/` — the thirteen pipelines
+## `pipelines/` — the fourteen pipelines
 
 ### The folder layout, once
 
@@ -217,15 +219,15 @@ Every pipeline is `src/pipelines/<id>/` and repeats the same shape.
 | `lenses/*.md`        | yes      | One markdown persona per stage, imported `?raw`. The filename is the lens id.            |
 | `output.ts`          | yes      | The output shape: a zod schema, `locate` for positional ids, `render`.                   |
 | `definition.spec.ts` | yes      | Validity, a JSON-round-trippable summary, personas long enough to be real.               |
-| `input.ts`           | 8 of 12  | A codec, when the goal is more than a prompt. Renders a typed input to markdown.         |
-| `validators.ts`      | 10 of 12 | Deterministic checks, each gating `block`, `cut` or `warn`. Never read prose.            |
-| `testing.ts`         | 10 of 12 | Pure sample builders shared by the folder's specs.                                       |
-| `run.spec.ts`        | 9 of 12  | An end-to-end loop spec over a fake model.                                               |
-| `controller.ts`      | 1 of 12  | Only when the pipeline has a decision rule of its own (`system-design-canvas`).          |
-| `from-run.ts`        | 2 of 12  | A finished run becomes the next pipeline's input (the experience and knowledge digests). |
-| `refound.ts`         | 1 of 12  | Only `browser-step`: the pipeline's `refoundEvidence` pass.                              |
+| `input.ts`           | 9 of 14  | A codec, when the goal is more than a prompt. Renders a typed input to markdown.         |
+| `validators.ts`      | 12 of 14 | Deterministic checks, each gating `block`, `cut` or `warn`. Never read prose.            |
+| `testing.ts`         | 11 of 14 | Pure sample builders shared by the folder's specs.                                       |
+| `run.spec.ts`        | 10 of 14 | An end-to-end loop spec over a fake model.                                               |
+| `controller.ts`      | 1 of 14  | Only when the pipeline has a decision rule of its own (`system-design-canvas`).          |
+| `from-run.ts`        | 2 of 14  | A finished run becomes the next pipeline's input (the experience and knowledge digests). |
+| `refound.ts`         | 1 of 14  | Only `browser-step`: the pipeline's `refoundEvidence` pass.                              |
 
-### The twelve
+### The fourteen
 
 **`system-design/`** — produces a structured design answer (summary, assumptions, components, flows,
 data model, tradeoffs, risks, capacity) from a markdown prompt, for a person practising. Four
@@ -265,7 +267,7 @@ no path can make decide `retry` — a retry would replace the author's canvas wi
 
 **`design-prompt/`** — produces a practice prompt from an engineer's experience: title, scenario,
 functional requirements, an NFR table, a scale table, constraints. The smallest pipeline — two
-critics, one evaluator, one sample each, the only warn-only validator. Its gated finding is
+critics, one evaluator, one sample each, and one validator, which only warns. Its gated finding is
 `brand_leak`, the one defect no score can offset.
 
 **`browser-step/`** — produces one plan for the page in front of a browser session: an assessment
@@ -296,6 +298,14 @@ evidence the goal lists, routing a field no evidence settles to the operator. A 
 validator and a `warn` limits validator; its evaluator runs after the critics, shown what they
 confirmed. The only gated type is a trap answered.
 
+**`answer-suggestions/`** — drafts a few suggested answers for each field of one form page the
+operator is about to be asked: from the record the goal lists about the subject, or, where the
+record is silent and the goal's suggesting policy allows, drafts labelled as drafts. Its goal is the
+form codec's, composed for this pipeline, and it runs as the form-memory orchestrator's other
+target. Four criteria head every rubric; two critics and one evaluator beside them, one sample each,
+one iteration — the operator waits on it — and a faulted suggestion is withheld from the operator
+rather than revised. A `block` references validator and two `warn` ones, citations and limits.
+
 **`document-digest/`** — digests one chunk of a document — a résumé page, a notes file, the
 operator's answers from a session — into facts in the store's own item shape, each resting on the
 sections that state it. Three critics and two evaluators, every lens sampled twice.
@@ -305,9 +315,24 @@ pattern, a procedure — written against what the store already knows. Its `from
 input from engine facts. Three critics and two evaluators, every lens sampled twice; two validators
 read its index, and three warnings withhold or keep an item as each declares.
 
+**`register-digest/`** — digests one text a program hands to a memory space — a conversation, a
+passage, a tool's result — into typed memories, each filed under a register the space lets a writer
+remember into and resting on the sections that state it. Its goal is composed by the space's host
+with the contracts codec (`renderRegisterDigestGoal`): every part quoted under its `section.N` alias
+with the label and time the text's owner declared, then the registers — what each holds, the fields
+it reconciles on, the identities it keeps reserved — the caller's rules, the limits, and an index
+that alone carries the space, the scope and the provenance. A memory fills one of five nullable kind
+slots, each the agentic-memory runtime's own candidate schema with its valid time relaxed to
+nullable text. Three dimensions — coverage, fidelity, filing — each earned by a kind, with the
+grounding, filing and safeguard rules fixed on every rubric; three critics own the eight finding
+types and two evaluators judge beside them, every lens sampled twice. Its four validators only warn,
+each withholding the one memory it faults, never the digest. Its caps are seeded from
+`document-digest`'s measurements until its own `measured.json` records runs. The `register-memory`
+orchestrator runs it and reports what the space may write.
+
 ### The registry
 
-`pipelines/index.ts` imports the twelve definitions, erases their type parameter and exports `PIPELINES`
+`pipelines/index.ts` imports the fourteen definitions, erases their type parameter and exports `PIPELINES`
 keyed by id. Exactly one place consumes it: `modules/runs/pipelines.module.ts`, which provides it as
 `PIPELINES_TOKEN`. Adding a pipeline is a folder, one line in `index.ts`, and one line in the ordered
 list in `index.spec.ts`. Nothing in `core/` changes.
@@ -429,7 +454,8 @@ pure and round-trips. Reading a finished run goes through `core/outputs/`.
 An orchestrator is data: which pipelines run, in what order, what each step needs from the ones
 before it, and the closed set of reasons its steps may give. One generic runner executes any of them.
 `index.ts` exports `ORCHESTRATORS`; `common.ts` holds what more than one of them declares —
-`refuseInternal`, `bareRequest`, `runTarget`, `briefRoutes` — none of which the runner applies.
+`refuseInternal`, `bareRequest`, `runTarget`, `briefRoutes`, and `UNADMITTED_REASON`, the reason a
+memory step gives for a child it may not draw on — none of which the runner applies.
 
 ### The shared machinery
 
@@ -443,15 +469,17 @@ several times over, `reconcileStep` reads those runs and reports where they disa
 
 ### Each one
 
-| Orchestrator      | Steps                         | Run it when                                                                   |
-| ----------------- | ----------------------------- | ----------------------------------------------------------------------------- |
-| `memory`          | recall, target, digest, store | You want a run to benefit from, and contribute to, what earlier runs learned. |
-| `knowledge`       | target, known, digest, store  | You want a finished run turned into typed knowledge, against what is known.   |
-| `router`          | classify, judge               | You have a brief and do not want to choose the pipeline yourself.             |
-| `calibration`     | panel, reconcile              | You want to measure end-to-end variance before trusting a score.              |
-| `second-opinion`  | first, panel, reconcile       | You want to judge one fixed artifact again and see where the judges disagree. |
-| `form-memory`     | recall, target                | A form page needs the subject's facts before it is answered.                  |
-| `document-memory` | digest, store                 | A document chunk should become facts about its subject.                       |
+| Orchestrator      | Steps                         | Run it when                                                                              |
+| ----------------- | ----------------------------- | ---------------------------------------------------------------------------------------- |
+| `memory`          | recall, target, digest, store | You want a run to benefit from, and contribute to, what earlier runs learned.            |
+| `knowledge`       | target, known, digest, store  | You want a finished run turned into typed knowledge, against what is known.              |
+| `router`          | classify, judge               | You have a brief and do not want to choose the pipeline yourself.                        |
+| `calibration`     | panel, reconcile              | You want to measure end-to-end variance before trusting a score.                         |
+| `second-opinion`  | first, panel, reconcile       | You want to judge one fixed artifact again and see where the judges disagree.            |
+| `form-memory`     | recall, target                | A form page needs the subject's facts before it is answered.                             |
+| `document-memory` | digest, store                 | A document chunk should become facts about its subject.                                  |
+| `memory-design`   | target, known, digest, store  | A finished memory-architecture design run should be learned from, against what is known. |
+| `register-memory` | digest                        | A text handed to a memory space should become the typed memories its registers keep.     |
 
 `memory/` and `knowledge/` are the largest. In `memory/`, `recall/` builds the query, fuses the hits
 and injects what the recall run endorsed into the goal; `digest/` reads what the digest run endorsed;

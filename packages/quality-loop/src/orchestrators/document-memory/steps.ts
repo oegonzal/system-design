@@ -19,10 +19,9 @@ import { DEFAULT_QUALITY_RUN_ITERATIONS, DOCUMENT_MEMORY_KINDS } from '@sysdesig
 
 import { outputsOf } from '../../core/outputs';
 import { DOCUMENT_DIGEST_ID, readIndex } from '../../pipelines/document-digest/input';
-import { completed, requestInput, runFailed, skipped } from '../common';
+import { completed, requestInput, runFailed, skipped, UNADMITTED_REASON } from '../common';
 import type { Digested } from '../memory/digest/endorsed';
 import { indexMemories } from '../memory/store/index-memories';
-import { UNADMITTED_REASON } from '../memory/unadmitted';
 import type { StepContext, StepResult } from '../runner/definition';
 import type { DocumentMemoryPorts } from './ports';
 import { readDocumentDigest, UNIT_UNNAMED } from './read-document-digest';

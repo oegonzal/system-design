@@ -4,7 +4,7 @@ import type { AnswerBasis } from './vocab';
 import { ANSWER_REASON_BOUND, type FieldAnswers } from './field-answers.schema';
 import { fieldSpecOf, type FieldSpec } from './field-goal';
 import { answeringFixture, formObservation } from './fixtures';
-import { type WithheldRef } from './pipelines';
+import { type WithheldRef } from '../quality-loop/admission';
 import { judgedRun as judged, type RunShape } from '../quality-loop/run-fixtures';
 import { routeFields, type FieldsDecision } from './route-fields';
 

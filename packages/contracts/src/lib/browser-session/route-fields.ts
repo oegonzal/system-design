@@ -12,14 +12,14 @@
  * the 34 whose answer is known were right.
  */
 import { parseLenient } from '../bounds';
-import type { Admission } from '../quality-loop/admission';
+import type { Admission, WithheldRef } from '../quality-loop/admission';
 import type { IterationTrace } from '../quality-loop/decision';
 import { bestIterationOf } from '../quality-loop/read-back';
 import type { QualityRunDto } from '../quality-loop/runs';
 import type { AnsweringSettings } from './answering';
 import { fieldAnswersSchema, type FieldAnswer } from './field-answers.schema';
 import type { FieldSpec } from './field-goal';
-import { fieldLocation, type WithheldRef } from './pipelines';
+import { fieldLocation } from './pipelines';
 import type { BrowserDecisionSource, FieldRoute } from './vocab';
 
 export interface FieldReadout {

@@ -1,12 +1,16 @@
+import { randomUUID } from 'node:crypto';
+
 import {
   fakeRun,
   type OrchestrationRunDto,
   type OrchestrationRunStartedDto,
+  type OrchestrationStepDto,
   type QualityLoopHealthDto,
   type QualityRunDto,
   type QualityRunStartedDto,
   type QualityRunStatus,
   type StartOrchestrationFromRunRequest,
+  type StartOrchestrationRequest,
   type StartQualityRunRequest,
 } from '@sysdesign/contracts';
 import { LoopClient } from '@sysdesign/loop-client';
@@ -24,26 +28,43 @@ export interface FakeSettling {
   orchestration: QualityRunStatus;
 }
 
+/** What a fake loop is scripted with; every part has a quiet default. */
+export interface FakeLoopOptions {
+  /** The runs that hold an artifact in their iteration, by id — a memory strategy a space is made from. */
+  artifacts?: ReadonlyMap<string, unknown>;
+  settled?: Partial<FakeSettling>;
+  /** The steps an orchestration started on a goal settles with, by step id: each complete unless the script says more. */
+  steps?: Readonly<Record<string, Partial<OrchestrationStepDto>>>;
+}
+
 /**
- * A loop that records the coach run and the orchestration it was asked for,
+ * A loop that records the coach run and the orchestrations it was asked for,
  * and answers each already settled — complete, unless a spec names another
  * ending in `settled`. A run named in `artifacts` holds that artifact in its
- * iteration — a memory strategy a space is made from — and any other holds none.
+ * iteration, and any other holds none. An orchestration handed a finished run
+ * is the cycle's learn step; one started on a goal — a memory space's digest —
+ * is answered with the goal and budget it was started on and the steps a spec
+ * scripted.
  */
 export class FakeLoopClient extends LoopClient {
   readonly runs: StartQualityRunRequest[] = [];
   readonly fromRun: StartOrchestrationFromRunRequest[] = [];
+  /** The orchestrations started on a goal, by the id each was answered with. */
+  readonly started = new Map<
+    string,
+    { orchestrator: string; request: StartOrchestrationRequest }
+  >();
   private readonly runId = 'coach-run-1';
   private readonly orchestrationRunId = 'learn-run-1';
   private readonly artifacts: ReadonlyMap<string, unknown>;
   private readonly settled: FakeSettling;
+  private readonly steps: Readonly<Record<string, Partial<OrchestrationStepDto>>>;
 
-  constructor(
-    options: { artifacts?: ReadonlyMap<string, unknown>; settled?: Partial<FakeSettling> } = {},
-  ) {
+  constructor(options: FakeLoopOptions = {}) {
     super();
     this.artifacts = options.artifacts ?? new Map();
     this.settled = { run: 'complete', orchestration: 'complete', ...options.settled };
+    this.steps = options.steps ?? {};
   }
   health(): Promise<QualityLoopHealthDto> {
     return Promise.resolve({
@@ -80,27 +101,58 @@ export class FakeLoopClient extends LoopClient {
   getPrompt(): Promise<never> {
     return Promise.resolve(notUsed('getPrompt'));
   }
-  startOrchestration(): Promise<never> {
-    return Promise.resolve(notUsed('startOrchestration'));
+  startOrchestration(
+    orchestrator: string,
+    request: StartOrchestrationRequest,
+  ): Promise<OrchestrationRunStartedDto> {
+    const orchestrationRunId = randomUUID();
+    this.started.set(orchestrationRunId, { orchestrator, request });
+    return Promise.resolve({ orchestrationRunId, status: 'running' });
   }
   getOrchestration(orchestrationRunId: string): Promise<OrchestrationRunDto | null> {
     const run = fakeRun('memory-architecture', null, { runId: this.runId });
+    const started = this.started.get(orchestrationRunId);
     return Promise.resolve({
       orchestrationRunId,
-      orchestrator: 'memory-design',
-      pipeline: 'memory-architecture',
+      orchestrator: started?.orchestrator ?? 'memory-design',
+      pipeline: started === undefined ? 'memory-architecture' : null,
       status: this.settled.orchestration,
       startedAt: run.startedAt,
       finishedAt: run.startedAt,
-      request: { ...run.request, samples: null },
+      request: {
+        ...run.request,
+        goal: started?.request.goal ?? run.request.goal,
+        maxIterations: started?.request.maxIterations ?? run.request.maxIterations,
+        samples: null,
+      },
       openedBy: null,
       context: {},
-      steps: {},
+      steps: started === undefined ? {} : this.scriptedSteps(run.startedAt),
       error: null,
     });
   }
   retractMemory(): Promise<never> {
     return Promise.resolve(notUsed('retractMemory'));
+  }
+
+  /** The scripted steps as the record holds them: each complete at `at`, unless the script says more. */
+  private scriptedSteps(at: string): Record<string, OrchestrationStepDto> {
+    return Object.fromEntries(
+      Object.entries(this.steps).map(([id, step]): [string, OrchestrationStepDto] => [
+        id,
+        {
+          status: 'complete',
+          reason: null,
+          runIds: [],
+          note: null,
+          counts: {},
+          report: null,
+          startedAt: at,
+          finishedAt: at,
+          ...step,
+        },
+      ]),
+    );
   }
 }
 

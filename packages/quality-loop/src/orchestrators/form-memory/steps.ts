@@ -16,7 +16,6 @@ import {
   FIELD_ANSWER_PIPELINE_ID,
   FORM_PIPELINES,
   GoalBudgetExceeded,
-  parseLenient,
   splitFieldGoal,
   type FieldGoalInput,
   type FormMemoryStepReason,
@@ -26,14 +25,7 @@ import {
 } from '@sysdesign/contracts';
 import { describeError } from '@sysdesign/run-dump';
 
-import {
-  admission,
-  outputsOf,
-  withheldItems,
-  withholdingOf,
-  type RunOutputs,
-  type WithheldItem,
-} from '../../core/outputs';
+import { admission, outputsOf, withheldOf } from '../../core/outputs';
 import type { PipelineDefinition } from '../../core/pipeline';
 import { ANSWER_SUGGESTIONS } from '../../pipelines/answer-suggestions/definition';
 import { FIELD_ANSWER } from '../../pipelines/field-answer/definition';
@@ -67,26 +59,6 @@ const FORM_DEFINITIONS: Readonly<Record<FormPipeline, PipelineDefinition<unknown
 
 const formPipelineOf = (named: string | undefined): FormPipeline | null =>
   FORM_PIPELINES.find((pipeline) => pipeline === named) ?? null;
-
-/**
- * The locations of the run's best artifact a reader withholds, each with what
- * withheld it and why: every one a confirmed finding or a validator problem
- * names, as far as what named it withholds — read off the pipeline's own
- * declarations, over engine facts only. The session routes by these and
- * recomputes nothing from the findings itself.
- */
-export function withheldOf<T>(
-  definition: PipelineDefinition<T>,
-  outputs: RunOutputs,
-): WithheldItem[] {
-  const { best } = outputs;
-  if (best === null) return [];
-  // Read as the session reads it: a text a little past its bound is kept and noted, never a reason to withhold nothing.
-  const parsed = parseLenient(definition.task.output.schema, best.artifact);
-  if (!parsed.ok) return [];
-  const items = definition.task.output.locate(parsed.value).map((location) => location.id);
-  return withheldItems(best.ledger, items, withholdingOf(definition));
-}
 
 /**
  * The goal with as much of the evidence as fits the engine's budget, the

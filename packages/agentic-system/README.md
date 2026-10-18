@@ -20,24 +20,28 @@ here as declared data.
 
 ## Routes
 
-| Method | Path                      | What                                                                                                                         |
-| ------ | ------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `POST` | `/designs`                | Start a design cycle from a memory brief (`{ goal }`); 202 with the cycle, which runs off the request path.                  |
-| `GET`  | `/designs/:id`            | Read a cycle back: its status, the coach run, the orchestration that learned from it.                                        |
-| `POST` | `/spaces`                 | Make a memory space from a settled run's best strategy (`{ runId }`); 201 with the space and its compile report.             |
-| `GET`  | `/spaces/:id`             | Read a space back, its report compiled again from the snapshots it keeps.                                                    |
-| `POST` | `/spaces/:id/remember`    | Assert a typed memory in a register: inserted, unchanged (it says the same), or superseding the current one.                 |
-| `POST` | `/spaces/:id/update`      | Supersede an addressed, current record with a new version of the same identity.                                              |
-| `POST` | `/spaces/:id/invalidate`  | Close an addressed, current record with its reason.                                                                          |
-| `POST` | `/spaces/:id/recall`      | Recall by key (exact), by text (meaning), or by a time range alone; ranked, budgeted, each item with its factors and routes. |
-| `POST` | `/spaces/:id/consolidate` | Turn verified episodes in a scope into lessons, and lessons into playbooks, as the strategy routes them.                     |
-| `POST` | `/spaces/:id/history`     | Every version of an addressed record's identity, oldest first.                                                               |
-| `GET`  | `/health`                 | Liveness.                                                                                                                    |
+| Method | Path                                  | What                                                                                                                                                                   |
+| ------ | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST` | `/designs`                            | Start a design cycle from a memory brief (`{ goal }`); 202 with the cycle, which runs off the request path.                                                            |
+| `GET`  | `/designs/:id`                        | Read a cycle back: its status, the coach run, the orchestration that learned from it.                                                                                  |
+| `POST` | `/spaces`                             | Make a memory space from a settled run's best strategy (`{ runId }`); 201 with the space and its compile report.                                                       |
+| `GET`  | `/spaces/:id`                         | Read a space back, its report compiled again from the snapshots it keeps.                                                                                              |
+| `POST` | `/spaces/:id/remember`                | Assert a typed memory in a register: inserted, unchanged (it says the same), or superseding the current one.                                                           |
+| `POST` | `/spaces/:id/update`                  | Supersede an addressed, current record with a new version of the same identity.                                                                                        |
+| `POST` | `/spaces/:id/invalidate`              | Close an addressed, current record with its reason.                                                                                                                    |
+| `POST` | `/spaces/:id/recall`                  | Recall by key (exact), by text (meaning), or by a time range alone; ranked, budgeted, each item with its factors and routes.                                           |
+| `POST` | `/spaces/:id/consolidate`             | Turn verified episodes in a scope into lessons, and lessons into playbooks, as the strategy routes them.                                                               |
+| `POST` | `/spaces/:id/history`                 | Every version of an addressed record's identity, oldest first.                                                                                                         |
+| `POST` | `/spaces/:id/digests`                 | Digest a text — split into parts its owner labels and dates — into the space's typed memories on the quality loop; 202 with the orchestration, which runs for minutes. |
+| `GET`  | `/spaces/:id/digests/:runId`          | Read a digest back from the loop's record: its step's status, reason and counts, its report — every memory proposed, endorsed or withheld — and the apply, once made.  |
+| `POST` | `/spaces/:id/digests/:runId/remember` | Remember what the digest endorsed, once, through the runtime's own write path; 200 with each memory's outcome or refusal.                                              |
+| `GET`  | `/health`                             | Liveness.                                                                                                                                                              |
 
 The coached strategy is the coach run's artifact; read it from the loop
 (`GET /runs/:id`), not from this service. Every request and answer of the
 `/spaces` routes is a contract in `@sysdesign/contracts`
-(`lib/agentic-system/memory.ts`); a verb answers 200 with `{ data }`.
+(`lib/agentic-system/memory.ts`, and for a digest `register-digest.ts` and
+`register-memory.ts`); a verb answers 200 with `{ data }`, a digest's start 202.
 
 ## How a cycle runs
 
@@ -65,19 +69,26 @@ memory is visible to a request whose scope contains its own.
 Every refusal answers one declared status, its body the framework's error shape
 plus the refusal's `code`, `message` and `issues` (`src/memory/refusals.ts`):
 
-| Status | Refusals                                                                                                                                                                                           |
-| ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| 404    | `run.not_found`, `space.not_found`, `record.not_found` (a record outside the caller's scope is not found too)                                                                                      |
-| 409    | `run.in_flight` (the run is still running), `record.not_current`, `conflict`                                                                                                                       |
-| 422    | `run.no_strategy`, `space.not_compiled`, `register.unknown`, `operation.undeclared`, `scope.invalid`, `candidate.invalid`, `metadata.undeclared`, `identity.mismatch`, `consolidation.unavailable` |
+| Status | Refusals                                                                                                                                                                                                                                                          |
+| ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 404    | `run.not_found` (an orchestration another orchestrator ran, or a digest composed for another space, is not found too), `space.not_found`, `record.not_found` (a record outside the caller's scope is not found too)                                               |
+| 409    | `run.in_flight` (the run or the digest is still running), `digest.applied` (the digest was remembered already), `record.not_current`, `conflict`                                                                                                                  |
+| 422    | `run.no_strategy`, `digest.no_registers`, `digest.too_large`, `digest.no_report`, `space.not_compiled`, `register.unknown`, `operation.undeclared`, `scope.invalid`, `candidate.invalid`, `metadata.undeclared`, `identity.mismatch`, `consolidation.unavailable` |
 
 A strategy that does not compile is 422 with `{ message, report }`, the report
 naming every problem. A body the contract does not accept is the pipe's 400,
 each offending path named; a loop that cannot be reached is 503, one too slow
 504, one that refuses 502.
 
-Postgres (`memory_space`, `memory_record`) is the truth; Qdrant holds a
-rebuildable projection, its collection bound to the embedding model and width.
+A digest is briefed by the runtime before any model is asked, so it is refused
+wherever its writes would be; the loop's `register-memory` orchestrator then
+digests the text and reports what the space may write, and `remember` writes
+only that, once, recording the apply. How it is checked, what a caller owns and
+what stays open: `docs/agentic-system/memory-runtime.md` §9–§10.
+
+Postgres (`memory_space`, `memory_record`, and each digest's apply in
+`memory_space_digest`) is the truth; Qdrant holds a rebuildable projection, its
+collection bound to the embedding model and width.
 A sweep runs on the declared schedule across every space: it expires
 short-term records, removes the points of closed ones, and projects every
 current record not yet in the current collection — a write whose projection

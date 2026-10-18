@@ -1,12 +1,15 @@
 /**
  * What more than one orchestrator declares: the refusal of a composed-goal
  * pipeline as a target, the request taken bare, the adapter that runs a pipeline as the
- * run's own deliverable, the stand-in a provided run makes, and the routes a
- * brief may be dispatched to. Each orchestrator names which of these it uses;
- * the runner applies none of them.
+ * run's own deliverable, the stand-in a provided run makes, the routes a
+ * brief may be dispatched to, and the reason a memory step gives for a child
+ * it may not draw on. Each orchestrator names which of these it uses; the
+ * runner applies none of them.
  */
 import type {
+  Admission,
   LlmAvailabilityDto,
+  MemoryStepReason,
   MemoryStoreAvailabilityDto,
   PipelineSummary,
   QualityRunDto,
@@ -161,3 +164,20 @@ export const briefRoutes = (registry: readonly PipelineSummary[]): RouteDto[] =>
   registry
     .filter((summary) => summary.goalSource === 'brief')
     .map((summary) => ({ id: summary.id, description: summary.description }));
+
+type Unadmitted = Exclude<Admission, 'admitted'>;
+
+/**
+ * What a memory step says when the child it read endorsed nothing: the
+ * engine's `admission`, in the orchestrator's closed vocabulary. One table,
+ * so no two steps — a recall, a digest, a run's own recall — can give the
+ * same admission a different name, and "nothing was judged" is never
+ * collapsed into "judged and fell short".
+ */
+export const UNADMITTED_REASON = {
+  'fell-short': 'not-accepted',
+  'no-rubric': 'no-rubric',
+  'no-artifact': 'no-artifact',
+} as const satisfies Record<Unadmitted, MemoryStepReason>;
+
+export type UnadmittedReason = (typeof UNADMITTED_REASON)[Unadmitted];

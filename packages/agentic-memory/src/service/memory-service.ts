@@ -4,7 +4,8 @@
  * pure and cheap, so nothing is cached and nothing goes stale — and a space
  * whose snapshot no longer reads, or no longer compiles, answers every verb
  * with `space.not_compiled`. Which verbs a register serves is the strategy's
- * declaration, enforced on every call.
+ * declaration, enforced on every call; a writer is briefed from the same load,
+ * before it writes.
  */
 import {
   memoryStrategySchema,
@@ -13,7 +14,10 @@ import {
   type ConsolidationResultDto,
   type MemoryRecordDto,
   type MemorySpaceDto,
+  type MemoryStrategy,
   type RecallResultDto,
+  type RecordScope,
+  type SpaceWriteBriefDto,
   type WriteResultDto,
 } from '@sysdesign/contracts';
 
@@ -26,14 +30,30 @@ import { recall } from '../recall/recall';
 import { refuse } from '../refusal';
 import { compileSpace, type CompileResult } from '../space/compile';
 import { memoryPolicySchema, type MemoryPolicy } from '../space/policy';
+import { writeBrief } from '../write/brief';
 import { history, invalidate, remember, update, type SpaceContext } from '../write/write';
 
 type Verb<F extends (ctx: SpaceContext, request: never) => unknown> = Parameters<F>[1];
 
+/**
+ * A kept snapshot compiled: the strategy it holds and what that compiles to
+ * under its policy — or nothing, when either no longer reads, with the report
+ * that says which.
+ */
+type CompiledSnapshot =
+  | (CompileResult & { strategy: MemoryStrategy })
+  | { strategy: null; compiled: null; report: CompileReportDto };
+
+/** A space opened for a verb: what its snapshot compiles to, and the strategy that snapshot holds. */
+interface OpenSpace extends SpaceContext {
+  strategy: MemoryStrategy;
+}
+
 const unreadable = (
   code: 'strategy.unreadable' | 'policy.unreadable',
   what: string,
-): CompileResult => ({
+): CompiledSnapshot => ({
+  strategy: null,
   compiled: null,
   report: {
     problems: [{ code, refs: [], message: `the space's ${what} no longer reads` }],
@@ -105,17 +125,30 @@ export class MemoryService {
     return consolidate(await this.open(spaceId), request);
   }
 
+  /**
+   * What a writer may remember into, and how each register files a memory —
+   * refused, as a write is, for a space not kept or not compiling and for a
+   * scope its policy does not declare. Writes nothing.
+   */
+  async writeBrief(spaceId: string, scope: RecordScope): Promise<SpaceWriteBriefDto> {
+    const { space, strategy } = await this.open(spaceId);
+    return writeBrief(space, strategy, scope);
+  }
+
   /** Expire, unproject and project across every space. */
   sweep(): Promise<SweepReport> {
     return sweep(this.ports, this.behaviors);
   }
 
-  private compile(stored: StoredSpace): CompileResult {
+  private compile(stored: StoredSpace): CompiledSnapshot {
     const policy = memoryPolicySchema.safeParse(stored.policy);
     if (!policy.success) return unreadable('policy.unreadable', 'policy');
     const strategy = parseLenient(memoryStrategySchema, stored.strategy);
     if (!strategy.ok) return unreadable('strategy.unreadable', 'strategy');
-    return compileSpace(strategy.value, policy.data, this.behaviors);
+    return {
+      ...compileSpace(strategy.value, policy.data, this.behaviors),
+      strategy: strategy.value,
+    };
   }
 
   private async stored(spaceId: string): Promise<StoredSpace> {
@@ -124,16 +157,15 @@ export class MemoryService {
     return stored;
   }
 
-  private async open(spaceId: string): Promise<SpaceContext> {
-    const stored = await this.stored(spaceId);
-    const { compiled, report } = this.compile(stored);
-    if (compiled === null) {
+  private async open(spaceId: string): Promise<OpenSpace> {
+    const snapshot = this.compile(await this.stored(spaceId));
+    if (snapshot.compiled === null) {
       refuse(
         'space.not_compiled',
-        `memory space ${spaceId} does not compile: ${report.problems.map(({ code }) => code).join(', ')}`,
+        `memory space ${spaceId} does not compile: ${snapshot.report.problems.map(({ code }) => code).join(', ')}`,
       );
     }
-    return { ports: this.ports, spaceId, space: compiled };
+    return { ports: this.ports, spaceId, space: snapshot.compiled, strategy: snapshot.strategy };
   }
 }
 

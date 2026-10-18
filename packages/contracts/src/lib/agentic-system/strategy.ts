@@ -99,6 +99,12 @@ const describe = <T extends string>(uses: Record<T, string>): string =>
 /** A register's name, as the strategy declares it and every reference to it is written. */
 export const REGISTER_NAME_BOUND = bound(40);
 
+/** What a register holds, in the strategy's words; a lenient read keeps up to `keptAtMost` of it. */
+export const REGISTER_HOLDS_BOUND = bound(260);
+
+/** How many registers a strategy keeps; a lenient read keeps up to the ceiling. */
+export const STRATEGY_REGISTERS_BOUND = bound(8, 'list');
+
 /** A reference to a declared register, or the (operation, register) pair a step binds — short, so never trimmed. */
 const nameRef = (description: string) => bounded.text(REGISTER_NAME_BOUND, { min: 1, description });
 
@@ -112,12 +118,12 @@ export const memoryStrategySchema = z.strictObject({
     description: 'What the brief left unsaid and you decided.',
   }),
   registers: bounded.list(
-    bound(8, 'list'),
+    STRATEGY_REGISTERS_BOUND,
     z.strictObject({
       name: nameRef('The register name interfaces and workflow steps reference.'),
       kind: z.enum(REGISTER_KINDS).describe(describe(REGISTER_KIND_USES)),
       term: z.enum(MEMORY_TERMS).describe(describe(MEMORY_TERM_USES)),
-      holds: bounded.text(bound(260), {
+      holds: bounded.text(REGISTER_HOLDS_BOUND, {
         description:
           'What it stores — atomic facts / episodes with outcomes / versioned playbooks …',
       }),

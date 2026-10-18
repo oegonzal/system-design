@@ -1,7 +1,7 @@
 import { strategyFixture, TEST_POLICY } from '@sysdesign/agentic-memory/testing';
 import { fakeRun } from '@sysdesign/contracts';
 
-import { RunRefused } from './spaces.service';
+import { HostRefused } from './host-refusal';
 import { loopWith, memoryUnderTest, SPEC_POLICY_SOURCE } from './testing';
 
 const refusalOf = async (call: Promise<unknown>): Promise<string> => {
@@ -9,8 +9,8 @@ const refusalOf = async (call: Promise<unknown>): Promise<string> => {
     () => null,
     (caught: unknown) => caught,
   );
-  if (!(error instanceof RunRefused)) {
-    throw new Error(`expected a RunRefused, got ${String(error)}`);
+  if (!(error instanceof HostRefused)) {
+    throw new Error(`expected a HostRefused, got ${String(error)}`);
   }
   return error.code;
 };

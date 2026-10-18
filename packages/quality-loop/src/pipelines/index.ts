@@ -14,6 +14,7 @@ import { FIELD_ANSWER } from './field-answer/definition';
 import { KNOWLEDGE_DIGEST } from './knowledge-digest/definition';
 import { MEMORY_ARCHITECTURE } from './memory-architecture/definition';
 import { MEMORY_RECALL } from './memory-recall/definition';
+import { REGISTER_DIGEST } from './register-digest/definition';
 import { SYSTEM_DESIGN } from './system-design/definition';
 import { SYSTEM_DESIGN_CANVAS } from './system-design-canvas/definition';
 
@@ -31,6 +32,7 @@ const declared: PipelineDefinition<unknown>[] = [
   ANSWER_SUGGESTIONS as PipelineDefinition<unknown>,
   DOCUMENT_DIGEST as PipelineDefinition<unknown>,
   KNOWLEDGE_DIGEST as PipelineDefinition<unknown>,
+  REGISTER_DIGEST as PipelineDefinition<unknown>,
 ];
 
 export const PIPELINES: ReadonlyMap<string, PipelineDefinition<unknown>> = new Map(

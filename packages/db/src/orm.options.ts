@@ -28,6 +28,7 @@ import { JobApplication } from './entities/job-application.entity';
 import { MemoryDesignCycle } from './entities/memory-design-cycle.entity';
 import { MemoryRecord } from './entities/memory-record.entity';
 import { MemorySpace } from './entities/memory-space.entity';
+import { MemorySpaceDigest } from './entities/memory-space-digest.entity';
 import { MemoryEmbedding } from './entities/memory-embedding.entity';
 import { MemorySupport } from './entities/memory-support.entity';
 import { OrchestrationRun } from './entities/orchestration-run.entity';
@@ -94,6 +95,7 @@ export const ormOptions = {
     MemoryDesignCycle,
     MemorySpace,
     MemoryRecord,
+    MemorySpaceDigest,
   ],
   metadataProvider: ReflectMetadataProvider,
   namingStrategy: UnderscoreNamingStrategy,

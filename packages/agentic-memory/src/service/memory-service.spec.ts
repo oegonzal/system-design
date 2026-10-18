@@ -1,3 +1,6 @@
+import type { RecordScope } from '@sysdesign/contracts';
+
+import { LESSON_PREDICATE } from '../kinds/behaviors';
 import type { MemoryPorts } from '../ports';
 import { MemoryRefused } from '../refusal';
 import { InMemorySpaceStore, manualClock, sequentialIds, tableEmbedder } from '../testing/fakes';
@@ -119,5 +122,108 @@ describe('the memory service', () => {
       'strategy.unreadable',
     ]);
     expect(await codeOf(service.getSpace('never-kept'))).toBe('space.not_found');
+  });
+
+  it('[AGM-11] briefs a writer on every register it may remember into, with what each holds, reconciles on and keeps reserved', async () => {
+    const service = new MemoryService(ports());
+    const created = await create(service, GOLDEN_STRATEGY);
+    if (!('space' in created)) throw new Error('the golden strategy should compile');
+    const holds = (name: string) =>
+      present(
+        GOLDEN_STRATEGY.registers.find((register) => register.name === name),
+        name,
+      ).holds;
+    expect(await service.writeBrief(created.space.id, { tenant: 't1' })).toEqual({
+      registers: [
+        {
+          name: 'episodic_record',
+          kind: 'episodic',
+          term: 'long_term',
+          holds: holds('episodic_record'),
+          identity: [],
+          reserved: [],
+        },
+        {
+          name: 'semantic_fact',
+          kind: 'semantic',
+          term: 'long_term',
+          holds: holds('semantic_fact'),
+          identity: ['subject', 'predicate'],
+          reserved: [{ field: 'predicate', value: LESSON_PREDICATE }],
+        },
+        {
+          name: 'working_state',
+          kind: 'working',
+          term: 'short_term',
+          holds: holds('working_state'),
+          identity: ['key'],
+          reserved: [],
+        },
+      ],
+    });
+  });
+
+  it('[AGM-11] leaves the register consolidation promotes playbooks into out of a brief, and reserves the lesson identity on the lesson register alone', async () => {
+    const strategy = strategyFixture();
+    const rememberNotes = present(strategy.interfaces[0], 'remember on notes');
+    strategy.registers.push({ ...present(strategy.registers[1], 'the facts'), name: 'more_facts' });
+    // Its invalidates make room for two more remembers within the interfaces' list bound.
+    strategy.interfaces = [
+      ...strategy.interfaces.filter(({ operation }) => operation !== 'invalidate'),
+      { ...rememberNotes, register: 'playbooks' },
+      { ...rememberNotes, register: 'more_facts' },
+    ];
+    const service = new MemoryService(ports());
+    const created = await create(service, strategy);
+    if (!('space' in created)) throw new Error('the strategy should compile');
+    const brief = await service.writeBrief(created.space.id, { tenant: 't1', user: 'u1' });
+    expect(brief.registers.map(({ name, reserved }) => ({ name, reserved }))).toEqual([
+      { name: 'episodes', reserved: [] },
+      { name: 'facts', reserved: [{ field: 'predicate', value: LESSON_PREDICATE }] },
+      { name: 'more_facts', reserved: [] },
+      { name: 'notes', reserved: [] },
+      { name: 'relations', reserved: [] },
+    ]);
+  });
+
+  it('[AGM-11] refuses a brief wherever a remember is refused for its space or its scope', async () => {
+    const memory = ports();
+    await memory.spaces.insert({
+      id: 'broken',
+      designRunId: 'run-1',
+      strategy: { registers: 'not a list' },
+      policy: TEST_POLICY,
+      policySource: 'test',
+      createdAt: new Date(),
+    });
+    const service = new MemoryService(memory);
+    const created = await create(service, strategyFixture());
+    if (!('space' in created)) throw new Error('the fixture should compile');
+    const remembered = (spaceId: string, scope: RecordScope) =>
+      service.remember(spaceId, {
+        register: 'notes',
+        scope,
+        candidate: { key: 'k', value: 'v' },
+        provenance: { source: 'agent', sourceRunId: null },
+        metadata: {},
+      });
+    const refused: [string, RecordScope][] = [
+      ['00000000-0000-4000-8000-00000000ffff', { tenant: 't1' }],
+      ['broken', { tenant: 't1' }],
+      [created.space.id, { user: 'u1' }],
+      [created.space.id, { tenant: 't1', team: 'a' }],
+    ];
+    const briefs = await Promise.all(
+      refused.map(([spaceId, scope]) => codeOf(service.writeBrief(spaceId, scope))),
+    );
+    expect(briefs).toEqual([
+      'space.not_found',
+      'space.not_compiled',
+      'scope.invalid',
+      'scope.invalid',
+    ]);
+    expect(briefs).toEqual(
+      await Promise.all(refused.map(([spaceId, scope]) => codeOf(remembered(spaceId, scope)))),
+    );
   });
 });

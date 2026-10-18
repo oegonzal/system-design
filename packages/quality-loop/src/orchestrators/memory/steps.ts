@@ -13,14 +13,20 @@ import {
   renderGoal as renderRecord,
 } from '../../pipelines/experience-digest/input';
 import { MEMORY_RECALL_ID } from '../../pipelines/memory-recall/input';
-import { completed, requestInput, runFailed, runTarget, skipped } from '../common';
+import {
+  completed,
+  requestInput,
+  runFailed,
+  runTarget,
+  skipped,
+  UNADMITTED_REASON,
+} from '../common';
 import type { StepContext, StepResult } from '../runner/definition';
 import { memoriesToStore, type Digested } from './digest/read-digest';
 import type { MemoryPorts } from './ports';
 import { bareGoal, withMemory } from './recall/inject';
 import { recallMemory } from './recall/recall-memory';
 import { indexMemories } from './store/index-memories';
-import { UNADMITTED_REASON } from './unadmitted';
 import { DEFAULT_CHUNK_KIND } from './store/chunks';
 
 /** What each step hands on. `store` yields nothing: it is the end of the line. */

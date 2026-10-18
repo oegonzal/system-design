@@ -19,10 +19,14 @@ import {
   type VectorIndex,
 } from '@sysdesign/agentic-memory';
 import { startPeriodic, type Periodic } from '@sysdesign/contracts';
-import { MemoryRecord, MemorySpace } from '@sysdesign/db';
+import { MemoryRecord, MemorySpace, MemorySpaceDigest } from '@sysdesign/db';
 import { HttpLoopClient, LoopClient } from '@sysdesign/loop-client';
 
 import { CLOCK, type Clock } from '../common/clock';
+import { DigestsController } from './digests/digests.controller';
+import { DigestsService } from './digests/digests.service';
+import { DIGEST_LEDGER, type DigestLedger } from './digests/ledger';
+import { MikroOrmDigestLedger } from './digests/persistence/mikro-orm-digest-ledger';
 import { MemoryController } from './memory.controller';
 import { policyOf, type MemorySettings } from './settings';
 import { SpacesService } from './spaces.service';
@@ -80,15 +84,17 @@ class MemorySweep implements OnModuleInit, OnModuleDestroy {
  * Memory spaces wired to their ports: records and spaces in Postgres through
  * the runtime's MikroORM stores (the `memory_record` and `memory_space`
  * tables), their projection in Qdrant bound to the embedder's model and width,
- * the loop client a space's run is read through, and the sweep on its
- * schedule. A recovered fault the runtime reports goes to the log.
+ * the loop client a space's run is read and its digests are run through, the
+ * ledger each digest's apply is recorded in once (the `memory_space_digest`
+ * table), and the sweep on its schedule. A recovered fault the runtime
+ * reports goes to the log.
  */
 @Module({})
 export class MemoryModule {
   static register(options: MemoryModuleOptions): DynamicModule {
     return {
       module: MemoryModule,
-      imports: [MikroOrmModule.forFeature([MemorySpace, MemoryRecord])],
+      imports: [MikroOrmModule.forFeature([MemorySpace, MemoryRecord, MemorySpaceDigest])],
       providers: [
         { provide: LoopClient, useFactory: () => new HttpLoopClient(options.loopUrl) },
         {
@@ -126,13 +132,28 @@ export class MemoryModule {
           inject: [LoopClient, MemoryService],
         },
         {
+          provide: DIGEST_LEDGER,
+          useFactory: (em: EntityManager): DigestLedger => new MikroOrmDigestLedger(em),
+          inject: [EntityManager],
+        },
+        {
+          provide: DigestsService,
+          useFactory: (
+            loop: LoopClient,
+            memory: MemoryService,
+            ledger: DigestLedger,
+            clock: Clock,
+          ) => new DigestsService(loop, memory, ledger, clock),
+          inject: [LoopClient, MemoryService, DIGEST_LEDGER, CLOCK],
+        },
+        {
           provide: MemorySweep,
           useFactory: (memory: MemoryService) =>
             new MemorySweep(memory, options.memory.sweep.everyMs),
           inject: [MemoryService],
         },
       ],
-      controllers: [MemoryController],
+      controllers: [MemoryController, DigestsController],
     };
   }
 }

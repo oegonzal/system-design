@@ -1,10 +1,10 @@
-import { REGISTER_KINDS } from '@sysdesign/contracts';
+import { CANDIDATE_VALID_TIME, REGISTER_KINDS } from '@sysdesign/contracts';
 
 import { spaceUnderTest } from '../testing/space-under-test';
 import { compileSpace } from '../space/compile';
 import { strategyFixture, TEST_POLICY } from '../testing/fixtures';
 import { contentHashOf, defineBehavior } from './behavior';
-import { DEFAULT_BEHAVIORS } from './behaviors';
+import { DEFAULT_BEHAVIORS, LESSON_PREDICATE } from './behaviors';
 
 describe('the memory kinds as data', () => {
   it('[AGM-2] declares a behavior for every kind a strategy can keep, each by its identity, keys, valid time and projection', () => {
@@ -42,6 +42,35 @@ describe('the memory kinds as data', () => {
       true,
     );
     expect(spaceUnderTest().ctx.space.registers.get('relations')?.behavior.projected).toBe(false);
+  });
+
+  it('[AGM-11] dates every kind by the valid-time field the contract declares for its candidate', () => {
+    expect(
+      Object.fromEntries(REGISTER_KINDS.map((kind) => [kind, DEFAULT_BEHAVIORS[kind].validFrom])),
+    ).toEqual(CANDIDATE_VALID_TIME);
+  });
+
+  it('[AGM-11] reserves on the lesson kind the identity every consolidated lesson is written under, and nothing on any other', () => {
+    expect(
+      Object.fromEntries(REGISTER_KINDS.map((kind) => [kind, DEFAULT_BEHAVIORS[kind].reserved])),
+    ).toEqual({
+      working: [],
+      episodic: [],
+      semantic: [{ field: 'predicate', value: LESSON_PREDICATE }],
+      procedural: [],
+      relational: [],
+    });
+    const lesson = {
+      key: 'retry-on-timeout',
+      text: 'Retry a timed-out call once.',
+      playbook: null,
+    };
+    for (const behavior of Object.values(DEFAULT_BEHAVIORS)) {
+      for (const { field, value } of behavior.reserved) {
+        expect(behavior.identity).toContain(field);
+        expect(behavior.fromLesson?.(lesson)[field]).toBe(value);
+      }
+    }
   });
 
   it('[AGM-3] hashes what a kind that appends deduplicates on, its source run included', () => {

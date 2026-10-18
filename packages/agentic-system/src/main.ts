@@ -13,7 +13,10 @@ import { readSettings } from './settings';
  * digests the finished run into memory; the strategy itself is read from the
  * loop run. A settled run's strategy becomes a memory space (POST /spaces) that
  * the agentic-memory runtime executes — remember, update, invalidate, recall,
- * consolidate and history under /spaces/:id. Beside GET /health.
+ * consolidate and history under /spaces/:id — and a text handed to a space is
+ * digested on the loop into its typed memories (POST /spaces/:id/digests), read
+ * back (GET …/digests/:runId) and remembered once (POST …/remember). Beside
+ * GET /health.
  */
 async function bootstrap(): Promise<void> {
   process.on('uncaughtException', (error) => {

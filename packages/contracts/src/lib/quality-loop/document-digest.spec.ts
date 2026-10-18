@@ -12,7 +12,6 @@ import {
   MEMORY_SCOPES,
   readDocumentIndex,
   renderDocumentGoal,
-  sectionAlias,
   DOCUMENT_RULES,
   DOCUMENT_MAX_MEMORIES,
   SCOPE_RULE,
@@ -24,6 +23,7 @@ import {
   GOAL_BUDGET_BYTES,
   readFencedIndex,
   renderIndexSection,
+  sectionAlias,
   stripIndexSection,
   textBytes,
 } from './goal-index';

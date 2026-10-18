@@ -375,4 +375,24 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
     statement:
       'A memory strategy is checked before any lens reads it: a reference to a register or an operation it does not declare, or a register declared twice, blocks; a register or an interface no workflow exercises warns; and whatever the agentic-memory runtime cannot run as written warns too, judged by the runtime’s own analysis shared through the contracts — a consolidation it cannot route, a register nothing can write, read or forget, a consolidate with no effect, metadata that is not a field — so the coach revises against it in the runtime’s words.',
   },
+  {
+    id: 'QL-75',
+    statement:
+      'A register-digest goal is composed from declared data only — the text’s parts as quoted sections aliased by position, each with the label and the time its owner declared; the space’s writable registers, each with what it holds, the fields it reconciles on and the identities it keeps reserved; the caller’s rules and the limits; and last, the index the validators and the host read — the space id, the scope and the provenance written into the index alone, no part’s text able to open a section of the goal, a goal past the engine’s budget refused, and any other goal read as having no index.',
+  },
+  {
+    id: 'QL-76',
+    statement:
+      'The register-digest pipeline asks for the runtime’s own candidate shapes — one nullable slot per kind, each valid time as nullable text — locates its memories at memory.N alone, grades coverage, fidelity and filing, each dimension earned by a criterion kind, with the grounding, filing and safeguard rules fixed on every rubric, gates a false or a forbidden memory, has every finding type owned by one critic and declaring what it withholds, and boots with a strict schema that contains no number.',
+  },
+  {
+    id: 'QL-77',
+    statement:
+      'A register-digest memory is withheld on its own — by a warning validator over the goal’s index, never refusing the digest — when it rests on a section the goal does not list, is filed under a register the goal does not list, holds anything but one slot of its register’s kind, is refused by the runtime’s strict candidate schema, or takes an identity its register keeps reserved.',
+  },
+  {
+    id: 'QL-78',
+    statement:
+      'The register-memory orchestrator refuses, before a row exists, a goal with no register-digest index and a request that hands in an output or a rubric; its digest step runs the pipeline under the iteration budget its record states and reports, under the contract the host reads, the run’s admission, every memory proposed, resolved, the memories it endorses and every memory withheld with what withheld it — endorsing only from a run the engine admits, whose every declared lens answered, and in which no safeguard criterion settled fail — and a child that did not complete reports nothing.',
+  },
 ];

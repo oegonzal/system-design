@@ -52,4 +52,9 @@ export const AGENTIC_MEMORY_CRITERIA: readonly Criterion[] = [
     statement:
       'The Postgres record and space stores and the Qdrant index honour the same contract as the in-memory fakes the runtime’s specs run on.',
   },
+  {
+    id: 'AGM-11',
+    statement:
+      'The runtime briefs a writer itself: a brief is refused as every verb is — a space it does not keep, one that does not compile, a scope its policy does not declare — and answers the registers that declare remember, less the one consolidation promotes playbooks into, each with what its strategy says it holds, the fields it reconciles on, and the identities consolidation keeps reserved there; each kind’s valid-time field is declared once in the contracts, and both the runtime’s behaviors and the digest read it.',
+  },
 ];

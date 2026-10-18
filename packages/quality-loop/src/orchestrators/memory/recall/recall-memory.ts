@@ -23,7 +23,7 @@ import {
   MEMORY_RECALL_ID,
   renderGoal as renderQuery,
 } from '../../../pipelines/memory-recall/input';
-import { completed, storeReadiness } from '../../common';
+import { completed, storeReadiness, UNADMITTED_REASON, type UnadmittedReason } from '../../common';
 import type { MemoryPorts } from '../ports';
 import { fuse } from './fusion';
 import { focusLines } from './focus';
@@ -31,7 +31,6 @@ import { knownLines, type RecallKnown } from './known';
 import { noveltyOf, POOL_FACTOR, screen } from './novelty';
 import { buildQuery, probeSet, probesOf, queryText, type FusedHit, type OfferedHit } from './query';
 import { readPack, type UsableMemory } from './read-pack';
-import { UNADMITTED_REASON, type UnadmittedReason } from '../unadmitted';
 
 export interface RecallAsk {
   /** The goal to recall for, taken bare: memory a previous run appended is not part of it. */

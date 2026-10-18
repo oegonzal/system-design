@@ -226,18 +226,25 @@ login, and the process refuses to boot). An API key is never used.
 
 `packages/quality-loop` runs the generic doctrine from
 [`../pipeline-best-practices/overview.md`](../pipeline-best-practices/overview.md)
-over any task declared as data. Six pipelines live as sibling folders under
-`src/pipelines/`: `system-design` and `agentic-design` judge a text brief;
-`memory-recall` and `experience-digest` are the memory tier's, composed by
+over any task declared as data. Fourteen pipelines live as sibling folders
+under `src/pipelines/`: `system-design`, `agentic-design` and
+`memory-architecture` judge a text brief; `memory-recall` and
+`experience-digest` are the memory tier's, composed by
 `POST /orchestrations/memory` so a run can recall what earlier runs learned
-and digest what it learned itself; `system-design-canvas` and
-`design-prompt` are the studio's, and take a goal the studio composed — never
-a brief a person types into the router. Every definition says which it is:
-`goalSource: 'brief' | 'composed'`, validated at boot and carried on the
-pipeline summary, so the loop UI offers only `brief` pipelines, the router
-never routes to a composed one, and no orchestrator takes one as a target. It
-has its own Postgres tables (`quality_run` and its children, `orchestration_run`
-and its children, `memory_embedding`) and its own vector store (Qdrant, the
+and digest what it learned itself, and `knowledge-digest` is composed from a
+finished run by the knowledge and memory-design orchestrators;
+`system-design-canvas` and `design-prompt` are the studio's; `browser-step`,
+`field-answer` and `answer-suggestions` are the browser session's, `tool-step`
+a tool session's, `document-digest` the document ingester's and the browser
+session's, and `register-digest` a memory space's. Each of those eleven takes
+a goal its owner composed — never a brief a person types into the router.
+Every definition says which it is: `goalSource: 'brief' | 'composed'`,
+validated at boot and carried on the pipeline summary, so the loop UI offers
+only `brief` pipelines, the router never routes to a composed one, and no
+orchestrator takes one as a target but `form-memory`, whose target is the form
+pipeline its goal was composed for. It has its own Postgres tables
+(`quality_run` and its children, `orchestration_run` and its children,
+`memory_embedding`) and its own vector store (Qdrant, the
 `vectors` compose service); the dump remains the full audit trail beside them.
 
 A run may adopt a recorded iteration of an earlier run:

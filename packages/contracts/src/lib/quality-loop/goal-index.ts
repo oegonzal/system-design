@@ -90,3 +90,12 @@ export function readFencedIndex<I>(goal: string, schema: ZodType<I>): I | null {
   const result = schema.safeParse(parsed);
   return result.success ? result.data : null;
 }
+
+/**
+ * The alias of a goal's section, for a composer that renders the parts it is
+ * given as numbered sections a model cites by alias: engine-assigned, from the
+ * part's position, never anything the model wrote — so every codec that
+ * numbers its sections numbers them alike.
+ */
+export const sectionAlias = (position: number): string => `section.${position + 1}`;
+export const SECTION_ALIAS = /^section\.\d+$/;

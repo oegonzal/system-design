@@ -15,7 +15,9 @@
  * — never over what any of them says in prose. Beside these, a reader may
  * withhold an item the goal's own index leaves no place to store, naming the
  * index as its source: a memory bound to a unit of work, of a document that
- * names none (`readDocumentDigest`).
+ * names none (`readDocumentDigest`). For a caller that draws on a run's best
+ * artifact by its locations, `withheldOf` is the whole read: the artifact's
+ * own locations, withheld by the rules its pipeline's definition declares.
  */
 import type {
   DecisionPolicy,
@@ -24,8 +26,11 @@ import type {
   Withholding,
   WithholdingSource,
 } from '@sysdesign/contracts';
+import { parseLenient } from '@sysdesign/contracts';
 
+import type { PipelineDefinition } from '../pipeline';
 import type { Validator } from '../ports';
+import type { RunOutputs } from './run-outputs';
 
 export {
   WITHHOLDING_SOURCES,
@@ -163,3 +168,23 @@ export function withheldItems(
 /** The refs of what `withheldItems` withheld, for a reader that only filters. */
 export const withheldRefs = (withheld: readonly WithheldItem[]): ReadonlySet<string> =>
   new Set(withheld.map((item) => item.ref));
+
+/**
+ * The locations of the run's best artifact a reader withholds, each with what
+ * withheld it and why: every one a confirmed finding or a validator problem
+ * names, as far as what named it withholds — read off the pipeline's own
+ * declarations, over engine facts only. A caller routes by these and
+ * recomputes nothing from the findings itself.
+ */
+export function withheldOf<T>(
+  definition: PipelineDefinition<T>,
+  outputs: RunOutputs,
+): WithheldItem[] {
+  const { best } = outputs;
+  if (best === null) return [];
+  // Read as a caller reads it: a text a little past its bound is kept and noted, never a reason to withhold nothing.
+  const parsed = parseLenient(definition.task.output.schema, best.artifact);
+  if (!parsed.ok) return [];
+  const items = definition.task.output.locate(parsed.value).map((location) => location.id);
+  return withheldItems(best.ledger, items, withholdingOf(definition));
+}

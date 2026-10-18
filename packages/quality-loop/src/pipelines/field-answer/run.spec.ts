@@ -2,9 +2,8 @@ import { answeringFixture, routeFields } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { runPipeline } from '../../core/loop/run-pipeline';
-import { admission, outputsOf } from '../../core/outputs';
+import { admission, outputsOf, withheldOf } from '../../core/outputs';
 import { fill, runDto, sequencedLlm } from '../../core/testing';
-import { withheldOf } from '../../orchestrators/form-memory/steps';
 import { FIELD_ANSWER } from './definition';
 import { answer, fieldGoal, policyCriteria, sampleAnswers, sampleFields } from './testing';
 

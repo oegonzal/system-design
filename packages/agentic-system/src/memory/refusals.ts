@@ -16,25 +16,30 @@ import type {
 } from '@sysdesign/contracts';
 import { LoopRefused, LoopTimeout, LoopUnreachable } from '@sysdesign/loop-client';
 
-import { RunRefused, type RunRefusal } from './spaces.service';
+import { HostRefused, type HostRefusal } from './host-refusal';
 
-/** A refusal from either vocabulary: the runtime's, or the spaces service's own. */
-type Refusal = MemoryRefusal | RunRefusal;
+/** A refusal from either vocabulary: the runtime's, or the host's own. */
+type Refusal = MemoryRefusal | HostRefusal;
 
 /** What a refusal answers: the framework's error shape around a `MemoryRefusalDto`, whichever vocabulary its code is from. */
 type RefusalBody = ApiErrorResponse & Omit<MemoryRefusalDto, 'code'> & { code: Refusal };
 
 /**
  * Every refusal the memory routes answer, with its one status: what an address
- * does not find is 404, a record that has moved on or a write that lost its
- * race is 409, and a request the space's declarations do not serve is 422.
- * Declared with `satisfies`, so a refusal added to either vocabulary does not
- * compile until it has its status here.
+ * does not find is 404; a record or a run that has moved on — still running,
+ * superseded, a digest already applied — or a write that lost its race is 409;
+ * and a request the space's declarations, or a digest's own record, do not
+ * serve is 422. Declared with `satisfies`, so a refusal added to either
+ * vocabulary does not compile until it has its status here.
  */
 const REFUSAL_STATUS = {
   'run.not_found': 404,
   'run.in_flight': 409,
   'run.no_strategy': 422,
+  'digest.no_registers': 422,
+  'digest.too_large': 422,
+  'digest.no_report': 422,
+  'digest.applied': 409,
   'space.not_found': 404,
   'space.not_compiled': 422,
   'register.unknown': 422,
@@ -101,7 +106,7 @@ export function notCompiled(report: CompileReportDto): HttpException {
  */
 function asHttp(error: unknown): unknown {
   if (error instanceof MemoryRefused) return refusal(error.code, error.message, error.issues);
-  if (error instanceof RunRefused) return refusal(error.code, error.message);
+  if (error instanceof HostRefused) return refusal(error.code, error.message);
   if (error instanceof LoopUnreachable) return new ServiceUnavailableException(error.message);
   if (error instanceof LoopTimeout) return new GatewayTimeoutException(error.message);
   if (error instanceof LoopRefused) {

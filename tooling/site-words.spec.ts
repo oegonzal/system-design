@@ -6,11 +6,12 @@ import { describe, expect, it } from 'vitest';
 /**
  * The goals are the only place a site or a line of work may be named. The
  * engine that runs a mission — the browser session, its settings, its contracts, and the
- * pipelines and orchestrators the session drives — is written about the shape
- * of the work: a page, a form, a unit of work, the subject the answers are
- * about. A site's name or a line of work's role word in that code, or in a
- * persona a model reads, is one case wearing an abstraction, and the same
- * program must run any goal.
+ * pipelines and orchestrators the session drives, or a memory space files a
+ * text through — is written about the shape of the work: a page, a form, a
+ * unit of work, the subject the answers are about, a text and its registers.
+ * A site's name or a line of work's role word in that code, or in a persona a
+ * model reads, is one case wearing an abstraction, and the same program must
+ * run any goal.
  *
  * Specs, spec builders and recorded fixtures may carry a concrete example;
  * the code and the personas may not.
@@ -28,8 +29,10 @@ const ENGINE = [
   'packages/quality-loop/src/pipelines/field-answer',
   'packages/quality-loop/src/pipelines/answer-suggestions',
   'packages/quality-loop/src/pipelines/document-digest',
+  'packages/quality-loop/src/pipelines/register-digest',
   'packages/quality-loop/src/orchestrators/form-memory',
   'packages/quality-loop/src/orchestrators/document-memory',
+  'packages/quality-loop/src/orchestrators/register-memory',
 ];
 /**
  * The sites the shipped goals name, the role words of the line of work they

@@ -5,8 +5,7 @@
  */
 import { z } from 'zod';
 
-import { ADMISSIONS } from '../quality-loop/admission';
-import { WITHHOLDING_SOURCES } from '../quality-loop/pipeline';
+import { ADMISSIONS, withheldRefSchema } from '../quality-loop/admission';
 
 /** One bounded plan for the page in front of the session. */
 export const BROWSER_STEP_PIPELINE_ID = 'browser-step';
@@ -31,22 +30,6 @@ export const FORM_MEMORY_ORCHESTRATOR_ID = 'form-memory';
 
 /** The form-memory step that runs the form pipeline: the run a session reads its answers from. */
 export const FORM_MEMORY_TARGET_STEP = 'target';
-
-/**
- * One location a reader of the run withholds, with what withheld it — a
- * finding's type or a validator's id — and why, in the judge's own words, for
- * the operator's eye and never for a route: the session routes by the ref
- * alone. The source is the shared vocabulary's, whose `index` only a
- * document digest's reader gives; a form run's reader withholds by findings
- * and validators.
- */
-export const withheldRefSchema = z.strictObject({
-  ref: z.string().min(1),
-  source: z.enum(WITHHOLDING_SOURCES),
-  by: z.string().min(1),
-  note: z.string().nullable(),
-});
-export type WithheldRef = z.infer<typeof withheldRefSchema>;
 
 /** What the form-memory target step reports: the run's admission, and the locations a reader of it withholds. */
 export const formTargetReportSchema = z.strictObject({

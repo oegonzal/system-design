@@ -1,8 +1,9 @@
 /**
  * A memory kind as declared data: the candidate it accepts, the fields its
  * identity is made of, the values an exact recall finds it by, the field its
- * valid time comes from, the text it is embedded and shown as, and whether it
- * is projected into the vector index. (The role a kind plays in consolidation
+ * valid time comes from, the text it is embedded and shown as, whether it is
+ * projected into the vector index, and the identity values it keeps for the
+ * lessons consolidation writes into it. (The role a kind plays in consolidation
  * is design vocabulary, the contract's `CONSOLIDATION_ROLES`.) The engine reads
  * these and nothing else about a kind, so a new kind or a changed
  * one is an entry in a registry, never an engine edit. The members are written
@@ -30,6 +31,15 @@ export interface KindBehavior<C extends Record<string, unknown> = Record<string,
   /** The field valid time comes from; null when it is the moment of recording. */
   readonly validFrom: (keyof C & string) | null;
   readonly projected: boolean;
+  /**
+   * The identity values every lesson a lesson target keeps is written under —
+   * what `fromLesson` always writes; empty for a kind that keeps none. A
+   * writer's memory that takes them reconciles with, and replaces,
+   * consolidation's lesson of the same identity, and the write path does not
+   * refuse one: the write brief names them, and a digest withholds a memory
+   * that takes one.
+   */
+  readonly reserved: readonly { readonly field: keyof C & string; readonly value: string }[];
   text(candidate: C): string;
   /** A source's lesson, when the episode proposes one it verified. */
   lessonOf?(candidate: C): MemoryLesson | null;

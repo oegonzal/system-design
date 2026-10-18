@@ -3,7 +3,7 @@
 A single quality run answers one question: is this artifact any good? An orchestrator answers questions that need several quality runs — _does this answer get better if it remembers what earlier quality runs learned_, _which
 judge does this brief belong to_, _would I get this score again_, _do the judges even agree_.
 
-This page covers what each one is for, how its steps actually work, and what a real recorded orchestration run looks like. Seven are registered; the two the browser session added — `form-memory` and `document-memory` — are documented with that work instead. Every trace below is a real row from the local database, not an invention. Section 2 is the exception: it shows how the studio's grading, coach and prompt generation — plain quality runs, not orchestrations — turn into iterations and revisions, and its traces are real dumps under `static/runs/`, not database rows.
+This page covers what each one is for, how its steps actually work, and what a real recorded orchestration run looks like. Nine are registered, and five of them are documented here; the two the browser session added — `form-memory` and `document-memory` — are documented with that work instead, `memory-design` with the memory-design capability ([`memory-design-capability.md`](../agentic-system/memory-design-capability.md)), and `register-memory` with the memory runtime whose spaces it digests texts for ([`memory-runtime.md`](../agentic-system/memory-runtime.md) §9). Every trace below is a real row from the local database, not an invention. Section 2 is the exception: it shows how the studio's grading, coach and prompt generation — plain quality runs, not orchestrations — turn into iterations and revisions, and its traces are real dumps under `static/runs/`, not database rows.
 
 ## 1. What an orchestrator is
 
@@ -141,8 +141,9 @@ subcommand; HTTP is the only door.
 
 Before the row is opened, the service applies the definition's `normalize`, then checks the target
 rule (`takesTarget`), then 404s an unregistered target, then applies the orchestrator's own `refuse`.
-Three of the four refuse a target whose `goalSource` is `composed` — those pipelines eat a generated
-goal, not a brief, so they are not something you can point an orchestrator at.
+Every one that takes a target refuses one whose `goalSource` is `composed` — those pipelines eat a
+generated goal, not a brief, so they are not something you can point an orchestrator at — except
+`form-memory`, whose target is the form pipeline its composed goal was written for.
 
 ### Briefs and composed goals
 
@@ -150,7 +151,7 @@ Every pipeline eats one thing: a **goal**, which is always markdown. What differ
 markdown came from, and each pipeline declares which kind it takes as its `goalSource`.
 
 A **brief** is a goal a person could have written: a prompt describing something to design. It is
-prose with headings, and nothing in the system generated it on the way in. One of the twenty-five
+prose with headings, and nothing in the system generated it on the way in. One of the twenty-six
 shipped with the repo opens like this:
 
 ```text
@@ -169,8 +170,8 @@ separate point-of-sale system. ... Design the service that produces that list.
 
 A **composed goal** is markdown a program built from typed data. It is still markdown, because the
 model can only read markdown, but nobody typed it: it exists only because an earlier step produced
-the data it is made of. The code that builds it is a **codec**, and for the two pipelines that carry
-their own it lives in the pipeline's folder as `input.ts`.
+the data it is made of. The code that builds it is a **codec**, and a pipeline whose goal is composed
+inside the loop keeps its own in the pipeline's folder as `input.ts`.
 
 Why bother? Because some pipelines grade things that are not prose. `memory-recall` judges a set of
 retrieved chunks. `experience-digest` judges a finished run. Neither of those is a document, so
@@ -232,21 +233,32 @@ never has to know what a memory chunk is.
 
 ### What each pipeline takes
 
-Six pipelines, and **two of them take a brief**. That is the whole reason the router has exactly two
-routes.
+Fourteen pipelines, and **three of them take a brief**. That is the whole reason the router has
+exactly three routes.
 
-| Pipeline               | Takes    | What its goal actually carries                                                                                     | Built by                                                       |
-| ---------------------- | -------- | ------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
-| `system-design`        | brief    | a prompt describing a system to design                                                                             | a person, the library, or `design-prompt`                      |
-| `agentic-design`       | brief    | a prompt describing a workflow of agents, tools and rules                                                          | the same                                                       |
-| `memory-recall`        | composed | the query, the admissibility rules, the probes searched under, and up to 16 candidate chunks with their provenance | the memory orchestrator, through the pipeline's own `input.ts` |
-| `experience-digest`    | composed | one finished run: its decision, stop reason, prompt, artifact, iterations, criteria and findings                   | the memory orchestrator, through `input.ts` and `from-run.ts`  |
-| `system-design-canvas` | composed | the practice prompt — **plus** supplied criteria and the author's canvas handed in as the artifact                 | the studio                                                     |
-| `design-prompt`        | composed | an engineer's recorded experience, rendered to markdown                                                            | the studio                                                     |
+| Pipeline               | Takes    | What its goal actually carries                                                                                                       | Built by                                                                                           |
+| ---------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------- |
+| `system-design`        | brief    | a prompt describing a system to design                                                                                               | a person, the library, or `design-prompt`                                                          |
+| `agentic-design`       | brief    | a prompt describing a workflow of agents, tools and rules                                                                            | the same                                                                                           |
+| `memory-architecture`  | brief    | a prompt describing an agentic-memory system to design                                                                               | a person or the library, directly or through agentic-system's design cycle                         |
+| `memory-recall`        | composed | the query, the admissibility rules, the probes searched under, and up to 16 candidate chunks with their provenance                   | the memory orchestrator, through the pipeline's own `input.ts`                                     |
+| `experience-digest`    | composed | one finished run: its decision, stop reason, prompt, artifact, iterations, criteria and findings                                     | the memory orchestrator, through `input.ts` and `from-run.ts`                                      |
+| `knowledge-digest`     | composed | one finished run's engine facts, set against what the store already knows                                                            | the knowledge and memory-design orchestrators, through `input.ts` and `from-run.ts`                |
+| `browser-step`         | composed | the page in front of a browser session: the mission, the page and its elements, what was just done, where the units of work stand    | the browser session, with the contracts codec                                                      |
+| `tool-step`            | composed | the state in front of a tool session: the mission, the tools, what earlier calls returned, what was just done                        | a tool session, with the contracts codec                                                           |
+| `field-answer`         | composed | one form page's fields and the evidence recalled about the subject                                                                   | the browser session, with the contracts codec, recomposed by `form-memory` once the evidence is in |
+| `answer-suggestions`   | composed | the same form goal, for the fields the operator is about to be asked                                                                 | the same                                                                                           |
+| `document-digest`      | composed | one chunk of a document — a résumé page, a notes file, an operator's answers — as aliased sections                                   | memory-ingest or the browser session, with the contracts codec; run by `document-memory`           |
+| `register-digest`      | composed | one text a program hands a memory space: its parts as quoted sections, the registers a memory may be filed under, the caller's rules | agentic-system's digest route, with the contracts codec; run by `register-memory`                  |
+| `system-design-canvas` | composed | the practice prompt — **plus** supplied criteria and the author's canvas handed in as the artifact                                   | the studio                                                                                         |
+| `design-prompt`        | composed | an engineer's recorded experience, rendered to markdown                                                                              | the studio                                                                                         |
 
-Read down the "Built by" column and there are really three groups, not two. Two pipelines are fed by
-a human. Two compose their own goal inside the loop, with a codec that lives in the pipeline's own
-folder beside the definition. Two are fed by the studio from something it already stored.
+Read down the "Built by" column and there are really four groups, not two. Three pipelines are fed a
+brief a person wrote. Three compose their own goal inside the loop, from what an earlier step left —
+recalled chunks or a finished run — with a codec in the pipeline's own folder beside the definition.
+Six are fed by another program, which writes the goal with a codec in the contracts, so the program
+that composes it and the pipeline that reads its index back share one. Two are fed by the studio from
+something it already stored.
 
 `system-design-canvas` is the one worth a second look, because its goal _is_ a practice prompt and
 reads exactly like a brief. It is still `composed`, and correctly so: the goal alone is not a
@@ -254,18 +266,20 @@ runnable request. The run also needs the criteria the rubric already derived and
 handed in as the artifact. Declaring it `composed` is what stops anything dispatching a bare prompt
 to it and getting a confident grade of a canvas nobody drew.
 
-The distinction is not cosmetic. A composed-goal pipeline is **never** a route, never a target you
-can point an orchestrator at, and never a choice in the UI — three of the four orchestrators refuse
-one outright. Handing a human prompt to `memory-recall` would not fail loudly; it would produce a
-confident reading of something that was never there.
+The distinction is not cosmetic. A composed-goal pipeline is **never** a route and never a choice in
+the UI. Five orchestrators take a target: four refuse a composed one outright, and the fifth,
+`form-memory`, takes nothing but the form pipeline its goal was composed for. Handing a human prompt
+to `memory-recall` would not fail loudly; it would produce a confident reading of something that was
+never there.
 
 ### Where a brief comes from
 
 Three places, and the third is the interesting one.
 
-1. **The shipped library.** Twenty-five markdown files under the package's `prompts/` directory, ten
-   describing systems to design and fifteen describing workflows of agents. The service walks that
-   directory on every request and serves them from `GET /prompts`, so adding a file is enough.
+1. **The shipped library.** Twenty-six markdown files under the package's `prompts/` directory, ten
+   describing systems to design, fifteen describing workflows of agents and one describing an
+   agentic-memory system. The service walks that directory on every request and serves them from
+   `GET /prompts`, so adding a file is enough.
 2. **Whatever you paste.** The goal is just a string on the request. Nothing validates that it is a
    brief rather than a shopping list; what protects you is the classifier refusing to guess, and the
    grade that follows being obviously wrong.
@@ -1013,25 +1027,26 @@ the same pipeline you could have named yourself on `POST /runs`. The word only m
 the router may dispatch to".
 
 So the list of judges is not written anywhere. It is computed, each time a router run opens, as
-every registered pipeline whose `goalSource` is `brief`. Today that is exactly two:
+every registered pipeline whose `goalSource` is `brief`. Today that is exactly three:
 
-| Judge            | What it grades, in its own words                                                                                                                        |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `system-design`  | A structured system-design answer to a markdown prompt, judged for coverage, soundness and scale.                                                       |
-| `agentic-design` | A design for a workflow of agents, tools and rules, judged for coverage, the fit between its parts, and whether it holds for inputs nobody anticipated. |
+| Judge                 | What it grades, in its own words                                                                                                                                                                                                                                                                                                                                                                        |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `system-design`       | A structured system-design answer to a markdown prompt, judged for coverage, soundness and scale.                                                                                                                                                                                                                                                                                                       |
+| `agentic-design`      | A design for a workflow of agents, tools and rules, judged for coverage, the fit between its parts, and whether it holds for inputs nobody anticipated.                                                                                                                                                                                                                                                 |
+| `memory-architecture` | A strategy for an agentic-memory system — its memory registers (working, episodic, semantic, procedural, relational; short versus long term), the typed Memory Service interfaces over them, and the recall, write, consolidation and expiry workflows — judged for the memory it keeps, the recall it serves, the write pipeline it runs, how it scopes and ages what it keeps, and how it governs it. |
 
-The other four are composed-goal pipelines, so they are not candidates and cannot be: handing one a
+The other eleven are composed-goal pipelines, so they are not candidates and cannot be: handing one a
 human prompt would produce a confident reading of something that was never there.
 
 ### The registry, and why nothing registers with the router
 
-The registry is one file, `packages/quality-loop/src/pipelines/index.ts`, and it is 24 lines
+The registry is one file, `packages/quality-loop/src/pipelines/index.ts`, and it is 40 lines
 including the comment. This is all of it:
 
 ```ts
 import { AGENTIC_DESIGN } from './agentic-design/definition';
-import { DESIGN_PROMPT } from './design-prompt/definition';
-// … four more imports
+import { ANSWER_SUGGESTIONS } from './answer-suggestions/definition';
+// … twelve more imports
 
 const declared: PipelineDefinition<unknown>[] = [
   SYSTEM_DESIGN as PipelineDefinition<unknown>,
@@ -1039,7 +1054,15 @@ const declared: PipelineDefinition<unknown>[] = [
   MEMORY_RECALL as PipelineDefinition<unknown>,
   EXPERIENCE_DIGEST as PipelineDefinition<unknown>,
   SYSTEM_DESIGN_CANVAS as PipelineDefinition<unknown>,
+  MEMORY_ARCHITECTURE as PipelineDefinition<unknown>,
   DESIGN_PROMPT as PipelineDefinition<unknown>,
+  BROWSER_STEP as PipelineDefinition<unknown>,
+  TOOL_STEP as PipelineDefinition<unknown>,
+  FIELD_ANSWER as PipelineDefinition<unknown>,
+  ANSWER_SUGGESTIONS as PipelineDefinition<unknown>,
+  DOCUMENT_DIGEST as PipelineDefinition<unknown>,
+  KNOWLEDGE_DIGEST as PipelineDefinition<unknown>,
+  REGISTER_DIGEST as PipelineDefinition<unknown>,
 ];
 
 export const PIPELINES: ReadonlyMap<string, PipelineDefinition<unknown>> = new Map(

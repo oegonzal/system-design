@@ -1,9 +1,20 @@
-import type { Withholding } from '@sysdesign/contracts';
+import { bound, bounded, type Withholding } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
-import { confirmed, ledger } from '../testing';
+import {
+  confirmed,
+  fill,
+  ledger,
+  tinyPipeline,
+  tinyPolicy,
+  traceOf,
+  type TinyOutput,
+} from '../testing';
+import { outputsOf } from './run-outputs';
 import {
   withheldItems,
+  withheldOf,
   withholdingOf,
   WITHHOLD_EVERY_REF,
   type WithholdingRules,
@@ -101,5 +112,55 @@ describe('withheldItems', () => {
     });
     expect(rules.validators).toEqual({ 'run-specificity': 'none' });
     expect(withheldItems(warned, ITEMS, rules)).toEqual([]);
+  });
+});
+
+describe('withheldOf', () => {
+  const ARTIFACT: TinyOutput = { text: 'a draft', parts: ['first', 'second'] };
+  const TEXT = bound(40);
+
+  /** A run whose best iteration holds `artifact`, with a `wrong` finding naming its second part and a location it lacks. */
+  const judged = (artifact: unknown) =>
+    outputsOf(
+      traceOf({ artifact, ledger: ledger({ findings: [naming('wrong', ['part.2', 'summary'])] }) }),
+    );
+
+  it('[QL-53] withholds, of the best artifact’s own locations, what the pipeline’s definition declares', () => {
+    // The tiny pipeline's `wrong` declares nothing, so every location it names that the artifact has is withheld.
+    expect(withheldOf(tinyPipeline(), judged(ARTIFACT))).toEqual([
+      { ref: 'part.2', source: 'finding', by: 'wrong', note: null },
+    ]);
+    const policy = tinyPolicy();
+    const declared = tinyPipeline({
+      policy: {
+        ...policy,
+        findingTypes: {
+          ...policy.findingTypes,
+          wrong: { dimension: 'form', gate: false, withholds: 'none' },
+        },
+      },
+    });
+    expect(withheldOf(declared, judged(ARTIFACT))).toEqual([]);
+  });
+
+  it('[QL-53] reads the best artifact as a caller does — a text a little past its bound is kept, and what was named in it is still withheld — and withholds nothing where no artifact reads', () => {
+    const tiny = tinyPipeline();
+    const capped = tinyPipeline({
+      task: {
+        ...tiny.task,
+        output: {
+          ...tiny.task.output,
+          schema: z.strictObject({ text: bounded.text(TEXT), parts: z.array(z.string()) }),
+        },
+      },
+    });
+    const overrun = { ...ARTIFACT, text: fill(TEXT.ceiling + 10) };
+    expect(withheldOf(capped, judged(overrun))).toEqual([
+      { ref: 'part.2', source: 'finding', by: 'wrong', note: null },
+    ]);
+    // No iteration crowned, a best that produced nothing, or one its schema refuses: no location to withhold.
+    expect(withheldOf(capped, outputsOf(traceOf({ iterations: 0 })))).toEqual([]);
+    expect(withheldOf(capped, judged(null))).toEqual([]);
+    expect(withheldOf(capped, judged({ text: 'a draft' }))).toEqual([]);
   });
 });
