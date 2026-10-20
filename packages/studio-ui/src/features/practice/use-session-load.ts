@@ -1,6 +1,11 @@
 'use client';
 
-import type { DesignRevisionSummaryDto, PromptDto, SessionInFlightDto } from '@sysdesign/contracts';
+import type {
+  DesignRevisionSummaryDto,
+  PromptDto,
+  SessionInFlightDto,
+  SessionViewDto,
+} from '@sysdesign/contracts';
 import { useLatestRequest } from '@sysdesign/web-kit';
 import { useCallback, useEffect, useState } from 'react';
 
@@ -14,6 +19,8 @@ export interface OpenedSession {
   /** Newest first. */
   revisions: DesignRevisionSummaryDto[];
   inFlight: SessionInFlightDto | null;
+  /** What the author may see of the prompt now, as the server projects it. */
+  view: SessionViewDto;
   /** The session's newest coaching run, followed again so a reload mid-coach picks it back up. */
   coachingRunId: string | null;
 }
@@ -68,6 +75,7 @@ export function useSessionLoad(
           prompt,
           revisions: sorted,
           inFlight: session.inFlight,
+          view: session.view,
           coachingRunId: coachingRuns[0]?.runId ?? null,
         });
         setLoading(false);

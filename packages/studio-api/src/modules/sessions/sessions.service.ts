@@ -9,6 +9,7 @@ import { EntityManager } from '@mikro-orm/postgresql';
 import {
   CANVAS_PIPELINE_ID,
   describeInFlight,
+  practiceFormat,
   PROMPT_COPY,
   regradable,
   type AdoptedIterationRef,
@@ -27,11 +28,14 @@ import {
   createRevision,
   DesignRevision,
   DesignSession,
+  InterviewTurn,
   Prompt,
   type RevisionRun,
 } from '@sysdesign/db';
 
 import { notFound } from '../../common/not-found';
+import { startPhases } from '../interview/session-phase';
+import { disclosedCriteria, gradedSubmission, sessionView } from '../interview/transcript';
 import { PromptsService } from '../prompts/prompts.service';
 import { isLoopUnavailable, QualityLoopClient } from '../quality-loop/quality-loop.client';
 import { recordCoachingStatus } from './coaching-status';
@@ -106,6 +110,7 @@ export class SessionsService {
     }
 
     const session = this.em.create(DesignSession, { prompt });
+    Object.assign(session, startPhases(practiceFormat(prompt.format), new Date()));
     this.em.persist(session);
     await this.em.flush();
     return this.detail({ session, latestRevision: null });
@@ -156,7 +161,16 @@ export class SessionsService {
   }
 
   private async detail(found: SessionWithLatest): Promise<SessionDetail> {
-    return { ...found, inFlight: await this.inFlight(this.em, found.session, 'read') };
+    const replies = await this.em.find(InterviewTurn, {
+      session: found.session.id,
+      role: 'interviewer',
+    });
+    const submitted = found.latestRevision !== null || found.session.status !== 'in-progress';
+    return {
+      ...found,
+      inFlight: await this.inFlight(this.em, found.session, 'read'),
+      view: sessionView(found.session.prompt, disclosedCriteria(replies), submitted),
+    };
   }
 
   /**
@@ -171,13 +185,23 @@ export class SessionsService {
     await this.ensureRubric(sessionId);
     return this.withSessionLock(sessionId, async (em, session, prompt) => {
       this.assertSessionOpen(session, prompt);
-      this.assertSubmission(submission, prompt.criteria);
       await this.assertNoGradeInFlight(em, session);
-      const started = await this.startGradingRun(prompt, { output: submission }, 1);
-      const revision = await createRevision(em, sessionId, submission, 'user', {
+      // An interview's transcript rides on the submission from here, under
+      // the clock the submit closes.
+      const { graded, clock } = await gradedSubmission(
+        em,
+        session,
+        practiceFormat(prompt.format),
+        submission,
+        new Date(),
+      );
+      this.assertSubmission(graded, prompt.criteria);
+      const started = await this.startGradingRun(prompt, { output: graded }, 1);
+      const revision = await createRevision(em, sessionId, graded, 'user', {
         runId: started.runId,
         iteration: 1,
       });
+      Object.assign(session, clock);
       session.draft = null;
       return revision;
     });

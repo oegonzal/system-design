@@ -84,6 +84,7 @@ export class EvaluationsService {
         brief: revision.brief,
         narrative: revision.narrative,
         model: revision.model,
+        transcript: revision.transcript,
       },
       new Date().toISOString(),
     );

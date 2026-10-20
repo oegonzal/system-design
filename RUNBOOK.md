@@ -137,8 +137,10 @@ The response carries `criteria` — `c1…cN`, each with a kind (`functional`,
 read, closed by the three standing trade-off criteria every canvas rubric
 carries. `format` is one of the practice formats contracts declares
 (`PRACTICE_FORMATS`: `system`, `model`, `boundaries`, `workflow`,
-`evolution`) and defaults to `system`; a format is fixed with the text once a
-session exists. Two other sources yield the same shape:
+`evolution`, `interview`) and defaults to `system`; a format is fixed with the
+text once a session exists. A prompt practised as an `interview` needs at
+least two `##` sections (422 otherwise): the candidate sees the first alone and
+the interviewer answers from the rest. Two other sources yield the same shape:
 `POST /api/prompts/import { libraryId, format? }` copies one of the loop's
 library documents (`GET /api/prompts/library`; the document's folder names
 its format unless one is given), and
@@ -163,6 +165,31 @@ written or imported prompt's with `POST /api/prompts/:id/criteria` while no
 session has been graded against them; afterwards the ids are frozen (409).
 Rewriting the markdown derives once, before anything is written, and makes
 the prompt authored.
+
+## Interview mode
+
+A session on an `interview` prompt runs through the phases its format declares
+(`clarify`, `design`, `deep-dive`, each with minutes shown as a countdown from
+the server's start time and never enforced). `GET /api/sessions/:id` projects
+the candidate's view — `view.markdown` is the prompt's first section and
+`view.criteria` only the criteria the interviewer's answers have disclosed,
+`view.withheld` the rest — until the design is submitted, after which the whole
+prompt is theirs beside the grade. The interviewer is one `interview-turn` run
+per exchange: `POST /api/sessions/:id/interview/clarify { questions }` (202)
+answers the candidate's questions from the whole prompt as its notes, under the
+three fixed rules the pipeline and the studio share (`INTERVIEW_TURN_RULES`:
+fidelity to the notes, restraint, clarity), and lists which rubric criteria
+each answer gave away; `POST …/interview/probe` (202) opens the deep dive with
+probing questions on the criteria the draft's brief has not bound, chosen
+without a model (unbound first, by the format's emphasis, `probes` many);
+`POST …/interview/answer { text }` (201) records the candidate's answer;
+`POST …/interview/advance` moves the clock where the current phase declares
+`advance`; `GET …/interview` reads the turns and claims a finished reply once
+by its run id — a run that left no reply is claimed as `(no reply — …)` and
+stands in the transcript. The submit closes the clock and composes the
+transcript onto the submission (`transcript.turns`, cited as `turn.N`; stored
+on the revision, exported as `transcript.md`); a submit body that carries a
+transcript of its own is refused.
 
 ## Re-grading a stored design
 

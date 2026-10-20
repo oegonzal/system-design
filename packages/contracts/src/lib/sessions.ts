@@ -6,10 +6,12 @@ import type {
   SessionDraft,
 } from './canvas.schema';
 import type { DesignModel } from './model.schema';
+import type { DesignTranscript } from './transcript.schema';
 import type { ApiListResponse, ApiResponse } from './envelope';
 import type { DecisionBasisDto, EvaluationFindingDto, UnscoredReason } from './evaluations';
 import type { LlmModelDto } from './llm-model';
 import type { IsoDateString, Uuid } from './primitives';
+import type { SuccessCriterion } from './quality-loop/evidence';
 import type { RunRecallDto } from './quality-loop/recall';
 import { MAX_QUALITY_RUN_ITERATIONS, type QualityRunStatus } from './quality-loop/runs';
 import type { Decision, IterationMode, StopReason } from './quality-loop/vocab';
@@ -141,8 +143,22 @@ export const describeInFlight = (inFlight: SessionInFlightDto): string =>
  * cannot answer makes that run `unknown`, never the read a failure. Lists
  * leave it out — it can cost a grader read per session.
  */
+/**
+ * The prompt as the author may see it now: the whole prompt and rubric for
+ * a format that shows them, or — for one that reveals by section — its first
+ * section and the criteria the interviewer's answers have disclosed, with how
+ * many are still withheld. A projection the server makes from the format's
+ * declaration and the stored turns; the page never decides what to hide.
+ */
+export interface SessionViewDto {
+  markdown: string;
+  criteria: SuccessCriterion[];
+  withheld: number;
+}
+
 export interface DesignSessionDetailDto extends DesignSessionDto {
   inFlight: SessionInFlightDto | null;
+  view: SessionViewDto;
 }
 
 /**
@@ -159,6 +175,8 @@ export interface DesignRevisionDto {
   brief: DesignBrief | null;
   narrative: DesignNarrative | null;
   model: DesignModel | null;
+  /** The interview's transcript as graded; null for every other session. */
+  transcript: DesignTranscript | null;
   /** Null only for revisions stored before grading was delegated. */
   evaluation: RevisionEvaluationRef | null;
   createdAt: IsoDateString;

@@ -37,6 +37,7 @@ import {
   RESPONSIBILITY_BOUND,
 } from './canvas';
 import { designModelDraftSchema, designModelSchema } from './model.schema';
+import { designTranscriptSchema } from './transcript.schema';
 import { CRITERION_ID_MAX_LENGTH } from './quality-loop/evidence';
 
 /**
@@ -281,6 +282,8 @@ export const designSubmissionSchema = z.strictObject({
   brief: designBriefSchema.nullable(),
   narrative: designNarrativeSchema.nullable(),
   model: designModelSchema.nullable().optional(),
+  /** Composed by the studio from an interview session's turns; absent for every other session. */
+  transcript: designTranscriptSchema.nullable().optional(),
 });
 export type DesignSubmission = z.infer<typeof designSubmissionSchema>;
 

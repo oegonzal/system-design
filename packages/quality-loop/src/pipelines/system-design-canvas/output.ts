@@ -224,6 +224,18 @@ export const canvasOutput: OutputShape<CanvasSubmission> = {
     } else {
       lines.push(...decisions.map((item, index) => renderDecision(item, index, node)));
     }
+    // Only an interview session has one; printing an empty section would
+    // invite a lens to grade its absence.
+    const turns = submission.transcript?.turns ?? [];
+    if (turns.length > 0) {
+      lines.push(
+        '',
+        '## Transcript',
+        ...turns.map(
+          (turn, index) => `[turn.${index + 1}] ${turn.role} (${turn.phase}): ${turn.text}`,
+        ),
+      );
+    }
     return lines.join('\n');
   },
 };

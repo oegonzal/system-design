@@ -3,11 +3,14 @@ import { EntityManager } from '@mikro-orm/postgresql';
 import {
   CANVAS_PIPELINE_ID,
   DEFAULT_PRACTICE_FORMAT,
+  PRACTICE_FORMATS,
   practiceFormatForLibraryFolder,
   PROMPT_COPY,
+  sectionCount,
   withStandingCriteria,
   type AuthorPromptRequest,
   type ImportPromptRequest,
+  type PracticeFormatId,
   type PromptLibraryDocumentDto,
   type PromptLibraryEntryDto,
   type SuccessCriterion,
@@ -51,6 +54,8 @@ export class PromptsService {
 
   /** The rubric is derived before the row exists: a grader that cannot answer leaves nothing behind. */
   async author(request: AuthorPromptRequest): Promise<PromptView> {
+    const format = request.format ?? DEFAULT_PRACTICE_FORMAT;
+    assertRevealable(format, request.markdown);
     const experience = request.experienceId ? await this.experience(request.experienceId) : null;
     const criteria = await this.rubricFor(request.markdown);
     const prompt = this.em.create(Prompt, {
@@ -58,7 +63,7 @@ export class PromptsService {
       markdown: request.markdown,
       criteria,
       source: 'authored',
-      format: request.format ?? DEFAULT_PRACTICE_FORMAT,
+      format,
       experience,
     });
     this.em.persist(prompt);
@@ -71,13 +76,15 @@ export class PromptsService {
     if (!document) {
       throw new UnprocessableEntityException(`Unknown library prompt: ${request.libraryId}`);
     }
+    const format = request.format ?? practiceFormatForLibraryFolder(document.folder);
+    assertRevealable(format, document.markdown);
     const criteria = await this.rubricFor(document.markdown);
     const prompt = this.em.create(Prompt, {
       title: document.title,
       markdown: document.markdown,
       criteria,
       source: 'library',
-      format: request.format ?? practiceFormatForLibraryFolder(document.folder),
+      format,
       experience: null,
     });
     this.em.persist(prompt);
@@ -135,6 +142,7 @@ export class PromptsService {
       await this.assertUnlocked(prompt, PROMPT_COPY.textLocked);
       if (request.title !== undefined) prompt.title = request.title;
       if (request.markdown !== undefined && request.markdown !== prompt.markdown) {
+        assertRevealable(prompt.format, request.markdown);
         // Derived before anything is written: a grader that cannot derive
         // leaves the prompt exactly as it was, never rewritten without a rubric.
         const criteria = await this.rubricFor(request.markdown);
@@ -208,5 +216,19 @@ export class PromptsService {
 
   private async assertUnlocked(prompt: Prompt, refusal: string): Promise<void> {
     if ((await this.view(prompt)).rubricLocked) throw new ConflictException(refusal);
+  }
+}
+
+/**
+ * A format that reveals the prompt section by section needs at least two:
+ * the one the candidate sees first, and the notes the interviewer answers
+ * from. Refused when the prompt is written or rewritten, so no reading of
+ * its structure is ever needed later.
+ */
+function assertRevealable(format: PracticeFormatId, markdown: string): void {
+  if (PRACTICE_FORMATS[format].reveal === 'first-section' && sectionCount(markdown) < 2) {
+    throw new UnprocessableEntityException(
+      `a prompt practised as ${PRACTICE_FORMATS[format].label.toLowerCase()} needs at least two sections: the scenario the candidate sees, and the notes the interviewer answers from`,
+    );
   }
 }

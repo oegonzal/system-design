@@ -11,6 +11,8 @@ import type {
   ImproveIterationDto,
   ImproveIterationOutcome,
   ImproveRunDto,
+  InterviewStateDto,
+  InterviewTurnDto,
   ProgressDto,
   PromptDto,
   PromptGenerationDto,
@@ -151,6 +153,7 @@ export function makeSession(
     latestEvaluationStatus: 'complete',
     draft: null,
     inFlight: null,
+    view: { markdown: PROMPT_MARKDOWN, criteria: makeCriteria(), withheld: 0 },
     createdAt: AT,
     updatedAt: AT,
     ...overrides,
@@ -185,6 +188,7 @@ export function makeRevision(overrides: Partial<DesignRevisionDto> = {}): Design
     graph: makeGraph(),
     brief: makeBrief(),
     narrative: makeNarrative(),
+    transcript: null,
     model: null,
     evaluation: {
       runId: 'run-1',
@@ -434,6 +438,46 @@ export function makeProgress(overrides: Partial<ProgressDto> = {}): ProgressDto 
           : never(kind),
     ),
     sessions: 2,
+    ...overrides,
+  };
+}
+
+export function makeTurn(overrides: Partial<InterviewTurnDto> = {}): InterviewTurnDto {
+  return {
+    id: 'turn-1',
+    ordinal: 1,
+    phase: 'clarify',
+    role: 'candidate',
+    text: 'How fast must reads be?',
+    disclosesCriterionIds: [],
+    runId: null,
+    decision: null,
+    overall: null,
+    createdAt: AT,
+    ...overrides,
+  };
+}
+
+/** An interview in its clarify phase: one question asked and answered, nothing pending. */
+export function makeInterviewState(overrides: Partial<InterviewStateDto> = {}): InterviewStateDto {
+  return {
+    phase: 'clarify',
+    phaseStartedAt: AT,
+    phases: [{ id: 'clarify', startedAt: AT, endedAt: null }],
+    turns: [
+      makeTurn(),
+      makeTurn({
+        id: 'turn-2',
+        ordinal: 2,
+        role: 'interviewer',
+        text: 'Within 300 ms at p99.',
+        disclosesCriterionIds: ['c2'],
+        runId: 'fake-run-1',
+        decision: 'accept',
+        overall: 88,
+      }),
+    ],
+    pending: null,
     ...overrides,
   };
 }

@@ -26,7 +26,8 @@ export const listRevisionsQuerySchema = z.strictObject(
 );
 export type ListRevisionsQueryInput = z.infer<typeof listRevisionsQuerySchema>;
 
-export const submitRevisionSchema = designSubmissionSchema;
+/** The transcript is the server's to compose from the session's turns; a body that carries one is refused. */
+export const submitRevisionSchema = designSubmissionSchema.omit({ transcript: true });
 
 /** The unsubmitted canvas: the contracts' draft schema, shape only. */
 export const putSessionDraftSchema = sessionDraftSchema;
@@ -35,7 +36,7 @@ const maxIterations = z.number().int().min(1).max(MAX_IMPROVE_ITERATIONS).option
 
 /** The coach starts from the draft, or from a graded revision of the session. */
 export const startImproveFromDraftSchema = z.strictObject({
-  ...designSubmissionSchema.shape,
+  ...submitRevisionSchema.shape,
   maxIterations,
 });
 export const startImproveFromRevisionSchema = z.strictObject({

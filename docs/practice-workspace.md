@@ -195,6 +195,22 @@ the session gone turns the page into its not-found. Blocks are selected one
 at a time by a click, several at once by ⌘-click or Ctrl-click; the
 Properties panel edits the one last clicked.)_
 
+## Interview mode
+
+A prompt practised as an **interview** adds an Interview tab and hides most of
+the prompt: you see its first section, and the Criteria list is empty until the
+interviewer's answers disclose criteria one by one. The tab shows the current
+phase with a countdown (clarify 10, design 35, deep dive 15 minutes — shown,
+never enforced; a phase ends only when you move on, open the deep dive, or
+submit), the transcript so far, and one box: write questions one per line and
+**Ask**, or **Answer** what you were asked. The interviewer answers from the
+whole prompt and nothing else, never proposes a design, and each reply carries
+the judges' decision as a badge. **Open the deep dive** asks the interviewer to
+probe the criteria your brief has not bound yet; the probes are chosen by rule,
+not by a model. Submitting ends the interview: the whole prompt and rubric are
+yours beside the grade, the transcript rides on the submission as `turn.N`
+lines the graders cite, and the export carries it as `transcript.md`.
+
 ## The Properties panel
 
 Select a block and the panel shows, in order: **Kind** (grouped by category,

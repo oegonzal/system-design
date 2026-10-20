@@ -10,6 +10,7 @@ export * from './entities/experience-profile.entity';
 export * from './entities/govcon';
 export * from './entities/interaction-delivery.entity';
 export * from './entities/interaction.entity';
+export * from './entities/interview-turn.entity';
 export * from './entities/job-application.entity';
 export * from './entities/memory-design-cycle.entity';
 export * from './entities/memory-record.entity';

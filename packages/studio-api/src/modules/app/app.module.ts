@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { DbModule, HealthController } from '@sysdesign/nest-kit';
 
 import { ExperiencesModule } from '../experiences/experiences.module';
+import { InterviewModule } from '../interview/interview.module';
 import { ProgressModule } from '../progress/progress.module';
 import { PromptsModule } from '../prompts/prompts.module';
 import { QualityLoopModule } from '../quality-loop/quality-loop.module';
@@ -13,6 +14,7 @@ import { StarStoriesModule } from '../star-stories/star-stories.module';
     DbModule,
     QualityLoopModule,
     ExperiencesModule,
+    InterviewModule,
     ProgressModule,
     PromptsModule,
     SessionsModule,

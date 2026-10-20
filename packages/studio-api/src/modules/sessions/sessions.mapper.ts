@@ -6,6 +6,7 @@ import type {
   DesignSessionDto,
   RevisionEvaluationRef,
   SessionInFlightDto,
+  SessionViewDto,
 } from '@sysdesign/contracts';
 import type { CoachingRun, DesignRevision, DesignSession } from '@sysdesign/db';
 
@@ -18,6 +19,7 @@ export interface SessionWithLatest {
 /** One session as a single read answers it: the row plus the run holding its grading slot. */
 export interface SessionDetail extends SessionWithLatest {
   inFlight: SessionInFlightDto | null;
+  view: SessionViewDto;
 }
 
 /** Where the grade lives, from the row's own pointer and cache; null for a revision graded before delegation. */
@@ -43,6 +45,7 @@ export const toRevisionDto = (r: DesignRevision): DesignRevisionDto => ({
   brief: r.brief,
   narrative: r.narrative,
   model: r.model,
+  transcript: r.transcript,
   evaluation: toEvaluationRef(r),
   createdAt: r.createdAt.toISOString(),
 });
@@ -81,4 +84,5 @@ export const toSessionDto = ({ session, latestRevision }: SessionWithLatest): De
 export const toSessionDetailDto = (detail: SessionDetail): DesignSessionDetailDto => ({
   ...toSessionDto(detail),
   inFlight: detail.inFlight,
+  view: detail.view,
 });

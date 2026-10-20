@@ -8,6 +8,7 @@ import { RevisionTimeline, type RevisionTimelineProps } from '../evaluation/revi
 import { ImprovementPanel, type ImprovementPanelProps } from '../improve/improvement-panel';
 import { PromptPane, type PromptPaneProps } from '../prompts/prompt-pane';
 import { DesignBriefEditor, type DesignBriefEditorProps } from './brief/design-brief-editor';
+import { InterviewPanel, type InterviewPanelProps } from './interview/interview-panel';
 import { ModelEditor } from './model/model-editor';
 import { NarrativeEditor, type NarrativeEditorProps } from './narrative-editor';
 
@@ -44,6 +45,8 @@ export interface SessionDockProps {
   onTabChange: (tab: string) => void;
   /** Null when the prompt could not be read. */
   prompt: PromptPaneProps | null;
+  /** The interview, for a session whose format declares phases; null for every other. */
+  interview: InterviewPanelProps | null;
   brief: DesignBriefEditorProps;
   narrative: NarrativeEditorProps;
   feedback: EvaluationPanelProps;
@@ -51,11 +54,12 @@ export interface SessionDockProps {
   timeline: RevisionTimelineProps;
 }
 
-/** The session beside its canvas, a panel per tab: the prompt, what the author writes (brief, model, narrative), the grade, the coach and the revisions. */
+/** The session beside its canvas, a panel per tab: the prompt, the interview where the format has one, what the author writes (brief, model, narrative), the grade, the coach and the revisions. */
 export function SessionDock({
   tab,
   onTabChange,
   prompt,
+  interview,
   brief,
   narrative,
   feedback,
@@ -71,6 +75,7 @@ export function SessionDock({
             clear of those ends, also when a submit opens Feedback from code. */}
         <TabList aria-label="Session panels" overflow="scroll">
           <Tab value="prompt">Prompt</Tab>
+          {interview !== null ? <Tab value="interview">Interview</Tab> : null}
           <Tab value="brief">Brief</Tab>
           <Tab value="model">Model</Tab>
           <Tab value="narrative">Narrative</Tab>
@@ -87,6 +92,11 @@ export function SessionDock({
             </Text>
           )}
         </DockPanel>
+        {interview !== null ? (
+          <DockPanel value="interview">
+            <InterviewPanel {...interview} />
+          </DockPanel>
+        ) : null}
         <DockPanel value="brief">
           <DesignBriefEditor {...brief} />
         </DockPanel>

@@ -33,11 +33,12 @@ export const SUBMISSION_PARTS = [
   'rationale',
   'narration',
   'decision',
+  'turn',
 ] as const;
 export type SubmissionPart = (typeof SUBMISSION_PARTS)[number];
 
 export interface SubmissionLocation {
-  /** Positional: `node.N`, `edge.N`, `entity.N`, `binding.N`, `overview`, `assumption.N`, `rationale.N`, `narration.N`, `decision.N`. */
+  /** Positional: `node.N`, `edge.N`, `entity.N`, `binding.N`, `overview`, `assumption.N`, `rationale.N`, `narration.N`, `decision.N`, `turn.N`. */
   id: string;
   label: string;
   part: SubmissionPart;
@@ -130,6 +131,12 @@ export function submissionLocations(submission: DesignSubmission): SubmissionLoc
       () => '',
       (item) => item.choice,
     ).map((location) => ({ ...location, key: null })),
+    ...numbered(
+      'turn',
+      submission.transcript?.turns ?? [],
+      (turn) => `${turn.role} turn`,
+      () => '',
+    ).map((location) => ({ ...location, key: null })),
   ];
 }
 
@@ -169,6 +176,7 @@ const SHORT_LABEL = {
   rationale: ({ key, label }) => (key === null ? label : `${key} rationale`),
   narration: ({ label }) => label,
   decision: ({ label }) => label,
+  turn: ({ label }) => label,
 } as const satisfies Record<
   SubmissionPart,
   (location: Pick<LocatedRef, 'key' | 'label'>) => string

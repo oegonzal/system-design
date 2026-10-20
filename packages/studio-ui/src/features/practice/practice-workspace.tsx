@@ -37,6 +37,7 @@ import { useCoachRun } from './use-coach-run';
 import { useDraftAutosave } from './use-draft-autosave';
 import { slotHolder, useSessionInFlight } from './use-session-in-flight';
 import { useSessionLoad } from './use-session-load';
+import { interviewPanelFor, useSessionView } from './use-session-view';
 import { useShownRevisions } from './use-shown-revisions';
 import { LEAVE_WHILE_SAVING, LOAD_REVISION_CONFIRM } from './workspace-copy';
 import { WorkspaceLayout } from './workspace-layout';
@@ -85,6 +86,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   const storeApi = useCanvasStoreApi();
 
   const [prompt, setPrompt] = useState<PromptDto | null>(null);
+  const { view, setView, refresh: refreshView, onInterviewState } = useSessionView(sessionId);
   const [submitting, setSubmitting] = useState(false);
   const [failure, setFailure] = useState<ActionError | null>(null);
   const [tab, setTab] = useState('prompt');
@@ -94,7 +96,9 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   const availability = useGraderAvailability();
 
   const promptCriteria = usePromptCriteria(prompt);
-  const { criteria } = promptCriteria;
+  // The rubric the editors bind to and the feedback cites: what the session
+  // may see of it, which is the whole rubric except under an interview.
+  const criteria = view?.criteria ?? promptCriteria.criteria;
   const slot = useSessionInFlight(sessionId);
   const { inFlight, hold: holdSlot, recheck: recheckSlot } = slot;
   const shown = useShownRevisions(sessionId, slot);
@@ -113,6 +117,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   const load = useSessionLoad(sessionId, storeApi, (session) => {
     holdSlot(session.inFlight);
     setPrompt(session.prompt);
+    setView(session.view);
     opened(session.revisions);
     followCoach(session.coachingRunId);
   });
@@ -164,8 +169,9 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
     (revision: DesignRevisionDto) => {
       storeApi.getState().markClean();
       submitted(revision);
+      void refreshView();
     },
-    [storeApi, submitted],
+    [storeApi, submitted, refreshView],
   );
 
   // The submit clears the server's draft, so the server must hold the latest
@@ -243,10 +249,14 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
     setExporting(true);
     setFailure(null);
     try {
+      // The transcript is the viewed revision's; the draft of an interview in
+      // progress has none until it is submitted.
+      const transcript = viewing ? (await api.getRevision(viewing.id)).transcript : null;
       await exportRun({
         prompt,
         criteria,
         ...readDraft(),
+        transcript,
         evaluation: polling.evaluation,
         revisions,
         subject: feedbackSubject,
@@ -256,7 +266,16 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
     } finally {
       setExporting(false);
     }
-  }, [prompt, criteria, readDraft, revisions, polling.evaluation, feedbackSubject, exportRun]);
+  }, [
+    prompt,
+    criteria,
+    readDraft,
+    viewing,
+    revisions,
+    polling.evaluation,
+    feedbackSubject,
+    exportRun,
+  ]);
 
   // Hand the canvas to the coach. An unedited revision whose grade is a
   // verdict is handed over as it is — the loop adopts its grade as the
@@ -421,12 +440,14 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
               ? {
                   prompt,
                   criteria,
+                  ...(view !== null ? { view } : {}),
                   deriving: promptCriteria.deriving,
                   deriveError: promptCriteria.error,
                   onDerive: promptCriteria.derive,
                 }
               : null
           }
+          interview={interviewPanelFor(sessionId, prompt, readOnly, onInterviewState)}
           brief={{ criteria, deriving: promptCriteria.deriving }}
           narrative={{ criteria }}
           feedback={{

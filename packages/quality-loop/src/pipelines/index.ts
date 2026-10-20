@@ -11,6 +11,7 @@ import { DESIGN_PROMPT } from './design-prompt/definition';
 import { DOCUMENT_DIGEST } from './document-digest/definition';
 import { EXPERIENCE_DIGEST } from './experience-digest/definition';
 import { FIELD_ANSWER } from './field-answer/definition';
+import { INTERVIEW_TURN } from './interview-turn/definition';
 import { KNOWLEDGE_DIGEST } from './knowledge-digest/definition';
 import { MEMORY_ARCHITECTURE } from './memory-architecture/definition';
 import { MEMORY_RECALL } from './memory-recall/definition';
@@ -29,6 +30,7 @@ const declared: PipelineDefinition<unknown>[] = [
   BROWSER_STEP as PipelineDefinition<unknown>,
   TOOL_STEP as PipelineDefinition<unknown>,
   FIELD_ANSWER as PipelineDefinition<unknown>,
+  INTERVIEW_TURN as PipelineDefinition<unknown>,
   ANSWER_SUGGESTIONS as PipelineDefinition<unknown>,
   DOCUMENT_DIGEST as PipelineDefinition<unknown>,
   KNOWLEDGE_DIGEST as PipelineDefinition<unknown>,

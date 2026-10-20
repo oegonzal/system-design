@@ -55,6 +55,33 @@ describe('PromptPane', () => {
     expect(screen.getByRole('heading', { level: 3, name: 'Non-functional' })).toBeTruthy();
   });
 
+  it('[UX-27] shows the session’s projection when given one: the first section, the disclosed criteria alone, and what is withheld — never a derive control', () => {
+    const prompt = makePrompt();
+    const [first] = prompt.criteria;
+    if (!first) throw new Error('the fixture prompt has criteria');
+    renderWithTheme(
+      <PromptPane
+        prompt={prompt}
+        view={{
+          markdown: '# Serve an order history\n\n## Scenario\n\nOne list.',
+          criteria: [],
+          withheld: prompt.criteria.length,
+        }}
+        onDerive={vi.fn()}
+      />,
+    );
+    expect(screen.getByTestId('prompt-markdown').textContent).toContain('One list.');
+    expect(screen.getByTestId('prompt-markdown').textContent).not.toContain(
+      'Functional requirements',
+    );
+    expect(screen.getByTestId('prompt-withheld')).toBeTruthy();
+    expect(screen.getByTestId('prompt-criteria-withheld').textContent).toContain(
+      `${prompt.criteria.length} criteria are withheld`,
+    );
+    expect(screen.queryByTestId('derive-criteria')).toBeNull();
+    expect(screen.queryByTestId(`criteria-group-${first.kind}`)).toBeNull();
+  });
+
   it('[UX-14] badges an archived prompt', () => {
     renderWithTheme(<PromptPane prompt={makePrompt({ status: 'archived' })} />);
     expect(screen.getByTestId('prompt-archived').textContent).toBe('Archived');

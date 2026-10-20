@@ -8,6 +8,7 @@ import { BrowserTask } from './entities/browser-task.entity';
 import { BusEvent } from './entities/bus-event.entity';
 import { BusSubscription } from './entities/bus-subscription.entity';
 import { CoachingRun } from './entities/coaching-run.entity';
+import { InterviewTurn } from './entities/interview-turn.entity';
 import { DesignRevision } from './entities/design-revision.entity';
 import { DesignSession } from './entities/design-session.entity';
 import { ExperienceProfile } from './entities/experience-profile.entity';
@@ -63,6 +64,7 @@ export const ormOptions = {
     DesignSession,
     DesignRevision,
     CoachingRun,
+    InterviewTurn,
     MemoryEmbedding,
     MemorySupport,
     OrchestrationRun,

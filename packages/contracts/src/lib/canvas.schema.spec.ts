@@ -193,6 +193,11 @@ describe('designSubmissionSchema', () => {
     // pipeline's 2.0.0; no coach has written one yet. The exemptions go the
     // day `pnpm measure:bounds --pipeline=system-design-canvas` first finds them.
     const unwritten = 'added with the canvas pipeline’s 2.0.0; no coach has written one yet';
+    // The transcript is composed by the studio from stored turns, never
+    // written by a model; its bounds hold what the interviewer pipeline's
+    // own schema allows a reply, and are measured where that is measured.
+    const composed =
+      'composed by the studio from interview turns; no interview has been graded yet';
     expect(
       boundsAgainstMeasured(designSubmissionSchema, measured.fields, {
         exempt: {
@@ -209,6 +214,13 @@ describe('designSubmissionSchema', () => {
           'narrative.assumptions[]': unwritten,
           'brief.bindings[].entityIds': unwritten,
           'brief.bindings[].entityIds[]': unwritten,
+          'transcript.turns': composed,
+          'transcript.turns[].phase': composed,
+          'transcript.turns[].text': composed,
+          'transcript.turns[].disclosesCriterionIds': composed,
+          'transcript.turns[].disclosesCriterionIds[]': composed,
+          'transcript.phases': composed,
+          'transcript.phases[].id': composed,
           'model.entities': unwritten,
           'model.entities[].id': unwritten,
           'model.entities[].name': unwritten,

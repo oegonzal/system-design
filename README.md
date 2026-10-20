@@ -90,6 +90,12 @@ Past runs re-appear on the Dashboard, since every session, design and grading
 run is a Postgres row. See **[RUNBOOK.md](./RUNBOOK.md)** for the persistence
 model and how to bring your runs back in the future.
 
+Prompts come in six practice formats, declared once as data: the whole system,
+the domain model and API, boundaries, workflows, evolution, and an interview —
+where you see only the opening, ask an interviewer that answers from the rest,
+design against a shown-but-unenforced clock, and defend the design under probes
+chosen by rule.
+
 The Dashboard also shows your competencies weakest first — the loop's verdicts
 on your own designs counted per criterion kind, never a score the studio made
 up — each with a link that opens the composer on the format that emphasises it,

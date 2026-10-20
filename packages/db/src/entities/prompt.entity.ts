@@ -26,6 +26,7 @@ const FORMATS = [
   'boundaries',
   'workflow',
   'evolution',
+  'interview',
 ] as const satisfies ContractFormats;
 
 /**

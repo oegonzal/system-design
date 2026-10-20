@@ -173,6 +173,21 @@ export const STUDIO_CRITERIA: readonly Criterion[] = [
     statement:
       'The dashboard shows the author’s competencies weakest first, each as the counts the loop recorded — passed, partial, failed — in a bar whose bands are labelled, with when it was last practised and a Practise-this link that opens the composer on the format that emphasises the kind; a kind never assessed says so; and Surprise me writes for the weakest.',
   },
+  {
+    id: 'UX-27',
+    statement:
+      'A prompt practised as an interview is seen first section only, with no criterion until the interviewer’s answer discloses it; the session runs through the phases its format declares — a clock shown from the server’s start time and never enforced, each phase ended only by its declared event and the clock closed by the submit — and the candidate asks, is answered, answers probes and advances from one panel, every turn kept and the whole prompt revealed once the design is submitted; the transcript rides on the submission as turn.N lines the graders cite and the export carries, and nothing in the page or the engine branches on the format’s id.',
+  },
+  {
+    id: 'DEL-9',
+    statement:
+      'The criteria an interviewer probes in a deep dive are chosen without a model: the ones the candidate’s brief has not bound first, then the bound, each ordered by the format’s emphasis and then the rubric’s own order, as many as the format declares — so the same design draws the same questions.',
+  },
+  {
+    id: 'DEL-10',
+    statement:
+      'An interviewer turn is one `interview-turn` run — the prompt as the interviewer’s notes, the rubric with ids, the transcript and the indexed items as its composed goal, the three fixed rules as its supplied rubric — claimed exactly once by its run id under a conditional update, its decision shown beside the reply and never gating it; a reply is validated against the goal’s declared index, never its prose; a run that left no reply is claimed as such and stands in the transcript.',
+  },
   // STAR repository
   {
     id: 'STAR-1',

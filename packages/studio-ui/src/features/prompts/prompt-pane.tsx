@@ -1,6 +1,11 @@
 'use client';
 
-import { PRACTICE_FORMATS, type PromptDto, type SuccessCriterion } from '@sysdesign/contracts';
+import {
+  PRACTICE_FORMATS,
+  type PromptDto,
+  type SessionViewDto,
+  type SuccessCriterion,
+} from '@sysdesign/contracts';
 import {
   Badge,
   Button,
@@ -28,6 +33,12 @@ export interface PromptPaneProps {
   titleLevel?: PromptTitleLevel;
   /** The rubric as resolved by `usePromptCriteria`; defaults to the prompt's own. */
   criteria?: SuccessCriterion[];
+  /**
+   * What the author may see of the prompt now, as the server projects it for
+   * the session: for a format that reveals by section, the first section and
+   * the disclosed criteria. Absent on the prompt's own page.
+   */
+  view?: SessionViewDto;
   /** True while the quality loop is deriving the rubric. */
   deriving?: boolean;
   /** Why the last derivation failed — the grader was unavailable. */
@@ -48,11 +59,13 @@ export function PromptPane({
   prompt,
   titleLevel = 2,
   criteria = prompt.criteria,
+  view,
   deriving = false,
   deriveError = null,
   onDerive,
 }: PromptPaneProps) {
-  const groups = groupCriteriaByKind(criteria);
+  const withheld = view?.withheld ?? 0;
+  const groups = groupCriteriaByKind(view?.criteria ?? criteria);
   const sectionLevel = (titleLevel + 1) as HeadingLevel;
   const groupLevel = (titleLevel + 2) as HeadingLevel;
 
@@ -79,9 +92,15 @@ export function PromptPane({
         label="Prompt"
         title={prompt.title}
         headingLevel={sectionLevel}
-        text={prompt.markdown}
+        text={view?.markdown ?? prompt.markdown}
         data-testid="prompt-markdown"
       />
+      {withheld > 0 ? (
+        <Text size="sm" tone="muted" data-testid="prompt-withheld">
+          The rest of the prompt is the interviewer’s: ask, and it is disclosed as you go; the whole
+          of it is yours once the design is submitted.
+        </Text>
+      ) : null}
 
       <Stack gap={3}>
         <Heading level={sectionLevel}>Criteria</Heading>
@@ -92,6 +111,11 @@ export function PromptPane({
               Normalizing the requirements into criteria…
             </Text>
           </Stack>
+        ) : groups.length === 0 && withheld > 0 ? (
+          <Text size="sm" tone="muted" data-testid="prompt-criteria-withheld">
+            {withheld} {withheld === 1 ? 'criterion is' : 'criteria are'} withheld until the
+            interviewer discloses {withheld === 1 ? 'it' : 'them'} or the design is submitted.
+          </Text>
         ) : groups.length === 0 ? (
           <Stack gap={3} data-testid="prompt-criteria-empty">
             <Text size="sm" tone="muted">

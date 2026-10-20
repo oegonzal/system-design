@@ -46,6 +46,20 @@ export class DesignSession {
   @Property({ type: 'json', nullable: true })
   draft: Contracts.SessionDraft | null = null;
 
+  /**
+   * Interview mode's clock: the format's current phase, when it began, and
+   * every phase entered so far with its start and end. Null and empty for a
+   * session whose format declares no phases. Recorded, never enforced.
+   */
+  @Property({ type: 'text', nullable: true })
+  phase: string | null = null;
+
+  @Property({ type: 'timestamptz', nullable: true })
+  phaseStartedAt: Date | null = null;
+
+  @Property({ type: 'json' })
+  phaseLog: Opt<Contracts.TranscriptPhase[]> = [];
+
   @Property({ type: 'timestamptz' })
   createdAt: Opt<Date> = new Date();
 

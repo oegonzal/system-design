@@ -6,6 +6,7 @@ import type {
   DesignModel,
   DesignNarrative,
   DesignRevisionSummaryDto,
+  DesignTranscript,
   EvaluationDto,
   PromptDto,
   SuccessCriterion,
@@ -21,6 +22,7 @@ import {
   revisionsMarkdown,
 } from './markdown';
 import { modelMarkdown } from './markdown-model';
+import { transcriptMarkdown } from './markdown-transcript';
 
 export interface RunExportInput {
   prompt: PromptDto;
@@ -30,6 +32,8 @@ export interface RunExportInput {
   narrative: DesignNarrative | null;
   brief: DesignBrief | null;
   model: DesignModel | null;
+  /** The interview's transcript, when the exported revision carries one. */
+  transcript: DesignTranscript | null;
   evaluation: EvaluationDto | null;
   revisions: DesignRevisionSummaryDto[];
   /**
@@ -86,6 +90,7 @@ export async function exportRun(
   zip.file('narrative.md', narrativeMarkdown(input.narrative, input.graph, input.criteria));
   zip.file('brief.md', briefMarkdown(input.brief, input.graph, input.criteria));
   zip.file('model.md', modelMarkdown(input.model, input.graph));
+  if (input.transcript !== null) zip.file('transcript.md', transcriptMarkdown(input.transcript));
   zip.file('feedback.md', feedbackMarkdown(input.evaluation, input.criteria, input.subject));
   zip.file('revisions.md', revisionsMarkdown(input.revisions));
 

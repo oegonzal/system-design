@@ -21,13 +21,14 @@ Two facts organise everything below:
 
 ---
 
-## 1. The studio's three paths, at a glance
+## 1. The studio's four paths, at a glance
 
 | #   | Path              | Trigger                                                                                                                                                               | Pipeline               | Iterations           | What the studio stores                                                                                                                       |
 | --- | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- | -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
 | 1   | Prompt generation | `POST /prompts/generate` → 202; `GET /prompts/generate/:runId` claims the draft                                                                                       | `design-prompt`        | 2                    | a `prompt_generation` row keyed by the run; the claimed `prompt`                                                                             |
 | 2   | Grade             | `POST /sessions/:id/revisions` → 201; `GET /revisions/:id/evaluation` polls                                                                                           | `system-design-canvas` | 1                    | the revision, pointing at `(runId, 1)`; the terminal score and decision, cached                                                              |
 | 3   | Coach             | `POST /sessions/:id/improve` → 202 (the draft, or `{ baseRevisionId }` to adopt a graded revision); `GET /sessions/:id/improve` lists; `GET …/improve/:runId` imports | `system-design-canvas` | `maxIterations` ≤ 10 | a `coaching_run` row; the draft as revision `(runId, 1)` or nothing new for an adopted base; every strictly better iteration as `(runId, k)` |
+| 4   | Interview turn    | `POST /sessions/:id/interview/clarify` or `…/probe` → 202; `GET /sessions/:id/interview` claims the reply once                                                        | `interview-turn`       | 1                    | an `interview_turn` row per turn, the interviewer's keyed by the run; the transcript composed onto the next submit                           |
 
 Beside them, without a run: `POST /prompts` stores markdown the author wrote,
 `POST /prompts/import` copies a document from the loop's library, and both —
@@ -234,10 +235,10 @@ under `src/pipelines/`: `system-design`, `agentic-design` and
 `POST /orchestrations/memory` so a run can recall what earlier runs learned
 and digest what it learned itself, and `knowledge-digest` is composed from a
 finished run by the knowledge and memory-design orchestrators;
-`system-design-canvas` and `design-prompt` are the studio's; `browser-step`,
+`system-design-canvas`, `design-prompt` and `interview-turn` are the studio's; `browser-step`,
 `field-answer` and `answer-suggestions` are the browser session's, `tool-step`
 a tool session's, `document-digest` the document ingester's and the browser
-session's, and `register-digest` a memory space's. Each of those eleven takes
+session's, and `register-digest` a memory space's. Each of those twelve takes
 a goal its owner composed — never a brief a person types into the router.
 Every definition says which it is: `goalSource: 'brief' | 'composed'`,
 validated at boot and carried on the pipeline summary, so the loop UI offers

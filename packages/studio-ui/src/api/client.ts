@@ -1,7 +1,10 @@
 import type {
+  AnswerInterviewResponse,
+  AnswerRequest,
   ApiListResponse,
   ApiResponse,
   AuthorPromptRequest,
+  ClarifyRequest,
   CoachingRunSummaryDto,
   CreateSessionRequest,
   DesignRevisionDto,
@@ -11,10 +14,14 @@ import type {
   EvaluationDto,
   ExperienceProfileDto,
   GeneratePromptRequest,
+  GetInterviewResponse,
   GetProgressResponse,
   GradingAvailabilityDto,
   ImportPromptRequest,
   ImproveRunDto,
+  InterviewStateDto,
+  InterviewTurnDto,
+  InterviewTurnStartedDto,
   ListPromptsQuery,
   ListSessionsQuery,
   ListStarStoriesQuery,
@@ -29,6 +36,7 @@ import type {
   StarStoryDto,
   StartImproveDto,
   StartImproveRequest,
+  StartInterviewTurnResponse,
   SubmitRevisionRequest,
   UpdatePromptRequest,
 } from '@sysdesign/contracts';
@@ -164,6 +172,49 @@ export const api = {
     opts: GetOptions = {},
   ): Promise<void> {
     await request<void>(`/sessions/${sessionId}/draft`, { method: 'PUT', body, ...opts });
+  },
+
+  // Interview --------------------------------------------------------------
+  /** The interview so far; a reply whose run has finished is claimed by this read, once. */
+  async getInterview(sessionId: string, opts: GetOptions = {}): Promise<InterviewStateDto> {
+    return unwrap(await request<GetInterviewResponse>(`/sessions/${sessionId}/interview`, opts));
+  },
+
+  async clarifyInterview(
+    sessionId: string,
+    body: ClarifyRequest,
+  ): Promise<InterviewTurnStartedDto> {
+    return unwrap(
+      await request<StartInterviewTurnResponse>(`/sessions/${sessionId}/interview/clarify`, {
+        method: 'POST',
+        body,
+      }),
+    );
+  },
+
+  async probeInterview(sessionId: string): Promise<InterviewTurnStartedDto> {
+    return unwrap(
+      await request<StartInterviewTurnResponse>(`/sessions/${sessionId}/interview/probe`, {
+        method: 'POST',
+      }),
+    );
+  },
+
+  async answerInterview(sessionId: string, body: AnswerRequest): Promise<InterviewTurnDto> {
+    return unwrap(
+      await request<AnswerInterviewResponse>(`/sessions/${sessionId}/interview/answer`, {
+        method: 'POST',
+        body,
+      }),
+    );
+  },
+
+  async advanceInterview(sessionId: string): Promise<InterviewStateDto> {
+    return unwrap(
+      await request<GetInterviewResponse>(`/sessions/${sessionId}/interview/advance`, {
+        method: 'POST',
+      }),
+    );
   },
 
   // Revisions --------------------------------------------------------------

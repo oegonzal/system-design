@@ -91,6 +91,10 @@ export class DesignRevision {
   @Property({ type: 'json', nullable: true })
   model: Contracts.DesignModel | null = null;
 
+  /** The interview's transcript, composed by the studio at submit; null for every other session. */
+  @Property({ type: 'json', nullable: true })
+  transcript: Contracts.DesignTranscript | null = null;
+
   /** The quality loop's run id; null only for revisions stored before grading was delegated. */
   @Index()
   @Property({ type: 'varchar', length: 80, nullable: true })

@@ -16,5 +16,7 @@ import { SessionsService } from './sessions.service';
   ],
   controllers: [SessionsController, RevisionsController],
   providers: [SessionsService, EvaluationsService, ImproveService],
+  // The interview module runs its turns under the session's own lock and rules.
+  exports: [SessionsService],
 })
 export class SessionsModule {}

@@ -30,6 +30,8 @@ const BOUNDS_FILE = 'packages/contracts/src/lib/bounds/bounded.ts';
 const SCHEMA_FILES = [
   'packages/contracts/src/lib/canvas.schema.ts',
   'packages/contracts/src/lib/model.schema.ts',
+  'packages/contracts/src/lib/transcript.schema.ts',
+  'packages/contracts/src/lib/interview.ts',
   'packages/contracts/src/lib/design-prompt.schema.ts',
   'packages/contracts/src/lib/prompts.ts',
   'packages/contracts/src/lib/star-stories.ts',
