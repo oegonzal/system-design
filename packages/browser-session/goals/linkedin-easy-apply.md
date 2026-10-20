@@ -67,6 +67,7 @@ Where the record answers a question, lead with record suggestions. Where it is s
 - limit-reached (complete) "limit daily submissions": the site says it limits daily submissions — today's Easy Apply applications are spent; a mark on a card is never a limit.
 - limit-reached (complete) "daily limit": the site says a daily limit is reached.
 - limit-reached (complete) "application limit": the site says an application limit is reached.
+- limit-reached (complete) "Easy Apply limit": the site says today's Easy Apply limit is reached — measured 2026-10-20, its dialog reads "You reached today's Easy Apply limit" and names none of the phrases above.
 - login-wall (stopped) "Sign in": a sign-in form, a verification challenge or a "confirm it is you" page appears.
 - mission-complete (complete): no next page of results is listed and no card in view qualifies.
 
