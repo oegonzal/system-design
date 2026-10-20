@@ -2,6 +2,8 @@ import {
   openingRecall,
   type DeriveCriteriaRequest,
   type DerivedCriteriaDto,
+  type IterationEvidenceDto,
+  type IterationRef,
   type IterationTrace,
   type LlmModelDto,
   type OrchestrationRunDto,
@@ -241,6 +243,24 @@ export class FakeLoop {
   getRun(runId: string): QualityRunDto | null {
     if (this.unreachable) throw new LoopUnreachable();
     return this.runs.get(runId) ?? null;
+  }
+
+  /** The verdicts of the named iterations, from the traces this fake settled; an iteration it never recorded is left out. */
+  iterationEvidence(refs: readonly IterationRef[]): IterationEvidenceDto[] {
+    if (this.unreachable) throw new LoopUnreachable();
+    return refs.flatMap((ref) => {
+      const run = this.runs.get(ref.runId);
+      const iteration = run?.trace?.iterations[ref.iteration - 1];
+      if (!run || !iteration || iteration.iteration !== ref.iteration) return [];
+      return [
+        {
+          runId: ref.runId,
+          iteration: ref.iteration,
+          finishedAt: run.finishedAt,
+          criteria: iteration.ledger.criteria.map((row) => ({ ...row })),
+        },
+      ];
+    });
   }
 
   listPrompts(): PromptLibraryEntryDto[] {

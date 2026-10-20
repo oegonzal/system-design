@@ -439,7 +439,7 @@ The core of the service. Tokens: `QUALITY_LOOP_LLM`, `PIPELINES_TOKEN`, `TRACE_S
 | File                      | What it does                                                               |
 | ------------------------- | -------------------------------------------------------------------------- |
 | `runs.service.ts`         | Starts and runs a run; `run-recorder.ts` writes what it did and closes it. |
-| `runs.controller.ts`      | `POST /runs` (202), `GET /runs`, `GET /runs/:id`.                          |
+| `runs.controller.ts`      | `POST /runs` (202), `GET /runs`, `GET /runs/:id`, `POST /runs/evidence`.   |
 | `pipelines.controller.ts` | `GET /pipelines` — the registry as summaries.                              |
 | `criteria.controller.ts`  | `POST /criteria` — one model call, no row, no dump.                        |
 | `run-request.ts`          | The request schemas, including the adopt and output rules.                 |

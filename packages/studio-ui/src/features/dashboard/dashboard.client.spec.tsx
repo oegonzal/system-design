@@ -4,7 +4,7 @@ import { screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { makeExperience, makeSession } from '../../testing/fixtures';
+import { makeExperience, makeProgress, makeSession } from '../../testing/fixtures';
 import { formatScore } from '../evaluation/score';
 import { Dashboard, RECENT_SESSIONS_PAGE } from './dashboard.client';
 
@@ -26,6 +26,8 @@ const EXPERIENCES = {
   body: { data: [makeExperience()], meta: { total: 1, limit: 50, offset: 0 } },
 };
 
+const PROGRESS = { path: '/api/progress', body: { data: makeProgress() } };
+
 /** `total` sessions on the server, served a page at a time as the client asks. */
 const sessionsRoute = (total: number) => ({
   path: '/api/sessions',
@@ -45,6 +47,7 @@ describe('Dashboard', () => {
     let sessionsDown = true;
     const sessions = sessionsRoute(1);
     stubApi([
+      PROGRESS,
       EXPERIENCES,
       {
         path: '/api/sessions',
@@ -72,6 +75,7 @@ describe('Dashboard', () => {
 
   it('[UX-12] keeps Surprise me off while the experiences cannot load, and offers their Retry', async () => {
     stubApi([
+      PROGRESS,
       { path: '/api/experiences', status: 503, body: { statusCode: 503, message: 'Down' } },
       sessionsRoute(0),
     ]);
@@ -87,6 +91,7 @@ describe('Dashboard', () => {
 
   it('prints a session’s latest score in whole points, as every other surface does', async () => {
     stubApi([
+      PROGRESS,
       EXPERIENCES,
       {
         path: '/api/sessions',
@@ -106,6 +111,7 @@ describe('Dashboard', () => {
 
   it('[UX-18] reads a latest grade that earned no score as not assessed — no score, no decision', async () => {
     stubApi([
+      PROGRESS,
       EXPERIENCES,
       {
         path: '/api/sessions',
@@ -125,6 +131,7 @@ describe('Dashboard', () => {
 
   it('[UX-21] reads a latest grade whose run failed as grading failed — no score, no decision', async () => {
     stubApi([
+      PROGRESS,
       EXPERIENCES,
       {
         path: '/api/sessions',
@@ -152,7 +159,7 @@ describe('Dashboard', () => {
   it('names each session by its prompt with a readable status, and pages through the rest', async () => {
     const user = userEvent.setup();
     const total = RECENT_SESSIONS_PAGE + 3;
-    stubApi([EXPERIENCES, sessionsRoute(total)]);
+    stubApi([PROGRESS, EXPERIENCES, sessionsRoute(total)]);
 
     renderWithTheme(<Dashboard />);
 

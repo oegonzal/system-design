@@ -51,7 +51,7 @@ export const CANVAS_CRITERION_KIND_LABELS = {
   constraint: 'Constraint',
 } as const satisfies Record<CanvasCriterionKind, string>;
 
-const isCanvasCriterionKind = (kind: string): kind is CanvasCriterionKind =>
+export const isCanvasCriterionKind = (kind: string): kind is CanvasCriterionKind =>
   (CANVAS_CRITERION_KINDS as readonly string[]).includes(kind);
 
 /**

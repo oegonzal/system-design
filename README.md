@@ -90,6 +90,11 @@ Past runs re-appear on the Dashboard, since every session, design and grading
 run is a Postgres row. See **[RUNBOOK.md](./RUNBOOK.md)** for the persistence
 model and how to bring your runs back in the future.
 
+The Dashboard also shows your competencies weakest first — the loop's verdicts
+on your own designs counted per criterion kind, never a score the studio made
+up — each with a link that opens the composer on the format that emphasises it,
+and "Surprise me" writes for the weakest one.
+
 ## Workspace layout
 
 Packages carry a `project.json` (no per-package `package.json`); every

@@ -96,3 +96,13 @@ const isPracticeFormatId = (value: string): value is PracticeFormatId =>
  */
 export const practiceFormatForLibraryFolder = (folder: string | null): PracticeFormatId =>
   folder !== null && isPracticeFormatId(folder) ? folder : DEFAULT_PRACTICE_FORMAT;
+
+/**
+ * The format to practise one competency in: the first declared format whose
+ * emphasis names the kind, so a weak competency is practised where the
+ * generator writes toward it; the default when no format emphasises it.
+ */
+export const practiceFormatForKind = (kind: CanvasCriterionKind): PracticeFormatId =>
+  PRACTICE_FORMAT_IDS.find((id) =>
+    (PRACTICE_FORMATS[id].emphasis as readonly CanvasCriterionKind[]).includes(kind),
+  ) ?? DEFAULT_PRACTICE_FORMAT;

@@ -67,6 +67,9 @@ class ScriptedClient extends LoopClient {
   retractMemory(): never {
     throw new Error('the await spec retracts nothing');
   }
+  iterationEvidence(): never {
+    throw new Error('the await spec reads no evidence');
+  }
   reads = 0;
   constructor(
     private readonly runs: (QualityRunDto | null)[] = [],

@@ -148,7 +148,17 @@ its format unless one is given), and
 omitting the experience draws the least practised one, in fixture order; the
 format's guidance and the emphasised kinds reach the writer as sections of
 its goal). A generated prompt's criteria are its
-draft's own rows, one each, and are never re-derived (409). Re-derive a
+draft's own rows, one each, and are never re-derived (409). A generation that
+names no `format` is pointed at the author's weakest competency: the first
+declared format whose emphasis names it, with that kind emphasised, read from
+`GET /api/progress` — the loop's recorded verdicts on the author's own
+revisions counted per kind (`assessed`, `passed`, `partial`, `failed`, when it
+was last practised, and the pass share of the last five sessions that assessed
+it; a coach revision, a run the loop never recorded and a criterion nobody
+judged count for nothing). The weakest kind is the lowest pass share among
+kinds with at least three verdicts; while none has that many the whole system
+is written for, as before. The verdicts come through the loop's
+`POST /runs/evidence` in one call, so the studio reads no loop table. Re-derive a
 written or imported prompt's with `POST /api/prompts/:id/criteria` while no
 session has been graded against them; afterwards the ids are frozen (409).
 Rewriting the markdown derives once, before anything is written, and makes

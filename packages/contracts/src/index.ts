@@ -24,6 +24,7 @@ export * from './lib/canvas';
 export * from './lib/canvas.schema';
 export * from './lib/model.schema';
 export * from './lib/practice-formats';
+export * from './lib/progress';
 export * from './lib/canvas-layout';
 export * from './lib/canvas-geometry';
 export * from './lib/design-prompt.schema';

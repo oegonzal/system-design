@@ -66,6 +66,9 @@ export class FakeLoopClient extends LoopClient {
     this.settled = { run: 'complete', orchestration: 'complete', ...options.settled };
     this.steps = options.steps ?? {};
   }
+  iterationEvidence(): never {
+    return notUsed('iterationEvidence');
+  }
   health(): Promise<QualityLoopHealthDto> {
     return Promise.resolve({
       status: 'ok',

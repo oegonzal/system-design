@@ -1,6 +1,8 @@
 import type {
   DeriveCriteriaRequest,
   DerivedCriteriaDto,
+  IterationEvidenceDto,
+  IterationRef,
   OrchestrationRunDto,
   OrchestrationRunStartedDto,
   PromptLibraryDocumentDto,
@@ -44,6 +46,9 @@ export class FakeLoopClient extends LoopClient {
     return this.answer(() => this.core.getRun(runId));
   }
 
+  iterationEvidence(refs: readonly IterationRef[]): Promise<IterationEvidenceDto[]> {
+    return this.answer(() => this.core.iterationEvidence(refs));
+  }
   listPrompts(): Promise<PromptLibraryEntryDto[]> {
     return this.answer(() => this.core.listPrompts());
   }

@@ -3,6 +3,7 @@ import {
   CRITERION_KIND_MAX_LENGTH,
   DEFAULT_LIST_LIMIT,
   MAX_LIST_LIMIT,
+  MAX_EVIDENCE_REFS,
   MAX_PROVIDED_CRITERIA,
   MAX_PROVIDED_STATEMENT_LENGTH,
   MAX_QUALITY_RUN_ITERATIONS,
@@ -30,6 +31,19 @@ const openerSchema = z.strictObject({
   kind: z.enum(RUN_OPENER_KINDS),
   id: z.string().min(1).max(RUN_OPENER_ID_MAX_LENGTH),
   label: z.string().max(RUN_OPENER_LABEL_MAX_LENGTH),
+});
+
+/** The body of `POST /runs/evidence`: which recorded iterations to read the verdicts of, each by run and number. */
+export const evidenceRequestSchema = z.strictObject({
+  iterations: z
+    .array(
+      z.strictObject({
+        runId: z.string().min(1).max(80),
+        iteration: z.number().int().min(1).max(MAX_QUALITY_RUN_ITERATIONS),
+      }),
+    )
+    .min(1)
+    .max(MAX_EVIDENCE_REFS),
 });
 
 /** The opener a list asks for, by the id it gave. */

@@ -2,10 +2,12 @@ import {
   MEMORY_ORCHESTRATOR_ID,
   type DeriveCriteriaRequest,
   type DerivedCriteriaDto,
+  type IterationEvidenceDto,
+  type IterationRef,
   type LlmModelDto,
+  type OrchestrationRunStartedDto,
   type PromptLibraryDocumentDto,
   type PromptLibraryEntryDto,
-  type OrchestrationRunStartedDto,
   type QualityLoopHealthDto,
   type QualityRunDto,
   type QualityRunStartedDto,
@@ -160,6 +162,10 @@ export class FakeQualityLoopClient extends QualityLoopClient {
 
   getRun(runId: string): Promise<QualityRunDto | null> {
     return answer(() => this.inner.getRun(runId));
+  }
+
+  iterationEvidence(refs: readonly IterationRef[]): Promise<IterationEvidenceDto[]> {
+    return answer(() => this.inner.iterationEvidence(refs));
   }
 
   listPrompts(): Promise<PromptLibraryEntryDto[]> {

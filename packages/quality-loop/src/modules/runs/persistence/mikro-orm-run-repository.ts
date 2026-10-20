@@ -2,6 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { LockMode } from '@mikro-orm/core';
 import { EntityManager } from '@mikro-orm/postgresql';
 import type {
+  CriterionEvidence,
+  IterationEvidenceDto,
+  IterationRef,
   LlmExchangeSummaryDto,
   QualityRunDto,
   QualityRunSummaryDto,
@@ -152,6 +155,47 @@ export class MikroOrmRunRepository implements RunRepository, RunRecallRecorder {
         findings.map((row) => ({ ...row, runId, iterationId: row.iteration.id })),
         results.map((row) => ({ ...row, runId, iterationId: row.iteration.id })),
       );
+    });
+  }
+
+  evidenceFor(refs: readonly IterationRef[]): Promise<IterationEvidenceDto[]> {
+    return readSnapshot(this.em, async (em) => {
+      const runIds = [...new Set(refs.map((ref) => ref.runId))];
+      if (runIds.length === 0) return [];
+      const wanted = new Set(refs.map((ref) => `${ref.runId}#${ref.iteration}`));
+      const [runs, iterations] = await Promise.all([
+        em.find(QualityRun, { id: { $in: runIds } }),
+        em.find(QualityRunIteration, { run: { $in: runIds } }, { orderBy: { iteration: 'asc' } }),
+      ]);
+      const finishedAt = new Map(
+        runs.map((run) => [run.id, run.finishedAt?.toISOString() ?? null]),
+      );
+      const asked = iterations.filter((row) => wanted.has(`${row.run.id}#${row.iteration}`));
+      if (asked.length === 0) return [];
+      const results = await em.find(
+        QualityRunCriterionResult,
+        { iteration: { $in: asked.map((row) => row.id) } },
+        { orderBy: { position: 'asc' } },
+      );
+      const byIteration = new Map<string, CriterionEvidence[]>();
+      for (const row of results) {
+        const list = byIteration.get(row.iteration.id) ?? [];
+        list.push({
+          criterionId: row.criterionId,
+          kind: row.kind,
+          result: row.result,
+          hits: row.hits,
+          confidence: row.confidence,
+          locationRefs: row.locationRefs,
+        });
+        byIteration.set(row.iteration.id, list);
+      }
+      return asked.map((row) => ({
+        runId: row.run.id,
+        iteration: row.iteration,
+        finishedAt: finishedAt.get(row.run.id) ?? null,
+        criteria: byIteration.get(row.id) ?? [],
+      }));
     });
   }
 

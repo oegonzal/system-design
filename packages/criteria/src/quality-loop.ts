@@ -395,4 +395,9 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
     statement:
       'The register-memory orchestrator refuses, before a row exists, a goal with no register-digest index and a request that hands in an output or a rubric; its digest step runs the pipeline under the iteration budget its record states and reports, under the contract the host reads, the run’s admission, every memory proposed, resolved, the memories it endorses and every memory withheld with what withheld it — endorsing only from a run the engine admits, whose every declared lens answered, and in which no safeguard criterion settled fail — and a child that did not complete reports nothing.',
   },
+  {
+    id: 'QL-79',
+    statement:
+      'The criterion verdicts of named iterations are read in one call — `POST /runs/evidence` answers, for each (run, iteration) the loop recorded, when the run finished and how every criterion settled, leaves out an iteration it never recorded rather than inventing one, and validates the list it is asked for — so a caller that keeps iteration pointers reads competencies without whole traces and without the loop’s tables; the loop clients and the fake answer the same contract.',
+  },
 ];

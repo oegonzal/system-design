@@ -2,6 +2,8 @@ import {
   MEMORY_ORCHESTRATOR_ID,
   type DeriveCriteriaRequest,
   type DerivedCriteriaDto,
+  type IterationEvidenceDto,
+  type IterationRef,
   type OrchestrationRunStartedDto,
   type PromptLibraryDocumentDto,
   type PromptLibraryEntryDto,
@@ -40,6 +42,10 @@ export class NestQualityLoopClient extends QualityLoopClient {
 
   getRun(runId: string): Promise<QualityRunDto | null> {
     return answer(() => this.inner.getRun(runId));
+  }
+
+  iterationEvidence(refs: readonly IterationRef[]): Promise<IterationEvidenceDto[]> {
+    return this.inner.iterationEvidence(refs);
   }
 
   listPrompts(): Promise<PromptLibraryEntryDto[]> {

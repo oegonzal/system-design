@@ -2,6 +2,8 @@ import { Body, Controller, Get, HttpCode, Param, Post, Query } from '@nestjs/com
 import type {
   GetQualityRunResponse,
   ListQualityRunsResponse,
+  ReadIterationEvidenceRequest,
+  ReadIterationEvidenceResponse,
   StartQualityRunRequest,
   StartQualityRunResponse,
 } from '@sysdesign/contracts';
@@ -9,7 +11,12 @@ import type {
 import { page, ZodValidationPipe } from '@sysdesign/nest-kit';
 
 import { orNotFound } from '../http/or-not-found';
-import { listRunsQuerySchema, runRequestSchema, type ListRunsQuery } from './run-request';
+import {
+  evidenceRequestSchema,
+  listRunsQuerySchema,
+  runRequestSchema,
+  type ListRunsQuery,
+} from './run-request';
 import { RunsService } from './runs.service';
 
 @Controller('runs')
@@ -24,6 +31,15 @@ export class RunsController {
   ): Promise<StartQualityRunResponse> {
     const record = await this.runs.start(body);
     return { data: { runId: record.runId, status: record.status } };
+  }
+
+  /** The verdicts of named iterations in one answer; an iteration the loop never recorded is simply absent. */
+  @Post('evidence')
+  @HttpCode(200)
+  async evidence(
+    @Body(new ZodValidationPipe(evidenceRequestSchema)) body: ReadIterationEvidenceRequest,
+  ): Promise<ReadIterationEvidenceResponse> {
+    return { data: await this.runs.evidence(body.iterations) };
   }
 
   /** Newest first. Declared before `:id` so the bare collection never reads as an id. */

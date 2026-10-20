@@ -11,12 +11,14 @@ import type {
   EvaluationDto,
   ExperienceProfileDto,
   GeneratePromptRequest,
+  GetProgressResponse,
   GradingAvailabilityDto,
   ImportPromptRequest,
   ImproveRunDto,
   ListPromptsQuery,
   ListSessionsQuery,
   ListStarStoriesQuery,
+  ProgressDto,
   PromptDto,
   PromptGenerationDto,
   PromptLibraryDocumentDto,
@@ -56,6 +58,11 @@ export const api = {
   // Experiences ------------------------------------------------------------
   async listExperiences(opts: GetOptions = {}): Promise<ApiListResponse<ExperienceProfileDto>> {
     return request<ApiListResponse<ExperienceProfileDto>>('/experiences', opts);
+  },
+
+  // Progress ---------------------------------------------------------------
+  async getProgress(opts: GetOptions = {}): Promise<ProgressDto> {
+    return unwrap(await request<GetProgressResponse>('/progress', opts));
   },
 
   // Prompts ----------------------------------------------------------------

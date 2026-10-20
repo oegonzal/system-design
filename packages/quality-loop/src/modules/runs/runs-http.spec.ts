@@ -228,6 +228,33 @@ describe('the HTTP surface', () => {
     expect(rows.map((row) => row.criterionId)).toEqual(['req-1', 'nfr-1']);
   });
 
+  it('[QL-79] the verdicts of named iterations are read in one call; an iteration never recorded is left out, and the list is validated', async () => {
+    const started = await postJson(url, '/runs', { pipeline: 'tiny', goal: '# Goal' });
+    const { data } = (await started.json()) as Envelope<{ runId: string }>;
+    const run = await settledRun(data.runId);
+    const asked = await postJson(url, '/runs/evidence', {
+      iterations: [
+        { runId: data.runId, iteration: 1 },
+        { runId: data.runId, iteration: 7 },
+        { runId: 'never-opened', iteration: 1 },
+      ],
+    });
+    expect(asked.status).toBe(200);
+    const { data: evidence } = (await asked.json()) as Envelope<
+      { runId: string; iteration: number; finishedAt: string | null; criteria: unknown[] }[]
+    >;
+    expect(evidence).toEqual([
+      {
+        runId: data.runId,
+        iteration: 1,
+        finishedAt: run.finishedAt,
+        criteria: run.trace?.iterations[0]?.ledger.criteria,
+      },
+    ]);
+    expect((await postJson(url, '/runs/evidence', { iterations: [] })).status).toBe(400);
+    expect((await postJson(url, '/runs/evidence', { runs: ['x'] })).status).toBe(400);
+  });
+
   it('[QL-47] a rubric statement past the ceiling, as long as the deriver can return, is taken back and recorded whole', async () => {
     // The studio hands a derived rubric back on every grade and coach run: a
     // statement the deriver kept past its ceiling must start a run, not a 400.

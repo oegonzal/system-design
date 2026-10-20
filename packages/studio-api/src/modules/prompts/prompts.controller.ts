@@ -33,12 +33,16 @@ import {
   type ListPromptsQueryInput,
 } from './prompt-requests';
 import { toPromptDto } from './prompts.mapper';
+import { PromptGenerationService } from './prompt-generation.service';
 import { PromptsService } from './prompts.service';
 
 /** Literal paths are declared before `:id` so they win route matching. */
 @Controller('prompts')
 export class PromptsController {
-  constructor(private readonly prompts: PromptsService) {}
+  constructor(
+    private readonly prompts: PromptsService,
+    private readonly generations: PromptGenerationService,
+  ) {}
 
   /** The quality loop's library, proxied: what `POST /prompts/import` can copy. */
   @Get('library')
@@ -60,12 +64,12 @@ export class PromptsController {
   async generate(
     @Body(new ZodValidationPipe(generatePromptSchema)) body: GeneratePromptRequest,
   ): Promise<StartPromptGenerationResponse> {
-    return ok(await this.prompts.startGeneration(body));
+    return ok(await this.generations.start(body));
   }
 
   @Get('generate/:runId')
   async generation(@Param('runId') runId: string): Promise<GetPromptGenerationResponse> {
-    return ok(await this.prompts.generation(runId));
+    return ok(await this.generations.read(runId));
   }
 
   /** 201: a prompt row is created from a library document. */

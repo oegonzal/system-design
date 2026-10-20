@@ -1,8 +1,11 @@
 import {
+  NO_RECOVERY,
+  rideOut,
   type ApiResponse,
   type DeriveCriteriaRequest,
   type DerivedCriteriaDto,
-  NO_RECOVERY,
+  type IterationEvidenceDto,
+  type IterationRef,
   type OrchestrationRunDto,
   type OrchestrationRunStartedDto,
   type PromptLibraryDocumentDto,
@@ -13,7 +16,6 @@ import {
   type Recovery,
   type RecoveryClock,
   type RetractedMemoryRunDto,
-  rideOut,
   type Settled,
   type StartOrchestrationFromRunRequest,
   type StartOrchestrationRequest,
@@ -118,6 +120,13 @@ export class HttpLoopClient extends LoopClient {
 
   async getRun(runId: string): Promise<QualityRunDto | null> {
     return this.read<QualityRunDto>(`/runs/${segment(runId)}`, 'GET /runs/:id');
+  }
+
+  async iterationEvidence(refs: readonly IterationRef[]): Promise<IterationEvidenceDto[]> {
+    if (refs.length === 0) return [];
+    const answer = await this.call('POST', '/runs/evidence', { iterations: refs }, READ_TIMEOUT_MS);
+    if (answer.status !== 200) throw this.refused('POST /runs/evidence', answer);
+    return data<IterationEvidenceDto[]>(answer.body);
   }
 
   async listPrompts(): Promise<PromptLibraryEntryDto[]> {

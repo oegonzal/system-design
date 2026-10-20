@@ -8,6 +8,8 @@ import {
   type AdoptedIterationRef,
   type DeriveCriteriaRequest,
   type DerivedCriteriaDto,
+  type IterationEvidenceDto,
+  type IterationRef,
   type IterationTrace,
   type PipelineSummary,
   type QualityRunDto,
@@ -102,6 +104,11 @@ export class RunsService {
 
   listRuns(query: RunListQuery): Promise<[QualityRunSummaryDto[], number]> {
     return this.repository.list(query);
+  }
+
+  /** The verdicts of named iterations, read together; an iteration never recorded is left out. */
+  evidence(refs: readonly IterationRef[]): Promise<IterationEvidenceDto[]> {
+    return this.repository.evidenceFor(refs);
   }
 
   /**

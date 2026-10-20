@@ -48,6 +48,25 @@ describe('HttpLoopClient', () => {
     expect(await client.getRun('r2')).toBeNull();
   });
 
+  it('[LC-1] reads the verdicts of named iterations in one POST, unwrapping the envelope, and asks nothing for an empty list', async () => {
+    const { fetch, calls } = scripted(() =>
+      json(200, {
+        data: [{ runId: 'r1', iteration: 1, finishedAt: null, criteria: [] }],
+      }),
+    );
+    const client = new HttpLoopClient('http://loop', fetch);
+
+    expect(await client.iterationEvidence([])).toEqual([]);
+    expect(calls).toHaveLength(0);
+
+    const evidence = await client.iterationEvidence([{ runId: 'r1', iteration: 1 }]);
+    expect(evidence).toEqual([{ runId: 'r1', iteration: 1, finishedAt: null, criteria: [] }]);
+    expect(calls[0]).toMatchObject({ url: 'http://loop/runs/evidence', init: { method: 'POST' } });
+    expect(JSON.parse(String(calls[0]?.init?.body))).toEqual({
+      iterations: [{ runId: 'r1', iteration: 1 }],
+    });
+  });
+
   it('[LC-1] starts an orchestration on a goal or from a run, and reads one back; a missing one is null', async () => {
     const { fetch, calls } = scripted(({ url }) =>
       url.endsWith('/orchestrations/form-memory')

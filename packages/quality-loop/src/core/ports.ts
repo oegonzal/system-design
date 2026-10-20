@@ -12,6 +12,8 @@ import type {
   Diagnostic,
   EvaluationReport,
   EvidenceLedger,
+  IterationEvidenceDto,
+  IterationRef,
   LensOutcome,
   ListQualityRunsQuery,
   LlmExchangeSummaryDto,
@@ -255,6 +257,12 @@ export interface RunRepository {
   close(record: RunRecord): Promise<CloseOutcome>;
   /** The run as the wire carries it, its header and child rows read as one snapshot. */
   find(runId: string): Promise<QualityRunDto | null>;
+  /**
+   * The criterion verdicts of the named iterations, in one read, for a caller
+   * that keeps iteration pointers and wants competencies without whole
+   * traces. An iteration never recorded is left out, never invented.
+   */
+  evidenceFor(refs: readonly IterationRef[]): Promise<IterationEvidenceDto[]>;
   list(query: RunListQuery): Promise<[QualityRunSummaryDto[], number]>;
   /**
    * Fail every `running` row whose heartbeat is older than `before`; returns

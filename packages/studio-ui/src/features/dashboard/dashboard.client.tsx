@@ -25,6 +25,7 @@ import { RetryAlert } from '../../components/retry-alert';
 import { humanizeToken } from '../evaluation/humanize';
 import { cachedStandingOf, formatScore, GRADE_STANDING_LABEL } from '../evaluation/score';
 import { usePromptGeneration } from '../prompts/use-prompt-generation';
+import { CompetenciesPanel } from './competencies-panel';
 
 /** How many sessions the dashboard shows at a time; the rest are a click away. */
 export const RECENT_SESSIONS_PAGE = 8;
@@ -123,7 +124,8 @@ export function Dashboard() {
   const [generatingFor, setGeneratingFor] = useState<string | null>(null);
 
   // No experienceId = "surprise me": the API picks the least-practised
-  // experience, so repeated practice covers every experience.
+  // experience, and with no format the weakest competency, so repeated
+  // practice covers every experience and leans on what the record says.
   const handleGenerate = (experienceId?: string) => {
     setGeneratingFor(experienceId ?? 'surprise');
     void generation.start(experienceId ? { experienceId } : {});
@@ -157,6 +159,8 @@ export function Dashboard() {
         </Text>
       ) : null}
 
+      <CompetenciesPanel />
+
       <Stack as="section" gap={4} aria-labelledby="experiences-heading">
         <Stack direction="row" gap={4} align="center" justify="between" wrap>
           <Heading level={2} id="experiences-heading">
@@ -167,7 +171,7 @@ export function Dashboard() {
             onClick={() => handleGenerate()}
             disabled={busy || !canSurprise}
             data-testid="surprise-me"
-            title="Write a prompt from your least-practised experience"
+            title="Write a prompt for your weakest competency from your least-practised experience"
           >
             {busy && generatingFor === 'surprise' ? 'Writing…' : 'Surprise me'}
           </Button>

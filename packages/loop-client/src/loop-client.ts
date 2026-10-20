@@ -1,6 +1,8 @@
 import type {
   DeriveCriteriaRequest,
   DerivedCriteriaDto,
+  IterationEvidenceDto,
+  IterationRef,
   OrchestrationRunDto,
   OrchestrationRunStartedDto,
   PromptLibraryDocumentDto,
@@ -30,6 +32,8 @@ export abstract class LoopClient {
   abstract startRun(request: StartQualityRunRequest): Promise<QualityRunStartedDto>;
   /** Null when the loop has no such run. */
   abstract getRun(runId: string): Promise<QualityRunDto | null>;
+  /** `POST /runs/evidence` — the verdicts of named iterations in one read; an iteration never recorded is absent. */
+  abstract iterationEvidence(refs: readonly IterationRef[]): Promise<IterationEvidenceDto[]>;
   abstract listPrompts(): Promise<PromptLibraryEntryDto[]>;
   /** Null when the library holds no such document. */
   abstract getPrompt(id: string): Promise<PromptLibraryDocumentDto | null>;

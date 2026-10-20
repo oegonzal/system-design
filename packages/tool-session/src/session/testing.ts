@@ -56,6 +56,9 @@ export class FakeLoopClient extends LoopClient {
     super();
   }
 
+  iterationEvidence(): never {
+    return notUsed('read iteration evidence');
+  }
   health(): Promise<QualityLoopHealthDto> {
     return Promise.resolve({
       status: 'ok',

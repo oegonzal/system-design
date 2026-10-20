@@ -236,6 +236,15 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       }
       return send(res, 202, { data: loop.digestRun(body['runId']) });
     }
+    if (method === 'POST' && path === '/runs/evidence') {
+      const body = await readJson(req);
+      if (!isRecord(body) || !Array.isArray(body['iterations'])) {
+        return badRequest(res, 'iterations are required');
+      }
+      return send(res, 200, {
+        data: loop.iterationEvidence(body['iterations'] as { runId: string; iteration: number }[]),
+      });
+    }
     if (method === 'GET' && path === '/runs') {
       loop.health();
       return send(res, 200, { data: [], meta: { total: 0, limit: 50, offset: 0 } });

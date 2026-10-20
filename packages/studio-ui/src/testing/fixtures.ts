@@ -1,4 +1,6 @@
+import { CANVAS_CRITERION_KINDS } from '@sysdesign/contracts';
 import type {
+  CompetencyProgressDto,
   CriterionResultDto,
   DesignRevisionDto,
   DesignRevisionSummaryDto,
@@ -9,6 +11,7 @@ import type {
   ImproveIterationDto,
   ImproveIterationOutcome,
   ImproveRunDto,
+  ProgressDto,
   PromptDto,
   PromptGenerationDto,
   PromptLibraryDocumentDto,
@@ -393,6 +396,44 @@ export function makeStory(overrides: Partial<StarStoryDto> = {}): StarStoryDto {
     experienceId: null,
     createdAt: AT,
     updatedAt: AT,
+    ...overrides,
+  };
+}
+
+/** The author's standing as the dashboard reads it: two kinds assessed, the rest never. */
+export function makeProgress(overrides: Partial<ProgressDto> = {}): ProgressDto {
+  const never = (kind: string): CompetencyProgressDto => ({
+    kind,
+    assessed: 0,
+    passed: 0,
+    partial: 0,
+    failed: 0,
+    lastPractisedAt: null,
+    recent: [],
+  });
+  return {
+    competencies: CANVAS_CRITERION_KINDS.map((kind) =>
+      kind === 'functional'
+        ? {
+            ...never(kind),
+            assessed: 4,
+            passed: 3,
+            partial: 1,
+            lastPractisedAt: '2026-10-19T10:00:00.000Z',
+            recent: [0.5, 0.75],
+          }
+        : kind === 'tradeoff'
+          ? {
+              ...never(kind),
+              assessed: 3,
+              passed: 1,
+              failed: 2,
+              lastPractisedAt: '2026-10-18T10:00:00.000Z',
+              recent: [0, 0.33],
+            }
+          : never(kind),
+    ),
+    sessions: 2,
     ...overrides,
   };
 }

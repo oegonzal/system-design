@@ -67,6 +67,29 @@ describe('FakeLoop', () => {
     expect(() => loop.recall(grade)).toThrow(/did not ask to recall/);
   });
 
+  it('[QL-79] answers the verdicts of the iterations it recorded, by run and number, and nothing for one it never did', () => {
+    const loop = new FakeLoop();
+    const { runId } = loop.startRun(request());
+    expect(loop.iterationEvidence([{ runId, iteration: 1 }])).toEqual([]);
+
+    loop.complete(runId);
+    const run = loop.getRun(runId);
+    expect(
+      loop.iterationEvidence([
+        { runId, iteration: 1 },
+        { runId, iteration: 2 },
+        { runId: 'never-opened', iteration: 1 },
+      ]),
+    ).toEqual([
+      {
+        runId,
+        iteration: 1,
+        finishedAt: run?.finishedAt,
+        criteria: run?.trace?.iterations[0]?.ledger.criteria,
+      },
+    ]);
+  });
+
   it('[QL-32] a run that asks to recall but can never call its producer is skipped as it opens, as the loop records it', () => {
     const loop = new FakeLoop();
     // One iteration over a supplied artifact: it is judged, never revised.

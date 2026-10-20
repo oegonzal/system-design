@@ -2,6 +2,8 @@ import { HttpException, HttpStatus } from '@nestjs/common';
 import type {
   DeriveCriteriaRequest,
   DerivedCriteriaDto,
+  IterationEvidenceDto,
+  IterationRef,
   OrchestrationRunStartedDto,
   PromptLibraryDocumentDto,
   PromptLibraryEntryDto,
@@ -42,6 +44,8 @@ export abstract class QualityLoopClient {
   abstract startRun(request: StartQualityRunRequest): Promise<QualityRunStartedDto>;
   /** Null when the loop has no such run. */
   abstract getRun(runId: string): Promise<QualityRunDto | null>;
+  /** The verdicts of named iterations in one read — what a competency count is made of. */
+  abstract iterationEvidence(refs: readonly IterationRef[]): Promise<IterationEvidenceDto[]>;
   abstract listPrompts(): Promise<PromptLibraryEntryDto[]>;
   /** Null when the library holds no such document. */
   abstract getPrompt(id: string): Promise<PromptLibraryDocumentDto | null>;
