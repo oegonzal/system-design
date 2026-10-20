@@ -8,7 +8,8 @@ function isBlank(binding: Binding): boolean {
   return (
     binding.claim.trim().length === 0 &&
     binding.nodeIds.length === 0 &&
-    (binding.path ?? []).length === 0
+    (binding.path ?? []).length === 0 &&
+    (binding.tradeoff ?? '').trim().length === 0
   );
 }
 
@@ -29,7 +30,12 @@ function upsert(
 
 export type BriefActions = Pick<
   CanvasState,
-  'setBindingClaim' | 'toggleBindingNode' | 'setBindingPath' | 'clearBinding' | 'loadBrief'
+  | 'setBindingClaim'
+  | 'setBindingTradeoff'
+  | 'toggleBindingNode'
+  | 'setBindingPath'
+  | 'clearBinding'
+  | 'loadBrief'
 >;
 
 /** The design brief: per criterion, the blocks and the walk the author binds it to, and the claim in their words. */
@@ -42,6 +48,18 @@ export const briefActions = ({
     commit(
       { bindings: upsert(get().bindings, criterionId, (current) => ({ ...current, claim })) },
       `binding:${criterionId}:claim`,
+    );
+  },
+
+  setBindingTradeoff(criterionId, tradeoff) {
+    commit(
+      {
+        bindings: upsert(get().bindings, criterionId, (current) => {
+          const { tradeoff: _dropped, ...rest } = current;
+          return tradeoff.trim() === '' ? rest : { ...rest, tradeoff };
+        }),
+      },
+      `binding:${criterionId}:tradeoff`,
     );
   },
 
@@ -67,6 +85,7 @@ export const briefActions = ({
           criterionId: current.criterionId,
           nodeIds: current.nodeIds,
           claim: current.claim,
+          ...(current.tradeoff !== undefined ? { tradeoff: current.tradeoff } : {}),
         };
         return path.length === 0 ? rest : { ...rest, path };
       }),

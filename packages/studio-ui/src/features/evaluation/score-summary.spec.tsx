@@ -116,16 +116,16 @@ describe('ScoreSummary', () => {
       <ScoreSummary
         evaluation={makeEvaluation({
           degraded: [
-            { stage: 'critic.scale', sample: 1, reason: 'llm-failed' },
-            { stage: 'evaluator.quality', sample: null, reason: 'token-clipped' },
+            { stage: 'critic.fitness', sample: 1, reason: 'llm-failed' },
+            { stage: 'evaluator.qualities', sample: null, reason: 'token-clipped' },
           ],
         })}
       />,
     );
     const note = screen.getByTestId('degraded-note').textContent ?? '';
     expect(note).toContain('Graded with 2 lens samples missing');
-    expect(note).toContain('critic scale #1 (the model did not answer)');
-    expect(note).toContain('evaluator quality (its answer was cut off)');
+    expect(note).toContain('critic fitness #1 (the model did not answer)');
+    expect(note).toContain('evaluator qualities (its answer was cut off)');
     expect(note).not.toContain('llm-failed');
     unmount();
 
@@ -140,8 +140,8 @@ describe('ScoreSummary', () => {
     expect(meters).toHaveLength(3);
     expect(meters.map((meter) => meter.getAttribute('aria-valuenow'))).toEqual(['80', '60', '90']);
     // The key is stamped verbatim; the label reads as words.
-    expect(document.querySelector('[data-dimension="quality_attributes"]')).toBeTruthy();
-    expect(screen.getByText('Quality attributes')).toBeTruthy();
+    expect(document.querySelector('[data-dimension="qualities"]')).toBeTruthy();
+    expect(screen.getByText('Qualities')).toBeTruthy();
   });
 
   it('renders whatever dimensions arrive — a pipeline with other names needs no edit here', () => {
@@ -158,14 +158,14 @@ describe('ScoreSummary', () => {
     renderWithTheme(
       <ScoreSummary
         evaluation={makeEvaluation({
-          dimensions: { coverage: 80, quality_attributes: null, compliance: 90 },
+          dimensions: { coverage: 80, qualities: null, compliance: 90 },
         })}
       />,
     );
 
     expect(screen.getAllByRole('meter')).toHaveLength(2);
-    const row = screen.getByTestId('not-assessed-quality_attributes');
-    expect(row.textContent).toContain('Quality attributes');
+    const row = screen.getByTestId('not-assessed-qualities');
+    expect(row.textContent).toContain('Qualities');
     expect(row.textContent).toContain('Not assessed');
     expect(row.querySelector('[aria-valuenow]')).toBeNull();
   });

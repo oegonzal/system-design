@@ -108,6 +108,17 @@ describe('reconcileBrief', () => {
     expect(kept).not.toHaveProperty('path');
   });
 
+  it('[UX-23] carries a binding’s trade-off trimmed, and omits a blank one', () => {
+    const bindings: Binding[] = [
+      { criterionId: 'c1', nodeIds: ['n-4'], claim: 'held', tradeoff: '  a table, not a cache  ' },
+      { criterionId: 'c2', nodeIds: ['n-4'], claim: 'held', tradeoff: '   ' },
+    ];
+    expect(reconcileBrief(bindings, graph, criteria)?.bindings).toEqual([
+      { criterionId: 'c1', nodeIds: ['n-4'], claim: 'held', tradeoff: 'a table, not a cache' },
+      { criterionId: 'c2', nodeIds: ['n-4'], claim: 'held' },
+    ]);
+  });
+
   it('is null when nothing is claimed, so nothing implies the author bound nothing', () => {
     expect(reconcileBrief([], graph, criteria)).toBeNull();
   });

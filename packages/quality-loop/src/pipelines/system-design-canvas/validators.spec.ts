@@ -45,7 +45,7 @@ describe('the system-design-canvas validators', () => {
       target: 'ghost',
       kind: 'sync',
     });
-    submission.brief?.bindings.push({ criterionId: 'c9', nodeIds: ['nobody'], claim: 'held' });
+    submission.brief?.bindings.push({ criterionId: 'c42', nodeIds: ['nobody'], claim: 'held' });
     submission.brief?.bindings.push({
       criterionId: 'c4',
       nodeIds: ['service-1'],
@@ -60,8 +60,8 @@ describe('the system-design-canvas validators', () => {
     expect(found.references.every((p) => p.severity === 'critical')).toBe(true);
     expect(found.references.map((p) => p.message)).toEqual([
       'edge edge-x references unknown target node: ghost',
-      'binding references unknown criterion: c9',
-      'binding of c9 references unknown node: nobody',
+      'binding references unknown criterion: c42',
+      'binding of c42 references unknown node: nobody',
       'criterion c4 is bound twice',
       'path of c4 breaks at edge edge-3 — it does not continue the walk',
       'narrative explains unknown node: ghost',

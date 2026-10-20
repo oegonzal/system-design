@@ -12,7 +12,7 @@ export const metadata: Metadata = {
     template: pageTitle('%s'),
   },
   description:
-    'Practice distributed-systems design on an interactive canvas, graded by a critic/eval pipeline.',
+    'Practice software system design on an interactive canvas, graded as the competencies a senior interview asks for by a critic/eval pipeline.',
 };
 
 /**

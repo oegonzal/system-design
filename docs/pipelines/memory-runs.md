@@ -113,7 +113,10 @@ type priced onto `quality_attributes`, which carries .30; and
 `evaluator.quality.md` names capacity estimates as the evidence it cites for a
 pass. `output.ts` makes `capacity` a mandatory key. An empty array parses, so
 this is not schema-forced — it is policy-forced, which is worse, because it is
-invisible.
+invisible. (The studio's `system-design-canvas` pipeline no longer shares this
+shape: since its 2.0.0 it grades ten criterion kinds, scale one among them
+weighted only by a prompt's own figures, under five dimensions; `system-design`
+itself is unchanged.)
 
 The store measured it. Against a 97-lesson corpus built entirely by
 `system-design`, the ten agentic prompts reached a mean best match of

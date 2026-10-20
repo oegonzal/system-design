@@ -27,6 +27,42 @@ describe('canvas-store', () => {
       expect(store.getState().componentRationales).toEqual([]);
     });
 
+    it('[UX-23] setComponentTradeoff keeps a slot written only as a trade-off, and clearing the prose keeps it', () => {
+      const store = createCanvasStore();
+      store.getState().setComponentTradeoff('n-3', 'a store of its own rather than a view');
+      expect(store.getState().componentRationales).toEqual([
+        { nodeId: 'n-3', prose: '', tradeoff: 'a store of its own rather than a view' },
+      ]);
+      store.getState().setComponentRationale('n-3', 'Persists every order.');
+      store.getState().setComponentRationale('n-3', '');
+      expect(store.getState().componentRationales).toEqual([
+        { nodeId: 'n-3', prose: '', tradeoff: 'a store of its own rather than a view' },
+      ]);
+      store.getState().setComponentTradeoff('n-3', '');
+      expect(store.getState().componentRationales).toEqual([]);
+    });
+
+    it('[UX-23] decisions are added blank, patched field by field with blanks cleared, and removed by position', () => {
+      const store = createCanvasStore();
+      store.getState().addDecision();
+      store.getState().addDecision();
+      expect(store.getState().decisions).toEqual([{ choice: '' }, { choice: '' }]);
+      store.getState().updateDecision(1, { choice: 'Own a read model', alternative: 'Query live' });
+      store.getState().updateDecision(1, { nodeIds: ['n-3'], cost: '' });
+      expect(store.getState().decisions[1]).toEqual({
+        choice: 'Own a read model',
+        alternative: 'Query live',
+        nodeIds: ['n-3'],
+      });
+      store.getState().updateDecision(1, { nodeIds: [], alternative: '  ' });
+      expect(store.getState().decisions[1]).toEqual({ choice: 'Own a read model' });
+      store.getState().removeDecision(0);
+      expect(store.getState().decisions).toEqual([{ choice: 'Own a read model' }]);
+      expect(store.getState().dirty).toBe(true);
+      store.getState().updateDecision(7, { choice: 'nowhere' });
+      expect(store.getState().decisions).toHaveLength(1);
+    });
+
     it('setCriterionNarration upserts by criterion id and clears on empty prose', () => {
       const store = createCanvasStore();
 

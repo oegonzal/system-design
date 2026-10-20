@@ -29,6 +29,24 @@ describe('canvas-store', () => {
   });
 
   describe('session draft', () => {
+    it('[UX-23] serializeDraft carries the decisions as typed, blank choice included, and loadDraft restores them', () => {
+      const store = createCanvasStore(makeGraph());
+      store.getState().addDecision();
+      store.getState().updateDecision(0, { alternative: 'Query live' });
+      const draft = store.getState().serializeDraft();
+      expect(draft.narrative).toEqual({
+        version: 1,
+        componentRationales: [],
+        criterionNarrations: [],
+        decisions: [{ choice: '', alternative: 'Query live' }],
+      });
+      const other = createCanvasStore();
+      other.getState().loadDraft(draft);
+      expect(other.getState().decisions).toEqual([{ choice: '', alternative: 'Query live' }]);
+      // A submission drops the undecided row.
+      expect(store.getState().serializeNarrative([{ id: 'c1' }])).toBeNull();
+    });
+
     it('[UX-15] serializeDraft keeps the bindings exactly as typed and nulls an unwritten half', () => {
       const store = createCanvasStore(makeGraph());
       expect(store.getState().serializeDraft()).toEqual({

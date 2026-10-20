@@ -1,17 +1,20 @@
 # System Design Studio
 
-Practice distributed-systems design the way you'd whiteboard it in an
-interview — on an interactive canvas, against prompts grounded in real
-production experience, with a critic/evaluator/controller loop that grades
-every submission, explains why, and can coach the design forward.
+Practice software system design the way you'd whiteboard it in a senior
+engineering interview — on an interactive canvas, against prompts grounded in
+real production experience, with a critic/evaluator/controller loop that
+grades every submission as the competencies a panel looks for, explains why,
+and can coach the design forward.
 
 **The loop:** pick a prompt — write one as markdown, import one from the
 library, or generate one from a seeded experience — the grader derives its
 criteria once (`c1…cN`) → sketch the architecture from a palette of
 system-design building blocks (gateway, load balancer, service, database,
 replica, cache, queue, event stream, CDN, …) → bind each criterion to the
-components that hold it, trace the path a request takes, narrate the design →
-submit → the quality loop judges it with five critics and two evaluators and a
+components that hold it, trace the path a request takes, say why that
+mechanism and not another, narrate the design and record the decisions it
+rests on — the choice, the alternative, the cost →
+submit → the quality loop judges it with five critics and four evaluators and a
 deterministic controller → findings point at the exact nodes and edges, results
 sit beside each criterion → iterate, resubmit, or hand the draft to the coach
 and watch its better iterations land in the timeline. A STAR-story repository
@@ -136,10 +139,13 @@ edges to nodes, bindings to criteria, paths that connect), waits for no
 earlier grade of the session to still be in flight, and starts one
 `system-design-canvas` run on those criteria with the canvas, brief and
 narrative as the artifact; the revision row points at that run's iteration.
-Five critic personas (requirements, architecture, capacity, explanation,
-failure scenarios) and two evaluators judge it with two samples each; the
-deterministic controller prices what they agreed on into coverage, quality
-attributes and compliance, and decides. The studio reads the run back,
+Five critic personas (requirements, model, structure, fitness, explanation)
+and four evaluators (coverage, design, qualities, reasoning) judge it with two
+samples each; the deterministic controller prices what they agreed on into
+coverage, design, qualities, reasoning and compliance, and decides. Every
+rubric closes with two standing trade-off criteria, so reasoning is earnable
+on every prompt; scale is one criterion kind among ten and earns only what a
+prompt's own figures give it. The studio reads the run back,
 grounds each finding onto the canvas by label and part, keeps the
 controller's reason, and caches the terminal score. The coach is the same
 run with more iterations, started from the draft or from a graded revision

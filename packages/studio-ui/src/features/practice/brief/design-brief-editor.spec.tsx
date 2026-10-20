@@ -50,6 +50,15 @@ describe('DesignBriefEditor', () => {
     expect(screen.getByRole('heading', { level: 3, name: 'Constraint' })).toBeTruthy();
   });
 
+  it('[UX-23] records why this mechanism and not another beside the claim', async () => {
+    const store = renderEditor();
+    await userEvent.type(screen.getByTestId('binding-tradeoff-c3'), 'a replica, not a cache');
+    expect(store.getState().bindings).toEqual([
+      { criterionId: 'c3', nodeIds: [], claim: '', tradeoff: 'a replica, not a cache' },
+    ]);
+    expect(screen.getByTestId('binding-state-c3').getAttribute('data-state')).toBe('incomplete');
+  });
+
   it('[UX-6] binds a criterion with a claim and the components that hold it', async () => {
     const store = renderEditor();
 

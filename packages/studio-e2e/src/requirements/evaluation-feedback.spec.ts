@@ -41,7 +41,7 @@ test.describe('the grading feedback', () => {
     await expect(page.getByTestId('stop-reason')).toHaveCount(0);
 
     // One meter per dimension the pipeline declared, none "not assessed".
-    for (const dimension of ['coverage', 'quality_attributes', 'compliance']) {
+    for (const dimension of ['coverage', 'qualities', 'compliance']) {
       await canvas.feedback.expectDimensionScored(dimension);
     }
     await expect(canvas.feedback.dimensionMeter('coverage')).toHaveAttribute(
@@ -96,12 +96,12 @@ test.describe('the grading feedback', () => {
     await expect(failure).toContainText('a restart drops the target');
     await expect(failure.getByTestId('finding-criterion')).toHaveText('c2');
     await expect(failure.getByTestId('finding-lens')).toHaveText([
-      'critic architecture',
-      'critic scenarios',
+      'critic structure',
+      'critic fitness',
     ]);
     await expect(failure.getByTestId('finding-lens').first()).toHaveAttribute(
       'title',
-      'critic.architecture',
+      'critic.structure',
     );
     await expect(failure.getByTestId('finding-select-unhandled_failure|node.3')).toHaveText(
       'Unhandled failure',

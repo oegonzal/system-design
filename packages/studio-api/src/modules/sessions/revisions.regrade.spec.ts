@@ -101,7 +101,7 @@ describe('revisions', () => {
         overall: null,
         unscored: 'unassessed',
         decision: 'escalate',
-        dimensions: { coverage: null, quality_attributes: null, compliance: null },
+        dimensions: { coverage: null, qualities: null, compliance: null },
         decisionBasis: { criteria: { assessed: 0, total: prompt.criteria.length } },
       });
       // The timeline's cache says the same: no number.

@@ -104,7 +104,7 @@ describe('narrativeMarkdown', () => {
 describe('briefMarkdown', () => {
   it('renders one table row per binding with its claim, components and resolved path', () => {
     const md = briefMarkdown(makeBrief(), graph, criteria);
-    expect(md).toContain('| Criterion | Claim | Components | Path |');
+    expect(md).toContain('| Criterion | Claim | Components | Path | Why this, not another |');
     expect(md).toContain('c1 — A shopper reads their merged order history');
     expect(md).toContain('The service reads the history from the orders database');
     expect(md).toContain('Order Service, Orders DB');
@@ -123,7 +123,7 @@ describe('feedbackMarkdown', () => {
     const evaluation = makeEvaluation({
       findings: [
         makeFinding({
-          lenses: ['critic.architecture'],
+          lenses: ['critic.structure'],
           rationale: 'node.3 is both the read bottleneck and the single point of failure.',
         }),
       ],
@@ -132,12 +132,12 @@ describe('feedbackMarkdown', () => {
     expect(md).toContain('# Feedback — revision #2');
     expect(md).toContain('**72/100 · revise**');
     expect(md).toContain('## Dimensions');
-    expect(md).toContain('| Quality attributes | 60 |');
+    expect(md).toContain('| Qualities | 60 |');
     expect(md).toContain('## Criteria');
     expect(md).toContain('| c3 — p99 read latency stays under 200 ms | Fail | high |');
     expect(md).toContain('## Findings');
     expect(md).toContain(
-      '- **[high · critic architecture · Unhandled failure]** (n-3 · database · Orders DB) — c3',
+      '- **[high · critic structure · Unhandled failure]** (n-3 · database · Orders DB) — c3',
     );
     expect(md).toContain(
       '  n-3 · database · Orders DB is both the read bottleneck and the single point of failure.',
@@ -146,7 +146,7 @@ describe('feedbackMarkdown', () => {
   });
 
   it('[UX-10] prints what the panel prints: whole-point scores, the decision reason and every rationale in labels, never a key or a position', () => {
-    const finding = makeFinding({ lenses: ['critic.architecture', 'evaluator.coverage'] });
+    const finding = makeFinding({ lenses: ['critic.structure', 'evaluator.coverage'] });
     const evaluation = makeEvaluation({
       overall: 72.6,
       dimensions: { coverage: 79.5, compliance: null },
@@ -183,10 +183,10 @@ describe('feedbackMarkdown', () => {
     );
     // A criterion's rationale reads with its labels, and its pipe never splits the row.
     expect(md).toContain('| n-3 · database · Orders DB \\| the one primary — a read bottleneck. |');
-    expect(md).toContain('critic architecture, evaluator coverage');
+    expect(md).toContain('critic structure, evaluator coverage');
     expect(md).not.toContain(finding.id);
     expect(md).not.toContain('node.3');
-    expect(md).not.toContain('critic.architecture');
+    expect(md).not.toContain('critic.structure');
   });
 
   it('[UX-10] words a rationale as the panel does: a capitalised ref by its label, a place already named by its short one, a finding type in words', () => {
@@ -247,7 +247,7 @@ describe('feedbackMarkdown', () => {
     );
 
     expect(md).toContain(
-      '- **[high · critic architecture · Unhandled failure]** (n-3 · database · Orders DB) — c3',
+      '- **[high · critic structure · Unhandled failure]** (n-3 · database · Orders DB) — c3',
     );
     expect(md).toContain(
       '  n-3 · database · Orders DB has no replica, so the read along e-2 · n-2 → n-3 (sync) stops at it.',
@@ -330,8 +330,8 @@ describe('feedbackMarkdown', () => {
           remediations: 0,
           criteria: { assessed: 0, total: 2 },
         },
-        dimensions: { coverage: null, quality_attributes: null },
-        degraded: [{ stage: 'evaluator.quality', sample: 1, reason: 'llm-failed' }],
+        dimensions: { coverage: null, qualities: null },
+        degraded: [{ stage: 'evaluator.qualities', sample: 1, reason: 'llm-failed' }],
         criterionResults: [
           makeCriterionResult({ result: 'unassessed', confidence: null, rationale: 'looks fine' }),
         ],
@@ -343,7 +343,7 @@ describe('feedbackMarkdown', () => {
     expect(md).toContain('**This revision couldn’t be graded**');
     expect(md).toContain('The lenses assessed 0 of 2 criteria — too few to score the design.');
     expect(md).toContain(
-      '1 lens sample did not answer: evaluator quality #1 (the model did not answer).',
+      '1 lens sample did not answer: evaluator qualities #1 (the model did not answer).',
     );
     expect(md).not.toMatch(/\/100|escalate|## Dimensions|score stands|only 0%/);
     expect(md).toContain('| Unassessed | — | — |');

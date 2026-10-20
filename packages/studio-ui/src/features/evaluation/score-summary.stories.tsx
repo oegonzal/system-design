@@ -20,7 +20,7 @@ export const Accept: Story = {
     evaluation: makeEvaluation({
       overall: 91,
       decision: 'accept',
-      dimensions: { coverage: 95, quality_attributes: 88, compliance: 100 },
+      dimensions: { coverage: 95, qualities: 88, compliance: 100 },
     }),
   },
 };
@@ -30,7 +30,7 @@ export const NotAssessed: Story = {
   args: {
     evaluation: makeEvaluation({
       overall: 81,
-      dimensions: { coverage: 84, quality_attributes: null, compliance: 79 },
+      dimensions: { coverage: 84, qualities: null, compliance: 79 },
     }),
   },
 };
@@ -79,8 +79,8 @@ export const BlockersAndMissingLenses: Story = {
         }),
       ],
       degraded: [
-        { stage: 'critic.scale', sample: 1, reason: 'llm-failed' },
-        { stage: 'evaluator.quality', sample: 2, reason: 'token-clipped' },
+        { stage: 'critic.fitness', sample: 1, reason: 'llm-failed' },
+        { stage: 'evaluator.qualities', sample: 2, reason: 'token-clipped' },
       ],
     }),
   },
@@ -99,7 +99,7 @@ export const Reject: Story = {
     evaluation: makeEvaluation({
       overall: 22,
       decision: 'reject',
-      dimensions: { coverage: 15, quality_attributes: 20, compliance: 30 },
+      dimensions: { coverage: 15, qualities: 20, compliance: 30 },
     }),
   },
 };

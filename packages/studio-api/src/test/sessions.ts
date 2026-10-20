@@ -98,7 +98,7 @@ export const unassessedIteration = (
   overall: 0,
   decision: 'escalate',
   evidenceSufficient: false,
-  dimensions: { coverage: 0, quality_attributes: 0, compliance: 0 },
+  dimensions: { coverage: 0, qualities: 0, compliance: 0 },
   criteria: criteria.map((criterion) => ({
     criterionId: criterion.id,
     kind: criterion.kind,

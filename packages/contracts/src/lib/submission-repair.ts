@@ -28,6 +28,7 @@ export function repairSubmission(
             narrative.criterionNarrations,
             graph,
             criteria,
+            narrative.decisions ?? [],
           ),
   };
 }

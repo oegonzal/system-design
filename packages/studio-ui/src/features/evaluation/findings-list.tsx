@@ -25,14 +25,17 @@ export interface FindingsListProps {
 /**
  * The finding types that are about the story told over the boxes rather than
  * the boxes: a claim the diagram does not back, a component nothing explains,
- * a narration that contradicts the drawing. Tagged so the author sees which
- * findings the Brief and Narrative tabs answer. Data, not a rule — a pipeline
- * that never emits them simply never shows the tag.
+ * a narration that contradicts the drawing, a choice nobody defends, an
+ * assumption nobody states. Tagged so the author sees which findings the
+ * Brief and Narrative tabs answer. Data, not a rule — a pipeline that never
+ * emits them simply never shows the tag.
  */
 const EXPLANATION_FINDING_TYPES: readonly string[] = [
   'unbacked_claim',
   'unexplained_component',
   'contradiction',
+  'bad_assumption',
+  'tradeoff_missing',
 ];
 
 const NO_CRITERIA: SuccessCriterion[] = [];

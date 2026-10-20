@@ -262,7 +262,8 @@ is judged there.
 
 **`system-design-canvas/`** — judges or coaches the author's React-Flow graph, the brief binding each
 criterion to the parts holding it, and the narrative. This is the grade a user sees in the studio.
-The largest vocabulary, twelve finding types, five critics. Its own controller, `REVISE_ONLY`, which
+The largest vocabulary, ten criterion kinds, sixteen finding types, five critics, four evaluators.
+Its own controller, `REVISE_ONLY`, which
 no path can make decide `retry` — a retry would replace the author's canvas with the model's.
 
 **`design-prompt/`** — produces a practice prompt from an engineer's experience: title, scenario,

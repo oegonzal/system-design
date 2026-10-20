@@ -8,8 +8,8 @@ import type { CanvasGraph, DesignNarrative } from './canvas.schema';
  *
  * The same line the brief validator holds: it rejects what is IMPOSSIBLE — a
  * rationale for a node that is not on the canvas, a narration for a criterion
- * the prompt never derived — and says nothing about prose that is merely
- * thin. A two-word rationale is a save that grades poorly, not a save the API
+ * the prompt never derived, a decision concerning a node that is not drawn —
+ * and says nothing about prose that is merely thin. A two-word rationale is a save that grades poorly, not a save the API
  * refuses; refusing it would move the teaching out of the evaluation and into
  * a form validator.
  */
@@ -45,6 +45,14 @@ export function validateNarration(
     }
     seenCriteria.add(narration.criterionId);
   }
+
+  (narrative.decisions ?? []).forEach((decision, index) => {
+    for (const nodeId of decision.nodeIds ?? []) {
+      if (!nodeIds.has(nodeId)) {
+        problems.push(`decision ${index + 1} concerns unknown node: ${nodeId}`);
+      }
+    }
+  });
 
   return problems;
 }

@@ -35,6 +35,7 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
       narrativeOverview: '',
       componentRationales: [],
       criterionNarrations: [],
+      decisions: [],
       bindings: [],
       highlight: null,
 

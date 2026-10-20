@@ -17,8 +17,11 @@ and **see results / iterate**.
 - **Prompt** — the challenge, read-only: its markdown rendered (tables and
   lists as written; its headings demoted so the document's own title never
   competes with the page's), and its **criteria** as chips grouped by kind —
-  functional, non-functional, scale, constraint — each with an id (`c1`,
-  `c2`, …) and its statement. For a written or imported prompt the criteria
+  functional, domain model, interface, boundary, workflow, non-functional,
+  scale, evolution, trade-off, constraint — each with an id (`c1`, `c2`, …)
+  and its statement. Two standing trade-off criteria close every rubric:
+  every load-bearing decision records an alternative and its cost, and the
+  design's assumptions are stated. For a written or imported prompt the criteria
   are derived once by the grader, the first time the prompt is opened
   ("normalising requirements…" while it answers), and can be re-derived until
   a session has been graded against them; a generated prompt's criteria are
@@ -31,12 +34,21 @@ and **see results / iterate**.
 
 - **Brief** — the _structured_ explanation. One row per criterion: the
   **components** that hold it (any nodes on the canvas), a **claim** in your
-  own words, and — where a request travels — a **traced path** of connected
-  edges. A row is `bound` once it has a claim and at least one component;
-  nothing else is checked here. Whether the claim holds is the grader's call.
+  own words, — where a request travels — a **traced path** of connected
+  edges, and **why this, not another**: the mechanism that could have held
+  the requirement instead, and the cost of the one chosen. A row is `bound`
+  once it has a claim and at least one component; nothing else is checked
+  here. Whether the claim holds, and whether the choice is defended, is the
+  grader's call.
 - **Narrative** — the _prose_ walkthrough: an **overview**, a **rationale per
-  component**, and a **narration per criterion**, keyed to the node and
-  criterion they explain.
+  component** with an **instead of** (what could have stood there, and why it
+  does not), the **decisions the design rests on** — each a choice, the
+  alternative, the cost, and what would change your mind, tied to the
+  components it concerns — and a **narration per criterion**, keyed to the
+  node and criterion they explain. Trade-offs are a quarter of the grade:
+  three standing criteria on every rubric ask that every load-bearing
+  decision be defended, that every binding that had a choice say why, and
+  that the assumptions be stated.
 
 ### See results / iterate
 
@@ -52,8 +64,8 @@ and **see results / iterate**.
   make.**, **Blocked by** the findings and criteria it names, **Below the
   reject floor of 30**, **At or above the accept threshold of 75** — never
   the controller's own sentence, one
-  **meter per dimension** the pipeline declares (coverage, quality attributes,
-  compliance — "Not assessed" when nothing earned it), a **result per
+  **meter per dimension** the pipeline declares (coverage, design, qualities,
+  reasoning, compliance — "Not assessed" when nothing earned it), a **result per
   criterion** (pass / partial / fail, a stacked list), and the **findings**:
   each with its severity, the lenses that confirmed it, its type, the criteria
   it names, the lens's rationale, and the places it points at, **labelled** —
@@ -211,20 +223,21 @@ measured against:
 
 | Input                | What's in it                                                                             | Read by                                                                |
 | -------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| **Diagram** (canvas) | nodes (kind, config, responsibilities, operations) + edges (sync/async, what they carry) | every lens — requirements, architecture, capacity, scenarios           |
-| **Brief**            | a claim, components and a path per criterion                                             | the explanation critic; both evaluators, as the evidence for a pass    |
-| **Narrative**        | overview + rationales + narrations                                                       | the explanation critic                                                 |
+| **Diagram** (canvas) | nodes (kind, config, responsibilities, operations) + edges (sync/async, what they carry) | every lens — requirements, model, structure, fitness                   |
+| **Brief**            | a claim, components and a path per criterion                                             | the explanation critic; every evaluator, as the evidence for a pass    |
+| **Narrative**        | overview + rationales + narrations                                                       | the explanation critic; the reasoning evaluator                        |
 | **Prompt**           | its markdown and its criteria                                                            | the goal every lens reads, and the rubric the evaluators grade against |
 
 Two rules keep the grade honest:
 
-- **Explanation earns coverage.** A functional criterion passes only through a
-  binding whose path the diagram actually contains; a claim the diagram does
-  not back, a load-bearing component nobody explains, and a narration that
-  contradicts the drawing are findings priced onto the same dimension the
-  criterion earned on. You can't talk your way to a score the design doesn't
-  support — and a box with the right label and no story is worth as much as no
-  box.
+- **Explanation is graded as reasoning.** A functional criterion passes only
+  through a binding whose path the diagram actually contains; a claim the
+  diagram does not back, a load-bearing component nobody explains, a narration
+  that contradicts the drawing, a choice with no alternative considered and an
+  assumption nobody states are findings priced onto `reasoning`, the dimension
+  the standing trade-off criteria earn. You can't talk your way to a score the
+  design doesn't support — and a box with the right label and no story is
+  worth as much as no box.
 - **The model never picks the number.** Every lens answers in a schema of
   categories and ordinals (severity, confidence, pass / partial / fail) locked
   to the ids on the page; two independent samples must agree before an item
@@ -237,16 +250,21 @@ The canvas pipeline's policy — in
 the engine validates at boot — says how:
 
 1. **Each criterion is judged** pass, partial or fail by the evaluator that
-   owns its kind (functional and constraint → the requirements evaluator;
-   non-functional and scale → the quality evaluator), weighted by confidence.
-2. **Each dimension is earned by its criteria** — functional criteria earn
-   `coverage`, non-functional and scale earn `quality_attributes` (scale at
-   half weight), constraints earn `compliance` — then **confirmed findings
-   subtract**: a priced penalty per severity, decaying with each further
-   finding on the same dimension, clamped at a per-dimension cap.
+   owns its kind (functional and constraint → coverage; domain model,
+   interface, boundary and workflow → design; non-functional, scale and
+   evolution → qualities; trade-off → reasoning), weighted by confidence. An
+   evaluator with no criteria of its kinds on a prompt is skipped without a
+   call.
+2. **Each dimension is earned by its criteria** — every kind at the same
+   weight — then **confirmed findings subtract**: a priced penalty per
+   severity, decaying with each further finding on the same dimension,
+   clamped at a per-dimension cap; a finding prices onto the dimension its
+   critic's kinds earn.
 3. **Overall is the weighted average** of the assessed dimensions
-   (`coverage` 0.4, `quality_attributes` 0.4, `compliance` 0.2); a dimension
-   nothing earned drops out and the rest rescale.
+   (`coverage` 0.25, `design` 0.35, `qualities` 0.2, `reasoning` 0.1,
+   `compliance` 0.1); a dimension with no criteria and no findings drops out
+   and the rest rescale, which is how a prompt that states no load gives scale
+   no weight at all.
 4. **Gates come before the number.** A `critical` finding, a confirmed
    constraint violation or a failed constraint criterion blocks an accept
    however high the score; at or above the accept threshold the decision is

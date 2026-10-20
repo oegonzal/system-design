@@ -95,6 +95,9 @@ describe('prompts', () => {
         'c3:non_functional',
         'c4:scale',
         'c5:constraint',
+        'c6:tradeoff',
+        'c7:tradeoff',
+        'c8:tradeoff',
       ]);
       expect(h.loop.criteriaRequests).toEqual([]);
 
@@ -205,7 +208,7 @@ describe('prompts', () => {
         experienceId: TICKETING_ID,
         markdown: '# Rewritten\n\n- one thing\n- two things',
       });
-      expect(rewritten.body.data.criteria.map((c) => c.id)).toEqual(['c1', 'c2']);
+      expect(rewritten.body.data.criteria.map((c) => c.id)).toEqual(['c1', 'c2', 'c3', 'c4', 'c5']);
       expect(h.loop.criteriaRequests).toHaveLength(1);
       // Authored now: it can be re-derived like any written prompt.
       const again = await call<GetPromptResponse>(`${h.url}/prompts/${id}/criteria`, {

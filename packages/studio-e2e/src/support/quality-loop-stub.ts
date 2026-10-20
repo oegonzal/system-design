@@ -65,7 +65,7 @@ const loop = new FakeLoop({
   pipelineVersion: 'stub',
   library: LIBRARY,
   knownPipelines: [CANVAS_PIPELINE_ID, PROMPT_PIPELINE_ID],
-  startExchanges: ['producer.s1', 'critic.architecture.s1', 'evaluator.coverage.s1'],
+  startExchanges: ['producer.s1', 'critic.structure.s1', 'evaluator.coverage.s1'],
   now: () => new Date().toISOString(),
 });
 

@@ -20,7 +20,7 @@ export const Empty: Story = { args: { findings: [] } };
 export const CompleteWithFindings: Story = {
   args: {
     findings: [
-      makeFinding({ lenses: ['critic.architecture', 'critic.scenarios'] }),
+      makeFinding({ lenses: ['critic.structure', 'critic.fitness'] }),
       makeFinding({
         id: 'unbacked_claim|binding.2',
         lenses: ['critic.explanation'],
@@ -39,7 +39,7 @@ export const CompleteWithFindings: Story = {
       }),
       makeFinding({
         id: 'operability_gap|node.2',
-        lenses: ['critic.architecture'],
+        lenses: ['critic.structure'],
         type: 'operability_gap',
         severity: 'info',
         criterionIds: [],

@@ -62,7 +62,7 @@ export const DEFAULT_ITERATIONS = (criteria: readonly SuccessCriterion[]): FakeI
   {
     overall: 64,
     decision: 'revise',
-    dimensions: { coverage: 70, quality_attributes: 52, compliance: 100 },
+    dimensions: { coverage: 70, qualities: 52, compliance: 100 },
     findings: [
       {
         key: 'unhandled_failure|node.2',
@@ -73,7 +73,7 @@ export const DEFAULT_ITERATIONS = (criteria: readonly SuccessCriterion[]): FakeI
         locationRefs: ['node.2'],
         criterionIds: criteria.length > 1 ? ['c2'] : [],
         hits: 2,
-        lenses: ['critic.architecture', 'critic.scenarios'],
+        lenses: ['critic.structure', 'critic.fitness'],
         rationale: 'a single instance serves every read; a restart drops the target',
         reconciledTo: null,
       },
@@ -237,7 +237,7 @@ function canvasFindings(
         'high',
         [`node.${nodes}`],
         criteria.some((criterion) => criterion.id === 'c2') ? ['c2'] : [],
-        ['critic.architecture', 'critic.scenarios'],
+        ['critic.structure', 'critic.fitness'],
         'a single instance serves every read; a restart drops the target',
       ),
     );
@@ -384,7 +384,7 @@ function canvasIteration(
     criteria,
     overall,
     decide(overall),
-    { coverage: overall, quality_attributes: Math.max(0, overall - 12), compliance: 100 },
+    { coverage: overall, qualities: Math.max(0, overall - 12), compliance: 100 },
     canvasFindings(graph, criteria),
     `stub: ${graph?.nodes.length ?? 0} nodes → ${overall}`,
   );

@@ -37,6 +37,7 @@ export function DesignBriefEditor({ criteria, deriving = false }: DesignBriefEdi
   const edges = useCanvasStore((state) => state.edges);
   const bindings = useCanvasStore((state) => state.bindings);
   const setBindingClaim = useCanvasStore((state) => state.setBindingClaim);
+  const setBindingTradeoff = useCanvasStore((state) => state.setBindingTradeoff);
   const toggleBindingNode = useCanvasStore((state) => state.toggleBindingNode);
   const setBindingPath = useCanvasStore((state) => state.setBindingPath);
   const clearBinding = useCanvasStore((state) => state.clearBinding);
@@ -52,9 +53,10 @@ export function DesignBriefEditor({ criteria, deriving = false }: DesignBriefEdi
   return (
     <Stack gap={5}>
       <Text size="sm" tone="muted">
-        For each criterion, say which components hold it, in one sentence, and trace how the request
-        travels. Every claim is checked against your diagram by the grader — an unsupported one is
-        allowed, and graded.
+        For each criterion, say which components hold it, in one sentence, trace how the request
+        travels, and say why that mechanism and not another that could have held it. Every claim is
+        checked against your diagram by the grader — an unsupported one is allowed, and graded; a
+        choice nobody defends is graded too.
       </Text>
 
       {criteria.length === 0 ? (
@@ -78,6 +80,7 @@ export function DesignBriefEditor({ criteria, deriving = false }: DesignBriefEdi
                 binding={bindings.find((binding) => binding.criterionId === criterion.id) ?? null}
                 disabled={readOnly}
                 onClaim={(claim) => setBindingClaim(criterion.id, claim)}
+                onTradeoff={(tradeoff) => setBindingTradeoff(criterion.id, tradeoff)}
                 onToggleNode={(nodeId) => toggleBindingNode(criterion.id, nodeId)}
                 onPath={(path) => setBindingPath(criterion.id, path)}
                 onClear={() => clearBinding(criterion.id)}

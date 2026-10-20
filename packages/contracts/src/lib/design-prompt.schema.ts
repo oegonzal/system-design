@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { bound, bounded, composedBound, type Bound } from './bounds';
 import { PROMPT_TITLE_BOUND } from './prompts';
 import { CRITERION_STATEMENT_BOUND, type SuccessCriterion } from './quality-loop/evidence';
-import { CANVAS_CRITERION_KINDS, CANVAS_MAX_CRITERIA } from './studio-pipelines';
+import { withStandingCriteria } from './studio-pipelines';
 
 /**
  * A system-design prompt as the `design-prompt` pipeline drafts it from an
@@ -15,11 +15,11 @@ import { CANVAS_CRITERION_KINDS, CANVAS_MAX_CRITERIA } from './studio-pipelines'
  * Kinds and targets are open strings on purpose: the model chooses the words
  * and the numbers; nothing here is a closed vocabulary a grader keys on.
  *
- * The row targets sum to the canvas pipeline's criteria cap, because a
- * generated prompt's rubric is its rows (`criteriaFromDraft`): one criterion
- * per row, never a blank one, and never more than the grader can hold — a
- * draft a little over a row bound is kept whole, and the cap takes the first
- * rows. And each row fits a criterion statement whole — a row is one, or
+ * The row targets sum to the room the standing criteria leave in the canvas
+ * pipeline's cap, because a generated prompt's rubric is its rows
+ * (`criteriaFromDraft`) closed by those: one criterion per row, never a
+ * blank one, and never more than the grader can hold — a draft a little over
+ * a row bound is kept whole, and the cap takes the first rows. And each row fits a criterion statement whole — a row is one, or
  * composes into one with its separators — so no requirement is ever cut to
  * become a criterion.
  *
@@ -165,30 +165,24 @@ const statement = (...cells: readonly string[]): string =>
 /**
  * A generated prompt's rubric is its rows: one criterion per row, in the
  * order the markdown prints the sections, kinded by the section it came from
- * — the same four kinds the canvas pipeline declares. No model is asked to
- * read back what the draft already states, so the ids `c1…cN` are fixed the
+ * — four of the kinds the canvas pipeline declares — and closed by the
+ * standing criteria every canvas rubric carries. No model is asked to read
+ * back what the draft already states, so the ids `c1…cN` are fixed the
  * moment the prompt is claimed, and there are never more than the grader's
- * cap: the row targets sum to it, and a draft kept past them yields its first
- * rows.
+ * cap: the row targets sum to the room the standing criteria leave, and a
+ * draft kept past them yields its first rows.
  */
 export function criteriaFromDraft(draft: DesignPromptDraft): SuccessCriterion[] {
-  const [functional, nonFunctional, scale, constraint] = CANVAS_CRITERION_KINDS;
-  const statements: { kind: string; statement: string }[] = [
+  return withStandingCriteria([
     ...draft.functionalRequirements.map((text) => ({
-      kind: functional,
+      kind: 'functional',
       statement: statement(text),
     })),
     ...draft.nonFunctionalRequirements.map((row) => ({
-      kind: nonFunctional,
+      kind: 'non_functional',
       statement: statement(row.kind, row.requirement, row.target),
     })),
-    ...draft.scale.map((row) => ({
-      kind: scale,
-      statement: statement(row.metric, row.target),
-    })),
-    ...draft.constraints.map((text) => ({ kind: constraint, statement: statement(text) })),
-  ];
-  return statements
-    .slice(0, CANVAS_MAX_CRITERIA)
-    .map((item, index) => ({ id: `c${index + 1}`, ...item }));
+    ...draft.scale.map((row) => ({ kind: 'scale', statement: statement(row.metric, row.target) })),
+    ...draft.constraints.map((text) => ({ kind: 'constraint', statement: statement(text) })),
+  ]);
 }

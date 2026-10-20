@@ -5,16 +5,34 @@
  * lives in the lens personas beside this file; the definition itself is kinds,
  * types, weights and gates.
  *
- * Two things shape the policy:
+ * A design is graded as the competencies a senior software-design interview
+ * asks for, each a criterion kind the contract declares
+ * (`CANVAS_CRITERION_KINDS`): what the system must do (coverage); the data it
+ * keeps, the contracts it exposes, where responsibility is split and the
+ * processes it carries (design); the quality targets, the load it is sized
+ * for and how it arrives and changes (qualities); the decisions it defends
+ * (reasoning); the rules it may not break (compliance). Scale is one kind
+ * among ten and earns only what a prompt's own figures give it.
  *
- * 1. Explanation earns coverage. A functional criterion passes only through a
- *    binding whose path the diagram contains, and a claim the diagram does not
- *    back, a part nobody explains, or a narration that contradicts the drawing
- *    prices onto `coverage` — the same dimension the requirement earned on.
- *    A box with the right label and no story is worth as much as no box.
- * 2. Every dimension earns from a criterion kind. `soundness` in the older
- *    text pipeline could only fall; here the failures of soundness price onto
- *    `quality_attributes`, which the non-functional and scale criteria earn.
+ * Three things shape the policy:
+ *
+ * 1. A dimension is earned by its criteria. One with no criteria on a prompt
+ *    and no findings leaves the score; one with findings but no criteria
+ *    starts at 100 and can only fall. Reasoning therefore rides on the three
+ *    standing criteria the studio appends to every rubric
+ *    (`CANVAS_STANDING_CRITERIA`) — every decision defended, every binding
+ *    that had a choice saying why, the assumptions stated — so it is
+ *    earnable on every prompt, and on the trade-off rows a prompt states.
+ *    The author writes those defences where the claims are: a trade-off on
+ *    each binding, an "instead of" on each rationale, and the decisions
+ *    list in the narrative.
+ * 2. A finding prices where its critic's kinds earn. The explanation
+ *    failures — a claim the diagram does not back, a part nobody explains, a
+ *    narration that contradicts the drawing, a decision with no alternative —
+ *    price onto reasoning; a defect of the data, the contracts, the seams or
+ *    a process onto design; a target or a figure missed onto qualities.
+ * 3. Proportion. The fitness critic holds a design to the goal's own figures,
+ *    and over-building where the goal states no load is a defect too.
  *
  * The studio always provides the artifact, so the producer is the coach: it
  * runs on revise only — the controller never decides retry, because a fresh
@@ -31,14 +49,16 @@ import {
 
 import type { PipelineDefinition } from '../../core/pipeline';
 import { STANDARD_SCORING } from '../../core/policy';
-import criticArchitecture from './lenses/critic.architecture.md?raw';
 import criticExplanation from './lenses/critic.explanation.md?raw';
+import criticFitness from './lenses/critic.fitness.md?raw';
+import criticModel from './lenses/critic.model.md?raw';
 import criticRequirements from './lenses/critic.requirements.md?raw';
-import criticScale from './lenses/critic.scale.md?raw';
-import criticScenarios from './lenses/critic.scenarios.md?raw';
+import criticStructure from './lenses/critic.structure.md?raw';
 import deriveCriteria from './lenses/derive-criteria.md?raw';
-import evaluatorQuality from './lenses/evaluator.quality.md?raw';
-import evaluatorRequirements from './lenses/evaluator.requirements.md?raw';
+import evaluatorCoverage from './lenses/evaluator.coverage.md?raw';
+import evaluatorDesign from './lenses/evaluator.design.md?raw';
+import evaluatorQualities from './lenses/evaluator.qualities.md?raw';
+import evaluatorReasoning from './lenses/evaluator.reasoning.md?raw';
 import producer from './lenses/producer.md?raw';
 import { REVISE_ONLY } from './controller';
 import { canvasOutput, type CanvasSubmission } from './output';
@@ -47,14 +67,14 @@ import { referencesValidator, structureValidator } from './validators';
 export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   id: CANVAS_PIPELINE_ID,
 
-  version: '1.0.0',
+  version: '2.0.0',
 
   // A goal another program composes; never a route, a target, or a choice in the UI.
 
   goalSource: 'composed',
 
   description:
-    'A canvas drawn in the studio — nodes, edges, the brief binding each requirement to the parts that hold it, and the narrative — judged against the prompt it answers, and coached when asked.',
+    'A canvas drawn in the studio — nodes, edges, the brief binding each requirement to the parts that hold it, and the narrative — judged as the competencies of a senior design against the prompt it answers, and coached when asked.',
 
   task: {
     // The kinds are the contract's declaration (`CANVAS_CRITERION_KINDS`),
@@ -66,11 +86,29 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       functional:
         'A capability the system must provide: a request it serves, data it ingests, a job it runs.',
 
+      domain_model:
+        'The entities the system keeps, who owns each, how they relate, the invariants and lifecycle states they hold, and the access patterns on them.',
+
+      interface:
+        'The shape of a contract the system exposes or consumes: operations, idempotency, pagination, versioning, errors, events published, polling or webhook obligations.',
+
+      boundary:
+        'Where responsibility is split and why: which part owns what, which way dependencies point, a seam, a build-or-buy choice.',
+
+      workflow:
+        'A business process carried end to end: its states, failure paths and compensations — what happens when.',
+
       non_functional:
-        'A quality target the design must meet: latency, availability, consistency, durability, freshness, security, observability or cost.',
+        'A quality target other than load: availability, consistency, durability, freshness, security, privacy, observability or cost.',
 
       scale:
-        'A load, volume, retention or fleet figure the design must be sized for — one figure per criterion.',
+        'The load, volume or retention the design is sized for, proportionately to the goal’s own figures.',
+
+      evolution:
+        'How the design arrives and lives: migration from what exists, rollout and rollback, compatibility, operability, cost over time.',
+
+      tradeoff:
+        'A decision the candidate must make and justify: the alternatives, the cost accepted.',
 
       constraint:
         'A hard rule the design may not break: an imposed platform, a data boundary, a compliance rule, a vendor that only behaves one way.',
@@ -93,10 +131,10 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
         'A connection, or the absence of one, that fails as drawn: an unreachable part, a client on a store, a single point on a path the goal does not forgive.',
 
       interface_defect:
-        'An operation carried but never declared, declared but never exercised, or owned by a part of the wrong kind.',
+        'A contract that cannot serve its consumer: an operation carried but never declared, declared but never exercised, owned by a part of the wrong kind, or missing the idempotency, versioning, pagination or error shape the goal’s consumers need.',
 
       operability_gap:
-        'Nothing watches, traces, rotates or alerts on what the goal asks to be operated — or machinery no requirement here pays for.',
+        'Nothing watches, traces, rotates, rolls out or rolls back what the goal asks to be operated — or machinery no requirement here pays for.',
 
       unbacked_claim:
         'A binding or narration naming a mechanism the diagram does not provide, or naming every part as if each held the requirement.',
@@ -109,6 +147,18 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
 
       bad_assumption:
         'A design decision resting on something the goal does not say and would not grant.',
+
+      model_defect:
+        'An entity, owner, relationship or invariant the goal names that nothing holds, that two parts write, or that cannot reach the states the goal describes.',
+
+      boundary_defect:
+        'A responsibility in the wrong part, two parts owning one, a dependency pointing the wrong way, or a seam the goal needs and nothing draws.',
+
+      workflow_gap:
+        'A step, failure path or compensation of a stated process that nothing carries.',
+
+      tradeoff_missing:
+        'A load-bearing decision with no alternative considered, no cost accepted, or no condition to revisit it.',
     } satisfies Record<CanvasFindingType, string>,
     maxCriteria: CANVAS_MAX_CRITERIA,
     output: canvasOutput,
@@ -133,7 +183,9 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   // (`callTimeLimitMs`), so a cap a stage outwrites is a call cut short: a
   // coached canvas has taken up to 40.2k output tokens in one turn, thinking
   // included (2026-10-02, a revision the seam now keeps whole), critics up
-  // to 25.4k on a dense diagram and evaluators up to 12.0k.
+  // to 25.4k on a dense diagram and evaluators up to 12.0k under the lenses
+  // this version replaced — the seeds the spec holds until this version's
+  // own runs are measured.
   producer: {
     persona: producer,
     maxTokens: 50000,
@@ -143,6 +195,9 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   validators: [referencesValidator, structureValidator],
   controller: REVISE_ONLY,
 
+  // Each critic owns the finding types it may raise, so its reply schema
+  // offers it those alone and a defect is priced where the critic's own
+  // kinds earn.
   critics: [
     {
       id: 'critic.requirements',
@@ -150,91 +205,139 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       samples: 2,
       maxItems: 10,
       maxTokens: 30000,
+      findingTypes: ['missing_requirement', 'constraint_violation'],
     },
     {
-      id: 'critic.architecture',
-      persona: criticArchitecture,
+      id: 'critic.model',
+      persona: criticModel,
       samples: 2,
-      maxItems: 12,
+      maxItems: 10,
       maxTokens: 32000,
+      findingTypes: ['model_defect', 'interface_defect', 'data_integrity'],
     },
     {
-      id: 'critic.scale',
-      persona: criticScale,
+      id: 'critic.structure',
+      persona: criticStructure,
+      samples: 2,
+      maxItems: 10,
+      maxTokens: 32000,
+      findingTypes: ['boundary_defect', 'workflow_gap', 'topology_defect'],
+    },
+    {
+      id: 'critic.fitness',
+      persona: criticFitness,
       samples: 2,
       maxItems: 8,
-      maxTokens: 30000,
+      maxTokens: 32000,
+      findingTypes: ['scale_mismatch', 'unhandled_failure', 'operability_gap'],
     },
     {
       id: 'critic.explanation',
       persona: criticExplanation,
       samples: 2,
-      maxItems: 10,
+      maxItems: 12,
       maxTokens: 32000,
-    },
-    {
-      id: 'critic.scenarios',
-      persona: criticScenarios,
-      samples: 2,
-      maxItems: 8,
-      maxTokens: 30000,
+      findingTypes: [
+        'unbacked_claim',
+        'contradiction',
+        'unexplained_component',
+        'bad_assumption',
+        'tradeoff_missing',
+      ],
     },
   ],
 
+  // An evaluator with no criteria of its kinds on a prompt is skipped
+  // without a call, so a prompt pays only for the competencies it asks for.
   evaluators: [
     {
-      id: 'evaluator.requirements',
-      persona: evaluatorRequirements,
+      id: 'evaluator.coverage',
+      persona: evaluatorCoverage,
       samples: 2,
       consumes: ['findings'],
       maxTokens: 12200,
       criterionKinds: ['functional', 'constraint'],
     },
     {
-      id: 'evaluator.quality',
-      persona: evaluatorQuality,
+      id: 'evaluator.design',
+      persona: evaluatorDesign,
       samples: 2,
       consumes: ['findings'],
       maxTokens: 16000,
-      criterionKinds: ['non_functional', 'scale'],
+      criterionKinds: ['domain_model', 'interface', 'boundary', 'workflow'],
+    },
+    {
+      id: 'evaluator.qualities',
+      persona: evaluatorQualities,
+      samples: 2,
+      consumes: ['findings'],
+      maxTokens: 16000,
+      criterionKinds: ['non_functional', 'scale', 'evolution'],
+    },
+    {
+      id: 'evaluator.reasoning',
+      persona: evaluatorReasoning,
+      samples: 2,
+      consumes: ['findings'],
+      maxTokens: 12200,
+      criterionKinds: ['tradeoff'],
     },
   ],
 
   policy: {
-    version: '1',
+    version: '2',
 
+    // Reasoning carries a quarter: the owner's call (2026-10-20) that
+    // defending each decision against the alternatives is a large part of
+    // what a senior design is, graded through the three standing criteria
+    // every rubric carries and the trade-off rows a prompt poses.
     dimensionWeights: {
-      coverage: 0.4,
+      coverage: 0.2,
 
-      quality_attributes: 0.4,
+      design: 0.3,
 
-      compliance: 0.2,
+      qualities: 0.15,
+
+      reasoning: 0.25,
+
+      compliance: 0.1,
     },
 
+    // Every kind weighs the same within its dimension: the deriver and the
+    // draft consolidate a prompt's figures into one or two scale criteria,
+    // so scale no longer needs the half weight that several figure rows once
+    // justified.
     criterionKinds: {
       functional: { dimension: 'coverage', weight: 1, gate: false },
-      non_functional: { dimension: 'quality_attributes', weight: 1, gate: false },
-      // Half the weight of a quality target: a figure is met or not, and a
-      // prompt lists several of them.
-      scale: { dimension: 'quality_attributes', weight: 0.5, gate: false },
+      domain_model: { dimension: 'design', weight: 1, gate: false },
+      interface: { dimension: 'design', weight: 1, gate: false },
+      boundary: { dimension: 'design', weight: 1, gate: false },
+      workflow: { dimension: 'design', weight: 1, gate: false },
+      non_functional: { dimension: 'qualities', weight: 1, gate: false },
+      scale: { dimension: 'qualities', weight: 1, gate: false },
+      evolution: { dimension: 'qualities', weight: 1, gate: false },
+      tradeoff: { dimension: 'reasoning', weight: 1, gate: false },
       constraint: { dimension: 'compliance', weight: 1, gate: true },
     } satisfies Record<CanvasCriterionKind, { dimension: string; weight: number; gate: boolean }>,
 
+    // A type prices onto the dimension its owning critic's kinds earn.
     findingTypes: {
       missing_requirement: { dimension: 'coverage', gate: false },
       constraint_violation: { dimension: 'compliance', gate: true },
-      scale_mismatch: { dimension: 'quality_attributes', gate: false },
-      unhandled_failure: { dimension: 'quality_attributes', gate: false },
-      data_integrity: { dimension: 'quality_attributes', gate: false },
-      topology_defect: { dimension: 'quality_attributes', gate: false },
-      interface_defect: { dimension: 'quality_attributes', gate: false },
-      operability_gap: { dimension: 'quality_attributes', gate: false },
-      // The explanation failures price where the requirement earned: a claim
-      // the diagram does not back costs the coverage it pretended to have.
-      unbacked_claim: { dimension: 'coverage', gate: false },
-      unexplained_component: { dimension: 'coverage', gate: false },
-      contradiction: { dimension: 'coverage', gate: false },
-      bad_assumption: { dimension: 'quality_attributes', gate: false },
+      scale_mismatch: { dimension: 'qualities', gate: false },
+      unhandled_failure: { dimension: 'qualities', gate: false },
+      data_integrity: { dimension: 'design', gate: false },
+      topology_defect: { dimension: 'design', gate: false },
+      interface_defect: { dimension: 'design', gate: false },
+      operability_gap: { dimension: 'qualities', gate: false },
+      unbacked_claim: { dimension: 'reasoning', gate: false },
+      unexplained_component: { dimension: 'reasoning', gate: false },
+      contradiction: { dimension: 'reasoning', gate: false },
+      bad_assumption: { dimension: 'reasoning', gate: false },
+      model_defect: { dimension: 'design', gate: false },
+      boundary_defect: { dimension: 'design', gate: false },
+      workflow_gap: { dimension: 'design', gate: false },
+      tradeoff_missing: { dimension: 'reasoning', gate: false },
     } satisfies Record<CanvasFindingType, { dimension: string; gate: boolean }>,
 
     ...STANDARD_SCORING,

@@ -4,8 +4,8 @@ import { degradedNote } from './degraded';
 
 describe('degradedNote', () => {
   it('[DEL-4] names each lens sample a grade was computed without, by lens and why, in words', () => {
-    expect(degradedNote([{ stage: 'critic.scale', sample: 1, reason: 'llm-failed' }])).toBe(
-      'Graded with 1 lens sample missing — critic scale #1 (the model did not answer). The score stands on the lenses that answered.',
+    expect(degradedNote([{ stage: 'critic.fitness', sample: 1, reason: 'llm-failed' }])).toBe(
+      'Graded with 1 lens sample missing — critic fitness #1 (the model did not answer). The score stands on the lenses that answered.',
     );
     expect(
       degradedNote([

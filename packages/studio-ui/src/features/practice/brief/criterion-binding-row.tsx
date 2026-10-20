@@ -3,6 +3,7 @@
 import {
   BINDING_CLAIM_BOUND,
   BINDING_NODES_BOUND,
+  BINDING_TRADEOFF_BOUND,
   type Binding,
   type CanvasGraph,
   type SuccessCriterion,
@@ -14,6 +15,7 @@ import {
   Stack,
   Surface,
   Text,
+  TextAreaField,
   TextField,
 } from '@sysdesign/design-system';
 import { useState } from 'react';
@@ -36,6 +38,7 @@ export interface CriterionBindingRowProps {
   /** Shown, never edited — every control is off. */
   disabled?: boolean;
   onClaim: (claim: string) => void;
+  onTradeoff: (tradeoff: string) => void;
   onToggleNode: (nodeId: string) => void;
   onPath: (path: string[]) => void;
   onClear: () => void;
@@ -43,9 +46,10 @@ export interface CriterionBindingRowProps {
 
 /**
  * One criterion, and the author's claim about how the design meets it: the
- * components that hold it, a sentence in the author's own words, and — for a
- * request that travels — the path of edges it takes. Every node on the canvas
- * is offered: whether a client can hold a latency target is the evaluators'
+ * components that hold it, a sentence in the author's own words, — for a
+ * request that travels — the path of edges it takes, and why that mechanism
+ * rather than another that could have held it. Every node on the canvas is
+ * offered: whether a client can hold a latency target is the evaluators'
  * question, not a picker's. Presentational and controlled.
  */
 export function CriterionBindingRow({
@@ -54,6 +58,7 @@ export function CriterionBindingRow({
   binding,
   disabled = false,
   onClaim,
+  onTradeoff,
   onToggleNode,
   onPath,
   onClear,
@@ -92,6 +97,18 @@ export function CriterionBindingRow({
           placeholder="e.g. the cache absorbs repeat reads"
           disabled={disabled}
           onChange={(event) => onClaim(event.target.value)}
+        />
+
+        <TextAreaField
+          label="Why this, not another"
+          data-testid={`binding-tradeoff-${criterion.id}`}
+          rows={2}
+          value={binding?.tradeoff ?? ''}
+          maxLength={BINDING_TRADEOFF_BOUND.ceiling}
+          target={BINDING_TRADEOFF_BOUND.target}
+          placeholder="e.g. a read replica rather than a cache: staleness is bounded by replication lag, not by a TTL to tune"
+          disabled={disabled}
+          onChange={(event) => onTradeoff(event.target.value)}
         />
 
         {graph.nodes.length > 0 ? (

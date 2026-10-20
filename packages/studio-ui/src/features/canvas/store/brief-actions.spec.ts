@@ -25,6 +25,19 @@ describe('canvas-store', () => {
       expect(store.getState().dirty).toBe(true);
     });
 
+    it('[UX-23] setBindingTradeoff keeps why this and not another beside the claim, clears it on blank text, and survives a path edit', () => {
+      const store = createCanvasStore(makeGraph());
+      store.getState().setBindingTradeoff('c3', 'a replica rather than a cache');
+      expect(store.getState().bindings).toEqual([
+        { criterionId: 'c3', nodeIds: [], claim: '', tradeoff: 'a replica rather than a cache' },
+      ]);
+      store.getState().setBindingPath('c3', ['e-1']);
+      expect(store.getState().bindings[0]?.tradeoff).toBe('a replica rather than a cache');
+      store.getState().setBindingTradeoff('c3', '  ');
+      store.getState().setBindingPath('c3', []);
+      expect(store.getState().bindings).toEqual([]);
+    });
+
     it('toggleBindingNode adds and removes components, capped at the contract', () => {
       const store = createCanvasStore(makeGraph());
 

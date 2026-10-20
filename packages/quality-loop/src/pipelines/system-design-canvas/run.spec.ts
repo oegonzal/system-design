@@ -15,7 +15,12 @@ import { coachedSubmission, sampleCriteria, sampleSubmission } from './testing';
 
 const GOAL = '# Serve an order history\n\nShoppers see their past orders; two sources feed them.';
 
-/** What every critic sample says: one confirmed defect at the history service, naming the latency target. */
+/**
+ * What the fitness critic's samples say — the one critic whose owned types
+ * this reply fits — : one confirmed defect at the history service, naming the
+ * latency target. Every other critic's schema refuses it and answers with
+ * nothing.
+ */
 const findings = {
   findings: [
     {
@@ -31,7 +36,9 @@ const findings = {
   ],
 };
 
-/** Two evaluators, two rubrics: the fake answers each by the criterion ids its schema locks to. */
+const noFindings = { findings: [] };
+
+/** Four evaluators, four rubrics: the fake answers each by the criterion ids its schema locks to. */
 const requirementResults = {
   results: [
     {
@@ -86,7 +93,57 @@ const qualityResults = {
   advisoryVerdict: 'revise',
 };
 
-const canned = [findings, requirementResults, qualityResults, coachedSubmission()];
+const designResults = {
+  results: [
+    {
+      criterionId: 'c7',
+      result: 'pass',
+      confidence: 'high',
+      locationRefs: ['node.11'],
+      rationale: 'the history store owns every order once',
+    },
+    {
+      criterionId: 'c8',
+      result: 'partial',
+      confidence: 'medium',
+      locationRefs: ['node.3'],
+      rationale: 'the webhook is keyed, the indexer is not',
+    },
+    {
+      criterionId: 'c9',
+      result: 'fail',
+      confidence: 'high',
+      locationRefs: ['edge.3'],
+      rationale: 'no path carries a refund back to its order',
+    },
+  ],
+  advisoryVerdict: 'revise',
+};
+
+const reasoningResults = {
+  results: [
+    {
+      criterionId: 'c10',
+      result: 'partial',
+      confidence: 'medium',
+      locationRefs: ['rationale.1'],
+      rationale: 'the read model is defended, the cost of staleness is not named',
+    },
+  ],
+  advisoryVerdict: 'revise',
+};
+
+/** Every judge's answer, in the order the fake tries them: a typed finding first, then nothing, then one results reply per evaluator. */
+const judges = [
+  findings,
+  noFindings,
+  requirementResults,
+  qualityResults,
+  designResults,
+  reasoningResults,
+];
+
+const canned = [...judges, coachedSubmission()];
 
 /** What a coach might return: a criterion it invented, a criterion bound twice, and a path that fans out. */
 const sloppyCoached = (): DesignSubmission => {
@@ -136,19 +193,14 @@ describe('the system-design-canvas loop', () => {
       { llm: fakeLlm(...canned), sink: (exchange) => exchanges.push(exchange), now: () => 0 },
     );
 
-    expect(trace.contract.criteria.map((criterion) => criterion.id)).toEqual([
-      'c1',
-      'c2',
-      'c3',
-      'c4',
-      'c5',
-      'c6',
-    ]);
+    expect(trace.contract.criteria.map((criterion) => criterion.id)).toEqual(
+      Array.from({ length: 10 }, (_, index) => `c${index + 1}`),
+    );
     const scopes = new Set(exchanges.map((exchange) => exchange.scope));
     expect(scopes.has('criteria')).toBe(false);
     expect(scopes.has('producer')).toBe(false);
-    // Seven lenses, two samples each — every one attributed.
-    expect(exchanges).toHaveLength(14);
+    // Nine lenses, two samples each — every one attributed.
+    expect(exchanges).toHaveLength(18);
 
     expect(trace.iterations).toHaveLength(1);
     const [only] = trace.iterations;
@@ -157,17 +209,23 @@ describe('the system-design-canvas loop', () => {
     expect(only.ledger.findings.map((finding) => finding.key)).toEqual([
       'unhandled_failure|edge.3,node.3',
     ]);
-    expect(only.ledger.findings[0].lenses).toEqual([
-      'critic.requirements',
-      'critic.architecture',
-      'critic.scale',
-      'critic.explanation',
-      'critic.scenarios',
-    ]);
+    // Only the critic that owns the type raised it; its two samples confirm it.
+    expect(only.ledger.findings[0].lenses).toEqual(['critic.fitness']);
     expect(only.ledger.findings[0].rationale).toContain('300 ms');
     expect(
       Object.fromEntries(only.ledger.criteria.map((row) => [row.criterionId, row.result])),
-    ).toEqual({ c1: 'pass', c2: 'partial', c3: 'fail', c4: 'fail', c5: 'partial', c6: 'pass' });
+    ).toEqual({
+      c1: 'pass',
+      c2: 'partial',
+      c3: 'fail',
+      c4: 'fail',
+      c5: 'partial',
+      c6: 'pass',
+      c7: 'pass',
+      c8: 'partial',
+      c9: 'fail',
+      c10: 'partial',
+    });
     expect(only.decision.finalDecision).toBe('revise');
     expect(trace.stopReason).toBe('max-iterations');
   });
@@ -206,7 +264,7 @@ describe('the system-design-canvas loop', () => {
       SYSTEM_DESIGN_CANVAS,
       { goal: GOAL, output: sampleSubmission(), criteria: sampleCriteria(), maxIterations: 2 },
       {
-        llm: fakeLlm(findings, requirementResults, qualityResults, sloppyCoached()),
+        llm: fakeLlm(...judges, sloppyCoached()),
         sink: (exchange) => exchanges.push(exchange),
         now: () => 0,
       },
@@ -262,7 +320,7 @@ describe('the system-design-canvas loop', () => {
           SYSTEM_DESIGN_CANVAS,
           { goal: GOAL, output: sampleSubmission(), criteria: sampleCriteria(), maxIterations: 2 },
           {
-            llm: fakeLlm(findings, requirementResults, qualityResults, coached),
+            llm: fakeLlm(...judges, coached),
             sink: () => undefined,
             now: () => 0,
           },
@@ -297,13 +355,7 @@ describe('the system-design-canvas loop', () => {
       SYSTEM_DESIGN_CANVAS,
       { goal: GOAL, output: sampleSubmission(), criteria: sampleCriteria(), maxIterations: 3 },
       {
-        llm: sequencedLlm(
-          findings,
-          requirementResults,
-          qualityResults,
-          brokenCoached(),
-          coachedSubmission(),
-        ),
+        llm: sequencedLlm(...judges, brokenCoached(), coachedSubmission()),
         sink: (exchange) => exchanges.push(exchange),
         now: () => 0,
       },

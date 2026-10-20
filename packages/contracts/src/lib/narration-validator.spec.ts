@@ -33,6 +33,16 @@ describe('validateNarration', () => {
     ).toEqual([]);
   });
 
+  it('[UX-23] rejects a decision concerning a node that is not drawn, and nothing about a thin one', () => {
+    expect(
+      validateNarration(
+        graph,
+        narrative({ decisions: [{ choice: 'thin' }, { choice: 'x', nodeIds: ['n-1', 'ghost'] }] }),
+        criteria,
+      ),
+    ).toEqual(['decision 2 concerns unknown node: ghost']);
+  });
+
   it('rejects rationales and narrations keyed to nothing on the canvas or in the rubric, or keyed twice', () => {
     expect(
       validateNarration(

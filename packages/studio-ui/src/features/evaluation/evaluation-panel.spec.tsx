@@ -65,10 +65,10 @@ describe('EvaluationPanel', () => {
           remediations: 0,
           criteria: { assessed: 0, total: 5 },
         },
-        dimensions: { coverage: null, quality_attributes: null, compliance: null },
+        dimensions: { coverage: null, qualities: null, compliance: null },
         degraded: [
           { stage: 'critic.explanation', sample: 2, reason: 'llm-failed' },
-          { stage: 'evaluator.requirements', sample: 1, reason: 'llm-failed' },
+          { stage: 'evaluator.coverage', sample: 1, reason: 'llm-failed' },
         ],
         criterionResults: [
           {
@@ -88,7 +88,7 @@ describe('EvaluationPanel', () => {
     expect(notice.textContent).toContain('This revision couldn’t be graded');
     expect(notice.textContent).toContain('The lenses assessed 0 of 5 criteria — too few to score');
     expect(notice.textContent).toContain(
-      '2 lens samples did not answer: critic explanation #2 (the model did not answer), evaluator requirements #1 (the model did not answer).',
+      '2 lens samples did not answer: critic explanation #2 (the model did not answer), evaluator coverage #1 (the model did not answer).',
     );
     // No headline: no number, no decision, no meters, and nothing standing on the lenses that answered.
     expect(screen.queryByTestId('score-summary')).toBeNull();

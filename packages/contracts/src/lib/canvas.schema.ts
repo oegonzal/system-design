@@ -4,11 +4,14 @@ import { bounded } from './bounds';
 import {
   BINDING_CLAIM_BOUND,
   BINDING_NODES_BOUND,
+  BINDING_TRADEOFF_BOUND,
   BRIEF_BINDINGS_BOUND,
   CANVAS_EDGES_BOUND,
   CANVAS_ID_MAX_LENGTH,
   CANVAS_MAX_TOTAL_OPERATIONS,
   CANVAS_NODES_BOUND,
+  DECISION_NODES_BOUND,
+  DECISION_TEXT_BOUND,
   EDGE_CARRIES_BOUND,
   EDGE_KINDS,
   EDGE_LABEL_BOUND,
@@ -17,6 +20,7 @@ import {
   NARRATION_CRITERION_NARRATIONS_BOUND,
   NARRATION_OVERVIEW_BOUND,
   NARRATION_PROSE_BOUND,
+  NARRATIVE_DECISIONS_BOUND,
   NODE_CONFIG_KEY_MAX_LENGTH,
   NODE_CONFIG_KEYS_BOUND,
   NODE_CONFIG_STRING_VALUE_BOUND,
@@ -144,8 +148,9 @@ export type CanvasGraph = z.infer<typeof canvasGraphSchema>;
 
 /**
  * How the design meets one success criterion: the components that hold it, a
- * short claim in the author's words, and — where a request travels — the path
- * of edges it takes. One binding per criterion.
+ * short claim in the author's words, — where a request travels — the path of
+ * edges it takes, and why this mechanism rather than another that could have
+ * held it. One binding per criterion.
  */
 export const bindingSchema = z.strictObject({
   criterionId: criterionId(),
@@ -160,6 +165,12 @@ export const bindingSchema = z.strictObject({
     })
     .optional(),
   claim: bounded.text(BINDING_CLAIM_BOUND, { min: 1 }),
+  tradeoff: bounded
+    .text(BINDING_TRADEOFF_BOUND, {
+      description:
+        'Why this mechanism and not another that could hold the requirement: the alternative considered and the cost accepted with the choice.',
+    })
+    .optional(),
 });
 export type Binding = z.infer<typeof bindingSchema>;
 
@@ -178,8 +189,47 @@ export const NARRATION_VERSION = 1;
 export const componentRationaleSchema = z.strictObject({
   nodeId: canvasId(),
   prose: bounded.text(NARRATION_PROSE_BOUND),
+  tradeoff: bounded
+    .text(NARRATION_PROSE_BOUND, {
+      description:
+        'What could have stood here instead, and why it does not: the alternative considered and the cost of this component.',
+    })
+    .optional(),
 });
 export type ComponentRationale = z.infer<typeof componentRationaleSchema>;
+
+/**
+ * One decision the design rests on, told the way a senior engineer defends
+ * it: what was chosen, what was not, what the choice costs, and what would
+ * change it. Only the choice is required of the schema; a decision with no
+ * alternative or no cost is accepted and graded, because that gap is the
+ * lesson, not a reason to refuse the save.
+ */
+export const designDecisionSchema = z.strictObject({
+  choice: bounded.text(DECISION_TEXT_BOUND, {
+    min: 1,
+    description: 'What was decided, in one sentence.',
+  }),
+  alternative: bounded
+    .text(DECISION_TEXT_BOUND, { description: 'The other option considered, and what it offered.' })
+    .optional(),
+  cost: bounded
+    .text(DECISION_TEXT_BOUND, {
+      description: 'What the choice costs: what was given up or taken on.',
+    })
+    .optional(),
+  reconsiderWhen: bounded
+    .text(DECISION_TEXT_BOUND, {
+      description: 'The condition under which the other option would win.',
+    })
+    .optional(),
+  nodeIds: bounded
+    .list(DECISION_NODES_BOUND, canvasId(), {
+      description: 'The nodes the decision concerns, existing ids only.',
+    })
+    .optional(),
+});
+export type DesignDecision = z.infer<typeof designDecisionSchema>;
 
 export const criterionNarrationSchema = z.strictObject({
   criterionId: criterionId(),
@@ -188,15 +238,21 @@ export const criterionNarrationSchema = z.strictObject({
 export type CriterionNarration = z.infer<typeof criterionNarrationSchema>;
 
 /**
- * The walkthrough: why each component is there and how each requirement is
- * met, keyed to the node and criterion it explains rather than left as one
- * free-text box.
+ * The walkthrough: why each component is there and instead of what, how each
+ * requirement is met, and the decisions the whole design rests on — keyed to
+ * the node and criterion each explains rather than left as one free-text box.
  */
 export const designNarrativeSchema = z.strictObject({
   version: z.literal(NARRATION_VERSION),
   overview: bounded.text(NARRATION_OVERVIEW_BOUND).optional(),
   componentRationales: bounded.list(NARRATION_COMPONENT_RATIONALES_BOUND, componentRationaleSchema),
   criterionNarrations: bounded.list(NARRATION_CRITERION_NARRATIONS_BOUND, criterionNarrationSchema),
+  decisions: bounded
+    .list(NARRATIVE_DECISIONS_BOUND, designDecisionSchema, {
+      description:
+        'The load-bearing decisions of the whole design — a store, a queue, a split into services, a synchronous call to an outside system — each with its alternative and its cost.',
+    })
+    .optional(),
 });
 export type DesignNarrative = z.infer<typeof designNarrativeSchema>;
 
@@ -224,10 +280,19 @@ export const designBriefDraftSchema = z.strictObject({
   bindings: bounded.list(BRIEF_BINDINGS_BOUND, bindingDraftSchema),
 });
 
+/** A decision as it sits in the editor: a row whose choice is not typed yet is fine. */
+export const designDecisionDraftSchema = designDecisionSchema.extend({
+  choice: bounded.text(DECISION_TEXT_BOUND),
+});
+
+export const designNarrativeDraftSchema = designNarrativeSchema.extend({
+  decisions: bounded.list(NARRATIVE_DECISIONS_BOUND, designDecisionDraftSchema).optional(),
+});
+
 /** The unsubmitted canvas, as `PUT /sessions/:id/draft` stores it and the workspace restores it. */
 export const sessionDraftSchema = z.strictObject({
   graph: canvasGraphSchema,
   brief: designBriefDraftSchema.nullable(),
-  narrative: designNarrativeSchema.nullable(),
+  narrative: designNarrativeDraftSchema.nullable(),
 });
 export type SessionDraft = z.infer<typeof sessionDraftSchema>;

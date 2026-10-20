@@ -13,6 +13,7 @@ import { useCanvasStore } from '../canvas/canvas-store-context';
 import { toCanvasGraph } from '../canvas/graph-io';
 import { narrationSlotState, type NarrationSlotState } from '../canvas/narration-draft';
 import { groupCriteriaByKind, humanizeKind } from '../prompts/criteria';
+import { NarrativeDecisions } from './narrative-decisions';
 
 const CHIP: Record<NarrationSlotState, { tone: 'neutral' | 'success'; label: string }> = {
   empty: { tone: 'neutral', label: 'Not written' },
@@ -62,11 +63,16 @@ export function NarrativeEditor({ criteria }: NarrativeEditorProps) {
   const narrations = useCanvasStore((state) => state.criterionNarrations);
   const setOverview = useCanvasStore((state) => state.setNarrativeOverview);
   const setRationale = useCanvasStore((state) => state.setComponentRationale);
+  const setTradeoff = useCanvasStore((state) => state.setComponentTradeoff);
   const setNarration = useCanvasStore((state) => state.setCriterionNarration);
 
   const graph: CanvasGraph = useMemo(() => toCanvasGraph(nodes, edges), [nodes, edges]);
   const proseByNode = useMemo(
     () => new Map(rationales.map((rationale) => [rationale.nodeId, rationale.prose])),
+    [rationales],
+  );
+  const tradeoffByNode = useMemo(
+    () => new Map(rationales.map((rationale) => [rationale.nodeId, rationale.tradeoff ?? ''])),
     [rationales],
   );
   const proseByCriterion = useMemo(
@@ -84,9 +90,10 @@ export function NarrativeEditor({ criteria }: NarrativeEditorProps) {
   return (
     <Stack gap={5}>
       <Text size="sm" tone="muted">
-        Walk a reader through the design — the big picture, why each component is there, and how
-        each criterion is met. The explanation critic reads every slot against your diagram: a claim
-        the drawing does not back costs more than silence.
+        Walk a reader through the design — the big picture, why each component is there and instead
+        of what, the decisions the design rests on, and how each criterion is met. The explanation
+        critic reads every slot against your diagram: a claim the drawing does not back costs more
+        than silence, and a choice nobody defends is graded as such.
       </Text>
 
       <Stack gap={2}>
@@ -131,11 +138,24 @@ export function NarrativeEditor({ criteria }: NarrativeEditorProps) {
                   onChange={(event) => setRationale(node.id, event.target.value)}
                   placeholder="What this component does for the design, and why it earns its place."
                 />
+                <TextAreaField
+                  label={`Instead of — why ${node.label} and not another`}
+                  data-testid={`narrative-tradeoff-${node.id}`}
+                  rows={2}
+                  maxLength={NARRATION_PROSE_BOUND.ceiling}
+                  target={NARRATION_PROSE_BOUND.target}
+                  value={tradeoffByNode.get(node.id) ?? ''}
+                  disabled={readOnly}
+                  onChange={(event) => setTradeoff(node.id, event.target.value)}
+                  placeholder="What could have stood here instead, and what this choice costs."
+                />
               </Stack>
             );
           })
         )}
       </Stack>
+
+      <NarrativeDecisions graph={graph} />
 
       <Stack gap={3}>
         <Heading level={3}>How each criterion is met</Heading>

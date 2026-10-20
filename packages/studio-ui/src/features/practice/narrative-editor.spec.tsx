@@ -43,6 +43,27 @@ describe('NarrativeEditor', () => {
     ]);
   });
 
+  it('[UX-23] writes a component’s “instead of” beside its rationale', async () => {
+    const store = renderEditor();
+    await userEvent.type(screen.getByTestId('narrative-tradeoff-n-3'), 'A store of its own.');
+    expect(store.getState().componentRationales).toEqual([
+      { nodeId: 'n-3', prose: '', tradeoff: 'A store of its own.' },
+    ]);
+  });
+
+  it('[UX-23] adds a decision, fills its slots, ties it to a component and removes it', async () => {
+    const store = renderEditor();
+    await userEvent.click(screen.getByTestId('narrative-decision-add'));
+    await userEvent.type(screen.getByTestId('narrative-decision-0-choice'), 'Own a read model');
+    await userEvent.type(screen.getByTestId('narrative-decision-0-cost'), 'Staleness');
+    await userEvent.click(screen.getByTestId('narrative-decision-0-node-n-3'));
+    expect(store.getState().decisions).toEqual([
+      { choice: 'Own a read model', cost: 'Staleness', nodeIds: ['n-3'] },
+    ]);
+    await userEvent.click(screen.getByTestId('narrative-decision-0-remove'));
+    expect(store.getState().decisions).toEqual([]);
+  });
+
   it('[UX-8] writes a narration keyed to the criterion id', async () => {
     const store = renderEditor();
     await userEvent.type(screen.getByTestId('narrative-narration-c1'), 'The client reads it.');

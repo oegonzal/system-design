@@ -26,6 +26,7 @@ import {
   type QualityRunStartedDto,
   type SuccessCriterion,
   type UpdatePromptRequest,
+  withStandingCriteria,
 } from '@sysdesign/contracts';
 import { DesignSession, ExperienceProfile, Prompt, PromptGeneration } from '@sysdesign/db';
 
@@ -271,13 +272,18 @@ export class PromptsService {
     return prompt;
   }
 
-  /** The canvas pipeline's rubric for a prompt — the one derivation every source shares. */
+  /**
+   * The canvas pipeline's rubric for a prompt — the one derivation every
+   * source shares, closed by the standing criteria every canvas rubric
+   * carries (the loop uses a supplied rubric verbatim, so they are appended
+   * here and never derived).
+   */
   private async rubricFor(markdown: string): Promise<SuccessCriterion[]> {
     const derived = await this.loop.deriveCriteria({
       pipeline: CANVAS_PIPELINE_ID,
       goal: markdown,
     });
-    return derived.criteria;
+    return withStandingCriteria(derived.criteria);
   }
 
   private async require(id: string): Promise<Prompt> {

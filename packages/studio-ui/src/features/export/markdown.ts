@@ -123,7 +123,10 @@ export function briefMarkdown(
   const hops = edgeHops(graph);
   const statements = criterionStatements(criteria);
 
-  lines.push(`| Criterion | Claim | Components | Path |`, `| --- | --- | --- | --- |`);
+  lines.push(
+    `| Criterion | Claim | Components | Path | Why this, not another |`,
+    `| --- | --- | --- | --- | --- |`,
+  );
   for (const binding of brief.bindings) {
     const statement = statements.get(binding.criterionId);
     const criterion = statement
@@ -134,7 +137,7 @@ export function briefMarkdown(
     lines.push(
       `| ${criterion} | ${markdownCell(binding.claim)} | ${markdownCell(components)} | ${
         markdownCell(path) || '—'
-      } |`,
+      } | ${markdownCell(binding.tradeoff ?? '') || '—'} |`,
     );
   }
   return joinLines(lines);
@@ -167,6 +170,25 @@ export function narrativeMarkdown(
         `### ${labels.get(rationale.nodeId) ?? rationale.nodeId}`,
         ``,
         rationale.prose.trim(),
+        ``,
+        ...(rationale.tradeoff ? [`_Instead of:_ ${rationale.tradeoff.trim()}`, ``] : []),
+      );
+    }
+  } else {
+    lines.push(NONE, ``);
+  }
+  lines.push(`## Decisions the design rests on`, ``);
+  const decisions = narrative.decisions ?? [];
+  if (decisions.length > 0) {
+    for (const decision of decisions) {
+      const concerns = (decision.nodeIds ?? []).map((id) => labels.get(id) ?? id).join(', ');
+      lines.push(
+        `### ${decision.choice.trim()}`,
+        ``,
+        `- Instead of: ${decision.alternative?.trim() || '—'}`,
+        `- Cost: ${decision.cost?.trim() || '—'}`,
+        `- Reconsider when: ${decision.reconsiderWhen?.trim() || '—'}`,
+        ...(concerns.length > 0 ? [`- Concerns: ${concerns}`] : []),
         ``,
       );
     }

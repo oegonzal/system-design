@@ -131,8 +131,10 @@ curl -X POST localhost:3000/api/prompts -H 'content-type: application/json' -d '
 ```
 
 The response carries `criteria` — `c1…cN`, each with a kind (`functional`,
-`non_functional`, `scale`, `constraint`) and the statement the loop read. Two
-other sources yield the same shape: `POST /api/prompts/import { libraryId }`
+`domain_model`, `interface`, `boundary`, `workflow`, `non_functional`,
+`scale`, `evolution`, `tradeoff`, `constraint`) and the statement the loop
+read, closed by the two standing trade-off criteria every canvas rubric
+carries. Two other sources yield the same shape: `POST /api/prompts/import { libraryId }`
 copies one of the loop's library documents (`GET /api/prompts/library`), and
 `POST /api/prompts/generate { experienceId? }` starts a `design-prompt` run
 over an experience (202; poll `GET /api/prompts/generate/:runId` until the
@@ -496,7 +498,13 @@ run `pnpm measure:bounds`:**
 ```bash
 pnpm measure:bounds                                    # reads static/runs
 pnpm measure:bounds --runs-dir=<dir> --since=2026-10-01
+pnpm measure:bounds --pipeline=system-design-canvas --since=2026-10-21   # one pipeline's fixtures only
 ```
+
+`--since` is global, so a pipeline re-measured from the date its new version
+first ran would empty every other fixture; `--pipeline=<id>` writes that
+pipeline's own `measured.json` and its contract output's alone, and leaves the
+shared lens and replayed-call fixtures as they were.
 
 It only reads the dumps — each call's reply as written, from its text when that
 parses and from its validated response otherwise, so a reply the seam refused,

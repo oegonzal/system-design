@@ -71,6 +71,50 @@ describe('reconcileNarration', () => {
     });
   });
 
+  it('[UX-23] keeps a rationale’s trade-off, keeps a slot written only as a trade-off, and omits a blank one', () => {
+    const narrative = reconcileNarration(
+      '',
+      [
+        { nodeId: 'n-3', prose: PROSE, tradeoff: '  a store of its own rather than a view  ' },
+        { nodeId: 'n-1', prose: '', tradeoff: 'a thin client rather than a native app' },
+        { nodeId: 'n-3', prose: 'a duplicate', tradeoff: '' },
+      ],
+      [],
+      graph,
+      criteria,
+    );
+    expect(narrative?.componentRationales).toEqual([
+      { nodeId: 'n-3', prose: PROSE, tradeoff: 'a store of its own rather than a view' },
+      { nodeId: 'n-1', prose: '', tradeoff: 'a thin client rather than a native app' },
+    ]);
+    expect(designNarrativeSchema.safeParse(narrative).success).toBe(true);
+  });
+
+  it('[UX-23] keeps every decision with a choice, trims its fields, omits the blank ones, drops a node the canvas lacks, and is null when nothing else is written', () => {
+    const narrative = reconcileNarration('', [], [], graph, criteria, [
+      {
+        choice: '  Own a read model  ',
+        alternative: ' Query both sources live ',
+        cost: '',
+        reconsiderWhen: undefined,
+        nodeIds: ['n-3', 'ghost', 'n-3'],
+      },
+      { choice: '   ', alternative: 'decided nothing' },
+      { choice: 'One queue for both feeds', nodeIds: ['ghost'] },
+    ]);
+    expect(narrative).toEqual({
+      version: 1,
+      componentRationales: [],
+      criterionNarrations: [],
+      decisions: [
+        { choice: 'Own a read model', alternative: 'Query both sources live', nodeIds: ['n-3'] },
+        { choice: 'One queue for both feeds' },
+      ],
+    });
+    expect(designNarrativeSchema.safeParse(narrative).success).toBe(true);
+    expect(reconcileNarration('', [], [], graph, criteria, [{ choice: ' ' }])).toBeNull();
+  });
+
   it('keeps prose past its bound whole for the schema to refuse — nothing is cut to fit', () => {
     const long = 'x'.repeat(NARRATION_PROSE_BOUND.ceiling + 1);
     const overview = 'y'.repeat(NARRATION_OVERVIEW_BOUND.ceiling + 1);

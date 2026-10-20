@@ -20,6 +20,7 @@ function contentOf(state: CanvasContent): CanvasContent {
     narrativeOverview: state.narrativeOverview,
     componentRationales: state.componentRationales,
     criterionNarrations: state.criterionNarrations,
+    decisions: state.decisions,
   };
 }
 

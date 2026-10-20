@@ -1,13 +1,16 @@
 import type { CriterionRef } from './brief-validator';
 import {
+  DECISION_NODES_BOUND,
   NARRATION_COMPONENT_RATIONALES_BOUND,
   NARRATION_CRITERION_NARRATIONS_BOUND,
+  NARRATIVE_DECISIONS_BOUND,
 } from './canvas';
 import {
   NARRATION_VERSION,
   type CanvasGraph,
   type ComponentRationale,
   type CriterionNarration,
+  type DesignDecision,
   type DesignNarrative,
 } from './canvas.schema';
 
@@ -39,23 +42,54 @@ export function reconcileNarration(
   narrations: readonly CriterionNarration[],
   graph: CanvasGraph,
   criteria: readonly CriterionRef[],
+  decisions: readonly DesignDecision[] = [],
 ): DesignNarrative | null {
   const nodeIds = new Set(graph.nodes.map((node) => node.id));
   const criterionIds = new Set(criteria.map((criterion) => criterion.id));
 
   const seenNodes = new Set<string>();
   const componentRationales = rationales
-    .map((rationale) => ({
-      nodeId: rationale.nodeId,
-      prose: rationale.prose.trim(),
-    }))
+    .map((rationale) => {
+      const tradeoff = rationale.tradeoff?.trim() ?? '';
+      return {
+        nodeId: rationale.nodeId,
+        prose: rationale.prose.trim(),
+        ...(tradeoff.length > 0 ? { tradeoff } : {}),
+      };
+    })
     .filter((rationale) => {
-      if (rationale.prose.length === 0 || !nodeIds.has(rationale.nodeId)) return false;
+      const written = rationale.prose.length > 0 || rationale.tradeoff !== undefined;
+      if (!written || !nodeIds.has(rationale.nodeId)) return false;
       if (seenNodes.has(rationale.nodeId)) return false;
       seenNodes.add(rationale.nodeId);
       return true;
     })
     .slice(0, NARRATION_COMPONENT_RATIONALES_BOUND.ceiling);
+
+  // A decision with no choice typed decided nothing; one naming a node the
+  // canvas no longer has keeps its words and loses the reference.
+  const optional = (text: string | undefined): string | undefined => {
+    const trimmed = text?.trim() ?? '';
+    return trimmed.length > 0 ? trimmed : undefined;
+  };
+  const kept: DesignDecision[] = decisions
+    .map((decision) => {
+      const nodes = [...new Set(decision.nodeIds ?? [])]
+        .filter((id) => nodeIds.has(id))
+        .slice(0, DECISION_NODES_BOUND.ceiling);
+      const alternative = optional(decision.alternative);
+      const cost = optional(decision.cost);
+      const reconsiderWhen = optional(decision.reconsiderWhen);
+      return {
+        choice: decision.choice.trim(),
+        ...(alternative !== undefined ? { alternative } : {}),
+        ...(cost !== undefined ? { cost } : {}),
+        ...(reconsiderWhen !== undefined ? { reconsiderWhen } : {}),
+        ...(nodes.length > 0 ? { nodeIds: nodes } : {}),
+      };
+    })
+    .filter((decision) => decision.choice.length > 0)
+    .slice(0, NARRATIVE_DECISIONS_BOUND.ceiling);
 
   const seenCriteria = new Set<string>();
   const criterionNarrations = narrations
@@ -76,7 +110,8 @@ export function reconcileNarration(
   if (
     trimmedOverview.length === 0 &&
     componentRationales.length === 0 &&
-    criterionNarrations.length === 0
+    criterionNarrations.length === 0 &&
+    kept.length === 0
   ) {
     return null;
   }
@@ -86,5 +121,6 @@ export function reconcileNarration(
     ...(trimmedOverview.length > 0 ? { overview: trimmedOverview } : {}),
     componentRationales,
     criterionNarrations,
+    ...(kept.length > 0 ? { decisions: kept } : {}),
   };
 }

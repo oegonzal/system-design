@@ -77,6 +77,32 @@ function renderPath(
   return `    path, ${path.length} ${path.length === 1 ? 'edge' : 'edges'}${span}: ${walk.join(' → ')}`;
 }
 
+/**
+ * A decision as the reasoning lenses read it: every slot printed, an empty
+ * one named as such, so a choice with no alternative or no cost is visible
+ * at a glance rather than inferred from silence.
+ */
+function renderDecision(
+  item: {
+    choice: string;
+    alternative?: string;
+    cost?: string;
+    reconsiderWhen?: string;
+    nodeIds?: readonly string[];
+  },
+  index: number,
+  node: (id: string) => string,
+): string {
+  const concerns =
+    item.nodeIds === undefined || item.nodeIds.length === 0
+      ? ''
+      : `; concerns ${item.nodeIds.map(node).join(', ')}`;
+  return (
+    `[decision.${index + 1}] chose: ${item.choice}; instead of: ${item.alternative ?? '(none given)'}; ` +
+    `cost: ${item.cost ?? '(none given)'}; reconsider when: ${item.reconsiderWhen ?? '(none given)'}${concerns}`
+  );
+}
+
 export const canvasOutput: OutputShape<CanvasSubmission> = {
   schema: designSubmissionSchema,
 
@@ -123,6 +149,7 @@ export const canvasOutput: OutputShape<CanvasSubmission> = {
           ...(binding.path !== undefined && binding.path.length > 0
             ? [renderPath(binding.path, edges, node)]
             : []),
+          `    why this, not another: ${binding.tradeoff ?? '(none given)'}`,
         ]),
       );
     }
@@ -138,12 +165,20 @@ export const canvasOutput: OutputShape<CanvasSubmission> = {
       if (overview.length > 0) lines.push(`[overview] ${overview}`);
       lines.push(
         ...narrative.componentRationales.map(
-          (item, index) => `[rationale.${index + 1}] ${node(item.nodeId)}: ${item.prose}`,
+          (item, index) =>
+            `[rationale.${index + 1}] ${node(item.nodeId)}: ${item.prose} — instead of: ${item.tradeoff ?? '(none given)'}`,
         ),
         ...narrative.criterionNarrations.map(
           (item, index) => `[narration.${index + 1}] ${item.criterionId}: ${item.prose}`,
         ),
       );
+    }
+    lines.push('', '## Decisions');
+    const decisions = narrative?.decisions ?? [];
+    if (decisions.length === 0) {
+      lines.push('(none recorded)');
+    } else {
+      lines.push(...decisions.map((item, index) => renderDecision(item, index, node)));
     }
     return lines.join('\n');
   },

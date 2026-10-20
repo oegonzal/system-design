@@ -27,15 +27,17 @@ export type BindingState = 'empty' | 'incomplete' | 'bound';
 
 /**
  * `bound` needs both halves the schema requires: a claim in the author's words
- * and at least one component. A path is welcome but never required.
+ * and at least one component. A path and a trade-off are welcome but never
+ * required of the schema — the grader asks for the trade-off.
  */
 export function bindingState(binding: Binding | null | undefined): BindingState {
   if (!binding) return 'empty';
   const hasClaim = binding.claim.trim().length > 0;
   const hasNodes = binding.nodeIds.length > 0;
   const hasPath = (binding.path ?? []).length > 0;
+  const hasTradeoff = (binding.tradeoff ?? '').trim().length > 0;
   if (hasClaim && hasNodes) return 'bound';
-  if (hasClaim || hasNodes || hasPath) return 'incomplete';
+  if (hasClaim || hasNodes || hasPath || hasTradeoff) return 'incomplete';
   return 'empty';
 }
 

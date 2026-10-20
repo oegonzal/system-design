@@ -69,12 +69,14 @@ export function reconcileBrief(
       .slice(0, BINDING_NODES_BOUND.ceiling);
     if (nodes.length === 0) continue;
     const path = validPrefix(graph, binding.path ?? []);
+    const tradeoff = binding.tradeoff?.trim() ?? '';
     seen.add(binding.criterionId);
     kept.push({
       criterionId: binding.criterionId,
       nodeIds: nodes,
       ...(path.length > 0 ? { path } : {}),
       claim,
+      ...(tradeoff.length > 0 ? { tradeoff } : {}),
     });
     if (kept.length >= BRIEF_BINDINGS_BOUND.ceiling) break;
   }

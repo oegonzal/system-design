@@ -45,14 +45,14 @@ describe('revisions', () => {
         status: 'complete',
         overall: 64,
         decision: 'revise',
-        dimensions: { coverage: 70, quality_attributes: 52, compliance: 100 },
+        dimensions: { coverage: 70, qualities: 52, compliance: 100 },
         // A plain grade ends on its one iteration; that is not a stop worth telling.
         stopReason: null,
       });
       expect(done.body.data.findings).toEqual([
         {
           id: 'unhandled_failure|node.2',
-          lenses: ['critic.architecture', 'critic.scenarios'],
+          lenses: ['critic.structure', 'critic.fitness'],
           type: 'unhandled_failure',
           severity: 'high',
           confidence: 'high',
@@ -75,6 +75,9 @@ describe('revisions', () => {
         'c3:fail',
         'c4:fail',
         'c5:fail',
+        'c6:fail',
+        'c7:fail',
+        'c8:fail',
       ]);
 
       // The terminal grade was written back: lists never fetch the loop.

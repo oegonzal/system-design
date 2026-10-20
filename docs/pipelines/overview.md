@@ -125,9 +125,10 @@ cannot differ. A produced artifact — the coach's — passes the output shape's
 narrations that name nothing on the graph, so a fan-out never blocks on a
 stale reference; a provided artifact is never repaired. When an iteration is
 still blocked, its validator notes reach the next produce as a refusals
-section of the briefing. Five critics — requirements, architecture, capacity,
-explanation, failure scenarios — and two evaluators judge with two samples
-each, and the standard controller decides.
+section of the briefing. Five critics — requirements, model, structure,
+fitness, explanation — and four evaluators — coverage, design, qualities,
+reasoning — judge with two samples each, and the pipeline's own controller
+decides.
 
 ---
 

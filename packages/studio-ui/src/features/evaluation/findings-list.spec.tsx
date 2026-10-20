@@ -11,7 +11,7 @@ const findings = [
   makeFinding({
     id: 'f-crit',
     severity: 'critical',
-    lenses: ['critic.architecture', 'critic.scenarios'],
+    lenses: ['critic.structure', 'critic.fitness'],
   }),
   makeFinding({
     id: 'f-claim',
@@ -45,13 +45,10 @@ describe('FindingsList', () => {
 
     const item = screen.getByTestId('finding-f-crit');
     const lenses = within(item).getAllByTestId('finding-lens');
-    expect(lenses.map((chip) => chip.textContent)).toEqual([
-      'critic architecture',
-      'critic scenarios',
-    ]);
+    expect(lenses.map((chip) => chip.textContent)).toEqual(['critic structure', 'critic fitness']);
     expect(lenses.map((chip) => chip.getAttribute('title'))).toEqual([
-      'critic.architecture',
-      'critic.scenarios',
+      'critic.structure',
+      'critic.fitness',
     ]);
     expect(screen.getByTestId('finding-select-f-crit').textContent).toBe('Unhandled failure');
     expect(within(item).queryByTestId('finding-type')).toBeNull();

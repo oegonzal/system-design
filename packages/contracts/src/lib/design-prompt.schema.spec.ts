@@ -14,7 +14,7 @@ import {
   type DesignPromptDraft,
 } from './design-prompt.schema';
 import { CRITERION_STATEMENT_BOUND } from './quality-loop/evidence';
-import { CANVAS_CRITERION_KINDS, CANVAS_MAX_CRITERIA } from './studio-pipelines';
+import { CANVAS_MAX_CRITERIA, CANVAS_STANDING_CRITERIA } from './studio-pipelines';
 
 export function draftFixture(): DesignPromptDraft {
   return {
@@ -61,7 +61,7 @@ describe('designPromptDraftSchema', () => {
     expect(() => z.toJSONSchema(designPromptDraftSchema)).not.toThrow();
   });
 
-  it('[GEN-1] asks for rows that sum to the canvas cap, accepts a few over, refuses past the ceiling and refuses a blank row', () => {
+  it('[GEN-1] asks for rows that sum to the room the standing criteria leave in the canvas cap, accepts a few over, refuses past the ceiling and refuses a blank row', () => {
     expect(designPromptDraftSchema.safeParse(maximalDraft()).success).toBe(true);
     expect(designPromptDraftSchema.safeParse(maximalDraft('ceiling')).success).toBe(true);
     const { bounds } = modelSchema(designPromptDraftSchema);
@@ -70,7 +70,7 @@ describe('designPromptDraftSchema', () => {
         (sum, path) => sum + bounds[path].target,
         0,
       ),
-    ).toBe(CANVAS_MAX_CRITERIA);
+    ).toBe(CANVAS_MAX_CRITERIA - CANVAS_STANDING_CRITERIA.length);
     const over = (draft: DesignPromptDraft) => designPromptDraftSchema.safeParse(draft).success;
     const max = maximalDraft('ceiling');
     expect(
@@ -129,13 +129,19 @@ describe('criteriaFromDraft', () => {
       'c4:non_functional:security — A customer sees only their own orders — 0 cross-customer reads',
       'c5:scale:Peak requests — 150 req/s',
       'c6:constraint:The point-of-sale system only answers polling',
+      ...CANVAS_STANDING_CRITERIA.map((c, index) => `c${7 + index}:${c.kind}:${c.statement}`),
     ]);
   });
 
-  it('[GEN-1] never exceeds the canvas cap, uses only the canvas kinds, and trims a statement', () => {
+  it('[GEN-1] [EVAL-4] never exceeds the canvas cap, kinds each section and closes with the standing criteria, and trims a statement', () => {
     const criteria = criteriaFromDraft(maximalDraft());
     expect(criteria).toHaveLength(CANVAS_MAX_CRITERIA);
-    expect(new Set(criteria.map((c) => c.kind))).toEqual(new Set(CANVAS_CRITERION_KINDS));
+    expect(new Set(criteria.map((c) => c.kind))).toEqual(
+      new Set(['functional', 'non_functional', 'scale', 'constraint', 'tradeoff']),
+    );
+    expect(criteria.slice(-CANVAS_STANDING_CRITERIA.length).map((c) => c.statement)).toEqual(
+      CANVAS_STANDING_CRITERIA.map((c) => c.statement),
+    );
     expect(new Set(criteria.map((c) => c.id)).size).toBe(CANVAS_MAX_CRITERIA);
     // A draft kept past the row targets yields its first rows, never more than the cap.
     expect(criteriaFromDraft(maximalDraft('ceiling'))).toHaveLength(CANVAS_MAX_CRITERIA);
@@ -178,6 +184,7 @@ describe('criteriaFromDraft', () => {
       DESIGN_PROMPT_ROW_STATEMENT_BOUNDS.nonFunctional.ceiling,
       DESIGN_PROMPT_ROW_STATEMENT_BOUNDS.scale.ceiling,
       DESIGN_PROMPT_ROW_STATEMENT_BOUNDS.constraint.ceiling,
+      ...CANVAS_STANDING_CRITERIA.map((c) => c.statement.length),
     ]);
   });
 
@@ -205,7 +212,13 @@ describe('criteriaFromDraft', () => {
       constraints: [longest('constraints[]')],
     };
     const criteria = criteriaFromDraft(draft);
-    expect(criteria.map((criterion) => criterion.kind)).toEqual([...CANVAS_CRITERION_KINDS]);
+    expect(criteria.map((criterion) => criterion.kind)).toEqual([
+      'functional',
+      'non_functional',
+      'scale',
+      'constraint',
+      ...CANVAS_STANDING_CRITERIA.map((c) => c.kind),
+    ]);
     for (const { kind, statement } of criteria) {
       expect([kind, statement.length <= keptAtMost(CRITERION_STATEMENT_BOUND)]).toEqual([
         kind,

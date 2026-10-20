@@ -44,7 +44,7 @@ async function finishedRun(): Promise<QualityRunDto> {
     {
       overall: 58,
       decision: 'revise',
-      dimensions: { coverage: 80, quality_attributes: 40, compliance: null },
+      dimensions: { coverage: 80, qualities: 40, compliance: null },
       findings: [
         {
           key: 'scale_mismatch|binding.1,edge.1,node.2,node.9',
@@ -55,7 +55,7 @@ async function finishedRun(): Promise<QualityRunDto> {
           locationRefs: ['binding.1', 'edge.1', 'node.2', 'node.9', 'narration.1'],
           criterionIds: ['c2'],
           hits: 2,
-          lenses: ['critic.scale'],
+          lenses: ['critic.fitness'],
           rationale: null,
           reconciledTo: 'c2',
         },
@@ -68,7 +68,7 @@ async function finishedRun(): Promise<QualityRunDto> {
   run.trace.iterations[0].critics = [
     {
       report: {
-        criticId: 'critic.scale',
+        criticId: 'critic.fitness',
         sample: 1,
         findings: [
           {
@@ -88,7 +88,7 @@ async function finishedRun(): Promise<QualityRunDto> {
   run.trace.iterations[0].evaluators = [
     {
       report: {
-        evaluatorId: 'evaluator.quality',
+        evaluatorId: 'evaluator.qualities',
         sample: 1,
         results: [
           {
@@ -117,7 +117,7 @@ describe('toEvaluationDto', () => {
       overall: 58,
       decision: 'revise',
       decisionReason: 'fake',
-      dimensions: { coverage: 80, quality_attributes: 40, compliance: null },
+      dimensions: { coverage: 80, qualities: 40, compliance: null },
       // One judgement ends on its budget of one: the run says so, the grade does not.
       stopReason: null,
       error: null,
@@ -143,7 +143,7 @@ describe('toEvaluationDto', () => {
         edgeIds: ['e-1'],
         locationRefs: ['binding.1', 'edge.1', 'node.2', 'node.9', 'narration.1'],
         criterionIds: ['c2'],
-        lenses: ['critic.scale'],
+        lenses: ['critic.fitness'],
         rationale: 'Node.2 runs three instances at 500 rps; node.3 cannot absorb the rest',
         reconciledTo: 'c2',
       }),
@@ -183,24 +183,29 @@ describe('toEvaluationDto', () => {
     const [it] = run.trace.iterations;
     it.critics.push({
       report: null,
-      diagnostic: { stage: 'critic.scale', sample: 2, reason: 'llm-failed', detail: 'timed out' },
-    });
-    it.evaluators.push({
-      report: null,
-      diagnostic: { stage: 'evaluator.quality', sample: 1, reason: 'token-clipped', detail: null },
+      diagnostic: { stage: 'critic.fitness', sample: 2, reason: 'llm-failed', detail: 'timed out' },
     });
     it.evaluators.push({
       report: null,
       diagnostic: {
-        stage: 'evaluator.requirements',
+        stage: 'evaluator.qualities',
+        sample: 1,
+        reason: 'token-clipped',
+        detail: null,
+      },
+    });
+    it.evaluators.push({
+      report: null,
+      diagnostic: {
+        stage: 'evaluator.coverage',
         sample: null,
         reason: 'not-applicable',
         detail: 'no criteria of its kinds',
       },
     });
     expect(toEvaluationDto(run, 1, submission, READ_AT).degraded).toEqual([
-      { stage: 'critic.scale', sample: 2, reason: 'llm-failed' },
-      { stage: 'evaluator.quality', sample: 1, reason: 'token-clipped' },
+      { stage: 'critic.fitness', sample: 2, reason: 'llm-failed' },
+      { stage: 'evaluator.qualities', sample: 1, reason: 'token-clipped' },
     ]);
   });
 
@@ -307,7 +312,7 @@ describe('toEvaluationDto', () => {
     it.decision = {
       ...it.decision,
       scores: {
-        dimensions: { coverage: null, quality_attributes: null, compliance: null },
+        dimensions: { coverage: null, qualities: null, compliance: null },
         overall: 0,
       },
     };
@@ -329,7 +334,7 @@ describe('toEvaluationDto', () => {
       ...it.decision,
       finalDecision: 'escalate',
       gates: { ...it.decision.gates, evidenceSufficient: false },
-      scores: { dimensions: { coverage: 0, quality_attributes: 0, compliance: 0 }, overall: 0 },
+      scores: { dimensions: { coverage: 0, qualities: 0, compliance: 0 }, overall: 0 },
     };
     it.ledger = {
       ...it.ledger,
@@ -341,7 +346,7 @@ describe('toEvaluationDto', () => {
       overall: null,
       unscored: 'unassessed',
       decision: 'escalate',
-      dimensions: { coverage: null, quality_attributes: null, compliance: null },
+      dimensions: { coverage: null, qualities: null, compliance: null },
     });
     // One evaluator sample still wrote about c2; nobody settled it, so its words are not a verdict.
     const c2 = thin.criterionResults.find((row) => row.criterionId === 'c2');
@@ -359,7 +364,7 @@ describe('toEvaluationDto', () => {
     expect(toEvaluationDto(run, 1, submission, READ_AT)).toMatchObject({
       overall: 0,
       unscored: null,
-      dimensions: { coverage: 0, quality_attributes: 0, compliance: 0 },
+      dimensions: { coverage: 0, qualities: 0, compliance: 0 },
     });
     // An iteration that produced nothing is unscored for its own reason.
     it.artifact = null;

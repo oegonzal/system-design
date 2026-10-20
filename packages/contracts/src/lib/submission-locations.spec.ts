@@ -144,6 +144,13 @@ describe('substituteLocationRefs', () => {
     { ref: 'rationale.3', label: 'Client rationale (n-1)', part: 'rationale', key: 'n-1' },
     { ref: 'narration.1', label: 'c5 narration', part: 'narration', key: 'c5' },
     { ref: 'overview', label: 'Overview', part: 'overview', key: null },
+    {
+      ref: 'decision.1',
+      label: 'decision: Own a read model',
+      part: 'decision',
+      key: null,
+      name: 'Own a read model',
+    },
   ];
 
   it('[EVAL-2] puts a label where a lens wrote a position, however the sentence cased it', () => {
@@ -320,6 +327,40 @@ describe('substituteLocationRefs', () => {
       'n-1 rationale',
       'c5 narration',
       'Overview',
+      'decision: Own a read model',
     ]);
+  });
+
+  it('[EVAL-2] numbers the narrative’s decisions after every other part, named by their choice and keyed by nothing', () => {
+    const base = submission();
+    if (base.narrative === null) throw new Error('the fixture has a narrative');
+    const withDecisions: DesignSubmission = {
+      ...base,
+      narrative: {
+        ...base.narrative,
+        decisions: [
+          { choice: 'Own a read model', alternative: 'Query both sources live', cost: 'Staleness' },
+          { choice: 'One queue for both feeds' },
+        ],
+      },
+    };
+    const locations = submissionLocations(withDecisions);
+    expect(locations.slice(-2)).toEqual([
+      {
+        id: 'decision.1',
+        label: 'decision: Own a read model',
+        part: 'decision',
+        key: null,
+        name: 'Own a read model',
+      },
+      {
+        id: 'decision.2',
+        label: 'decision: One queue for both feeds',
+        part: 'decision',
+        key: null,
+        name: 'One queue for both feeds',
+      },
+    ]);
+    expect(submissionLocations(base).some((location) => location.part === 'decision')).toBe(false);
   });
 });

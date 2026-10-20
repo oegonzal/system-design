@@ -89,6 +89,11 @@ export const STUDIO_CRITERIA: readonly Criterion[] = [
       'A design improved along a finding, resubmitted, is graded higher, and the timeline shows the rising trend.',
   },
   {
+    id: 'EVAL-4',
+    statement:
+      'A design is graded as competencies — coverage, design, qualities, reasoning, compliance — each earned by the criterion kinds a prompt’s rubric states, scale one kind among ten weighted only by the figures the prompt gives it, every finding type owned by one critic and priced where that critic’s kinds earn, and two standing trade-off criteria closing every rubric so reasoning is earnable on every prompt.',
+  },
+  {
     id: 'UX-14',
     statement:
       'A prompt shows its markdown rendered and its criteria as chips grouped by kind; a written or imported prompt’s criteria are derived once by the grader, shown as normalising until they arrive, and can be re-derived until a session has been started on them — every read says when that has locked them — while a generated prompt’s are its draft’s and are never re-derived; a rewrite derives once and makes the prompt authored; a session whose prompt was archived still reads but takes no submit and no coach until the prompt is back.',
@@ -132,6 +137,11 @@ export const STUDIO_CRITERIA: readonly Criterion[] = [
     id: 'UX-22',
     statement:
       'A text field holding a value past its ceiling — set from code, as a coach revision imported whole is, and refused by a submit — shows it whole and never cuts it: its count says how far past the most the field accepts the value runs and that it must be shortened to submit, and the field announces that once, until it is shortened.',
+  },
+  {
+    id: 'UX-23',
+    statement:
+      'Trade-offs are written where the claims are and graded there: every binding offers why this mechanism and not another, every component rationale an instead-of, and the narrative a list of the decisions the design rests on — choice, alternative, cost, what would change it, the components concerned — kept as typed in a draft, trimmed and reference-checked on submit, printed for the graders and in the export, and never required by a validator, because an undefended choice is the grader’s lesson, not a refused save.',
   },
   // STAR repository
   {

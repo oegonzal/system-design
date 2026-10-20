@@ -2,13 +2,14 @@ import {
   CANVAS_CRITERION_KINDS,
   CANVAS_FINDING_TYPES,
   CANVAS_MAX_CRITERIA,
+  CANVAS_STANDING_CRITERIA,
   submissionLocations,
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline } from '../../core/describe-pipeline';
 import { validatePipeline } from '../../core/validate-pipeline';
-import { capsAgainstMeasured } from '../../core/testing';
+import { capsAgainstMeasured, seededCaps } from '../../core/testing';
 import { SYSTEM_DESIGN_CANVAS } from './definition';
 import measured from './measured.json';
 import { canvasOutput } from './output';
@@ -48,17 +49,70 @@ describe('the system-design-canvas pipeline', () => {
     );
   });
 
-  it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage has measurably written', () => {
-    // `measured.json`, refreshed by `pnpm measure:bounds`. A cap is also the
-    // call's time limit, so one a stage outwrites is a call cut short. The
-    // coach writes into the submission schema contracts declares, so its
-    // fields are measured and held there (`canvas.schema.spec.ts`).
-    expect(measured.runs).toBeGreaterThan(0);
+  it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage has measurably written, or above the seed it holds until this version is measured', () => {
+    // `measured.json`, refreshed by `pnpm measure:bounds --pipeline=system-design-canvas
+    // --since=<the date 2.0.0 first ran>`. A cap is also the call's time
+    // limit, so one a stage outwrites is a call cut short. The coach writes
+    // into the submission schema contracts declares, so its fields are
+    // measured and held there (`canvas.schema.spec.ts`). Until this version's
+    // own runs are measured, every stage holds the most its predecessor wrote
+    // under 1.0.0 (48 runs, 2026-09-30 to 10-03): the three critics that
+    // replaced the architecture critic hold its 25,362; a measurement
+    // replaces a seed the moment it exists.
+    const seeds = seededCaps({
+      'critic.requirements': 24678,
+      'critic.model': 25362,
+      'critic.structure': 25362,
+      'critic.fitness': 25362,
+      'critic.explanation': 25094,
+      'evaluator.coverage': 10135,
+      'evaluator.design': 11958,
+      'evaluator.qualities': 11958,
+      'evaluator.reasoning': 10135,
+      producer: 40173,
+    });
     expect(
-      capsAgainstMeasured(SYSTEM_DESIGN_CANVAS, measured.caps, {
-        exempt: { criteria: 'the rubric is the author’s prompt’s, never derived' },
-      }),
+      capsAgainstMeasured(
+        SYSTEM_DESIGN_CANVAS,
+        { ...seeds, ...measured.caps },
+        {
+          exempt: {
+            criteria:
+              'derived only through POST /criteria, whose dumps are kind `criteria` and never measured',
+          },
+        },
+      ),
     ).toEqual([]);
+  });
+
+  it('[EVAL-4] grades a design as competencies: every finding type is owned by one critic, scale weighs the same as every other kind, and reasoning is earned by the standing criteria every rubric carries', () => {
+    const owners = new Map<string, string[]>();
+    for (const critic of SYSTEM_DESIGN_CANVAS.critics) {
+      for (const type of critic.findingTypes ?? []) {
+        owners.set(type, [...(owners.get(type) ?? []), critic.id]);
+      }
+    }
+    for (const type of CANVAS_FINDING_TYPES) expect(owners.get(type)).toHaveLength(1);
+    const { criterionKinds, dimensionWeights } = SYSTEM_DESIGN_CANVAS.policy;
+    for (const kind of CANVAS_CRITERION_KINDS) expect(criterionKinds[kind].weight).toBe(1);
+    expect(Object.keys(dimensionWeights)).toEqual([
+      'coverage',
+      'design',
+      'qualities',
+      'reasoning',
+      'compliance',
+    ]);
+    const reasoningKinds = CANVAS_CRITERION_KINDS.filter(
+      (kind) => criterionKinds[kind].dimension === 'reasoning',
+    );
+    expect(reasoningKinds).toEqual(['tradeoff']);
+    for (const standing of CANVAS_STANDING_CRITERIA)
+      expect(reasoningKinds).toContain(standing.kind);
+    expect(
+      SYSTEM_DESIGN_CANVAS.evaluators.find((evaluator) =>
+        evaluator.criterionKinds.includes('tradeoff'),
+      )?.id,
+    ).toBe('evaluator.reasoning');
   });
 
   it('[QL-1] every dimension earns from a criterion kind, so none can only fall', () => {
@@ -82,6 +136,7 @@ describe('the system-design-canvas pipeline', () => {
       'overview',
       ...Array.from({ length: 4 }, (_, index) => `rationale.${index + 1}`),
       ...Array.from({ length: 3 }, (_, index) => `narration.${index + 1}`),
+      'decision.1',
     ]);
     // The author's ids ride beside the positional ones wherever the brief and
     // narrative refer to them, so a reader can join the two.
@@ -94,6 +149,15 @@ describe('the system-design-canvas pipeline', () => {
     );
     expect(rendered).toContain('[rationale.1] service-1 (node.3):');
     expect(rendered).toContain('[narration.1] c1:');
+    // Trade-offs print where the claim is, and a slot left empty says so.
+    expect(rendered).toContain('    why this, not another: an owned read model rather than');
+    expect(rendered).toContain('    why this, not another: (none given)');
+    expect(rendered).toContain('— instead of: a service of its own rather than');
+    expect(rendered).toContain('— instead of: (none given)');
+    expect(rendered).toContain(
+      '[decision.1] chose: Own a read model fed by both sources rather than query the storefront and the POS live.; instead of: Query both sources on every request and merge.; cost: Orders can lag',
+    );
+    expect(rendered).toContain('concerns database-1 (node.11), queue-1 (node.');
     expect(canvasOutput.schema.safeParse(submission).success).toBe(true);
   });
 
@@ -139,8 +203,13 @@ describe('the system-design-canvas pipeline', () => {
     expect(under('[binding.2]')).toBe(
       '    path, 2 edges, n-1 (node.1) to ai-db-replica (node.4): edge.1 (e-1: n-1 -> n-3) → edge.4 (e-4: n-3 -> ai-db-replica)',
     );
-    // No path, no line: the next line is the next binding.
-    expect(under('[binding.3]')).toMatch(/^\[binding\.4\] /);
+    // No path, no path line: the trade-off line, printed even when empty so
+    // a choice nobody defended is visible, is all that stands before the
+    // next binding.
+    expect(under('[binding.3]')).toBe('    why this, not another: (none given)');
+    expect(lines[lines.findIndex((l) => l.startsWith('[binding.3]')) + 2]).toMatch(
+      /^\[binding\.4\] /,
+    );
     // A hop no edge answers to is named as such, and the walk's ends are not guessed.
     expect(under('[binding.4]')).toBe(
       '    path, 2 edges: edge.1 (e-1: n-1 -> n-3) → gone (no such edge)',
@@ -155,9 +224,10 @@ describe('the system-design-canvas pipeline', () => {
     const bare = sampleSubmission({ brief: null, narrative: null });
     const rendered = canvasOutput.render(bare);
     expect(rendered.match(/\(none submitted\)/g)).toHaveLength(2);
+    expect(rendered).toContain('## Decisions\n(none recorded)');
     const ids = canvasOutput.locate(bare).map((location) => location.id);
-    expect(ids.some((id) => /^(binding|rationale|narration)\./.test(id) || id === 'overview')).toBe(
-      false,
-    );
+    expect(
+      ids.some((id) => /^(binding|rationale|narration|decision)\./.test(id) || id === 'overview'),
+    ).toBe(false);
   });
 });

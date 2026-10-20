@@ -5,6 +5,7 @@ import type {
   CriterionNarration,
   CriterionRef,
   DesignBrief,
+  DesignDecision,
   DesignNarrative,
   EdgeKind,
   NodeConfigEntry,
@@ -47,10 +48,12 @@ export interface CanvasContent {
    * to be incomplete while it is typed — an empty claim or no component yet.
    */
   bindings: Binding[];
-  /** The narrative as three slot groups: an overview, a rationale per node id, a narration per criterion id. */
+  /** The narrative as four slot groups: an overview, a rationale per node id, a narration per criterion id, and the decisions the design rests on. */
   narrativeOverview: string;
   componentRationales: ComponentRationale[];
   criterionNarrations: CriterionNarration[];
+  /** In the order the author added them; a row whose choice is still blank is kept while it is typed. */
+  decisions: DesignDecision[];
 }
 
 /** How many edits undo can walk back; the oldest is dropped past it. */
@@ -164,14 +167,23 @@ export interface CanvasState extends CanvasContent {
   attachViewport(viewport: CanvasViewport | null): void;
   /** Author edit — sets the big-picture overview and dirties the draft. */
   setNarrativeOverview(text: string): void;
-  /** Author edit — sets one component's rationale; empty prose clears the slot. */
+  /** Author edit — sets one component's rationale; empty prose clears the slot unless its trade-off is written. */
   setComponentRationale(nodeId: string, prose: string): void;
+  /** Author edit — why this component and not another; empty text clears it. */
+  setComponentTradeoff(nodeId: string, tradeoff: string): void;
+  /** Author edit — a new blank decision row at the end. */
+  addDecision(): void;
+  /** Author edit — patches the decision at `index`; a field set to an empty string is cleared. */
+  updateDecision(index: number, patch: Partial<DesignDecision>): void;
+  removeDecision(index: number): void;
   /** Author edit — sets one criterion's narration; empty prose clears it. */
   setCriterionNarration(criterionId: string, prose: string): void;
   /** Revision load — replaces the narrative draft without touching `dirty`. */
   loadNarrative(narrative: DesignNarrative | null): void;
   /** Author edit — the claim in the author's words; creates the binding on first use. */
   setBindingClaim(criterionId: string, claim: string): void;
+  /** Author edit — why this mechanism and not another; empty text clears it. */
+  setBindingTradeoff(criterionId: string, tradeoff: string): void;
   toggleBindingNode(criterionId: string, nodeId: string): void;
   /** Replace the walk for one criterion; an empty path removes it. */
   setBindingPath(criterionId: string, path: string[]): void;

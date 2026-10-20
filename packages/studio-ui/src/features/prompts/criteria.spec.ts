@@ -5,9 +5,14 @@ import { makeCriteria } from '../../testing/fixtures';
 import { groupCriteriaByKind, humanizeKind } from './criteria';
 
 describe('groupCriteriaByKind', () => {
-  it('[UX-14] groups in the contract’s order — functional, non-functional, scale, constraint', () => {
-    const groups = groupCriteriaByKind([...makeCriteria()].reverse());
-    expect(groups.map((group) => group.kind)).toEqual([...CANVAS_CRITERION_KINDS]);
+  it('[UX-14] groups in the contract’s order, skipping the kinds no criterion carries', () => {
+    const criteria = makeCriteria();
+    const groups = groupCriteriaByKind([...criteria].reverse());
+    expect(groups.map((group) => group.kind)).toEqual(
+      CANVAS_CRITERION_KINDS.filter((kind) =>
+        criteria.some((criterion) => criterion.kind === kind),
+      ),
+    );
     expect(groups[0].criteria.map((criterion) => criterion.id)).toEqual(['c2', 'c1']);
   });
 

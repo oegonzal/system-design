@@ -172,7 +172,7 @@ describe('the coach', () => {
         locationRefs,
         criterionIds: [],
         hits: 2,
-        lenses: ['critic.architecture'],
+        lenses: ['critic.structure'],
         rationale: 'a single instance serves every read',
         reconciledTo: null,
       });

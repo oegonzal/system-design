@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
 import { CANVAS_NODES_BOUND, CANVAS_MAX_TOTAL_OPERATIONS, NODE_CONFIG_KEYS_BOUND } from './canvas';
-import { designSubmissionSchema, type DesignSubmission } from './canvas.schema';
+import { designSubmissionSchema, sessionDraftSchema, type DesignSubmission } from './canvas.schema';
 import { boundsAgainstMeasured } from './measured-bounds';
 import measured from './measured/canvas.json';
 
@@ -117,6 +117,35 @@ describe('designSubmissionSchema', () => {
     expect(designSubmissionSchema.safeParse(noClaim).success).toBe(false);
   });
 
+  it('[UX-23] accepts a trade-off on a binding and a rationale and a decisions list; a submission needs a decision’s choice, a draft does not', () => {
+    const fixture = submissionFixture();
+    if (fixture.brief === null || fixture.narrative === null)
+      throw new Error('the fixture is whole');
+    const defended = {
+      ...fixture,
+      brief: {
+        ...fixture.brief,
+        bindings: fixture.brief.bindings.map((binding, index) =>
+          index === 0 ? { ...binding, tradeoff: 'a table rather than a cache' } : binding,
+        ),
+      },
+      narrative: {
+        ...fixture.narrative,
+        componentRationales: fixture.narrative.componentRationales.map((rationale, index) =>
+          index === 0 ? { ...rationale, tradeoff: 'a service of its own' } : rationale,
+        ),
+        decisions: [{ choice: 'Own a read model', alternative: 'Query live', cost: 'Staleness' }],
+      },
+    };
+    expect(designSubmissionSchema.safeParse(defended).success).toBe(true);
+    const undecided = {
+      ...defended,
+      narrative: { ...defended.narrative, decisions: [{ choice: '' }] },
+    };
+    expect(designSubmissionSchema.safeParse(undecided).success).toBe(false);
+    expect(sessionDraftSchema.safeParse(undecided).success).toBe(true);
+  });
+
   it('[QL-49] every bound the coach writes into sits above what it has measurably written', () => {
     // `measured/canvas.json`: every field the canvas coach wrote across the
     // recorded runs, refreshed by `pnpm measure:bounds`. A target under the
@@ -124,7 +153,25 @@ describe('designSubmissionSchema', () => {
     // ceiling at or under the longest would keep it past the ceiling rather
     // than accept it — which a submit, held to the ceilings, then refuses.
     expect(measured.runs).toBeGreaterThan(0);
-    expect(boundsAgainstMeasured(designSubmissionSchema, measured.fields)).toEqual([]);
+    // The trade-off slots and the decisions arrived with the canvas
+    // pipeline's 2.0.0; no coach has written one yet. The exemptions go the
+    // day `pnpm measure:bounds --pipeline=system-design-canvas` first finds them.
+    const unwritten = 'added with the canvas pipeline’s 2.0.0; no coach has written one yet';
+    expect(
+      boundsAgainstMeasured(designSubmissionSchema, measured.fields, {
+        exempt: {
+          'brief.bindings[].tradeoff': unwritten,
+          'narrative.componentRationales[].tradeoff': unwritten,
+          'narrative.decisions': unwritten,
+          'narrative.decisions[].choice': unwritten,
+          'narrative.decisions[].alternative': unwritten,
+          'narrative.decisions[].cost': unwritten,
+          'narrative.decisions[].reconsiderWhen': unwritten,
+          'narrative.decisions[].nodeIds': unwritten,
+          'narrative.decisions[].nodeIds[]': unwritten,
+        },
+      }),
+    ).toEqual([]);
   });
 
   it('converts to JSON Schema, so a model can be asked to write into it', () => {

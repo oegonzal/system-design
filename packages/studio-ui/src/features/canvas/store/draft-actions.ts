@@ -39,6 +39,7 @@ export const draftActions = ({ set, get, edits: { loaded } }: ActionDeps): Draft
       narrativeOverview: draft.narrative?.overview ?? '',
       componentRationales: draft.narrative?.componentRationales ?? [],
       criterionNarrations: draft.narrative?.criterionNarrations ?? [],
+      decisions: draft.narrative?.decisions ?? [],
     });
     set({
       ...restored,
@@ -50,12 +51,20 @@ export const draftActions = ({ set, get, edits: { loaded } }: ActionDeps): Draft
   },
 
   serializeDraft() {
-    const { nodes, edges, bindings, narrativeOverview, componentRationales, criterionNarrations } =
-      get();
+    const {
+      nodes,
+      edges,
+      bindings,
+      narrativeOverview,
+      componentRationales,
+      criterionNarrations,
+      decisions,
+    } = get();
     const narrativeEmpty =
       narrativeOverview.length === 0 &&
       componentRationales.length === 0 &&
-      criterionNarrations.length === 0;
+      criterionNarrations.length === 0 &&
+      decisions.length === 0;
     return {
       graph: toCanvasGraph(nodes, edges),
       brief:
@@ -72,6 +81,7 @@ export const draftActions = ({ set, get, edits: { loaded } }: ActionDeps): Draft
             ...(narrativeOverview.length > 0 ? { overview: narrativeOverview } : {}),
             componentRationales: [...componentRationales],
             criterionNarrations: [...criterionNarrations],
+            ...(decisions.length > 0 ? { decisions: decisions.map((item) => ({ ...item })) } : {}),
           },
     };
   },
@@ -87,13 +97,15 @@ export const draftActions = ({ set, get, edits: { loaded } }: ActionDeps): Draft
   },
 
   serializeNarrative(criteria) {
-    const { nodes, edges, narrativeOverview, componentRationales, criterionNarrations } = get();
+    const { nodes, edges, narrativeOverview, componentRationales, criterionNarrations, decisions } =
+      get();
     return reconcileNarration(
       narrativeOverview,
       componentRationales,
       criterionNarrations,
       toCanvasGraph(nodes, edges),
       criteria,
+      decisions,
     );
   },
 

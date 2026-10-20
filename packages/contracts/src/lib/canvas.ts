@@ -248,8 +248,14 @@ export const BRIEF_BINDINGS_BOUND = bound(24, 'list');
 export const BINDING_NODES_BOUND = bound(12, 'list');
 export const FLOW_STEPS_BOUND = bound(24, 'list');
 export const BINDING_CLAIM_BOUND = bound(360);
+/** Why this mechanism and not another: the alternative considered and the cost of the choice. */
+export const BINDING_TRADEOFF_BOUND = bound(360);
 
 export const NARRATION_PROSE_BOUND = bound(720);
 export const NARRATION_OVERVIEW_BOUND = bound(1500);
 export const NARRATION_COMPONENT_RATIONALES_BOUND = bound(40, 'list');
 export const NARRATION_CRITERION_NARRATIONS_BOUND = bound(24, 'list');
+/** The decisions a design rests on: each a choice, the alternative, the cost, and what would change it. */
+export const NARRATIVE_DECISIONS_BOUND = bound(12, 'list');
+export const DECISION_TEXT_BOUND = bound(360);
+export const DECISION_NODES_BOUND = bound(6, 'list');

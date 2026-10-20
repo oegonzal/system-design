@@ -89,8 +89,8 @@ describe('PracticeWorkspace grading a revision again', () => {
         remediations: 0,
         criteria: { assessed: 0, total: 3 },
       },
-      dimensions: { coverage: null, quality_attributes: null, compliance: null },
-      degraded: [{ stage: 'evaluator.requirements', sample: 1, reason: 'llm-failed' }],
+      dimensions: { coverage: null, qualities: null, compliance: null },
+      degraded: [{ stage: 'evaluator.coverage', sample: 1, reason: 'llm-failed' }],
     });
     const { calls } = stubApi([
       {

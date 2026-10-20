@@ -12,7 +12,7 @@ const SAMPLE_MISSING: Record<DiagnosticReason, string> = {
   refounded: 'the engine re-founded a criterion from the goal',
 };
 
-/** One missing lens sample as a reader names it: `critic scale #1 (the model did not answer)`. */
+/** One missing lens sample as a reader names it: `critic fitness #1 (the model did not answer)`. */
 const describeSample = ({ stage, sample, reason }: DegradedSampleDto): string =>
   `${humanizeToken(stage).toLowerCase()}${sample === null ? '' : ` #${sample}`} (${SAMPLE_MISSING[reason]})`;
 

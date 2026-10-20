@@ -195,7 +195,7 @@ export function makeRevision(overrides: Partial<DesignRevisionDto> = {}): Design
 export function makeFinding(overrides: Partial<EvaluationFindingDto> = {}): EvaluationFindingDto {
   return {
     id: 'unhandled_failure|node.3',
-    lenses: ['critic.architecture'],
+    lenses: ['critic.structure'],
     type: 'unhandled_failure',
     severity: 'high',
     confidence: 'high',
@@ -258,7 +258,7 @@ export function makeEvaluation(overrides: Partial<EvaluationDto> = {}): Evaluati
       remediations: 1,
       criteria: { assessed: 5, total: 5 },
     },
-    dimensions: { coverage: 80, quality_attributes: 60, compliance: 90 },
+    dimensions: { coverage: 80, qualities: 60, compliance: 90 },
     findings: [makeFinding()],
     criterionResults: [
       makeCriterionResult(),

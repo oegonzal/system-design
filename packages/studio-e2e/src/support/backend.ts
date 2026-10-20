@@ -100,9 +100,20 @@ export const AUTHORED_CRITERIA_BY_KIND: Readonly<Record<string, readonly string[
   non_functional: ['c3'],
   scale: ['c4'],
   constraint: ['c5'],
+  // The standing trade-off criteria the studio closes every rubric with.
+  tradeoff: ['c6', 'c7', 'c8'],
 };
 
-export const AUTHORED_CRITERIA_IDS: readonly string[] = ['c1', 'c2', 'c3', 'c4', 'c5'];
+export const AUTHORED_CRITERIA_IDS: readonly string[] = [
+  'c1',
+  'c2',
+  'c3',
+  'c4',
+  'c5',
+  'c6',
+  'c7',
+  'c8',
+];
 
 export async function authorPrompt(
   request: APIRequestContext,
