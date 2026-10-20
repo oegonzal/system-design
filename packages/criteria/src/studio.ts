@@ -139,6 +139,11 @@ export const STUDIO_CRITERIA: readonly Criterion[] = [
       'A text field holding a value past its ceiling — set from code, as a coach revision imported whole is, and refused by a submit — shows it whole and never cuts it: its count says how far past the most the field accepts the value runs and that it must be shortened to submit, and the field announces that once, until it is shortened.',
   },
   {
+    id: 'UX-24',
+    statement:
+      'A design carries a data model beside its diagram — entities with their owner node, key, fields, invariants and lifecycle states, and the relations between them — and a list of the assumptions it depends on; a binding may name the entities that hold a criterion beside the nodes; the model is its own tab, kept as typed in a draft, trimmed and reference-checked on submit, printed for the graders as entity lines and in the export as model.md, and never required: a revision stored before models existed reads as none submitted.',
+  },
+  {
     id: 'UX-23',
     statement:
       'Trade-offs are written where the claims are and graded there: every binding offers why this mechanism and not another, every component rationale an instead-of, and the narrative a list of the decisions the design rests on — choice, alternative, cost, what would change it, the components concerned — kept as typed in a draft, trimmed and reference-checked on submit, printed for the graders and in the export, and never required by a validator, because an undefended choice is the grader’s lesson, not a refused save.',

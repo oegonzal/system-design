@@ -12,6 +12,9 @@ export type NarrativeActions = Pick<
   | 'addDecision'
   | 'updateDecision'
   | 'removeDecision'
+  | 'addAssumption'
+  | 'setAssumption'
+  | 'removeAssumption'
   | 'loadNarrative'
 >;
 
@@ -106,6 +109,25 @@ export const narrativeActions = ({
     );
   },
 
+  addAssumption() {
+    commit({ assumptions: [...get().assumptions, ''] });
+  },
+
+  setAssumption(index, text) {
+    const { assumptions } = get();
+    if (assumptions[index] === undefined) return;
+    commit(
+      { assumptions: assumptions.map((item, at) => (at === index ? text : item)) },
+      `narrative:assumption:${index}`,
+    );
+  },
+
+  removeAssumption(index) {
+    const { assumptions } = get();
+    if (assumptions[index] === undefined) return;
+    commit({ assumptions: assumptions.filter((_, at) => at !== index) });
+  },
+
   loadNarrative(narrative) {
     set(
       loaded({
@@ -113,6 +135,7 @@ export const narrativeActions = ({
         componentRationales: narrative?.componentRationales ?? [],
         criterionNarrations: narrative?.criterionNarrations ?? [],
         decisions: narrative?.decisions ?? [],
+        assumptions: narrative?.assumptions ?? [],
       }),
     );
   },

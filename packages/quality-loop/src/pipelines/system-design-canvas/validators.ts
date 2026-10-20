@@ -8,9 +8,10 @@
  *
  * `references` blocks. An edge to a node that is not there, a carry naming an
  * operation neither endpoint declares, a brief bound to a criterion the
- * contract never listed or to a node the canvas does not hold, a path that
+ * contract never listed, to a node the canvas does not hold or to an entity
+ * the model does not declare, a model owned by an undrawn node, a path that
  * does not connect — none of it can be judged, and a coach that produced it
- * is asked to fix that before anything else. The checks are the same three
+ * is asked to fix that before anything else. The checks are the same four
  * the studio runs on a submission, from `@sysdesign/contracts`, so what the
  * studio refuses and what the loop blocks cannot differ.
  *
@@ -20,6 +21,7 @@
 import {
   validateBriefReferences,
   validateGraphReferences,
+  validateModelReferences,
   validateNarration,
   type ValidationProblem,
   type ValidationReport,
@@ -57,10 +59,13 @@ function check(
   return { validatorId, gate, problems: rule(parsed.value, contract) };
 }
 
-const references: Rule = ({ graph, brief, narrative }, contract) =>
+const references: Rule = ({ graph, brief, narrative, model }, contract) =>
   [
     ...validateGraphReferences(graph),
-    ...(brief === null ? [] : validateBriefReferences(graph, brief, contract.criteria)),
+    ...(model === undefined || model === null ? [] : validateModelReferences(graph, model)),
+    ...(brief === null
+      ? []
+      : validateBriefReferences(graph, brief, contract.criteria, model ?? null)),
     ...(narrative === null ? [] : validateNarration(graph, narrative, contract.criteria)),
   ].map((message) => problem('critical', message));
 

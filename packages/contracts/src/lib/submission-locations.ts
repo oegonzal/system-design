@@ -26,8 +26,10 @@ import {
 export const SUBMISSION_PARTS = [
   'node',
   'edge',
+  'entity',
   'binding',
   'overview',
+  'assumption',
   'rationale',
   'narration',
   'decision',
@@ -35,7 +37,7 @@ export const SUBMISSION_PARTS = [
 export type SubmissionPart = (typeof SUBMISSION_PARTS)[number];
 
 export interface SubmissionLocation {
-  /** Positional: `node.N`, `edge.N`, `binding.N`, `overview`, `rationale.N`, `narration.N`, `decision.N`. */
+  /** Positional: `node.N`, `edge.N`, `entity.N`, `binding.N`, `overview`, `assumption.N`, `rationale.N`, `narration.N`, `decision.N`. */
   id: string;
   label: string;
   part: SubmissionPart;
@@ -62,6 +64,7 @@ const numbered = <I>(
 
 export function submissionLocations(submission: DesignSubmission): SubmissionLocation[] {
   const { graph, brief, narrative } = submission;
+  const model = submission.model ?? null;
   const overview = narrative?.overview?.trim() ?? '';
   const nodes = new Map(graph.nodes.map((node) => [node.id, node]));
   /** A rationale names the node it explains — by its label when the node is drawn. */
@@ -84,6 +87,13 @@ export function submissionLocations(submission: DesignSubmission): SubmissionLoc
       (edge) => edge.id,
     ),
     ...numbered(
+      'entity',
+      model?.entities ?? [],
+      (entity) => `${entity.name} entity (${entity.id})`,
+      (entity) => entity.id,
+      (entity) => entity.name,
+    ),
+    ...numbered(
       'binding',
       brief?.bindings ?? [],
       (binding) =>
@@ -95,6 +105,12 @@ export function submissionLocations(submission: DesignSubmission): SubmissionLoc
     ...(overview.length > 0
       ? [{ id: 'overview', label: 'Overview', part: 'overview' as const, key: null, name: null }]
       : []),
+    ...numbered(
+      'assumption',
+      narrative?.assumptions ?? [],
+      (text) => `assumption: ${text}`,
+      () => '',
+    ).map((location) => ({ ...location, key: null })),
     ...numbered(
       'rationale',
       narrative?.componentRationales ?? [],
@@ -146,8 +162,10 @@ export interface LocatedRef {
 const SHORT_LABEL = {
   node: ({ key, label }) => key ?? label,
   edge: ({ key, label }) => key ?? label,
+  entity: ({ key, label }) => key ?? label,
   binding: ({ key, label }) => (key === null ? label : `${key} binding`),
   overview: ({ label }) => label,
+  assumption: ({ label }) => label,
   rationale: ({ key, label }) => (key === null ? label : `${key} rationale`),
   narration: ({ label }) => label,
   decision: ({ label }) => label,

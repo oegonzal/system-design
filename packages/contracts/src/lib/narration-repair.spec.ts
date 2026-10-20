@@ -115,6 +115,25 @@ describe('reconcileNarration', () => {
     expect(reconcileNarration('', [], [], graph, criteria, [{ choice: ' ' }])).toBeNull();
   });
 
+  it('[UX-24] keeps the assumptions trimmed, drops blank ones, and counts them as written', () => {
+    const narrative = reconcileNarration(
+      '',
+      [],
+      [],
+      graph,
+      criteria,
+      [],
+      ['  One shopper, one history. ', '   '],
+    );
+    expect(narrative).toEqual({
+      version: 1,
+      componentRationales: [],
+      criterionNarrations: [],
+      assumptions: ['One shopper, one history.'],
+    });
+    expect(designNarrativeSchema.safeParse(narrative).success).toBe(true);
+  });
+
   it('keeps prose past its bound whole for the schema to refuse — nothing is cut to fit', () => {
     const long = 'x'.repeat(NARRATION_PROSE_BOUND.ceiling + 1);
     const overview = 'y'.repeat(NARRATION_OVERVIEW_BOUND.ceiling + 1);

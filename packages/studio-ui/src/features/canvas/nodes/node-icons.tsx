@@ -24,6 +24,21 @@ const svgProps: SVGProps<SVGSVGElement> = {
 };
 
 export const NODE_ICONS = {
+  /* A person: head over shoulders. */
+  actor: (
+    <svg {...svgProps}>
+      <circle cx="8" cy="5" r="2.5" />
+      <path d="M3 14c0-2.8 2.2-5 5-5s5 2.2 5 5" />
+    </svg>
+  ),
+  /* A module: a box with its one declared interface on the right face. */
+  module: (
+    <svg {...svgProps}>
+      <rect x="2" y="3" width="10" height="10" rx="1.5" />
+      <path d="M12 6h2M12 10h2" />
+      <path d="M5 6.5h4M5 9.5h3" />
+    </svg>
+  ),
   client: (
     <svg {...svgProps}>
       <rect x="2" y="3" width="12" height="8" rx="1" />

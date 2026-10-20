@@ -29,6 +29,7 @@ const BOUNDS_FILE = 'packages/contracts/src/lib/bounds/bounded.ts';
 /** The schema files that declare their bounds through `bounded`. */
 const SCHEMA_FILES = [
   'packages/contracts/src/lib/canvas.schema.ts',
+  'packages/contracts/src/lib/model.schema.ts',
   'packages/contracts/src/lib/design-prompt.schema.ts',
   'packages/contracts/src/lib/prompts.ts',
   'packages/contracts/src/lib/star-stories.ts',

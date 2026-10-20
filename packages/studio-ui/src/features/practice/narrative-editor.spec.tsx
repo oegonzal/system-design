@@ -64,6 +64,15 @@ describe('NarrativeEditor', () => {
     expect(store.getState().decisions).toEqual([]);
   });
 
+  it('[UX-24] adds an assumption, writes it, and removes it', async () => {
+    const store = renderEditor();
+    await userEvent.click(screen.getByTestId('narrative-assumption-add'));
+    await userEvent.type(screen.getByTestId('narrative-assumption-0'), 'One shopper, one history.');
+    expect(store.getState().assumptions).toEqual(['One shopper, one history.']);
+    await userEvent.click(screen.getByTestId('narrative-assumption-0-remove'));
+    expect(store.getState().assumptions).toEqual([]);
+  });
+
   it('[UX-8] writes a narration keyed to the criterion id', async () => {
     const store = renderEditor();
     await userEvent.type(screen.getByTestId('narrative-narration-c1'), 'The client reads it.');

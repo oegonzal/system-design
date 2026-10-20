@@ -4,7 +4,9 @@ import type { NodeKind } from './canvas';
  * The in-app teaching guide: what each block kind is and when to reach for
  * it. Shown in the properties panel when a block is selected and as the
  * palette hover text — the product explains its own vocabulary instead of
- * assuming it.
+ * assuming it. Every kind is described by the responsibility it holds, not
+ * by the load it withstands: a design earns its blocks from what the goal
+ * asks, and the right answer to a small goal is the simple one.
  */
 export interface NodeKindGuide {
   /** What the block is, present tense, one sentence. */
@@ -14,10 +16,22 @@ export interface NodeKindGuide {
 }
 
 export const NODE_KIND_GUIDE = {
+  // ── Application
+  actor: {
+    what: 'A person or outside party with a role in the system — customer, approver, operator, partner — who triggers work and is owed an outcome.',
+    whenToUse:
+      'Whenever the goal names who does what: a request path, a workflow and a permission all start from an actor.',
+  },
+  module: {
+    what: 'A unit of code inside a deployable with one owner and a declared interface — a bounded context, a package, a layer.',
+    whenToUse:
+      'To show the seams inside one deployable: who owns which data and decisions, and which way the dependencies point.',
+  },
   // ── Clients & Edge
   client: {
-    what: 'The people and devices using the system — browsers, apps, other services. Every request path starts here.',
-    whenToUse: 'Start every design with one, so what users can actually reach is traceable.',
+    what: 'The browsers, apps and other programs that call the system — what the actors use to reach it.',
+    whenToUse:
+      'Start every design with one, so what users can actually reach is traceable from the first hop.',
   },
   cdn: {
     what: 'Edge caches that serve static and cacheable content from locations near users, keeping that traffic off your origin.',
@@ -36,9 +50,9 @@ export const NODE_KIND_GUIDE = {
       'Any internet-facing design — spikes and abusive clients should be shed here, not deep in the stack.',
   },
   'load-balancer': {
-    what: 'Spreads incoming requests across identical instances so no single machine becomes the choke point.',
+    what: 'Spreads incoming requests across identical instances so no single machine is the only one serving.',
     whenToUse:
-      "In front of any horizontally scaled tier — a service can't earn its replica count without one.",
+      'In front of a tier that runs more than one instance, for availability as much as for load.',
   },
   'websocket-gateway': {
     what: 'Terminates long-lived WebSocket/SSE connections and pushes updates to subscribed clients.',
@@ -52,9 +66,9 @@ export const NODE_KIND_GUIDE = {
   },
   // ── Compute
   service: {
-    what: 'One stateless microservice: a single-purpose API tier that scales horizontally by adding replicas.',
+    what: 'One deployable owning one responsibility and exposing it as a contract — the commands, queries and events it declares.',
     whenToUse:
-      'Each distinct business capability gets its own — declare its commands and queries to be graded on the contract.',
+      'Where a capability needs its own deployment or owner; split only along a seam the goal pays for, and declare its operations.',
   },
   worker: {
     what: 'Background compute that drains queues and does the slow or retryable work off the request path.',
@@ -72,9 +86,9 @@ export const NODE_KIND_GUIDE = {
   },
   // ── Data Stores
   database: {
-    what: 'The transactional system of record. Strong consistency and careful write ordering live here — or nowhere.',
+    what: 'The system of record for the entities it owns: their invariants, their lifecycle and the transactions that keep them consistent.',
     whenToUse:
-      'One per bounded context; give it a replica, and shard or buffer before write volume outgrows a primary.',
+      'One per owner of data; say which entities it keeps and who writes them. Replicas, partitions and buffers only when the goal states the load.',
   },
   replica: {
     what: 'A read-only copy fed asynchronously by the primary — read fanout plus a failover target.',
@@ -107,9 +121,9 @@ export const NODE_KIND_GUIDE = {
   },
   // ── Caching
   cache: {
-    what: 'Keeps hot reads in memory so repeated queries never reach the database — the first answer to a read spike.',
+    what: 'Keeps repeated reads in memory so they never reach the store — at the price of serving data that may be stale.',
     whenToUse:
-      'Read-heavy ratios and tight latency budgets; decide the invalidation story or it serves lies.',
+      'When a stated read ratio or latency budget needs it; decide the invalidation story or it serves lies, and say what you gave up.',
   },
   // ── Messaging & Streaming
   queue: {
@@ -204,8 +218,9 @@ export const NODE_KIND_GUIDE = {
     whenToUse: 'More than a couple of services; correlate with traces to find the failing hop.',
   },
   tracing: {
-    what: 'Follows one request across every hop, showing where the latency budget actually went.',
-    whenToUse: "Deep call chains and p99 hunts — you can't fix the slow hop you can't see.",
+    what: 'Follows one request across every hop, showing where its time and its failures actually went.',
+    whenToUse:
+      "Call chains across several parts — you can't fix the slow or failing hop you can't see.",
   },
   // ── External & SaaS
   'external-api': {

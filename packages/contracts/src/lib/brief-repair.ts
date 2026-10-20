@@ -1,4 +1,9 @@
-import { BINDING_NODES_BOUND, BRIEF_BINDINGS_BOUND, FLOW_STEPS_BOUND } from './canvas';
+import {
+  BINDING_ENTITIES_BOUND,
+  BINDING_NODES_BOUND,
+  BRIEF_BINDINGS_BOUND,
+  FLOW_STEPS_BOUND,
+} from './canvas';
 import {
   DESIGN_BRIEF_VERSION,
   type Binding,
@@ -6,6 +11,7 @@ import {
   type DesignBrief,
 } from './canvas.schema';
 import type { CriterionRef } from './brief-validator';
+import type { DesignModel } from './model.schema';
 
 /**
  * The repair of a brief — the drop-side twin of `validateBriefReferences`.
@@ -53,8 +59,10 @@ export function reconcileBrief(
   bindings: readonly Binding[],
   graph: CanvasGraph,
   criteria: readonly CriterionRef[],
+  model: DesignModel | null = null,
 ): DesignBrief | null {
   const nodeIds = new Set(graph.nodes.map((node) => node.id));
+  const entityIds = new Set((model?.entities ?? []).map((entity) => entity.id));
   const criterionIds = new Set(criteria.map((criterion) => criterion.id));
   const seen = new Set<string>();
 
@@ -70,12 +78,16 @@ export function reconcileBrief(
     if (nodes.length === 0) continue;
     const path = validPrefix(graph, binding.path ?? []);
     const tradeoff = binding.tradeoff?.trim() ?? '';
+    const entities = [...new Set(binding.entityIds ?? [])]
+      .filter((id) => entityIds.has(id))
+      .slice(0, BINDING_ENTITIES_BOUND.ceiling);
     seen.add(binding.criterionId);
     kept.push({
       criterionId: binding.criterionId,
       nodeIds: nodes,
       ...(path.length > 0 ? { path } : {}),
       claim,
+      ...(entities.length > 0 ? { entityIds: entities } : {}),
       ...(tradeoff.length > 0 ? { tradeoff } : {}),
     });
     if (kept.length >= BRIEF_BINDINGS_BOUND.ceiling) break;

@@ -119,6 +119,28 @@ describe('reconcileBrief', () => {
     ]);
   });
 
+  it('[UX-24] keeps the entity refs the model declares and drops the rest', () => {
+    const model = {
+      version: 1 as const,
+      entities: [{ id: 'order', name: 'Order', fields: [], invariants: [], states: [] }],
+      relations: [],
+    };
+    const bindings: Binding[] = [
+      {
+        criterionId: 'c1',
+        nodeIds: ['n-4'],
+        claim: 'held',
+        entityIds: ['order', 'ghost', 'order'],
+      },
+      { criterionId: 'c2', nodeIds: ['n-4'], claim: 'held', entityIds: ['ghost'] },
+    ];
+    expect(reconcileBrief(bindings, graph, criteria, model)?.bindings).toEqual([
+      { criterionId: 'c1', nodeIds: ['n-4'], claim: 'held', entityIds: ['order'] },
+      { criterionId: 'c2', nodeIds: ['n-4'], claim: 'held' },
+    ]);
+    expect(reconcileBrief(bindings, graph, criteria)?.bindings[0]?.entityIds).toBeUndefined();
+  });
+
   it('is null when nothing is claimed, so nothing implies the author bound nothing', () => {
     expect(reconcileBrief([], graph, criteria)).toBeNull();
   });

@@ -87,6 +87,10 @@ export class DesignRevision {
   @Property({ type: 'json', nullable: true })
   narrative: Contracts.DesignNarrative | null = null;
 
+  /** The data model beside the diagram; null for a revision stored before models existed or written without one. */
+  @Property({ type: 'json', nullable: true })
+  model: Contracts.DesignModel | null = null;
+
   /** The quality loop's run id; null only for revisions stored before grading was delegated. */
   @Index()
   @Property({ type: 'varchar', length: 80, nullable: true })

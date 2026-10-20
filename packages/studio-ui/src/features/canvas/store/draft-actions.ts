@@ -1,7 +1,9 @@
 import {
   DESIGN_BRIEF_VERSION,
+  DESIGN_MODEL_VERSION,
   NARRATION_VERSION,
   reconcileBrief,
+  reconcileModel,
   reconcileNarration,
 } from '@sysdesign/contracts';
 
@@ -17,6 +19,8 @@ export type DraftActions = Pick<
   | 'serialize'
   | 'serializeBrief'
   | 'serializeNarrative'
+  | 'serializeModel'
+  | 'loadModel'
   | 'markClean'
   | 'markDirty'
 >;
@@ -40,6 +44,9 @@ export const draftActions = ({ set, get, edits: { loaded } }: ActionDeps): Draft
       componentRationales: draft.narrative?.componentRationales ?? [],
       criterionNarrations: draft.narrative?.criterionNarrations ?? [],
       decisions: draft.narrative?.decisions ?? [],
+      assumptions: draft.narrative?.assumptions ?? [],
+      entities: draft.model?.entities ?? [],
+      relations: draft.model?.relations ?? [],
     });
     set({
       ...restored,
@@ -59,12 +66,16 @@ export const draftActions = ({ set, get, edits: { loaded } }: ActionDeps): Draft
       componentRationales,
       criterionNarrations,
       decisions,
+      assumptions,
+      entities,
+      relations,
     } = get();
     const narrativeEmpty =
       narrativeOverview.length === 0 &&
       componentRationales.length === 0 &&
       criterionNarrations.length === 0 &&
-      decisions.length === 0;
+      decisions.length === 0 &&
+      assumptions.length === 0;
     return {
       graph: toCanvasGraph(nodes, edges),
       brief:
@@ -82,8 +93,26 @@ export const draftActions = ({ set, get, edits: { loaded } }: ActionDeps): Draft
             componentRationales: [...componentRationales],
             criterionNarrations: [...criterionNarrations],
             ...(decisions.length > 0 ? { decisions: decisions.map((item) => ({ ...item })) } : {}),
+            ...(assumptions.length > 0 ? { assumptions: [...assumptions] } : {}),
           },
+      model:
+        entities.length === 0
+          ? null
+          : {
+              version: DESIGN_MODEL_VERSION,
+              entities: entities.map((item) => ({ ...item })),
+              relations: relations.map((item) => ({ ...item })),
+            },
     };
+  },
+
+  serializeModel() {
+    const { nodes, edges, entities, relations } = get();
+    return reconcileModel(entities, relations, toCanvasGraph(nodes, edges));
+  },
+
+  loadModel(model) {
+    set(loaded({ entities: model?.entities ?? [], relations: model?.relations ?? [] }));
   },
 
   serialize() {
@@ -92,13 +121,21 @@ export const draftActions = ({ set, get, edits: { loaded } }: ActionDeps): Draft
   },
 
   serializeBrief(criteria) {
-    const { nodes, edges, bindings } = get();
-    return reconcileBrief(bindings, toCanvasGraph(nodes, edges), criteria);
+    const { nodes, edges, bindings, entities, relations } = get();
+    const graph = toCanvasGraph(nodes, edges);
+    return reconcileBrief(bindings, graph, criteria, reconcileModel(entities, relations, graph));
   },
 
   serializeNarrative(criteria) {
-    const { nodes, edges, narrativeOverview, componentRationales, criterionNarrations, decisions } =
-      get();
+    const {
+      nodes,
+      edges,
+      narrativeOverview,
+      componentRationales,
+      criterionNarrations,
+      decisions,
+      assumptions,
+    } = get();
     return reconcileNarration(
       narrativeOverview,
       componentRationales,
@@ -106,6 +143,7 @@ export const draftActions = ({ set, get, edits: { loaded } }: ActionDeps): Draft
       toCanvasGraph(nodes, edges),
       criteria,
       decisions,
+      assumptions,
     );
   },
 

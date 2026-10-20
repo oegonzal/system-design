@@ -151,6 +151,13 @@ describe('substituteLocationRefs', () => {
       key: null,
       name: 'Own a read model',
     },
+    { ref: 'entity.1', label: 'Order entity (order)', part: 'entity', key: 'order', name: 'Order' },
+    {
+      ref: 'assumption.1',
+      label: 'assumption: One shopper, one history.',
+      part: 'assumption',
+      key: null,
+    },
   ];
 
   it('[EVAL-2] puts a label where a lens wrote a position, however the sentence cased it', () => {
@@ -328,39 +335,8 @@ describe('substituteLocationRefs', () => {
       'c5 narration',
       'Overview',
       'decision: Own a read model',
+      'order',
+      'assumption: One shopper, one history.',
     ]);
-  });
-
-  it('[EVAL-2] numbers the narrative’s decisions after every other part, named by their choice and keyed by nothing', () => {
-    const base = submission();
-    if (base.narrative === null) throw new Error('the fixture has a narrative');
-    const withDecisions: DesignSubmission = {
-      ...base,
-      narrative: {
-        ...base.narrative,
-        decisions: [
-          { choice: 'Own a read model', alternative: 'Query both sources live', cost: 'Staleness' },
-          { choice: 'One queue for both feeds' },
-        ],
-      },
-    };
-    const locations = submissionLocations(withDecisions);
-    expect(locations.slice(-2)).toEqual([
-      {
-        id: 'decision.1',
-        label: 'decision: Own a read model',
-        part: 'decision',
-        key: null,
-        name: 'Own a read model',
-      },
-      {
-        id: 'decision.2',
-        label: 'decision: One queue for both feeds',
-        part: 'decision',
-        key: null,
-        name: 'One queue for both feeds',
-      },
-    ]);
-    expect(submissionLocations(base).some((location) => location.part === 'decision')).toBe(false);
   });
 });

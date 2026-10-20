@@ -36,8 +36,9 @@ export function bindingState(binding: Binding | null | undefined): BindingState 
   const hasNodes = binding.nodeIds.length > 0;
   const hasPath = (binding.path ?? []).length > 0;
   const hasTradeoff = (binding.tradeoff ?? '').trim().length > 0;
+  const hasEntities = (binding.entityIds ?? []).length > 0;
   if (hasClaim && hasNodes) return 'bound';
-  if (hasClaim || hasNodes || hasPath || hasTradeoff) return 'incomplete';
+  if (hasClaim || hasNodes || hasPath || hasTradeoff || hasEntities) return 'incomplete';
   return 'empty';
 }
 

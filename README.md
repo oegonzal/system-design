@@ -9,11 +9,13 @@ and can coach the design forward.
 **The loop:** pick a prompt — write one as markdown, import one from the
 library, or generate one from a seeded experience — the grader derives its
 criteria once (`c1…cN`) → sketch the architecture from a palette of
-system-design building blocks (gateway, load balancer, service, database,
-replica, cache, queue, event stream, CDN, …) → bind each criterion to the
-components that hold it, trace the path a request takes, say why that
-mechanism and not another, narrate the design and record the decisions it
-rests on — the choice, the alternative, the cost →
+building blocks from the application's own actors and modules down to its
+infrastructure (gateway, load balancer, service, database, replica, cache,
+queue, event stream, CDN, …) → bind each criterion to the
+components that hold it, model the entities it keeps and who owns them, trace
+the path a request takes, say why that mechanism and not another, narrate the
+design and record the decisions it rests on — the choice, the alternative, the
+cost →
 submit → the quality loop judges it with five critics and four evaluators and a
 deterministic controller → findings point at the exact nodes and edges, results
 sit beside each criterion → iterate, resubmit, or hand the draft to the coach

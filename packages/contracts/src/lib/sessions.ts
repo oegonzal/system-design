@@ -5,6 +5,7 @@ import type {
   DesignSubmission,
   SessionDraft,
 } from './canvas.schema';
+import type { DesignModel } from './model.schema';
 import type { ApiListResponse, ApiResponse } from './envelope';
 import type { DecisionBasisDto, EvaluationFindingDto, UnscoredReason } from './evaluations';
 import type { LlmModelDto } from './llm-model';
@@ -157,6 +158,7 @@ export interface DesignRevisionDto {
   graph: CanvasGraph;
   brief: DesignBrief | null;
   narrative: DesignNarrative | null;
+  model: DesignModel | null;
   /** Null only for revisions stored before grading was delegated. */
   evaluation: RevisionEvaluationRef | null;
   createdAt: IsoDateString;

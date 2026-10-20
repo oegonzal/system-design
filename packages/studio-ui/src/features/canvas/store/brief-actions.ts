@@ -1,4 +1,4 @@
-import { BINDING_NODES_BOUND, type Binding } from '@sysdesign/contracts';
+import { BINDING_ENTITIES_BOUND, BINDING_NODES_BOUND, type Binding } from '@sysdesign/contracts';
 
 import type { ActionDeps } from './history';
 import type { CanvasState } from './state';
@@ -9,6 +9,7 @@ function isBlank(binding: Binding): boolean {
     binding.claim.trim().length === 0 &&
     binding.nodeIds.length === 0 &&
     (binding.path ?? []).length === 0 &&
+    (binding.entityIds ?? []).length === 0 &&
     (binding.tradeoff ?? '').trim().length === 0
   );
 }
@@ -33,6 +34,7 @@ export type BriefActions = Pick<
   | 'setBindingClaim'
   | 'setBindingTradeoff'
   | 'toggleBindingNode'
+  | 'toggleBindingEntity'
   | 'setBindingPath'
   | 'clearBinding'
   | 'loadBrief'
@@ -78,6 +80,21 @@ export const briefActions = ({
     });
   },
 
+  toggleBindingEntity(criterionId, entityId) {
+    const { bindings } = get();
+    const existing = bindings.find((binding) => binding.criterionId === criterionId);
+    const held = existing?.entityIds ?? [];
+    const has = held.includes(entityId);
+    if (!has && held.length >= BINDING_ENTITIES_BOUND.target) return;
+    commit({
+      bindings: upsert(bindings, criterionId, (current) => {
+        const { entityIds: _held, ...rest } = current;
+        const next = has ? held.filter((id) => id !== entityId) : [...held, entityId];
+        return next.length === 0 ? rest : { ...rest, entityIds: next };
+      }),
+    });
+  },
+
   setBindingPath(criterionId, path) {
     commit({
       bindings: upsert(get().bindings, criterionId, (current) => {
@@ -85,6 +102,7 @@ export const briefActions = ({
           criterionId: current.criterionId,
           nodeIds: current.nodeIds,
           claim: current.claim,
+          ...(current.entityIds !== undefined ? { entityIds: current.entityIds } : {}),
           ...(current.tradeoff !== undefined ? { tradeoff: current.tradeoff } : {}),
         };
         return path.length === 0 ? rest : { ...rest, path };

@@ -37,6 +37,7 @@ export function createRevision(
         graph: submission.graph,
         brief: submission.brief,
         narrative: submission.narrative,
+        model: submission.model ?? null,
         qualityRunId: run.runId,
         qualityIteration: run.iteration,
         evaluationStatus: 'running',

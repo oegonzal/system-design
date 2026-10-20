@@ -2,7 +2,9 @@ import { z } from 'zod';
 
 import { bounded } from './bounds';
 import {
+  ASSUMPTION_BOUND,
   BINDING_CLAIM_BOUND,
+  BINDING_ENTITIES_BOUND,
   BINDING_NODES_BOUND,
   BINDING_TRADEOFF_BOUND,
   BRIEF_BINDINGS_BOUND,
@@ -20,6 +22,7 @@ import {
   NARRATION_CRITERION_NARRATIONS_BOUND,
   NARRATION_OVERVIEW_BOUND,
   NARRATION_PROSE_BOUND,
+  NARRATIVE_ASSUMPTIONS_BOUND,
   NARRATIVE_DECISIONS_BOUND,
   NODE_CONFIG_KEY_MAX_LENGTH,
   NODE_CONFIG_KEYS_BOUND,
@@ -33,6 +36,7 @@ import {
   OPERATION_NOTES_BOUND,
   RESPONSIBILITY_BOUND,
 } from './canvas';
+import { designModelDraftSchema, designModelSchema } from './model.schema';
 import { CRITERION_ID_MAX_LENGTH } from './quality-loop/evidence';
 
 /**
@@ -165,6 +169,11 @@ export const bindingSchema = z.strictObject({
     })
     .optional(),
   claim: bounded.text(BINDING_CLAIM_BOUND, { min: 1 }),
+  entityIds: bounded
+    .list(BINDING_ENTITIES_BOUND, canvasId(), {
+      description: 'The entities of the model that hold this criterion, existing ids only.',
+    })
+    .optional(),
   tradeoff: bounded
     .text(BINDING_TRADEOFF_BOUND, {
       description:
@@ -253,14 +262,25 @@ export const designNarrativeSchema = z.strictObject({
         'The load-bearing decisions of the whole design — a store, a queue, a split into services, a synchronous call to an outside system — each with its alternative and its cost.',
     })
     .optional(),
+  assumptions: bounded
+    .list(NARRATIVE_ASSUMPTIONS_BOUND, bounded.text(ASSUMPTION_BOUND, { min: 1 }), {
+      description:
+        'What the design takes as given that the goal does not state, one sentence each — stated here rather than smuggled into a claim.',
+    })
+    .optional(),
 });
 export type DesignNarrative = z.infer<typeof designNarrativeSchema>;
 
-/** What the canvas submits and what the quality loop judges: one object. */
+/**
+ * What the canvas submits and what the quality loop judges: one object. The
+ * model is optional as well as nullable: revisions stored before it existed
+ * carry none, and a reader treats absent as null.
+ */
 export const designSubmissionSchema = z.strictObject({
   graph: canvasGraphSchema,
   brief: designBriefSchema.nullable(),
   narrative: designNarrativeSchema.nullable(),
+  model: designModelSchema.nullable().optional(),
 });
 export type DesignSubmission = z.infer<typeof designSubmissionSchema>;
 
@@ -287,6 +307,7 @@ export const designDecisionDraftSchema = designDecisionSchema.extend({
 
 export const designNarrativeDraftSchema = designNarrativeSchema.extend({
   decisions: bounded.list(NARRATIVE_DECISIONS_BOUND, designDecisionDraftSchema).optional(),
+  assumptions: bounded.list(NARRATIVE_ASSUMPTIONS_BOUND, bounded.text(ASSUMPTION_BOUND)).optional(),
 });
 
 /** The unsubmitted canvas, as `PUT /sessions/:id/draft` stores it and the workspace restores it. */
@@ -294,5 +315,6 @@ export const sessionDraftSchema = z.strictObject({
   graph: canvasGraphSchema,
   brief: designBriefDraftSchema.nullable(),
   narrative: designNarrativeDraftSchema.nullable(),
+  model: designModelDraftSchema.nullable().optional(),
 });
 export type SessionDraft = z.infer<typeof sessionDraftSchema>;

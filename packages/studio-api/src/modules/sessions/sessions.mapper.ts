@@ -42,6 +42,7 @@ export const toRevisionDto = (r: DesignRevision): DesignRevisionDto => ({
   graph: r.graph,
   brief: r.brief,
   narrative: r.narrative,
+  model: r.model,
   evaluation: toEvaluationRef(r),
   createdAt: r.createdAt.toISOString(),
 });

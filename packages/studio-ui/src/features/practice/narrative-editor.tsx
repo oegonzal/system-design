@@ -13,6 +13,7 @@ import { useCanvasStore } from '../canvas/canvas-store-context';
 import { toCanvasGraph } from '../canvas/graph-io';
 import { narrationSlotState, type NarrationSlotState } from '../canvas/narration-draft';
 import { groupCriteriaByKind, humanizeKind } from '../prompts/criteria';
+import { NarrativeAssumptions } from './narrative-assumptions';
 import { NarrativeDecisions } from './narrative-decisions';
 
 const CHIP: Record<NarrationSlotState, { tone: 'neutral' | 'success'; label: string }> = {
@@ -90,10 +91,10 @@ export function NarrativeEditor({ criteria }: NarrativeEditorProps) {
   return (
     <Stack gap={5}>
       <Text size="sm" tone="muted">
-        Walk a reader through the design — the big picture, why each component is there and instead
-        of what, the decisions the design rests on, and how each criterion is met. The explanation
-        critic reads every slot against your diagram: a claim the drawing does not back costs more
-        than silence, and a choice nobody defends is graded as such.
+        Walk a reader through the design — the big picture, what you assume, why each component is
+        there and instead of what, the decisions the design rests on, and how each criterion is met.
+        The explanation critic reads every slot against your diagram: a claim the drawing does not
+        back costs more than silence, and a choice nobody defends is graded as such.
       </Text>
 
       <Stack gap={2}>
@@ -111,6 +112,8 @@ export function NarrativeEditor({ criteria }: NarrativeEditorProps) {
         />
         <SlotChip prose={overview} />
       </Stack>
+
+      <NarrativeAssumptions />
 
       <Stack gap={3}>
         <Heading level={3}>Why each component is here</Heading>

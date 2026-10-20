@@ -3,6 +3,7 @@
 import type {
   CanvasGraph,
   DesignBrief,
+  DesignModel,
   DesignNarrative,
   DesignRevisionSummaryDto,
   EvaluationDto,
@@ -19,6 +20,7 @@ import {
   promptMarkdown,
   revisionsMarkdown,
 } from './markdown';
+import { modelMarkdown } from './markdown-model';
 
 export interface RunExportInput {
   prompt: PromptDto;
@@ -27,6 +29,7 @@ export interface RunExportInput {
   graph: CanvasGraph;
   narrative: DesignNarrative | null;
   brief: DesignBrief | null;
+  model: DesignModel | null;
   evaluation: EvaluationDto | null;
   revisions: DesignRevisionSummaryDto[];
   /**
@@ -82,6 +85,7 @@ export async function exportRun(
   zip.file('prompt.md', promptMarkdown(input.prompt, input.criteria));
   zip.file('narrative.md', narrativeMarkdown(input.narrative, input.graph, input.criteria));
   zip.file('brief.md', briefMarkdown(input.brief, input.graph, input.criteria));
+  zip.file('model.md', modelMarkdown(input.model, input.graph));
   zip.file('feedback.md', feedbackMarkdown(input.evaluation, input.criteria, input.subject));
   zip.file('revisions.md', revisionsMarkdown(input.revisions));
 

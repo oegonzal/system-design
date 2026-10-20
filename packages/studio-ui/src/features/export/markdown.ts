@@ -53,7 +53,7 @@ function joinLines(lines: string[]): string {
 }
 
 /** Node id → label, for turning brief/narrative references into readable prose. */
-function nodeLabels(graph: CanvasGraph): Map<string, string> {
+export function nodeLabels(graph: CanvasGraph): Map<string, string> {
   // The same name the lens was shown, so a finding's prose and this document
   // cannot disagree about what a node is called.
   return new Map(graph.nodes.map((node) => [node.id, nodeLabel(node)]));
@@ -157,6 +157,10 @@ export function narrativeMarkdown(
   const statements = criterionStatements(criteria);
   if (narrative.overview && narrative.overview.trim().length > 0) {
     lines.push(`## Overview`, ``, narrative.overview.trim(), ``);
+  }
+  const assumptions = narrative.assumptions ?? [];
+  if (assumptions.length > 0) {
+    lines.push(`## Assumptions`, ``, ...assumptions.map((text) => `- ${text.trim()}`), ``);
   }
   lines.push(`## Why each component is here`, ``);
   if (narrative.componentRationales.length > 0) {

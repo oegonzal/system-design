@@ -6,6 +6,7 @@ import { briefActions } from './store/brief-actions';
 import { draftActions } from './store/draft-actions';
 import { graphActions } from './store/graph-actions';
 import { editsOf, EMPTY_HISTORY, historyActions } from './store/history';
+import { modelActions } from './store/model-actions';
 import { narrativeActions } from './store/narrative-actions';
 import type { CanvasState } from './store/state';
 import { viewActions } from './store/view-actions';
@@ -36,6 +37,9 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
       componentRationales: [],
       criterionNarrations: [],
       decisions: [],
+      assumptions: [],
+      entities: [],
+      relations: [],
       bindings: [],
       highlight: null,
 
@@ -43,6 +47,7 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
       ...historyActions(deps),
       ...viewActions(deps),
       ...narrativeActions(deps),
+      ...modelActions(deps),
       ...briefActions(deps),
       ...draftActions(deps),
     };

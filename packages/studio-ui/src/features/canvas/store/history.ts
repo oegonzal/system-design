@@ -21,6 +21,9 @@ function contentOf(state: CanvasContent): CanvasContent {
     componentRationales: state.componentRationales,
     criterionNarrations: state.criterionNarrations,
     decisions: state.decisions,
+    assumptions: state.assumptions,
+    entities: state.entities,
+    relations: state.relations,
   };
 }
 

@@ -3,6 +3,7 @@ import {
   DECISION_NODES_BOUND,
   NARRATION_COMPONENT_RATIONALES_BOUND,
   NARRATION_CRITERION_NARRATIONS_BOUND,
+  NARRATIVE_ASSUMPTIONS_BOUND,
   NARRATIVE_DECISIONS_BOUND,
 } from './canvas';
 import {
@@ -43,6 +44,7 @@ export function reconcileNarration(
   graph: CanvasGraph,
   criteria: readonly CriterionRef[],
   decisions: readonly DesignDecision[] = [],
+  assumptions: readonly string[] = [],
 ): DesignNarrative | null {
   const nodeIds = new Set(graph.nodes.map((node) => node.id));
   const criterionIds = new Set(criteria.map((criterion) => criterion.id));
@@ -105,13 +107,19 @@ export function reconcileNarration(
     })
     .slice(0, NARRATION_CRITERION_NARRATIONS_BOUND.ceiling);
 
+  const keptAssumptions = assumptions
+    .map((text) => text.trim())
+    .filter((text) => text.length > 0)
+    .slice(0, NARRATIVE_ASSUMPTIONS_BOUND.ceiling);
+
   const trimmedOverview = overview.trim();
 
   if (
     trimmedOverview.length === 0 &&
     componentRationales.length === 0 &&
     criterionNarrations.length === 0 &&
-    kept.length === 0
+    kept.length === 0 &&
+    keptAssumptions.length === 0
   ) {
     return null;
   }
@@ -122,5 +130,6 @@ export function reconcileNarration(
     componentRationales,
     criterionNarrations,
     ...(kept.length > 0 ? { decisions: kept } : {}),
+    ...(keptAssumptions.length > 0 ? { assumptions: keptAssumptions } : {}),
   };
 }

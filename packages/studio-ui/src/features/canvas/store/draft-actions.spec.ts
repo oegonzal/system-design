@@ -53,6 +53,7 @@ describe('canvas-store', () => {
         graph: makeGraph(),
         brief: null,
         narrative: null,
+        model: null,
       });
 
       // Half-typed: a claim with no component yet, which a submission would drop.
@@ -70,6 +71,7 @@ describe('canvas-store', () => {
           componentRationales: [],
           criterionNarrations: [],
         },
+        model: null,
       });
     });
 

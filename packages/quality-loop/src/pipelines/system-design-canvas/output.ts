@@ -78,6 +78,35 @@ function renderPath(
 }
 
 /**
+ * An entity as the model critic reads it: who owns it, what identifies it,
+ * what it holds and the rules and states it carries, with an empty slot
+ * named so a model with no owner or no invariants is visible at a glance.
+ */
+function renderEntity(
+  item: {
+    id: string;
+    name: string;
+    ownerNodeId?: string;
+    key?: string;
+    fields: readonly { name: string; note?: string }[];
+    invariants: readonly string[];
+    states: readonly string[];
+  },
+  index: number,
+  node: (id: string) => string,
+): string {
+  const fields = item.fields.map((field) =>
+    field.note === undefined ? field.name : `${field.name} (${field.note})`,
+  );
+  return (
+    `[entity.${index + 1}] ${item.name} (${item.id}): owned by ${item.ownerNodeId === undefined ? '(no owner)' : node(item.ownerNodeId)}; ` +
+    `key: ${item.key ?? '(none given)'}; fields: ${fields.length === 0 ? '(none given)' : fields.join(', ')}; ` +
+    `invariants: ${item.invariants.length === 0 ? '(none given)' : item.invariants.join('; ')}; ` +
+    `states: ${item.states.length === 0 ? '(none)' : item.states.join(' → ')}`
+  );
+}
+
+/**
  * A decision as the reasoning lenses read it: every slot printed, an empty
  * one named as such, so a choice with no alternative or no cost is visible
  * at a glance rather than inferred from silence.
@@ -126,17 +155,30 @@ export const canvasOutput: OutputShape<CanvasSubmission> = {
 
   render: (submission) => {
     const { graph, brief, narrative } = submission;
+    const model = submission.model ?? null;
     const node = positional(graph.nodes, 'node');
+    const entity = positional(model?.entities ?? [], 'entity');
     const edges = edgeIndex(graph);
     const overview = narrative?.overview?.trim() ?? '';
     const lines: string[] = [
-      'Cite parts by the bracketed ids. The token after each bracket is the author’s own canvas id; the brief and narrative refer to those. An author’s id is a name, not a position: `e-4` need not be `edge.4`. A binding’s path is the line under it, each hop led by the id to cite.',
+      'Cite parts by the bracketed ids. The token after each bracket is the author’s own canvas id; the model, brief and narrative refer to those. An author’s id is a name, not a position: `e-4` need not be `edge.4`. A binding’s path is the line under it, each hop led by the id to cite.',
       '',
       '## Nodes',
       ...graph.nodes.map((item, index) => `[node.${index + 1}] ${renderNodeLine(item).trim()}`),
       '',
       '## Edges',
       ...graph.edges.map((item, index) => `[edge.${index + 1}] ${renderEdgeLine(item).trim()}`),
+      '',
+      '## Model',
+      ...(model === null || model.entities.length === 0
+        ? ['(none submitted)']
+        : [
+            ...model.entities.map((item, index) => renderEntity(item, index, node)),
+            ...model.relations.map(
+              (item) =>
+                `    relation: ${entity(item.from)} -> ${entity(item.to)} (${item.kind})${item.note === undefined ? '' : `: ${item.note}`}`,
+            ),
+          ]),
       '',
       '## Brief',
     ];
@@ -145,7 +187,7 @@ export const canvasOutput: OutputShape<CanvasSubmission> = {
     } else {
       lines.push(
         ...brief.bindings.flatMap((binding, index) => [
-          `[binding.${index + 1}] ${binding.criterionId} ← ${binding.nodeIds.map(node).join(', ')}: ${JSON.stringify(binding.claim)}`,
+          `[binding.${index + 1}] ${binding.criterionId} ← ${[...binding.nodeIds.map(node), ...(binding.entityIds ?? []).map(entity)].join(', ')}: ${JSON.stringify(binding.claim)}`,
           ...(binding.path !== undefined && binding.path.length > 0
             ? [renderPath(binding.path, edges, node)]
             : []),
@@ -158,12 +200,14 @@ export const canvasOutput: OutputShape<CanvasSubmission> = {
       narrative === null ||
       (overview.length === 0 &&
         narrative.componentRationales.length === 0 &&
-        narrative.criterionNarrations.length === 0)
+        narrative.criterionNarrations.length === 0 &&
+        (narrative.assumptions ?? []).length === 0)
     ) {
       lines.push('(none submitted)');
     } else {
       if (overview.length > 0) lines.push(`[overview] ${overview}`);
       lines.push(
+        ...(narrative.assumptions ?? []).map((text, index) => `[assumption.${index + 1}] ${text}`),
         ...narrative.componentRationales.map(
           (item, index) =>
             `[rationale.${index + 1}] ${node(item.nodeId)}: ${item.prose} — instead of: ${item.tradeoff ?? '(none given)'}`,

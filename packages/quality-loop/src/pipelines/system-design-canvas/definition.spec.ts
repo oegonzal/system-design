@@ -132,8 +132,11 @@ describe('the system-design-canvas pipeline', () => {
     expect(ids).toEqual([
       ...submission.graph.nodes.map((_, index) => `node.${index + 1}`),
       ...submission.graph.edges.map((_, index) => `edge.${index + 1}`),
+      'entity.1',
+      'entity.2',
       ...Array.from({ length: 6 }, (_, index) => `binding.${index + 1}`),
       'overview',
+      'assumption.1',
       ...Array.from({ length: 4 }, (_, index) => `rationale.${index + 1}`),
       ...Array.from({ length: 3 }, (_, index) => `narration.${index + 1}`),
       'decision.1',
@@ -142,7 +145,15 @@ describe('the system-design-canvas pipeline', () => {
     // narrative refer to them, so a reader can join the two.
     expect(rendered).toContain('[node.3] node service-1 kind=service');
     expect(rendered).toContain(
-      '[binding.1] c1 ← gateway-1 (node.2), service-1 (node.3), database-1 (node.11): ',
+      '[entity.1] Order (order): owned by database-1 (node.11); key: order id from the source, namespaced by channel; fields: customerId, placedAt, channel (online or in-store); invariants: An order is stored once, whichever source it came from.; states: placed → fulfilled → refunded',
+    );
+    expect(rendered).toContain(
+      '[entity.2] Line item (line-item): owned by database-1 (node.11); key: (none given); fields: sku, quantity; invariants: (none given); states: (none)',
+    );
+    expect(rendered).toContain('    relation: order (entity.1) -> line-item (entity.2) (contains)');
+    expect(rendered).toContain('[assumption.1] A shopper reads only their own history');
+    expect(rendered).toContain(
+      '[binding.1] c1 ← gateway-1 (node.2), service-1 (node.3), database-1 (node.11), order (entity.1): ',
     );
     expect(rendered).toContain(
       '    path, 3 edges, client-1 (node.1) to database-1 (node.11): edge.1 (edge-1: client-1 -> gateway-1) → edge.2 (edge-2: gateway-1 -> service-1) → edge.3 (edge-3: service-1 -> database-1)',
@@ -220,14 +231,21 @@ describe('the system-design-canvas pipeline', () => {
     );
   });
 
-  it('[QL-21] a submission without a brief or a narrative says so, and exposes nothing to cite there', () => {
-    const bare = sampleSubmission({ brief: null, narrative: null });
+  it('[QL-21] a submission without a model, a brief or a narrative says so, and exposes nothing to cite there', () => {
+    const bare = sampleSubmission({ brief: null, narrative: null, model: null });
     const rendered = canvasOutput.render(bare);
-    expect(rendered.match(/\(none submitted\)/g)).toHaveLength(2);
+    expect(rendered.match(/\(none submitted\)/g)).toHaveLength(3);
     expect(rendered).toContain('## Decisions\n(none recorded)');
     const ids = canvasOutput.locate(bare).map((location) => location.id);
     expect(
-      ids.some((id) => /^(binding|rationale|narration|decision)\./.test(id) || id === 'overview'),
+      ids.some(
+        (id) =>
+          /^(entity|binding|assumption|rationale|narration|decision)\./.test(id) ||
+          id === 'overview',
+      ),
     ).toBe(false);
+    // A revision stored before models existed carries none: read as none submitted.
+    const { model: _absent, ...older } = sampleSubmission();
+    expect(canvasOutput.render(older)).toContain('## Model\n(none submitted)');
   });
 });

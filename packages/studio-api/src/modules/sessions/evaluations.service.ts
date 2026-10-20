@@ -79,7 +79,12 @@ export class EvaluationsService {
     const dto = toEvaluationDto(
       run,
       revision.qualityIteration,
-      { graph: revision.graph, brief: revision.brief, narrative: revision.narrative },
+      {
+        graph: revision.graph,
+        brief: revision.brief,
+        narrative: revision.narrative,
+        model: revision.model,
+      },
       new Date().toISOString(),
     );
     if (

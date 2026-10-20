@@ -89,12 +89,14 @@ export interface SemanticColors {
  * eyeballed), so the chips are self-contained in either mode.
  *
  * The hues keep their long-standing anchors, which is what makes a
- * hundred-node diagram scannable: light blue at the client edge, deep blues
- * for traffic, indigo for compute, greens and teals for data at rest, warm
- * ambers and oranges for caches and messaging (the "hot path"), and neutral
- * gray for the actors the design doesn't own.
+ * hundred-node diagram scannable: parchment for the application's own actors
+ * and modules, light blue at the client edge, deep blues for traffic, indigo
+ * for compute, greens and teals for data at rest, warm ambers and oranges for
+ * caches and messaging (the "hot path"), and neutral gray for the actors the
+ * design doesn't own.
  */
 export const CATEGORY_COLORS = {
+  application: { bg: '#e7d9bf', fg: INK },
   'clients-edge': { bg: '#85c8f2', fg: INK },
   traffic: { bg: '#2a63ae', fg: PAPER },
   compute: { bg: '#4653c8', fg: PAPER },

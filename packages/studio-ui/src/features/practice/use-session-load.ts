@@ -60,6 +60,7 @@ export function useSessionLoad(
           storeApi.getState().loadDraft(draft);
         } else if (restored) {
           storeApi.getState().setGraph(restored.graph);
+          storeApi.getState().loadModel(restored.model);
           storeApi.getState().loadNarrative(restored.narrative);
           storeApi.getState().loadBrief(restored.brief);
         }

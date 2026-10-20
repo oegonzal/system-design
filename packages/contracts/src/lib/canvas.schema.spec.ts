@@ -146,6 +146,42 @@ describe('designSubmissionSchema', () => {
     expect(sessionDraftSchema.safeParse(undecided).success).toBe(true);
   });
 
+  it('[UX-24] accepts a data model beside the diagram and entity refs on a binding; a submission needs an entity’s name, a draft does not, and a stored revision without a model still parses', () => {
+    const fixture = submissionFixture();
+    if (fixture.brief === null) throw new Error('the fixture is whole');
+    const modelled = {
+      ...fixture,
+      model: {
+        version: 1,
+        entities: [
+          {
+            id: 'order',
+            name: 'Order',
+            ownerNodeId: fixture.graph.nodes[0].id,
+            fields: [{ name: 'placedAt' }],
+            invariants: ['Stored once.'],
+            states: ['placed', 'fulfilled'],
+          },
+        ],
+        relations: [],
+      },
+      brief: {
+        ...fixture.brief,
+        bindings: fixture.brief.bindings.map((binding, index) =>
+          index === 0 ? { ...binding, entityIds: ['order'] } : binding,
+        ),
+      },
+    };
+    expect(designSubmissionSchema.safeParse(modelled).success).toBe(true);
+    expect(designSubmissionSchema.safeParse(fixture).success).toBe(true);
+    const unnamed = {
+      ...modelled,
+      model: { ...modelled.model, entities: [{ ...modelled.model.entities[0], name: '' }] },
+    };
+    expect(designSubmissionSchema.safeParse(unnamed).success).toBe(false);
+    expect(sessionDraftSchema.safeParse(unnamed).success).toBe(true);
+  });
+
   it('[QL-49] every bound the coach writes into sits above what it has measurably written', () => {
     // `measured/canvas.json`: every field the canvas coach wrote across the
     // recorded runs, refreshed by `pnpm measure:bounds`. A target under the
@@ -169,6 +205,26 @@ describe('designSubmissionSchema', () => {
           'narrative.decisions[].reconsiderWhen': unwritten,
           'narrative.decisions[].nodeIds': unwritten,
           'narrative.decisions[].nodeIds[]': unwritten,
+          'narrative.assumptions': unwritten,
+          'narrative.assumptions[]': unwritten,
+          'brief.bindings[].entityIds': unwritten,
+          'brief.bindings[].entityIds[]': unwritten,
+          'model.entities': unwritten,
+          'model.entities[].id': unwritten,
+          'model.entities[].name': unwritten,
+          'model.entities[].ownerNodeId': unwritten,
+          'model.entities[].key': unwritten,
+          'model.entities[].fields': unwritten,
+          'model.entities[].fields[].name': unwritten,
+          'model.entities[].fields[].note': unwritten,
+          'model.entities[].invariants': unwritten,
+          'model.entities[].invariants[]': unwritten,
+          'model.entities[].states': unwritten,
+          'model.entities[].states[]': unwritten,
+          'model.relations': unwritten,
+          'model.relations[].from': unwritten,
+          'model.relations[].to': unwritten,
+          'model.relations[].note': unwritten,
         },
       }),
     ).toEqual([]);

@@ -6,8 +6,11 @@ import type {
   CriterionRef,
   DesignBrief,
   DesignDecision,
+  DesignModel,
   DesignNarrative,
   EdgeKind,
+  ModelEntity,
+  ModelRelation,
   NodeConfigEntry,
   NodeKind,
   NodeOperation,
@@ -54,6 +57,11 @@ export interface CanvasContent {
   criterionNarrations: CriterionNarration[];
   /** In the order the author added them; a row whose choice is still blank is kept while it is typed. */
   decisions: DesignDecision[];
+  /** The assumptions the design depends on, one sentence each, in the order written. */
+  assumptions: string[];
+  /** The data model as it is typed: an entity whose name is still blank is kept, and a relation may name an entity not yet drawn. */
+  entities: ModelEntity[];
+  relations: ModelRelation[];
 }
 
 /** How many edits undo can walk back; the oldest is dropped past it. */
@@ -176,10 +184,27 @@ export interface CanvasState extends CanvasContent {
   /** Author edit — patches the decision at `index`; a field set to an empty string is cleared. */
   updateDecision(index: number, patch: Partial<DesignDecision>): void;
   removeDecision(index: number): void;
+  /** Author edit — a new blank assumption at the end. */
+  addAssumption(): void;
+  setAssumption(index: number, text: string): void;
+  removeAssumption(index: number): void;
+  /** Author edit — a new entity with a fresh id and a blank name; the selection stays on the canvas. */
+  addEntity(): void;
+  updateEntity(id: string, patch: Partial<Omit<ModelEntity, 'id'>>): void;
+  removeEntity(id: string): void;
+  addRelation(relation: ModelRelation): void;
+  updateRelation(index: number, patch: Partial<ModelRelation>): void;
+  removeRelation(index: number): void;
+  /** Revision load — replaces the model draft without touching `dirty`. */
+  loadModel(model: DesignModel | null): void;
+  /** The model as a payload, reconciled against the live graph, or null. */
+  serializeModel(): DesignModel | null;
   /** Author edit — sets one criterion's narration; empty prose clears it. */
   setCriterionNarration(criterionId: string, prose: string): void;
   /** Revision load — replaces the narrative draft without touching `dirty`. */
   loadNarrative(narrative: DesignNarrative | null): void;
+  /** Author edit — adds or removes one entity on a criterion's binding. */
+  toggleBindingEntity(criterionId: string, entityId: string): void;
   /** Author edit — the claim in the author's words; creates the binding on first use. */
   setBindingClaim(criterionId: string, claim: string): void;
   /** Author edit — why this mechanism and not another; empty text clears it. */

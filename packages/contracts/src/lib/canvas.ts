@@ -1,10 +1,11 @@
 /**
  * The diagram's notation: which blocks the palette offers, how they are
  * shelved, the two kinds of connection and the four kinds of operation, plus
- * the size limits every side enforces. Nothing here grades a design — the
- * vocabulary is what the author draws with, and the quality loop's lenses
- * judge whatever they drew. The shapes themselves are the zod schema in
- * `canvas.schema.ts`.
+ * the size limits every side enforces. The vocabulary spans the whole of a
+ * software design, from the people and modules of an application to the
+ * infrastructure under it; nothing here grades a design — the vocabulary is
+ * what the author draws with, and the quality loop's lenses judge whatever
+ * they drew. The shapes themselves are the zod schema in `canvas.schema.ts`.
  */
 import { bound } from './bounds';
 
@@ -16,6 +17,9 @@ import { bound } from './bounds';
  * so adding a kind here refuses to compile until every consumer has caught up.
  */
 export const NODE_KINDS = [
+  // ── Application
+  'actor',
+  'module',
   // ── Clients & Edge
   'client',
   'cdn',
@@ -82,6 +86,7 @@ export type NodeKind = (typeof NODE_KINDS)[number];
  * must still render "category with no kinds" as nothing.
  */
 export const NODE_KIND_CATEGORIES = [
+  { id: 'application', label: 'Application' },
   { id: 'clients-edge', label: 'Clients & Edge' },
   { id: 'traffic', label: 'Traffic & Routing' },
   { id: 'compute', label: 'Compute' },
@@ -103,6 +108,8 @@ export type NodeKindCategoryId = (typeof NODE_KIND_CATEGORIES)[number]['id'];
  * than surfacing as an empty section.
  */
 export const NODE_KIND_CATEGORY = {
+  actor: 'application',
+  module: 'application',
   client: 'clients-edge',
   cdn: 'clients-edge',
   dns: 'clients-edge',
@@ -158,6 +165,8 @@ export function kindsInCategory(id: NodeKindCategoryId): NodeKind[] {
  * name and no reader has to invent one.
  */
 export const DEFAULT_NODE_LABELS = {
+  actor: 'Actor',
+  module: 'Module',
   client: 'Client',
   cdn: 'CDN',
   dns: 'DNS',
@@ -259,3 +268,16 @@ export const NARRATION_CRITERION_NARRATIONS_BOUND = bound(24, 'list');
 export const NARRATIVE_DECISIONS_BOUND = bound(12, 'list');
 export const DECISION_TEXT_BOUND = bound(360);
 export const DECISION_NODES_BOUND = bound(6, 'list');
+/** The assumptions the design depends on, each one sentence, stated rather than smuggled into a claim. */
+export const NARRATIVE_ASSUMPTIONS_BOUND = bound(12, 'list');
+export const ASSUMPTION_BOUND = bound(240);
+/** The data model: the entities the design keeps and how they relate. */
+export const MODEL_ENTITIES_BOUND = bound(30, 'list');
+export const MODEL_RELATIONS_BOUND = bound(40, 'list');
+export const ENTITY_NAME_BOUND = bound(60);
+export const ENTITY_NOTE_BOUND = bound(200);
+export const ENTITY_FIELDS_BOUND = bound(16, 'list');
+export const ENTITY_INVARIANTS_BOUND = bound(8, 'list');
+export const ENTITY_STATES_BOUND = bound(10, 'list');
+/** The entities a binding names as holding a requirement, beside the nodes. */
+export const BINDING_ENTITIES_BOUND = bound(8, 'list');

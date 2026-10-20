@@ -1,6 +1,7 @@
 import {
   validateBriefReferences,
   validateGraphReferences,
+  validateModelReferences,
   validateNarration,
   type DesignSubmission,
   type SuccessCriterion,
@@ -18,8 +19,14 @@ export const submissionProblems = (
   criteria: readonly SuccessCriterion[],
 ): string[] => [
   ...validateGraphReferences(submission.graph),
+  ...(submission.model ? validateModelReferences(submission.graph, submission.model) : []),
   ...(submission.brief
-    ? validateBriefReferences(submission.graph, submission.brief, criteria)
+    ? validateBriefReferences(
+        submission.graph,
+        submission.brief,
+        criteria,
+        submission.model ?? null,
+      )
     : []),
   ...(submission.narrative
     ? validateNarration(submission.graph, submission.narrative, criteria)

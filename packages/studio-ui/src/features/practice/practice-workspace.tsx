@@ -148,13 +148,14 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
     [fail],
   );
 
-  /** The draft as the API takes it: graph plus brief and narrative, null when nothing is claimed. */
+  /** The draft as the API takes it: graph plus brief, narrative and model, null when nothing is claimed. */
   const readDraft = useCallback(() => {
     const state = storeApi.getState();
     return {
       graph: state.serialize(),
       brief: state.serializeBrief(criteria),
       narrative: state.serializeNarrative(criteria),
+      model: state.serializeModel(),
     };
   }, [storeApi, criteria]);
 

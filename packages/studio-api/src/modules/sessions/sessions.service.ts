@@ -211,6 +211,7 @@ export class SessionsService {
         graph: revision.graph,
         brief: revision.brief,
         narrative: revision.narrative,
+        model: revision.model,
       };
       this.assertSubmission(submission, prompt.criteria);
       const started = await this.startGradingRun(prompt, { output: submission }, 1);

@@ -36,9 +36,11 @@ export function DesignBriefEditor({ criteria, deriving = false }: DesignBriefEdi
   const nodes = useCanvasStore((state) => state.nodes);
   const edges = useCanvasStore((state) => state.edges);
   const bindings = useCanvasStore((state) => state.bindings);
+  const entities = useCanvasStore((state) => state.entities);
   const setBindingClaim = useCanvasStore((state) => state.setBindingClaim);
   const setBindingTradeoff = useCanvasStore((state) => state.setBindingTradeoff);
   const toggleBindingNode = useCanvasStore((state) => state.toggleBindingNode);
+  const toggleBindingEntity = useCanvasStore((state) => state.toggleBindingEntity);
   const setBindingPath = useCanvasStore((state) => state.setBindingPath);
   const clearBinding = useCanvasStore((state) => state.clearBinding);
 
@@ -77,11 +79,13 @@ export function DesignBriefEditor({ criteria, deriving = false }: DesignBriefEdi
                 key={criterion.id}
                 criterion={criterion}
                 graph={graph}
+                entities={entities}
                 binding={bindings.find((binding) => binding.criterionId === criterion.id) ?? null}
                 disabled={readOnly}
                 onClaim={(claim) => setBindingClaim(criterion.id, claim)}
                 onTradeoff={(tradeoff) => setBindingTradeoff(criterion.id, tradeoff)}
                 onToggleNode={(nodeId) => toggleBindingNode(criterion.id, nodeId)}
+                onToggleEntity={(entityId) => toggleBindingEntity(criterion.id, entityId)}
                 onPath={(path) => setBindingPath(criterion.id, path)}
                 onClear={() => clearBinding(criterion.id)}
               />

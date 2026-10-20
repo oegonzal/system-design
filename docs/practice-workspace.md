@@ -40,7 +40,14 @@ and **see results / iterate**.
   once it has a claim and at least one component; nothing else is checked
   here. Whether the claim holds, and whether the choice is defended, is the
   grader's call.
-- **Narrative** — the _prose_ walkthrough: an **overview**, a **rationale per
+- **Model** — the _data_ half: the **entities** the design keeps, each with
+  the node that **owns** it, its **key**, its **fields**, the **invariants**
+  every instance must hold and the **states** it moves through, and the
+  **relations** between them. A binding may name the entities that hold a
+  criterion beside the nodes. The model critic reads it against your diagram;
+  a store that owns nothing and an entity nothing owns are both findings.
+- **Narrative** — the _prose_ walkthrough: an **overview**, the
+  **assumptions** the design depends on (one sentence each), a **rationale per
   component** with an **instead of** (what could have stood there, and why it
   does not), the **decisions the design rests on** — each a choice, the
   alternative, the cost, and what would change your mind, tied to the
@@ -224,7 +231,8 @@ measured against:
 | Input                | What's in it                                                                             | Read by                                                                |
 | -------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | **Diagram** (canvas) | nodes (kind, config, responsibilities, operations) + edges (sync/async, what they carry) | every lens — requirements, model, structure, fitness                   |
-| **Brief**            | a claim, components and a path per criterion                                             | the explanation critic; every evaluator, as the evidence for a pass    |
+| **Model**            | entities (owner, key, fields, invariants, states) and their relations                    | the model critic; the design evaluator                                 |
+| **Brief**            | a claim, components, entities and a path per criterion                                   | the explanation critic; every evaluator, as the evidence for a pass    |
 | **Narrative**        | overview + rationales + narrations                                                       | the explanation critic; the reasoning evaluator                        |
 | **Prompt**           | its markdown and its criteria                                                            | the goal every lens reads, and the rubric the evaluators grade against |
 

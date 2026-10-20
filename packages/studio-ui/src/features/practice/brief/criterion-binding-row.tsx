@@ -2,10 +2,12 @@
 
 import {
   BINDING_CLAIM_BOUND,
+  BINDING_ENTITIES_BOUND,
   BINDING_NODES_BOUND,
   BINDING_TRADEOFF_BOUND,
   type Binding,
   type CanvasGraph,
+  type ModelEntity,
   type SuccessCriterion,
 } from '@sysdesign/contracts';
 import {
@@ -34,12 +36,15 @@ const STATE_CHIP: Record<BindingState, { tone: 'neutral' | 'medium' | 'success';
 export interface CriterionBindingRowProps {
   criterion: SuccessCriterion;
   graph: CanvasGraph;
+  /** The model's entities, offered beside the nodes as holders of a requirement. */
+  entities: readonly ModelEntity[];
   binding: Binding | null;
   /** Shown, never edited — every control is off. */
   disabled?: boolean;
   onClaim: (claim: string) => void;
   onTradeoff: (tradeoff: string) => void;
   onToggleNode: (nodeId: string) => void;
+  onToggleEntity: (entityId: string) => void;
   onPath: (path: string[]) => void;
   onClear: () => void;
 }
@@ -55,11 +60,13 @@ export interface CriterionBindingRowProps {
 export function CriterionBindingRow({
   criterion,
   graph,
+  entities,
   binding,
   disabled = false,
   onClaim,
   onTradeoff,
   onToggleNode,
+  onToggleEntity,
   onPath,
   onClear,
 }: CriterionBindingRowProps) {
@@ -68,6 +75,8 @@ export function CriterionBindingRow({
   const state = bindingState(binding);
   const chip = STATE_CHIP[state];
   const atCap = (binding?.nodeIds.length ?? 0) >= BINDING_NODES_BOUND.target;
+  const heldEntities = binding?.entityIds ?? [];
+  const entitiesAtCap = heldEntities.length >= BINDING_ENTITIES_BOUND.target;
   const showTracer = tracing || path.length > 0;
 
   return (
@@ -135,6 +144,27 @@ export function CriterionBindingRow({
             Add components to the canvas, then say which of them hold this.
           </Text>
         )}
+
+        {entities.length > 0 ? (
+          <Stack gap={2} role="group" aria-label={`Entities holding ${criterion.id}`}>
+            <Text as="span" size="sm" tone="secondary">
+              Entities it concerns
+            </Text>
+            {entities.map((entity) => {
+              const checked = heldEntities.includes(entity.id);
+              return (
+                <CheckboxField
+                  key={entity.id}
+                  label={entity.name.trim().length > 0 ? entity.name : entity.id}
+                  data-testid={`binding-entity-${criterion.id}-${entity.id}`}
+                  checked={checked}
+                  disabled={disabled || (!checked && entitiesAtCap)}
+                  onChange={() => onToggleEntity(entity.id)}
+                />
+              );
+            })}
+          </Stack>
+        ) : null}
 
         {showTracer ? (
           <FlowTracer

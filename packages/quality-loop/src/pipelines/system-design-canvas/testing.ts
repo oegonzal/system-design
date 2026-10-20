@@ -7,7 +7,12 @@
  * queue and an idempotent indexer (`testing.graph.ts` holds the diagram).
  * `sampleCriteria` is the rubric it answers.
  */
-import type { DesignBrief, DesignNarrative, SuccessCriterion } from '@sysdesign/contracts';
+import type {
+  DesignBrief,
+  DesignModel,
+  DesignNarrative,
+  SuccessCriterion,
+} from '@sysdesign/contracts';
 
 import type { CanvasSubmission } from './output';
 import { sampleGraph } from './testing.graph';
@@ -71,6 +76,7 @@ export const sampleBrief = (): DesignBrief => ({
       nodeIds: ['gateway-1', 'service-1', 'database-1'],
       path: ['edge-1', 'edge-2', 'edge-3'],
       claim: "the history service reads the customer's own shard; no fan-out",
+      entityIds: ['order'],
       tradeoff:
         'an owned read model rather than fanning out to both sources per request: a bounded staleness in exchange for a POS outage never reaching a shopper',
     },
@@ -157,12 +163,42 @@ export const sampleNarrative = (): DesignNarrative => ({
       nodeIds: ['database-1', 'queue-1'],
     },
   ],
+  assumptions: ['A shopper reads only their own history; no cross-customer view is needed.'],
+});
+
+export const sampleModel = (): DesignModel => ({
+  version: 1,
+  entities: [
+    {
+      id: 'order',
+      name: 'Order',
+      ownerNodeId: 'database-1',
+      key: 'order id from the source, namespaced by channel',
+      fields: [
+        { name: 'customerId' },
+        { name: 'placedAt' },
+        { name: 'channel', note: 'online or in-store' },
+      ],
+      invariants: ['An order is stored once, whichever source it came from.'],
+      states: ['placed', 'fulfilled', 'refunded'],
+    },
+    {
+      id: 'line-item',
+      name: 'Line item',
+      ownerNodeId: 'database-1',
+      fields: [{ name: 'sku' }, { name: 'quantity' }],
+      invariants: [],
+      states: [],
+    },
+  ],
+  relations: [{ from: 'order', to: 'line-item', kind: 'contains' }],
 });
 
 export const sampleSubmission = (overrides: Partial<CanvasSubmission> = {}): CanvasSubmission => ({
   graph: sampleGraph(),
   brief: sampleBrief(),
   narrative: sampleNarrative(),
+  model: sampleModel(),
   ...overrides,
 });
 

@@ -59,6 +59,18 @@ describe('DesignBriefEditor', () => {
     expect(screen.getByTestId('binding-state-c3').getAttribute('data-state')).toBe('incomplete');
   });
 
+  it('[UX-24] offers the model’s entities beside the nodes and binds one to a criterion', async () => {
+    const store = renderEditor((seeded) => {
+      seeded.getState().addEntity();
+      seeded.getState().updateEntity('ent-1', { name: 'Order' });
+    });
+    await userEvent.click(screen.getByTestId('binding-entity-c3-ent-1'));
+    expect(store.getState().bindings).toEqual([
+      { criterionId: 'c3', nodeIds: [], claim: '', entityIds: ['ent-1'] },
+    ]);
+    expect(screen.getByTestId('binding-state-c3').getAttribute('data-state')).toBe('incomplete');
+  });
+
   it('[UX-6] binds a criterion with a claim and the components that hold it', async () => {
     const store = renderEditor();
 

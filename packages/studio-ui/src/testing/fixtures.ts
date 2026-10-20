@@ -180,6 +180,7 @@ export function makeRevision(overrides: Partial<DesignRevisionDto> = {}): Design
     graph: makeGraph(),
     brief: makeBrief(),
     narrative: makeNarrative(),
+    model: null,
     evaluation: {
       runId: 'run-1',
       iteration: 1,

@@ -1,4 +1,5 @@
 import type { CanvasGraph, DesignBrief } from './canvas.schema';
+import type { DesignModel } from './model.schema';
 
 /** The rubric a brief must line up with — the prompt's criteria, by id. */
 export interface CriterionRef {
@@ -21,10 +22,12 @@ export function validateBriefReferences(
   graph: CanvasGraph,
   brief: DesignBrief,
   criteria: readonly CriterionRef[],
+  model: DesignModel | null = null,
 ): string[] {
   const problems: string[] = [];
 
   const nodeIds = new Set(graph.nodes.map((node) => node.id));
+  const entityIds = new Set((model?.entities ?? []).map((entity) => entity.id));
   const edgeById = new Map(graph.edges.map((edge) => [edge.id, edge]));
   const criterionIds = new Set(criteria.map((criterion) => criterion.id));
 
@@ -48,6 +51,12 @@ export function validateBriefReferences(
         problems.push(`binding of ${binding.criterionId} lists node ${nodeId} twice`);
       }
       seenNodes.add(nodeId);
+    }
+
+    for (const entityId of binding.entityIds ?? []) {
+      if (!entityIds.has(entityId)) {
+        problems.push(`binding of ${binding.criterionId} references unknown entity: ${entityId}`);
+      }
     }
 
     // A walk, not a bag of edges: each hop must start where the last one ended.
