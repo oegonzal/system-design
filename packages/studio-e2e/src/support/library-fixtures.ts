@@ -15,6 +15,7 @@ import type { PromptLibraryDocumentDto } from '@sysdesign/contracts';
 export const ORDER_HISTORY_DOCUMENT: PromptLibraryDocumentDto = {
   id: 'order-history',
   title: 'Serve an order history',
+  folder: null,
   markdown: [
     '# Serve an order history',
     '',
@@ -49,6 +50,7 @@ export const ORDER_HISTORY_DOCUMENT: PromptLibraryDocumentDto = {
 export const NOTIFICATION_FANOUT_DOCUMENT: PromptLibraryDocumentDto = {
   id: 'messaging/notification-fanout',
   title: 'Fan out notifications to followers',
+  folder: 'messaging',
   markdown: [
     '# Fan out notifications to followers',
     '',

@@ -1,18 +1,22 @@
-import type { SuccessCriterion } from '@sysdesign/contracts';
+import { DRAFT_SECTION_KEYS, DRAFT_SECTIONS, type SuccessCriterion } from '@sysdesign/contracts';
 
-const KIND_BY_HEADING: readonly [RegExp, string][] = [
-  [/non-functional|quality/i, 'non_functional'],
-  [/scale/i, 'scale'],
-  [/constraint/i, 'constraint'],
-  [/functional/i, 'functional'],
-];
+/** A `##` heading → the kind its rows become, from the contract's own section table; an unknown heading keeps the kind in force. */
+const KIND_BY_HEADING = new Map(
+  DRAFT_SECTION_KEYS.map((key) => [
+    DRAFT_SECTIONS[key].heading.replace(/^#+\s*/, '').toLowerCase(),
+    DRAFT_SECTIONS[key].kind,
+  ]),
+);
 
 /**
  * A rubric from a markdown goal, by its own headings: one criterion per
- * bullet, numbered line or table row, kinded by the section it sits under.
- * Deterministic, so a spec can predict `c1…cN`; a goal with no lists at all
- * still yields one criterion of each kind the canvas pipeline declares. A
- * test fixture, never a runtime rule: the real loop derives through a model.
+ * bullet, numbered line or table row, kinded by the section it sits under
+ * through the same declared table the generator renders with. The standing
+ * criteria are not added here: the loop's deriver never adds them either, and
+ * the studio closes every rubric with them itself. Deterministic, so a spec
+ * can predict `c1…cN`; a goal with no lists at all still yields one criterion
+ * of three canvas kinds. A test fixture, never a runtime rule: the real loop
+ * derives through a model.
  */
 export function criteriaFromMarkdown(goal: string): SuccessCriterion[] {
   const statements: { kind: string; statement: string }[] = [];
@@ -21,7 +25,7 @@ export function criteriaFromMarkdown(goal: string): SuccessCriterion[] {
     const line = raw.trim();
     const heading = /^#{2,}\s+(.+)$/.exec(line);
     if (heading) {
-      kind = KIND_BY_HEADING.find(([pattern]) => pattern.test(heading[1]))?.[1] ?? kind;
+      kind = KIND_BY_HEADING.get(heading[1].trim().toLowerCase()) ?? kind;
       continue;
     }
     const item = /^(?:\d+\.|[-*])\s+(.+)$/.exec(line);
@@ -34,7 +38,7 @@ export function criteriaFromMarkdown(goal: string): SuccessCriterion[] {
       const cells = row[1].split('|').map((cell) => cell.trim());
       if (cells.every((cell) => /^-+$/.test(cell))) continue;
       if (/^(kind|metric)$/i.test(cells[0] ?? '')) continue;
-      statements.push({ kind, statement: cells.join(' — ') });
+      statements.push({ kind, statement: cells.filter((cell) => cell.length > 0).join(' — ') });
     }
   }
   if (statements.length === 0) {

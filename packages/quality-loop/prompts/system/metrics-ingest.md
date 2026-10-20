@@ -35,8 +35,6 @@ An infrastructure team runs an agent on every host and container in its estate. 
 | Dashboard queries/s | 400        |
 | Raw retention       | 15 days    |
 | Rolled-up retention | 13 months  |
-| p95 query latency   | 800 ms     |
-| Availability        | 99.9       |
 
 ## Constraints
 

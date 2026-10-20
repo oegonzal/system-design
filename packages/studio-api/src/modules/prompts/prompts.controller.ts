@@ -60,7 +60,7 @@ export class PromptsController {
   async generate(
     @Body(new ZodValidationPipe(generatePromptSchema)) body: GeneratePromptRequest,
   ): Promise<StartPromptGenerationResponse> {
-    return ok(await this.prompts.startGeneration(body.experienceId));
+    return ok(await this.prompts.startGeneration(body));
   }
 
   @Get('generate/:runId')

@@ -29,11 +29,11 @@ describe('FilePromptLibrary', () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
-  it('[QL-11] lists every markdown file below the root, titled by its first H1 or its id', async () => {
+  it('[QL-11] [GEN-5] lists every markdown file below the root, titled by its first H1 or its id, with the folder it sits in', async () => {
     expect(await library.list()).toEqual([
-      { id: 'agentic/nested', title: 'Nested one' },
-      { id: 'apple', title: 'apple' },
-      { id: 'zebra', title: 'Stripe the zebra' },
+      { id: 'agentic/nested', title: 'Nested one', folder: 'agentic' },
+      { id: 'apple', title: 'apple', folder: null },
+      { id: 'zebra', title: 'Stripe the zebra', folder: null },
     ]);
   });
 
@@ -41,6 +41,7 @@ describe('FilePromptLibrary', () => {
     expect(await library.get('agentic/nested')).toEqual({
       id: 'agentic/nested',
       title: 'Nested one',
+      folder: 'agentic',
       markdown: '# Nested one\n\nBody.\n',
     });
     // The stem alone is not the id: the path is, so it cannot collide.
@@ -51,6 +52,7 @@ describe('FilePromptLibrary', () => {
     expect(await library.get('zebra')).toEqual({
       id: 'zebra',
       title: 'Stripe the zebra',
+      folder: null,
       markdown: '\n# Stripe the zebra\n\nBody.\n',
     });
     expect(await library.get('nope')).toBeNull();

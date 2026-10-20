@@ -32,6 +32,4 @@ A retail brand sells online through a hosted storefront platform and in stores t
 | Concurrent users | 2,000   |
 | Requests/sec     | 150     |
 | Read:write       | 98:2    |
-| p99 latency      | 300 ms  |
-| Availability     | 99.9    |
 | Data retention   | forever |

@@ -1,6 +1,6 @@
 'use client';
 
-import type { PromptDto, SuccessCriterion } from '@sysdesign/contracts';
+import { PRACTICE_FORMATS, type PromptDto, type SuccessCriterion } from '@sysdesign/contracts';
 import {
   Badge,
   Button,
@@ -63,6 +63,9 @@ export function PromptPane({
         <Stack direction="row" gap={2} wrap>
           <Badge tone="neutral" data-testid="prompt-source">
             {humanizeToken(prompt.source)}
+          </Badge>
+          <Badge tone="accent" data-testid="prompt-format">
+            {PRACTICE_FORMATS[prompt.format].label}
           </Badge>
           {prompt.status === 'archived' ? (
             <Badge tone="neutral" data-testid="prompt-archived">

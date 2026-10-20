@@ -245,7 +245,7 @@ export class FakeLoop {
 
   listPrompts(): PromptLibraryEntryDto[] {
     if (this.unreachable) throw new LoopUnreachable();
-    return this.library.map(({ id, title }) => ({ id, title }));
+    return this.library.map(({ id, title, folder }) => ({ id, title, folder }));
   }
 
   getPrompt(id: string): PromptLibraryDocumentDto | null {

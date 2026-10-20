@@ -22,7 +22,7 @@ Everything under `src/core/` is pure: no Nest, no filesystem, no clock (`now` is
 
 ```bash
 # one run from the command line (builds first; the dump path is printed)
-pnpm quality-loop:run --pipeline system-design --goal packages/quality-loop/prompts/order-history.md
+pnpm quality-loop:run --pipeline system-design --goal packages/quality-loop/prompts/system/order-history.md
 # judge a supplied artifact instead of producing one
 pnpm quality-loop:run --pipeline system-design --goal prompt.md --output answer.json --iterations 1
 
@@ -30,7 +30,7 @@ pnpm quality-loop:run --pipeline system-design --goal prompt.md --output answer.
 pnpm quality-loop:serve
 curl -s localhost:3003/pipelines
 curl -s localhost:3003/prompts                               # the library: one md file per prompt
-curl -s localhost:3003/prompts/order-history                 # { id, title, markdown }
+curl -s localhost:3003/prompts/system/order-history                 # { id, title, markdown }
 curl -s -X POST localhost:3003/runs -H 'content-type: application/json' \
   -d '{"pipeline":"system-design","goal":"# Prompt …"}'     # 202 { runId }
 curl -s localhost:3003/runs/<runId>                          # poll until status is complete

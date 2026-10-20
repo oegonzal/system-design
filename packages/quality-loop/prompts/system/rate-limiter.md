@@ -34,8 +34,6 @@ A public API sits behind a fleet of gateway processes in three regions. Every cu
 | Hottest key share | 8% of all |
 | Gateway processes | 600       |
 | Regions           | 3         |
-| p99 latency       | 1 ms      |
-| Availability      | 99.99     |
 
 ## Constraints
 

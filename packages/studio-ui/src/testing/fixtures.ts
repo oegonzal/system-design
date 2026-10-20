@@ -76,6 +76,7 @@ export function makePrompt(overrides: Partial<PromptDto> = {}): PromptDto {
     markdown: PROMPT_MARKDOWN,
     criteria: makeCriteria(),
     source: 'authored',
+    format: 'system',
     status: 'active',
     rubricLocked: false,
     createdAt: AT,
@@ -104,6 +105,7 @@ export function makeLibraryDocument(
   return {
     id: 'order-history',
     title: 'Order history integration',
+    folder: null,
     markdown: PROMPT_MARKDOWN,
     ...overrides,
   };

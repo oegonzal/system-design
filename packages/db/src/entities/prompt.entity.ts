@@ -19,6 +19,14 @@ const STATUSES = ['active', 'archived'] as const satisfies ContractStatuses;
 
 type ContractSources = (typeof Contracts)['PROMPT_SOURCES'];
 const SOURCES = ['authored', 'generated', 'library'] as const satisfies ContractSources;
+type ContractFormats = (typeof Contracts)['PRACTICE_FORMAT_IDS'];
+const FORMATS = [
+  'system',
+  'model',
+  'boundaries',
+  'workflow',
+  'evolution',
+] as const satisfies ContractFormats;
 
 /**
  * A design prompt: one markdown document plus the criteria the quality loop
@@ -35,6 +43,10 @@ const SOURCES = ['authored', 'generated', 'library'] as const satisfies Contract
 @Check({
   name: 'prompt_source_check',
   expression: `source in (${SOURCES.map((s) => `'${s}'`).join(', ')})`,
+})
+@Check({
+  name: 'prompt_format_check',
+  expression: `format in (${FORMATS.map((f) => `'${f}'`).join(', ')})`,
 })
 export class Prompt {
   @PrimaryKey({ type: 'uuid' })
@@ -61,6 +73,10 @@ export class Prompt {
 
   @Property({ type: 'text' })
   source!: Contracts.PromptSource;
+
+  /** The shape of practice the prompt asks for; fixed with the text once a session exists. */
+  @Property({ type: 'text' })
+  format: Opt<Contracts.PracticeFormatId> = 'system';
 
   @Index()
   @Property({ type: 'text' })

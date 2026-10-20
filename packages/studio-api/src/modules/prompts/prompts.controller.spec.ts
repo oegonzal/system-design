@@ -79,7 +79,10 @@ describe('prompts', () => {
     it('[GEN-3] lists the loop’s library and imports a document as a prompt with its own rubric', async () => {
       const list = await call<ListPromptLibraryResponse>(`${h.url}/prompts/library`);
       expect(list.status).toBe(200);
-      expect(list.body.data).toEqual([{ id: 'order-history', title: 'Serve an order history' }]);
+      expect(list.body.data).toEqual([
+        { id: 'order-history', title: 'Serve an order history', folder: null },
+        { id: 'model/tenant-permissions', title: 'Decide who may do what', folder: 'model' },
+      ]);
 
       const document = await call<GetPromptLibraryDocumentResponse>(
         `${h.url}/prompts/library/order-history`,
@@ -94,6 +97,7 @@ describe('prompts', () => {
       expect(body.data).toMatchObject({
         source: 'library',
         experienceId: null,
+        format: 'system',
         title: 'Serve an order history',
         markdown: document.body.data.markdown,
       });
@@ -106,6 +110,29 @@ describe('prompts', () => {
         'tradeoff',
         'tradeoff',
       ]);
+    });
+
+    it('[GEN-4] [GEN-5] a document’s folder names its format on import unless one is given, and an authored prompt keeps the format it was written in', async () => {
+      const foldered = await call<GetPromptResponse>(`${h.url}/prompts/import`, {
+        method: 'POST',
+        body: JSON.stringify({ libraryId: 'model/tenant-permissions' }),
+      });
+      expect(foldered.status).toBe(201);
+      expect(foldered.body.data.format).toBe('model');
+      expect(foldered.body.data.criteria.map((c) => c.kind)).toEqual([
+        'functional',
+        'domain_model',
+        'tradeoff',
+        'tradeoff',
+        'tradeoff',
+      ]);
+      const overridden = await call<GetPromptResponse>(`${h.url}/prompts/import`, {
+        method: 'POST',
+        body: JSON.stringify({ libraryId: 'model/tenant-permissions', format: 'workflow' }),
+      });
+      expect(overridden.body.data.format).toBe('workflow');
+      const { body } = await author({ ...authoredPrompt(), format: 'evolution' });
+      expect(body.data.format).toBe('evolution');
     });
 
     it('a document the library does not hold is 404 to read and 422 to import', async () => {

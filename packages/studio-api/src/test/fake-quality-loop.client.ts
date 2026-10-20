@@ -39,6 +39,7 @@ export class FakeQualityLoopClient extends QualityLoopClient {
       {
         id: 'order-history',
         title: 'Serve an order history',
+        folder: null,
         markdown: [
           '# Serve an order history',
           '',
@@ -56,6 +57,23 @@ export class FakeQualityLoopClient extends QualityLoopClient {
           '## Constraints',
           '',
           '- The point-of-sale system only answers polling.',
+          '',
+        ].join('\n'),
+      },
+      {
+        id: 'model/tenant-permissions',
+        title: 'Decide who may do what',
+        folder: 'model',
+        markdown: [
+          '# Decide who may do what',
+          '',
+          '## Functional requirements',
+          '',
+          '1. Answer whether a principal may act on a resource.',
+          '',
+          '## Domain and data',
+          '',
+          '- A grant records its grantor, scope and expiry.',
           '',
         ].join('\n'),
       },

@@ -2,10 +2,12 @@ import { z } from 'zod';
 
 import { bound, bounded } from './bounds';
 import type { ApiListResponse, ApiResponse } from './envelope';
+import type { PracticeFormatId } from './practice-formats';
 import type { IsoDateString, Uuid } from './primitives';
 import type { SuccessCriterion } from './quality-loop/evidence';
 import type { QualityRunStartedDto, QualityRunStatus } from './quality-loop/runs';
 import type { Decision } from './quality-loop/vocab';
+import type { CanvasCriterionKind } from './studio-pipelines';
 
 /**
  * A prompt is one markdown document plus the criteria the quality loop
@@ -36,7 +38,7 @@ export const PROMPT_COPY = {
   archived: 'This prompt is archived — unarchive it to practise it again.',
   criteriaLocked: 'This prompt already has practice sessions, so its criteria are fixed.',
   textLocked:
-    'This prompt already has practice sessions, so its title and text are fixed — write a new prompt instead.',
+    'This prompt already has practice sessions, so its title, text and format are fixed — write a new prompt instead.',
   generatedCriteria:
     'This prompt was generated, so its criteria are its draft’s — rewrite it to derive new ones.',
 } as const;
@@ -51,6 +53,8 @@ export type PromptDocument = z.infer<typeof promptDocumentSchema>;
 export interface PromptDto extends PromptDocument {
   id: Uuid;
   experienceId: Uuid | null;
+  /** The shape of practice the prompt asks for (`PRACTICE_FORMATS`); fixed with the text once a session exists. */
+  format: PracticeFormatId;
   /** Empty until derived; the studio derives on first read and keeps the result. */
   criteria: SuccessCriterion[];
   source: PromptSource;
@@ -65,23 +69,29 @@ export interface PromptDto extends PromptDocument {
   updatedAt: IsoDateString;
 }
 
-/** `POST /prompts` — write the prompt yourself. */
+/** `POST /prompts` — write the prompt yourself; the format defaults to the whole system. */
 export interface AuthorPromptRequest extends PromptDocument {
   experienceId?: Uuid;
+  format?: PracticeFormatId;
 }
 
-/** `POST /prompts/import` — copy one from the quality loop's library. */
+/** `POST /prompts/import` — copy one from the quality loop's library; its folder names its format unless one is given. */
 export interface ImportPromptRequest {
   libraryId: string;
+  format?: PracticeFormatId;
 }
 
 /**
  * `POST /prompts/generate` — draft one from an experience through the
  * quality loop's prompt pipeline. Omitted experience → the least-practised
- * one, so repeated practice covers every experience instead of re-drilling one.
+ * one, so repeated practice covers every experience instead of re-drilling
+ * one. The format and the emphasised competencies reach the writer as a
+ * section of its goal; omitted, the writer drafts a whole-system prompt.
  */
 export interface GeneratePromptRequest {
   experienceId?: Uuid;
+  format?: PracticeFormatId;
+  emphasis?: CanvasCriterionKind[];
 }
 
 /** `GET /prompts/generate/:runId` — the run's state; `prompt` once the draft was claimed. */

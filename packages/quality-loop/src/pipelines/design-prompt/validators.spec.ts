@@ -26,29 +26,29 @@ describe('the design-prompt shape validator', () => {
       title: ' ',
       scenario: '',
       functionalRequirements: [],
+      domainAndData: [],
+      interfaces: [],
       nonFunctionalRequirements: [],
       scale: [],
+      decisions: [],
     });
     expect(problems(empty).map((problem) => problem.message)).toEqual([
       'the prompt has no title',
       'the prompt has no scenario',
       'the prompt states no functional requirement',
       'the prompt states no quality target',
-      'the prompt states no scale target',
+      'the prompt states no data, no interface and no decision to make',
     ]);
+    // No scale table is not a gap: load figures belong only where load shaped the system.
+    expect(problems(sampleDraft({ scale: [] }))).toEqual([]);
   });
 
-  it('[QL-3] a target without a figure is located at its row', () => {
+  it('[QL-3] a scale row without a figure is located at its row; a quality target needs no figure', () => {
     // An empty target fails the schema outright; a blank one passes it and is this validator's to name.
     const draft = sampleDraft();
     draft.nonFunctionalRequirements[1] = { ...draft.nonFunctionalRequirements[1], target: ' ' };
     draft.scale[0] = { ...draft.scale[0], target: '  ' };
     expect(problems(draft)).toEqual([
-      {
-        severity: 'medium',
-        locationRefs: ['nfr.2'],
-        message: 'quality target 2 has no target figure',
-      },
       {
         severity: 'medium',
         locationRefs: ['scale.1'],
@@ -64,11 +64,11 @@ describe('the design-prompt shape validator', () => {
   it('[QL-47] a scenario past its ceiling hides no gap: the draft is read whole, as the seam read it', () => {
     const draft = sampleDraft({
       scenario: 'x'.repeat(DESIGN_PROMPT_SCENARIO_BOUND.ceiling + 200),
-      scale: [],
+      nonFunctionalRequirements: [],
     });
     expect(DESIGN_PROMPT.task.output.schema.safeParse(draft).success).toBe(false);
     expect(problems(draft).map((problem) => problem.message)).toEqual([
-      'the prompt states no scale target',
+      'the prompt states no quality target',
     ]);
   });
 });

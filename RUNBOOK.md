@@ -126,20 +126,28 @@ ids for the prompt's life:
 curl -X POST localhost:3000/api/prompts -H 'content-type: application/json' -d '{
   "title": "Order history for my account",
   "experienceId": "<experience uuid, optional>",
-  "markdown": "# Order history for my account\n\n## Scenario\n\nYou own the order-history service …\n\n## Functional requirements\n\n1. …\n\n## Non-functional requirements\n\n| Kind | Requirement | Target |\n| --- | --- | --- |\n| latency | reads | p99 ≤ 300 ms |\n\n## Scale targets\n\n| Metric | Target |\n| --- | --- |\n| peak reads | 2,000 requests/s |\n\n## Constraints\n\n- …"
+  "format": "system",
+  "markdown": "# Order history for my account\n\n## Scenario\n\nYou own the order-history service …\n\n## Functional requirements\n\n1. …\n\n## Domain and data\n\n- …\n\n## Interfaces\n\n- …\n\n## Non-functional requirements\n\n| Kind | Requirement | Target |\n| --- | --- | --- |\n| latency | reads | p99 ≤ 300 ms |\n| security | a shopper reads only their own orders | |\n\n## Scale targets\n\n| Metric | Target |\n| --- | --- |\n| peak reads | 2,000 requests/s |\n\n## Decisions to make\n\n- …\n\n## Constraints\n\n- …"
 }'
 ```
 
 The response carries `criteria` — `c1…cN`, each with a kind (`functional`,
 `domain_model`, `interface`, `boundary`, `workflow`, `non_functional`,
 `scale`, `evolution`, `tradeoff`, `constraint`) and the statement the loop
-read, closed by the two standing trade-off criteria every canvas rubric
-carries. Two other sources yield the same shape: `POST /api/prompts/import { libraryId }`
-copies one of the loop's library documents (`GET /api/prompts/library`), and
-`POST /api/prompts/generate { experienceId? }` starts a `design-prompt` run
-over an experience (202; poll `GET /api/prompts/generate/:runId` until the
-draft is claimed into a prompt — omitting the experience draws the least
-practised one, in fixture order). A generated prompt's criteria are its
+read, closed by the three standing trade-off criteria every canvas rubric
+carries. `format` is one of the practice formats contracts declares
+(`PRACTICE_FORMATS`: `system`, `model`, `boundaries`, `workflow`,
+`evolution`) and defaults to `system`; a format is fixed with the text once a
+session exists. Two other sources yield the same shape:
+`POST /api/prompts/import { libraryId, format? }` copies one of the loop's
+library documents (`GET /api/prompts/library`; the document's folder names
+its format unless one is given), and
+`POST /api/prompts/generate { experienceId?, format?, emphasis? }` starts a
+`design-prompt` run over an experience (202; poll
+`GET /api/prompts/generate/:runId` until the draft is claimed into a prompt —
+omitting the experience draws the least practised one, in fixture order; the
+format's guidance and the emphasised kinds reach the writer as sections of
+its goal). A generated prompt's criteria are its
 draft's own rows, one each, and are never re-derived (409). Re-derive a
 written or imported prompt's with `POST /api/prompts/:id/criteria` while no
 session has been graded against them; afterwards the ids are frozen (409).

@@ -3,7 +3,7 @@
 The generic critic → evaluator → controller loop as a NestJS service. Pipelines are data (vocabularies, md lens personas, a decision policy) plus one `OutputShape`; models return enums and ordinals; the deterministic policy owns every number and the final decision; every run writes a dump and a row.
 
 ```bash
-pnpm quality-loop:run --pipeline system-design --goal packages/quality-loop/prompts/order-history.md
+pnpm quality-loop:run --pipeline system-design --goal packages/quality-loop/prompts/system/order-history.md
 pnpm quality-loop:serve          # the HTTP surface on :3003 (QUALITY_LOOP_PORT)
 node packages/quality-loop/dist/main.js replay --pipeline system-design   # every recorded iteration, decided again by each controller
 pnpm exec nx test quality-loop

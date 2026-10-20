@@ -35,7 +35,6 @@ A product team writes specifications together in a browser editor. Several peopl
 | Editors per document | up to 40  |
 | Operations/sec       | 20,000    |
 | Read:write           | 60:40     |
-| p99 convergence      | 250 ms    |
 | Data retention       | forever   |
 
 ## Constraints

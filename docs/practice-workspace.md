@@ -14,6 +14,13 @@ and **see results / iterate**.
 
 ### Read the challenge
 
+Every prompt carries a **practice format** (`PRACTICE_FORMATS` in contracts):
+the whole system, or one competency practised on its own — domain model and
+API, boundaries and modules, workflows and failure handling, evolution and
+migration. The format shows beside the prompt's source, says what the graders
+lean on, and is what the prompt writer drafts toward when a prompt is
+generated. It is data on the prompt; nothing in the studio branches on it.
+
 - **Prompt** — the challenge, read-only: its markdown rendered (tables and
   lists as written; its headings demoted so the document's own title never
   competes with the page's), and its **criteria** as chips grouped by kind —

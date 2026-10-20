@@ -33,7 +33,7 @@ afterEach(() => {
 });
 
 describe('PromptComposer', () => {
-  it('[GEN-2] authors a prompt from a title and markdown and opens it', async () => {
+  it('[GEN-2] [GEN-4] authors a prompt from a title and markdown, in the default format, and opens it', async () => {
     const user = userEvent.setup();
     const { fetchMock } = stubApi([
       EXPERIENCES,
@@ -55,6 +55,7 @@ describe('PromptComposer', () => {
     expect(JSON.parse((post?.[1] as RequestInit).body as string)).toEqual({
       title: 'Design an order-history service',
       markdown: '# Design it',
+      format: 'system',
       experienceId: 'exp-1',
     });
   });

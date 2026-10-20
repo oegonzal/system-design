@@ -1,4 +1,5 @@
 import type { Opt, Rel } from '@mikro-orm/core';
+import type * as Contracts from '@sysdesign/contracts';
 import { Entity, ManyToOne, OneToOne, PrimaryKey, Property } from '@mikro-orm/decorators/legacy';
 
 import { ExperienceProfile } from './experience-profile.entity';
@@ -23,6 +24,10 @@ export class PromptGeneration {
   /** Set when claimed; unique, so a race between two polls creates one prompt. */
   @OneToOne(() => Prompt, { deleteRule: 'cascade', nullable: true, owner: true })
   prompt: Rel<Prompt> | null = null;
+
+  /** The format the draft was asked for, copied to the prompt when the draft is claimed. */
+  @Property({ type: 'text' })
+  format: Opt<Contracts.PracticeFormatId> = 'system';
 
   @Property({ type: 'timestamptz' })
   startedAt: Opt<Date> = new Date();

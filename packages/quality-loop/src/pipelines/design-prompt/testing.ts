@@ -33,6 +33,12 @@ export const sampleDraft = (overrides: Partial<DesignPromptDraft> = {}): DesignP
     'Ingest online orders as the storefront pushes them by webhook.',
     'Import in-store orders from the point-of-sale system.',
   ],
+  domainAndData: [
+    'An order is owned by the history store once, whichever source it came from, keyed by its source id and channel.',
+  ],
+  interfaces: [
+    'The storefront webhook is accepted idempotently: a redelivered order is stored once.',
+  ],
   nonFunctionalRequirements: [
     { kind: 'latency', requirement: 'Order-history reads', target: 'p99 ≤ 300 ms' },
     {
@@ -40,10 +46,14 @@ export const sampleDraft = (overrides: Partial<DesignPromptDraft> = {}): DesignP
       requirement: 'No accepted order is lost or duplicated',
       target: 'zero loss across an eight-hour redelivery',
     },
+    { kind: 'security', requirement: 'A shopper reads only their own orders' },
   ],
   scale: [
     { metric: 'Peak read rate', target: '2,000 requests/s' },
     { metric: 'Stores', target: '400' },
+  ],
+  decisions: [
+    'Own a read model fed by both sources, or query the storefront and the POS live on each request.',
   ],
   constraints: [
     'The point-of-sale system only answers polling; it is never called on a customer request.',

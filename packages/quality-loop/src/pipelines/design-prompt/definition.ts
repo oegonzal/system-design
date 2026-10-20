@@ -1,9 +1,11 @@
 /**
  * The studio's other pipeline: write a system-design prompt from an
  * engineer's experience. The goal is the experience as the studio renders it
- * — role, summary, stack, highlights, employer named — and the artifact is
- * the structured draft the studio renders to markdown once the loop accepts
- * it. The employer is in the goal on purpose: the fidelity critic exists to
+ * — role, summary, stack, highlights, employer named, and the practice format
+ * the prompt is for — and the artifact is the structured draft the studio
+ * renders to markdown once the loop accepts it: the data the system owned,
+ * the contracts it exposed, the decisions it made, the process it carried,
+ * with figures only where the experience had them. The employer is in the goal on purpose: the fidelity critic exists to
  * catch it leaking into the prompt, and `brand_leak` gates.
  *
  * One sample per lens and one hit to confirm: the defects here are checkable
@@ -29,7 +31,7 @@ export const DESIGN_PROMPT: PipelineDefinition<ReturnType<typeof designPromptOut
   {
     id: PROMPT_PIPELINE_ID,
 
-    version: '1.0.0',
+    version: '2.0.0',
 
     // A goal another program composes; never a route, a target, or a choice in the UI.
 
@@ -44,7 +46,7 @@ export const DESIGN_PROMPT: PipelineDefinition<ReturnType<typeof designPromptOut
           'A fact of the experience the prompt must build on: its domain, the shape of an integration, a figure, a failure the system survived.',
 
         gradeability:
-          'A property that lets a panel grade answers: a requirement a grader can check, a target with a number, a stated scale, a constraint a design must respect.',
+          'A property that lets a panel grade answers: a requirement a grader can check, a target that is a figure or a checkable property, a decision with named options, a constraint a design must respect.',
 
         scope:
           "A boundary the prompt must hold: no employer, product or vendor named, and one session's worth of design.",
@@ -58,7 +60,7 @@ export const DESIGN_PROMPT: PipelineDefinition<ReturnType<typeof designPromptOut
         vague_requirement: 'A requirement with no outcome a grader could observe.',
 
         unmeasurable_target:
-          'A quality target with no figure, unit or percentile, or a scale row that states nothing a design could be sized to.',
+          'A quality target that is neither a figure nor a checkable property, or a scale row that states nothing a design could be sized to.',
 
         contradiction: 'Two lines of the prompt that cannot both hold.',
 

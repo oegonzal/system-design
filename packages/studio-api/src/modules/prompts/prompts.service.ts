@@ -8,17 +8,22 @@ import { EntityManager } from '@mikro-orm/postgresql';
 import {
   CANVAS_PIPELINE_ID,
   criteriaFromDraft,
+  DEFAULT_PRACTICE_FORMAT,
   describeIssue,
   describeOverrun,
   designPromptDraftSchema,
   modelSchema,
   parseLenient,
+  practiceFormatForLibraryFolder,
   PROMPT_COPY,
   PROMPT_PIPELINE_ID,
   renderDesignPromptMarkdown,
+  withStandingCriteria,
   type AuthorPromptRequest,
   type DesignPromptDraft,
+  type GeneratePromptRequest,
   type ImportPromptRequest,
+  type PracticeFormatId,
   type PromptGenerationDto,
   type PromptLibraryDocumentDto,
   type PromptLibraryEntryDto,
@@ -26,7 +31,6 @@ import {
   type QualityRunStartedDto,
   type SuccessCriterion,
   type UpdatePromptRequest,
-  withStandingCriteria,
 } from '@sysdesign/contracts';
 import { DesignSession, ExperienceProfile, Prompt, PromptGeneration } from '@sysdesign/db';
 
@@ -85,6 +89,7 @@ export class PromptsService {
       markdown: request.markdown,
       criteria,
       source: 'authored',
+      format: request.format ?? DEFAULT_PRACTICE_FORMAT,
       experience,
     });
     this.em.persist(prompt);
@@ -103,6 +108,7 @@ export class PromptsService {
       markdown: document.markdown,
       criteria,
       source: 'library',
+      format: request.format ?? practiceFormatForLibraryFolder(document.folder),
       experience: null,
     });
     this.em.persist(prompt);
@@ -116,16 +122,20 @@ export class PromptsService {
    * row here remembers which experience it was drawn from and, once claimed,
    * which prompt it became.
    */
-  async startGeneration(experienceId: string | undefined): Promise<QualityRunStartedDto> {
-    const experience = experienceId
-      ? await this.experience(experienceId)
+  async startGeneration(request: GeneratePromptRequest): Promise<QualityRunStartedDto> {
+    const experience = request.experienceId
+      ? await this.experience(request.experienceId)
       : await this.leastPractised();
+    const format = request.format ?? DEFAULT_PRACTICE_FORMAT;
     const started = await this.loop.startRun({
       pipeline: PROMPT_PIPELINE_ID,
-      goal: renderExperienceGoal(experience),
+      goal: renderExperienceGoal(experience, {
+        format,
+        emphasis: [...new Set(request.emphasis ?? [])],
+      }),
       maxIterations: GENERATION_ITERATIONS,
     });
-    this.em.persist(this.em.create(PromptGeneration, { runId: started.runId, experience }));
+    this.em.persist(this.em.create(PromptGeneration, { runId: started.runId, experience, format }));
     await this.em.flush();
     return started;
   }
@@ -188,7 +198,7 @@ export class PromptsService {
         `prompt generation ${runId}: claimed with ${draft.overruns.length} field(s) past what was asked — ${draft.overruns.map(describeOverrun).join('; ')}`,
       );
     }
-    const claimed = await this.claim(runId, row.experience, draft.value);
+    const claimed = await this.claim(runId, row.experience, row.format, draft.value);
     return answer({
       status: 'complete',
       error: null,
@@ -348,6 +358,7 @@ export class PromptsService {
   private async claim(
     runId: string,
     experience: ExperienceProfile | null,
+    format: PracticeFormatId,
     draft: DesignPromptDraft,
   ): Promise<Prompt> {
     const markdown = renderDesignPromptMarkdown(draft);
@@ -360,6 +371,7 @@ export class PromptsService {
           markdown,
           criteria,
           source: 'generated',
+          format,
           experience,
         });
         em.persist(prompt);

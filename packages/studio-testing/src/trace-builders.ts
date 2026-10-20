@@ -446,11 +446,14 @@ function draftFromGoal(goal: string): DesignPromptDraft {
       'Serve the primary read path with data no older than the last committed write.',
       'Accept writes during a burst without dropping any.',
     ],
+    domainAndData: [],
+    interfaces: [],
     nonFunctionalRequirements: [
       { kind: 'latency', requirement: 'primary reads', target: 'p99 ≤ 300 ms' },
       { kind: 'availability', requirement: 'the write path', target: '99.9% monthly' },
     ],
     scale: [{ metric: 'peak request rate', target: '4,000 requests/s' }],
+    decisions: [],
     constraints: ['One relational database is the system of record.'],
   };
 }

@@ -72,6 +72,21 @@ export const STUDIO_CRITERIA: readonly Criterion[] = [
     statement:
       "A prompt can be imported from the grader's library and is stored with the rubric the grader derives from it.",
   },
+  {
+    id: 'GEN-4',
+    statement:
+      'A prompt carries a practice format from compose, import or generate — one of the formats contracts declares, the library document’s folder by default on import — fixed with its text once a session exists and shown beside its source; a generation request may name the format and the competencies to emphasise, and both reach the prompt writer and the criteria deriver as sections of the goal, never as a branch.',
+  },
+  {
+    id: 'GEN-5',
+    statement:
+      'The library reports each document’s folder as declared structure; the studio reads a practice format off it with one declared lookup, and the loop attaches no meaning to it.',
+  },
+  {
+    id: 'GEN-6',
+    statement:
+      'A generated prompt’s sections are one declared table: the renderer, the rubric mapper, the pipeline’s own render and locations and the test fake’s heading reader iterate it; the writer asks for the data the system owned, the contracts it exposed and the decisions it made, with a quality target’s figure optional and a scale table only where load shaped the system.',
+  },
   // Critic / eval pipeline
   {
     id: 'EVAL-1',

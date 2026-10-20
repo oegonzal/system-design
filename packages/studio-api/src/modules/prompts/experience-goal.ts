@@ -1,9 +1,21 @@
-import type { ExperienceProfileDto } from '@sysdesign/contracts';
+import {
+  CANVAS_CRITERION_KIND_LABELS,
+  PRACTICE_FORMATS,
+  type CanvasCriterionKind,
+  type ExperienceProfileDto,
+  type PracticeFormatId,
+} from '@sysdesign/contracts';
 
 export type ExperienceGoalSource = Pick<
   ExperienceProfileDto,
   'title' | 'companyLabel' | 'summary' | 'techStack' | 'highlights' | 'practiceHighlights'
 >;
+
+/** What the prompt is for: the format's own guidance and the competencies the author wants drawn out. */
+export interface PracticeAsk {
+  format: PracticeFormatId;
+  emphasis: readonly CanvasCriterionKind[];
+}
 
 /**
  * An experience as the `design-prompt` pipeline reads it: the goal its
@@ -14,10 +26,16 @@ export type ExperienceGoalSource = Pick<
  * the writer sizes a prompt from them as from any highlight, and the goal
  * reads exactly as it did when they were written as the experience's last
  * highlights. Whose the experience is never reaches the goal — a prompt is
- * drawn from a practice example as from the subject's own.
+ * drawn from a practice example as from the subject's own. The practice ask
+ * — the format's guidance and the emphasised competencies — closes the goal
+ * as sections of its own, read by the writer and the deriver as data; the
+ * studio always passes one, the whole system when none was chosen.
  */
-export function renderExperienceGoal(experience: ExperienceGoalSource): string {
-  return [
+export function renderExperienceGoal(
+  experience: ExperienceGoalSource,
+  practice: PracticeAsk | null = null,
+): string {
+  const lines = [
     `# ${experience.title}`,
     '',
     `Where: ${experience.companyLabel}`,
@@ -34,5 +52,17 @@ export function renderExperienceGoal(experience: ExperienceGoalSource): string {
     '',
     ...[...experience.highlights, ...experience.practiceHighlights].map((line) => `- ${line}`),
     '',
-  ].join('\n');
+  ];
+  if (practice !== null) {
+    const format = PRACTICE_FORMATS[practice.format];
+    lines.push('## Practice format', '', `${format.label}: ${format.guidance}`, '');
+    const emphasis = practice.emphasis.length > 0 ? practice.emphasis : format.emphasis;
+    lines.push(
+      '## Emphasis',
+      '',
+      ...emphasis.map((kind) => `- ${CANVAS_CRITERION_KIND_LABELS[kind]}`),
+      '',
+    );
+  }
+  return lines.join('\n');
 }

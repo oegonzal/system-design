@@ -62,10 +62,14 @@ describe('the design-prompt pipeline', () => {
       'functional.1',
       'functional.2',
       'functional.3',
+      'domain.1',
+      'interface.1',
       'nfr.1',
       'nfr.2',
+      'nfr.3',
       'scale.1',
       'scale.2',
+      'decision.1',
       'constraint.1',
     ]);
     expect(designPromptOutput.schema.safeParse(draft).success).toBe(true);
@@ -81,8 +85,12 @@ describe('the design-prompt pipeline', () => {
       expect(markdown).toContain(`${index + 1}. ${requirement}`);
     });
     for (const row of draft.nonFunctionalRequirements) {
-      expect(markdown).toContain(`| ${row.kind} | ${row.requirement} | ${row.target} |`);
+      expect(markdown).toContain(`| ${row.kind} | ${row.requirement} | ${row.target ?? ''} |`);
     }
+    // A target left out renders as an empty cell and is named to the lenses.
+    expect(designPromptOutput.render(draft)).toContain(
+      '[nfr.3] security — A shopper reads only their own orders — (none given)',
+    );
     for (const row of draft.scale) expect(markdown).toContain(`| ${row.metric} | ${row.target} |`);
     for (const constraint of draft.constraints) expect(markdown).toContain(`- ${constraint}`);
   });

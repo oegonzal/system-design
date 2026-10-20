@@ -32,8 +32,6 @@ A subscription app emits account events — a payment failed, an invoice is read
 | Concurrent users | 20,000     |
 | Events/sec       | 1,200 peak |
 | Read:write       | 80:20      |
-| p99 latency      | 5 s        |
-| Availability     | 99.95      |
 | Data retention   | 90 days    |
 
 ## Constraints

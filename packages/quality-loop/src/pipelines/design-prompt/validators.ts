@@ -1,9 +1,10 @@
 /**
  * The exact checks on a prompt draft: the parts a prompt cannot be graded
- * without. It warns rather than blocks — a draft with no scale table is still
- * a prompt the lenses can judge, and they are told what it lacks — and never
- * reads prose: a target is missing when the string is blank, not when it is
- * weak.
+ * without. It warns rather than blocks — a draft with no data, interface or
+ * decision rows is still a prompt the lenses can judge, and they are told what
+ * it lacks — and never reads prose: a row is missing when the list is empty,
+ * not when it is weak. A scale table is not asked for: load figures belong
+ * only where load shaped the system, and the lenses judge that, not a count.
  */
 import type { DesignPromptDraft, ValidationProblem } from '@sysdesign/contracts';
 
@@ -28,12 +29,13 @@ function shape(draft: DesignPromptDraft): ValidationProblem[] {
   if (draft.nonFunctionalRequirements.length === 0) {
     problems.push(gap('the prompt states no quality target'));
   }
-  if (draft.scale.length === 0) problems.push(gap('the prompt states no scale target'));
-  draft.nonFunctionalRequirements.forEach((row, index) => {
-    if (blank(row.target)) {
-      problems.push(gap(`quality target ${index + 1} has no target figure`, [`nfr.${index + 1}`]));
-    }
-  });
+  if (
+    draft.domainAndData.length === 0 &&
+    draft.interfaces.length === 0 &&
+    draft.decisions.length === 0
+  ) {
+    problems.push(gap('the prompt states no data, no interface and no decision to make'));
+  }
   draft.scale.forEach((row, index) => {
     if (blank(row.target)) {
       problems.push(gap(`scale row ${index + 1} has no target figure`, [`scale.${index + 1}`]));

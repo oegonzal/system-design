@@ -35,8 +35,6 @@ A creator platform accepts video uploads of anything from thirty seconds to four
 | Median duration       | 6 minutes |
 | Renditions per upload | 5         |
 | Stored output         | 4 PB      |
-| p90 turnaround        | 4 minutes |
-| Availability          | 99.9      |
 
 ## Constraints
 

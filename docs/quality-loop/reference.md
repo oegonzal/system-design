@@ -267,7 +267,8 @@ Its own controller, `REVISE_ONLY`, which
 no path can make decide `retry` — a retry would replace the author's canvas with the model's.
 
 **`design-prompt/`** — produces a practice prompt from an engineer's experience: title, scenario,
-functional requirements, an NFR table, a scale table, constraints. The smallest pipeline — two
+functional requirements, the data owned, the interfaces exposed, a quality-target table (figures
+optional), a scale table only where load shaped the system, the decisions to make, constraints. The smallest pipeline — two
 critics, one evaluator, one sample each, and one validator, which only warns. Its gated finding is
 `brand_leak`, the one defect no score can offset.
 
@@ -510,7 +511,7 @@ a markdown file beside its pipeline.
 
 ```bash
 # one run from the command line; builds first, prints the dump path
-pnpm quality-loop:run --pipeline system-design --goal packages/quality-loop/prompts/order-history.md
+pnpm quality-loop:run --pipeline system-design --goal packages/quality-loop/prompts/system/order-history.md
 
 # judge a supplied artifact instead of producing one
 pnpm quality-loop:run --pipeline system-design --goal prompt.md --output answer.json --iterations 1

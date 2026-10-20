@@ -38,8 +38,6 @@ An automated design-review service (a quality loop) grades system-design answers
 | Search queries/sec  | 50 peak                                    |
 | Ingest peak         | 100 runs/min during a backfill             |
 | Read:write          | 80:20                                      |
-| p95 latency         | 300 ms                                     |
-| Availability        | 99.9                                       |
 | Data retention      | source rows forever; vectors rebuildable   |
 
 ## Constraints

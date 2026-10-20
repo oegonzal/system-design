@@ -35,8 +35,6 @@ A ticketing platform sells numbered seats for concerts. When a popular show goes
 | Hold attempts/sec | 12,000    |
 | Hold window       | 8 minutes |
 | Read:write        | 85:15     |
-| p99 latency       | 500 ms    |
-| Availability      | 99.95     |
 
 ## Constraints
 

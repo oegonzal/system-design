@@ -10,8 +10,12 @@ import {
 /** What the service's library and pipeline registry answer, shaped exactly like the wire. */
 
 export const PROMPT_ENTRIES: PromptLibraryEntryDto[] = [
-  { id: 'notification-fanout', title: 'Fan out account notifications' },
-  { id: 'order-history', title: 'Unify online and in-store orders behind one history' },
+  { id: 'notification-fanout', title: 'Fan out account notifications', folder: null },
+  {
+    id: 'order-history',
+    title: 'Unify online and in-store orders behind one history',
+    folder: null,
+  },
 ];
 
 export const PROMPT_MARKDOWN = [
@@ -26,6 +30,7 @@ export const PROMPT_MARKDOWN = [
 export const makePromptDocument = (): PromptLibraryDocumentDto => ({
   id: 'order-history',
   title: 'Unify online and in-store orders behind one history',
+  folder: null,
   markdown: PROMPT_MARKDOWN,
 });
 

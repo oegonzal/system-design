@@ -2,9 +2,16 @@
 
 import styled from '@emotion/styled';
 import {
+  CANVAS_CRITERION_KINDS,
+  DEFAULT_PRACTICE_FORMAT,
+  PRACTICE_FORMAT_IDS,
+  PRACTICE_FORMATS,
+  practiceFormatForLibraryFolder,
   PROMPT_MARKDOWN_BOUND,
   PROMPT_TITLE_BOUND,
+  type CanvasCriterionKind,
   type ExperienceProfileDto,
+  type PracticeFormatId,
   type PromptLibraryDocumentDto,
   type PromptLibraryEntryDto,
 } from '@sysdesign/contracts';
@@ -27,10 +34,18 @@ import {
   transient,
 } from '@sysdesign/design-system';
 import { toErrorMessage, useLatestRequest, useLeaveGuard } from '@sysdesign/web-kit';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
 import { api } from '../../api/client';
+import { ComposerGenerateTab } from './composer-generate-tab';
+import { FormatField } from './format-field';
+import { usePromptGeneration } from './use-prompt-generation';
+
+const isFormatId = (value: string | null): value is PracticeFormatId =>
+  value !== null && (PRACTICE_FORMAT_IDS as readonly string[]).includes(value);
+const isKind = (value: string): value is CanvasCriterionKind =>
+  (CANVAS_CRITERION_KINDS as readonly string[]).includes(value);
 
 /**
  * The library as master and detail: the list beside the preview while both
@@ -97,16 +112,28 @@ const EntryButton = styled('button', transient)<{ $selected: boolean }>`
 `;
 
 /**
- * Two ways to get a prompt without a model writing one: type the markdown
- * yourself, or copy a document from the quality loop's library. Either way
- * the result is the same shape — one markdown document — and the criteria
- * are derived on first read.
+ * Three ways to get a prompt: type the markdown yourself, copy a document
+ * from the quality loop's library, or ask the loop's prompt writer for one
+ * drawn from your experience. Either way the result is the same shape — one
+ * markdown document with a practice format — and the criteria are derived
+ * on first read. `?format=` and `?emphasis=a,b` preselect the generate tab,
+ * the way a competencies panel links here.
  */
 export function PromptComposer() {
   const router = useRouter();
   const preview = useLatestRequest();
+  const params = useSearchParams();
+  const linkedFormat = params.get('format');
+  const linkedEmphasis = (params.get('emphasis') ?? '').split(',').filter(isKind);
+  const generation = usePromptGeneration((prompt) => router.push(`/prompts/${prompt.id}`));
 
-  const [tab, setTab] = useState('write');
+  const [tab, setTab] = useState(() =>
+    isFormatId(linkedFormat) || linkedEmphasis.length > 0 ? 'generate' : 'write',
+  );
+  const [format, setFormat] = useState<PracticeFormatId>(() =>
+    isFormatId(linkedFormat) ? linkedFormat : DEFAULT_PRACTICE_FORMAT,
+  );
+  const [importFormat, setImportFormat] = useState<PracticeFormatId | null>(null);
   const [experiences, setExperiences] = useState<ExperienceProfileDto[]>([]);
   const [title, setTitle] = useState('');
   const [markdown, setMarkdown] = useState('');
@@ -159,6 +186,7 @@ export function PromptComposer() {
       const prompt = await api.authorPrompt({
         title: title.trim(),
         markdown,
+        format,
         ...(experienceId ? { experienceId } : {}),
       });
       router.push(`/prompts/${prompt.id}`);
@@ -173,7 +201,10 @@ export function PromptComposer() {
     setSaving(true);
     setError(null);
     try {
-      const prompt = await api.importPrompt({ libraryId: selectedId });
+      const prompt = await api.importPrompt({
+        libraryId: selectedId,
+        ...(importFormat !== null ? { format: importFormat } : {}),
+      });
       router.push(`/prompts/${prompt.id}`);
     } catch (caught) {
       setError(toErrorMessage(caught, 'Could not import the prompt.'));
@@ -194,6 +225,7 @@ export function PromptComposer() {
           <TabList aria-label="How to add the prompt">
             <Tab value="write">Write</Tab>
             <Tab value="import">Import from the library</Tab>
+            <Tab value="generate">Generate from experience</Tab>
           </TabList>
 
           <TabPanel value="write">
@@ -220,6 +252,7 @@ export function PromptComposer() {
                 onChange={(event) => setMarkdown(event.target.value)}
                 data-testid="compose-markdown"
               />
+              <FormatField value={format} onChange={setFormat} />
               <SelectField
                 label="Experience it draws on (optional)"
                 value={experienceId}
@@ -275,6 +308,10 @@ export function PromptComposer() {
                           data-testid={`library-entry-${entry.id}`}
                         >
                           {entry.title}
+                          <Text as="span" size="sm" tone="muted">
+                            {' '}
+                            · {PRACTICE_FORMATS[practiceFormatForLibraryFolder(entry.folder)].label}
+                          </Text>
                         </EntryButton>
                       </li>
                     ))}
@@ -297,6 +334,11 @@ export function PromptComposer() {
                     ) : previewed ? (
                       <Stack gap={3}>
                         <Heading level={2}>{previewed.title}</Heading>
+                        <FormatField
+                          value={importFormat ?? practiceFormatForLibraryFolder(previewed.folder)}
+                          onChange={setImportFormat}
+                          data-testid="import-format"
+                        />
                         <Markdown
                           label={previewed.title}
                           title={previewed.title}
@@ -311,6 +353,16 @@ export function PromptComposer() {
                 </LibraryLayout>
               )}
             </Stack>
+          </TabPanel>
+
+          <TabPanel value="generate">
+            <ComposerGenerateTab
+              experiences={experiences}
+              format={format}
+              onFormat={setFormat}
+              initialEmphasis={linkedEmphasis}
+              generation={generation}
+            />
           </TabPanel>
         </Tabs>
       </Surface>

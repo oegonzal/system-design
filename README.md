@@ -170,7 +170,7 @@ pnpm exec nx run studio-e2e:e2e                            # end-to-end in Chrom
 pnpm exec nx run website-e2e:e2e                           # the Enfav site in Chrome, desktop and 320 px wide, against wrangler dev on :4205 (WEBSITE_E2E_BASE_URL=https://enfav.com checks production instead)
 pnpm review:code --staged --profile=quick                  # what the pre-commit hook runs
 pnpm test:stories                                          # render every story, both modes
-pnpm quality-loop:run --pipeline system-design --goal packages/quality-loop/prompts/order-history.md
+pnpm quality-loop:run --pipeline system-design --goal packages/quality-loop/prompts/system/order-history.md
 pnpm quality:start                         # quality-loop on :3003 + its web client on :4201 (needs the db)
 pnpm govcon:start                          # govcon on :3004 + its web client on :4202 (needs the db)
 pnpm notifications:serve                   # the event bus on :3005, polling one Telegram bot per purpose (needs the db)

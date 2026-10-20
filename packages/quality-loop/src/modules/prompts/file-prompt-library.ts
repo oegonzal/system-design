@@ -12,6 +12,12 @@ const EXTENSION = '.md';
 export const titleOf = (markdown: string, fallback: string): string =>
   /^# +(\S.*?) *$/m.exec(markdown)?.[1] ?? fallback;
 
+/** The first folder below the root an id sits in — `agentic` of `agentic/workflow-graph-engine` — or null at the root. */
+const folderOf = (id: string): string | null => {
+  const slash = id.indexOf('/');
+  return slash === -1 ? null : id.slice(0, slash);
+};
+
 const isMissing = (error: unknown): boolean =>
   typeof error === 'object' && error !== null && (error as { code?: string }).code === 'ENOENT';
 
@@ -23,7 +29,9 @@ const isMissing = (error: unknown): boolean =>
  * A prompt's id is its path below the root without the extension, in POSIX
  * form — `agentic/workflow-graph-engine`. The filesystem already guarantees
  * that is unique, which is why grouping prompts into folders needs no rule for
- * resolving two files that share a name: there cannot be two.
+ * resolving two files that share a name: there cannot be two. The first
+ * folder is reported with each entry (`folder`): the studio reads a practice
+ * format off it, and the loop itself attaches no meaning to it.
  *
  * There is deliberately no pattern check on the id any more. The old one
  * existed because `get` joined the id onto the root, so a request could name a
@@ -63,7 +71,11 @@ export class FilePromptLibrary implements PromptLibrary {
   async list(): Promise<PromptLibraryEntryDto[]> {
     const found = [...(await this.index())];
     const read = await Promise.allSettled(
-      found.map(async ([id, path]) => ({ id, title: titleOf(await readFile(path, 'utf8'), id) })),
+      found.map(async ([id, path]) => ({
+        id,
+        title: titleOf(await readFile(path, 'utf8'), id),
+        folder: folderOf(id),
+      })),
     );
     const entries: PromptLibraryEntryDto[] = [];
     read.forEach((outcome, index) => {
@@ -84,7 +96,7 @@ export class FilePromptLibrary implements PromptLibrary {
     if (path === undefined) return null;
     try {
       const markdown = await readFile(path, 'utf8');
-      return { id, title: titleOf(markdown, id), markdown };
+      return { id, title: titleOf(markdown, id), folder: folderOf(id), markdown };
     } catch (error) {
       // Deleted between the walk and the read; to a caller that is "unknown".
       if (isMissing(error)) return null;

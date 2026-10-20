@@ -29,10 +29,13 @@ const draft = (): DesignPromptDraft => ({
     'Reserve a seat for exactly one buyer.',
     'Release it when checkout lapses.',
   ],
+  domainAndData: [],
+  interfaces: [],
   nonFunctionalRequirements: [
     { kind: 'latency', requirement: 'reservation', target: 'p99 ≤ 500 ms' },
   ],
   scale: [{ metric: 'peak buyers', target: '10,000 concurrent' }],
+  decisions: [],
   constraints: ['Inventory lives in one relational database.'],
 });
 
@@ -60,6 +63,8 @@ describe('prompts', () => {
       });
       expect(h.loop.startRequests[0]?.goal).toContain('Where: Ticketing & events platform');
       expect(h.loop.startRequests[0]?.goal).toContain('## Highlights');
+      // No format asked for: the writer is still told the default, the whole system.
+      expect(h.loop.startRequests[0]?.goal).toContain('## Practice format\n\nWhole system: ');
 
       const running = await generation('fake-run-1');
       expect(running.status).toBe(200);
@@ -113,6 +118,24 @@ describe('prompts', () => {
       expect(h.loop.criteriaRequests).toEqual([]);
     });
 
+    it('[GEN-4] a format and the emphasised kinds reach the writer as sections of its goal, each kind once, and the claimed prompt keeps the format', async () => {
+      const started = await startGeneration({
+        experienceId: TICKETING_ID,
+        format: 'model',
+        emphasis: ['interface', 'interface', 'tradeoff'],
+      });
+      expect(started.status).toBe(202);
+      const goal = h.loop.startRequests.at(-1)?.goal ?? '';
+      expect(goal).toContain('## Practice format\n\nDomain model and API: ');
+      expect(goal).toContain('## Emphasis\n\n- Interface\n- Trade-off\n');
+      h.loop.complete(started.body.data.runId, [
+        { overall: 86, decision: 'accept', mode: 'initial', artifact: draft() },
+      ]);
+      const { body } = await generation(started.body.data.runId);
+      expect(body.data.status).toBe('complete');
+      expect(body.data.prompt?.format).toBe('model');
+    });
+
     it('[GEN-1] [QL-58] a draft the run kept past its ceilings is claimed whole, its overruns logged, and every row a criterion the grader takes back on a grade', async () => {
       // The longest a lenient read keeps of each field the draft declares —
       // whole to the cut point, never more — so each row composes at its most.
@@ -129,6 +152,9 @@ describe('prompts', () => {
           .slice(0, DESIGN_PROMPT_SCENARIO_BOUND.ceiling + 600)
           .trimEnd(),
         functionalRequirements: [longest('functionalRequirements[]')],
+        domainAndData: [],
+        interfaces: [],
+        decisions: [],
         nonFunctionalRequirements: [
           {
             kind: longest('nonFunctionalRequirements[].kind'),

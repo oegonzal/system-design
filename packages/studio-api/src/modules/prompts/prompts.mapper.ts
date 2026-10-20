@@ -15,6 +15,7 @@ export const toPromptDto = ({ prompt: e, rubricLocked }: PromptView): PromptDto 
   markdown: e.markdown,
   criteria: e.criteria,
   source: e.source,
+  format: e.format,
   status: e.status,
   rubricLocked,
   createdAt: e.createdAt.toISOString(),

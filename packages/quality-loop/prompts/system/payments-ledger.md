@@ -34,8 +34,6 @@ A marketplace holds money on behalf of buyers, sellers and itself. A buyer's car
 | Transfers/sec    | 300     |
 | Peak transfers/s | 3,000   |
 | Read:write       | 70:30   |
-| p99 latency      | 400 ms  |
-| Availability     | 99.95   |
 | Data retention   | 7 years |
 
 ## Constraints

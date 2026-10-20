@@ -32,8 +32,6 @@ An online retailer ships through four delivery carriers. Three of them push scan
 | Concurrent users | 5,000   |
 | Requests/sec     | 400     |
 | Read:write       | 95:5    |
-| p99 latency      | 250 ms  |
-| Availability     | 99.9    |
 | Data retention   | 2 years |
 
 ## Constraints
