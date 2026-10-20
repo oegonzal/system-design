@@ -7,13 +7,13 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { DEFAULT_RUNS_DIR, loadMeasureConfig, MeasureConfigError } from './config';
 import {
   FIXTURE_LAYOUT,
+  fixturesToWrite,
   measuredCalls,
   measuredFixtures,
   percentile,
   pipelineFixture,
-  readRecordedCalls,
-  type RecordedCall,
 } from './measure';
+import { type RecordedCall, readRecordedCalls } from './recorded';
 import { measureReply, replyOf } from './reply';
 
 /** The JSON Schema a producer showed its model: sizes at their targets. */
@@ -214,6 +214,14 @@ describe('the measurement of a runs folder', () => {
     expect(measuredFixtures(calls, []).retired).toEqual(['tiny']);
   });
 
+  it('[QL-49] a measurement of one pipeline writes its own fixture and its contract output’s alone, never the shared lenses’', () => {
+    const { calls } = readRecordedCalls(dir, null);
+    const { fixtures } = measuredFixtures(calls, ['tiny', 'idle']);
+    expect([...fixturesToWrite(fixtures, null).keys()]).toEqual([...fixtures.keys()]);
+    expect([...fixturesToWrite(fixtures, 'tiny').keys()]).toEqual([pipelineFixture('tiny')]);
+    expect([...fixturesToWrite(fixtures, 'idle').keys()]).toEqual([pipelineFixture('idle')]);
+  });
+
   it('[QL-49] picks the calls the time-limit spec replays: the longest, slowest, tightest, furthest past their declaration and longest per stage, each once', () => {
     const call = (name: string, fields: Partial<RecordedCall>): RecordedCall => ({
       run: 'r',
@@ -264,13 +272,18 @@ describe('the measurement of a runs folder', () => {
 
 describe('loadMeasureConfig', () => {
   it('[QL-49] reads the runs folder and the date from flags it declares, and refuses any other by name', () => {
-    expect(loadMeasureConfig([])).toEqual({ runsDir: DEFAULT_RUNS_DIR, since: null });
-    expect(loadMeasureConfig(['--runs-dir=/tmp/runs', '--since=2026-10-01'])).toEqual({
-      runsDir: '/tmp/runs',
-      since: new Date('2026-10-01'),
+    expect(loadMeasureConfig([])).toEqual({
+      runsDir: DEFAULT_RUNS_DIR,
+      since: null,
+      pipeline: null,
     });
+    expect(
+      loadMeasureConfig(['--runs-dir=/tmp/runs', '--since=2026-10-01', '--pipeline=tiny']),
+    ).toEqual({ runsDir: '/tmp/runs', since: new Date('2026-10-01'), pipeline: 'tiny' });
     expect(() => loadMeasureConfig(['--since=yesterday'])).toThrow(MeasureConfigError);
     expect(() => loadMeasureConfig(['--runs-dir'])).toThrow(/unknown or malformed flag/);
-    expect(() => loadMeasureConfig(['--write'])).toThrow(/--runs-dir=<value>, --since=<value>/);
+    expect(() => loadMeasureConfig(['--write'])).toThrow(
+      /--runs-dir=<value>, --since=<value>, --pipeline=<value>/,
+    );
   });
 });

@@ -4,6 +4,8 @@ import { join, resolve } from 'node:path';
  * The measurement's configuration, declared once: every flag `pnpm
  * measure:bounds` takes, parsed here into one typed object the rest of the
  * script receives. Nothing else under `tooling/bounds` reads `process`.
+ * `--pipeline` exists because `--since` is global: measuring one pipeline's
+ * new version from a date would otherwise empty every other fixture.
  */
 export const REPO_ROOT = resolve(__dirname, '..', '..');
 
@@ -16,6 +18,8 @@ export const MEASURE_FLAGS = {
   runsDir: { name: '--runs-dir' },
   /** `=<date>`: measure only runs started at or after it (ISO date or date-time). */
   since: { name: '--since' },
+  /** `=<id>`: write only that pipeline's fixture and its contract output's; every other fixture is left as it is. */
+  pipeline: { name: '--pipeline' },
 } as const;
 
 type FlagKey = keyof typeof MEASURE_FLAGS;
@@ -24,6 +28,8 @@ export interface MeasureConfig {
   runsDir: string;
   /** Runs started before this are not measured; null measures every recorded run. */
   since: Date | null;
+  /** The one pipeline whose fixtures are written; null writes every fixture. */
+  pipeline: string | null;
 }
 
 export class MeasureConfigError extends Error {
@@ -63,5 +69,9 @@ export function loadMeasureConfig(argv: readonly string[] = process.argv.slice(2
       throw new MeasureConfigError(`--since must be a date, got ${JSON.stringify(given.since)}`);
     }
   }
-  return { runsDir: resolve(given.runsDir ?? DEFAULT_RUNS_DIR), since };
+  return {
+    runsDir: resolve(given.runsDir ?? DEFAULT_RUNS_DIR),
+    since,
+    pipeline: given.pipeline ?? null,
+  };
 }

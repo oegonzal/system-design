@@ -1,6 +1,6 @@
 /**
- * `pnpm measure:bounds [--runs-dir=<dir>] [--since=<date>]` — the measured
- * fixtures, regenerated from the run dumps.
+ * `pnpm measure:bounds [--runs-dir=<dir>] [--since=<date>] [--pipeline=<id>]`
+ * — the measured fixtures, regenerated from the run dumps.
  *
  * Every bound a model writes into and every output cap a stage declares is
  * sized from what the model measurably does, and a spec holds each one
@@ -14,7 +14,7 @@
  * spec replays. Run it before changing any bound or cap, and commit what it
  * writes.
  */
-import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 
 import type {
@@ -27,32 +27,8 @@ import { callTimeLimitMs } from '@sysdesign/llm';
 import { format, resolveConfig } from 'prettier';
 
 import { loadMeasureConfig, REPO_ROOT, type MeasureConfig } from './config';
-import { measureReply, replyOf } from './reply';
-
-/** What a call's stage answers: the deriver's criteria, the producer's artifact, a lens's report. */
-export type StageRole = 'criteria' | 'producer' | 'critic' | 'evaluator';
-
-/** One recorded call, attributed to its run, pipeline and stage. */
-export interface RecordedCall {
-  run: string;
-  /** The run's start, ISO. */
-  startedAt: string;
-  pipeline: string;
-  /** `criteria`, `producer`, or the lens id. */
-  stage: string;
-  role: StageRole;
-  /** The file stem under `05-llm/`: `07.critic.requirements.s2.1`. */
-  call: string;
-  outcome: string;
-  maxTokens: number;
-  outputTokens: number | null;
-  durationMs: number;
-  apiCalls: number | null;
-  /** The reply as the model wrote it, or null when nothing parsed. */
-  reply: unknown;
-  /** The JSON Schema the call showed the model. */
-  schema: unknown;
-}
+import { readRecordedCalls, type RecordedCall, type StageRole } from './recorded';
+import { measureReply } from './reply';
 
 /** Where the fixtures live, relative to the repo root. */
 export const FIXTURE_LAYOUT = {
@@ -85,118 +61,6 @@ export const CALL_SELECTION = {
   tightest: 12,
   pastDeclaration: 12,
 } as const;
-
-const readJson = (path: string): unknown => JSON.parse(readFileSync(path, 'utf8'));
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-  value !== null && typeof value === 'object' && !Array.isArray(value);
-
-interface PipelineShape {
-  id: string;
-  critics: { id: string; samples: number }[];
-  evaluators: { id: string; samples: number }[];
-}
-
-/** A run's dumped pipeline summary, as far as attribution needs it; null when there is none. */
-function pipelineOf(value: unknown): PipelineShape | null {
-  if (!isRecord(value) || typeof value['id'] !== 'string') return null;
-  const lenses = (key: string) =>
-    (Array.isArray(value[key]) ? value[key] : []).filter(
-      (lens): lens is { id: string; samples: number } =>
-        isRecord(lens) && typeof lens['id'] === 'string' && typeof lens['samples'] === 'number',
-    );
-  return { id: value['id'], critics: lenses('critics'), evaluators: lenses('evaluators') };
-}
-
-/**
- * Every scope the run's pipeline records under, with its stage: the engine
- * scopes a lens's sample `<lens>.s<n>` (`core/loop/materialize.ts`), and the
- * summary dumped with the run says which lenses ran how many samples, so a
- * scope is looked up, never parsed.
- */
-function scopesOf(pipeline: PipelineShape): Map<string, { stage: string; role: StageRole }> {
-  const scopes = new Map<string, { stage: string; role: StageRole }>([
-    ['criteria', { stage: 'criteria', role: 'criteria' }],
-    ['producer', { stage: 'producer', role: 'producer' }],
-  ]);
-  const add = (lenses: PipelineShape['critics'], role: StageRole) => {
-    for (const lens of lenses) {
-      for (let sample = 1; sample <= lens.samples; sample++) {
-        scopes.set(`${lens.id}.s${sample}`, { stage: lens.id, role });
-      }
-    }
-  };
-  add(pipeline.critics, 'critic');
-  add(pipeline.evaluators, 'evaluator');
-  return scopes;
-}
-
-export interface Recorded {
-  calls: RecordedCall[];
-  /** What was not measured, and why — said, never silently dropped. */
-  skipped: string[];
-}
-
-/** Every call of every quality run under `runsDir` started at or after `since`. Reads only. */
-export function readRecordedCalls(runsDir: string, since: Date | null): Recorded {
-  const calls: RecordedCall[] = [];
-  const skipped: string[] = [];
-  const runs = readdirSync(runsDir, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => entry.name)
-    .sort();
-  for (const run of runs) {
-    const dir = join(runsDir, run);
-    const manifestPath = join(dir, 'manifest.json');
-    if (!existsSync(manifestPath)) continue;
-    const manifest = readJson(manifestPath);
-    if (!isRecord(manifest) || manifest['kind'] !== 'quality') continue;
-    const startedAt = String(manifest['startedAt']);
-    if (since !== null && new Date(startedAt) < since) continue;
-    const pipelinePath = join(dir, '03-pipeline.json');
-    const pipeline = existsSync(pipelinePath) ? pipelineOf(readJson(pipelinePath)) : null;
-    if (pipeline === null) {
-      skipped.push(`${run}: no pipeline summary`);
-      continue;
-    }
-    const scopes = scopesOf(pipeline);
-    const llmDir = join(dir, '05-llm');
-    if (!existsSync(llmDir)) continue;
-    for (const file of readdirSync(llmDir).sort()) {
-      if (!file.endsWith('.meta.json')) continue;
-      const call = file.slice(0, -'.meta.json'.length);
-      const meta = readJson(join(llmDir, file));
-      if (!isRecord(meta)) continue;
-      const scope = scopes.get(String(meta['scope']));
-      if (scope === undefined) {
-        skipped.push(
-          `${run}/${call}: scope ${String(meta['scope'])} is no stage of ${pipeline.id}`,
-        );
-        continue;
-      }
-      const responsePath = join(llmDir, `${call}.response.json`);
-      const response = existsSync(responsePath) ? readJson(responsePath) : null;
-      const usage = isRecord(meta['usage']) ? meta['usage'] : null;
-      const text = typeof meta['text'] === 'string' ? meta['text'] : null;
-      calls.push({
-        run,
-        startedAt,
-        pipeline: pipeline.id,
-        stage: scope.stage,
-        role: scope.role,
-        call,
-        outcome: String(meta['outcome']),
-        maxTokens: Number(meta['maxTokens']),
-        outputTokens: typeof usage?.['outputTokens'] === 'number' ? usage['outputTokens'] : null,
-        durationMs: Number(meta['durationMs']),
-        apiCalls: typeof meta['apiCalls'] === 'number' ? meta['apiCalls'] : null,
-        reply: replyOf(text, response, meta['schema']),
-        schema: meta['schema'],
-      });
-    }
-  }
-  return { calls, skipped };
-}
 
 /** The value at the given share of a sorted list, nearest rank. */
 export function percentile(sorted: readonly number[], share: number): number {
@@ -374,6 +238,24 @@ export function measuredCalls(calls: readonly RecordedCall[]): MeasuredCall[] {
   return sortedEntries(seen).map(([, picked]) => picked);
 }
 
+/**
+ * The fixtures one measurement writes: all of them, or — when one pipeline is
+ * named — that pipeline's own and its contract output's alone, so a pipeline
+ * re-measured from the date its new version first ran leaves every other
+ * fixture untouched. The lenses' and the replayed calls' fixtures are shared
+ * by every pipeline, so a measurement of one writes neither.
+ */
+export function fixturesToWrite(
+  fixtures: ReadonlyMap<string, MeasuredBounds>,
+  pipeline: string | null,
+): Map<string, MeasuredBounds> {
+  if (pipeline === null) return new Map(fixtures);
+  const own = new Set([pipelineFixture(pipeline)]);
+  const contract = CONTRACT_OUTPUTS[pipeline];
+  if (contract !== undefined) own.add(join(FIXTURE_LAYOUT.contracts, `${contract}.json`));
+  return new Map([...fixtures].filter(([file]) => own.has(file)));
+}
+
 /** Every pipeline folder that declares one. */
 function declaredPipelines(): string[] {
   const root = join(REPO_ROOT, FIXTURE_LAYOUT.pipelines);
@@ -393,19 +275,25 @@ async function writeJson(file: string, value: unknown): Promise<void> {
 
 export async function measure(config: MeasureConfig): Promise<string[]> {
   const { calls, skipped } = readRecordedCalls(config.runsDir, config.since);
-  const { fixtures, retired } = measuredFixtures(calls, declaredPipelines());
+  const pipelines = declaredPipelines();
+  if (config.pipeline !== null && !pipelines.includes(config.pipeline)) {
+    throw new Error(`--pipeline names ${config.pipeline}; declared: ${pipelines.join(', ')}`);
+  }
+  const { fixtures, retired } = measuredFixtures(calls, pipelines);
   const lines = [
-    `measured ${calls.length} calls from ${config.runsDir}${config.since ? ` since ${config.since.toISOString()}` : ''}`,
+    `measured ${calls.length} calls from ${config.runsDir}${config.since ? ` since ${config.since.toISOString()}` : ''}${config.pipeline ? ` for ${config.pipeline}` : ''}`,
   ];
-  for (const [file, fixture] of fixtures) {
+  for (const [file, fixture] of fixturesToWrite(fixtures, config.pipeline)) {
     await writeJson(file, fixture);
     lines.push(
       `  ${file}: ${fixture.runs} runs, ${Object.keys(fixture.fields).length} fields, ${Object.keys(fixture.caps).length} caps`,
     );
   }
-  const replayed = measuredCalls(calls);
-  await writeJson(FIXTURE_LAYOUT.calls, replayed);
-  lines.push(`  ${FIXTURE_LAYOUT.calls}: ${replayed.length} calls`);
+  if (config.pipeline === null) {
+    const replayed = measuredCalls(calls);
+    await writeJson(FIXTURE_LAYOUT.calls, replayed);
+    lines.push(`  ${FIXTURE_LAYOUT.calls}: ${replayed.length} calls`);
+  }
   if (retired.length > 0) lines.push(`not measured — no longer declared: ${retired.join(', ')}`);
   for (const reason of skipped) lines.push(`skipped ${reason}`);
   return lines.map((line) => line.replace(`${REPO_ROOT}/`, ''));
