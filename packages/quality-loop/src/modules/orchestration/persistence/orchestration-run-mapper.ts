@@ -70,6 +70,7 @@ export function fromRow(row: OrchestrationRun): OrchestrationRunDto {
     request: {
       ...row.request,
       criteriaProvided: row.request.criteriaProvided ?? false,
+      acceptAt: row.request.acceptAt ?? null,
       adoptedFrom: row.request.adoptedFrom ?? null,
     },
     openedBy: openerOf(row),

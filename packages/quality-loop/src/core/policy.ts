@@ -7,6 +7,7 @@ import type { DecisionPolicy } from '@sysdesign/contracts';
 
 import { sum } from './arithmetic';
 import type { TaskSpec } from './contracts';
+import type { PipelineDefinition } from './pipeline';
 
 /** How far from exactly 1 the dimension weights may sum, allowing for the decimals they are written in. */
 const WEIGHT_TOLERANCE = 1e-9;
@@ -178,4 +179,22 @@ export function validatePolicy(
   checkFindingTypes(policy, task, dimensions, fail);
   checkPricing(policy, fail);
   checkLoop(policy, fail);
+}
+
+/**
+ * The definition a run is held to when it asks for a higher bar: its own
+ * policy with `acceptAt` raised to the request's. A bar under the pipeline's
+ * is never taken — the pipeline's floor stands — so a caller can ask for
+ * more than the pipeline would settle for, never less.
+ */
+export function withAcceptAt<T>(
+  definition: PipelineDefinition<T>,
+  acceptAt: number | undefined,
+): PipelineDefinition<T> {
+  const own = definition.policy.thresholds.acceptAt;
+  if (acceptAt === undefined || acceptAt <= own) return definition;
+  return {
+    ...definition,
+    policy: { ...definition.policy, thresholds: { ...definition.policy.thresholds, acceptAt } },
+  };
 }

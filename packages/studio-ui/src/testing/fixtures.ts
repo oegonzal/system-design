@@ -379,6 +379,7 @@ export function makeImproveRun(overrides: Partial<ImproveRunDto> = {}): ImproveR
     readAt: AT,
     llm: { model: 'test-model' },
     exchangeCount: 4,
+    aim: null,
     iterations: [makeImproveIteration()],
     stopReason: null,
     error: null,

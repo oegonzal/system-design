@@ -205,7 +205,11 @@ next revision.
 ## The AI coach
 
 Stuck, or curious how a model would improve your current design? The coach
-posts to `POST /api/sessions/:id/improve`, two ways:
+posts to `POST /api/sessions/:id/improve`, two ways (either may carry
+`aim`, the overall the coach must reach before it stops — above the canvas
+pipeline's own 75, never below it; the loop holds the run to that bar and
+decides an adopted grade again under it, so a design can be carried past
+the pipeline's bar through the coach, as many runs as it takes):
 
 - **From the draft** (the body is the submission plus `maxIterations`): the
   draft is stored as your own revision, iteration 1 of the run, and the saved

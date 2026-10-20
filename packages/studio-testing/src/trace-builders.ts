@@ -91,7 +91,8 @@ export function tracesFrom(
   return specs.map((spec, index) => {
     const iteration = first + index;
     const overall = spec.overall;
-    const decision = spec.decision ?? (overall >= 75 ? 'accept' : 'revise');
+    // The pipeline's bar is 75 unless the request raised it, as the loop's controller reads it.
+    const decision = spec.decision ?? (overall >= (request.acceptAt ?? 75) ? 'accept' : 'revise');
     const validation = spec.validation ?? [];
     const blockers = blocked(validation);
     return {

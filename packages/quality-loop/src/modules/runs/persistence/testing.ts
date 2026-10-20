@@ -182,6 +182,7 @@ export const fullRecord = (overrides: Partial<RunRecord> = {}): RunRecord => ({
     goal: '# Goal',
     outputProvided: false,
     criteriaProvided: false,
+    acceptAt: null,
     adoptedFrom: null,
     maxIterations: 1,
   },

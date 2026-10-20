@@ -63,6 +63,7 @@ export const runRequestShape = z.strictObject({
   goal: z.string().min(1),
   output: z.unknown().optional(),
   maxIterations: z.number().int().min(1).max(MAX_QUALITY_RUN_ITERATIONS).optional(),
+  acceptAt: z.number().int().min(0).max(100).optional(),
   criteria: z.array(providedCriterionSchema).min(1).max(MAX_PROVIDED_CRITERIA).optional(),
   adopt: z
     .strictObject({

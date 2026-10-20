@@ -130,6 +130,7 @@ export const settledOrchestration = (
     goal: '',
     outputProvided: false,
     criteriaProvided: false,
+    acceptAt: null,
     adoptedFrom: null,
     maxIterations: 2,
     samples: null,

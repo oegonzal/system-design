@@ -147,6 +147,7 @@ export function fromRows(
     request: {
       ...run.request,
       criteriaProvided: run.request.criteriaProvided ?? false,
+      acceptAt: run.request.acceptAt ?? null,
       adoptedFrom: run.request.adoptedFrom ?? null,
     },
     parentRunId: run.parentRunId ?? null,

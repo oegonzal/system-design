@@ -117,6 +117,7 @@ describe('the memory orchestration over the three pipelines', () => {
       goal: GOAL,
       outputProvided: false,
       criteriaProvided: false,
+      acceptAt: null,
 
       adoptedFrom: null,
       maxIterations: 3,

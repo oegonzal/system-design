@@ -105,6 +105,8 @@ export interface AdoptedIterationRef {
 export interface QualityRunRequestSummary {
   goal: string;
   outputProvided: boolean;
+  /** The bar the run asked to be held to above its pipeline's own; null when the pipeline's stood. */
+  acceptAt: number | null;
   /** True when the caller supplied the rubric; false when it was derived from the goal. */
   criteriaProvided: boolean;
   /** The recorded iteration this run took as its iteration 1; null when it produced or judged its own. */
@@ -206,6 +208,13 @@ export interface StartQualityRunRequest {
   goal: string;
   output?: unknown;
   maxIterations?: number;
+  /**
+   * A higher bar than the pipeline's: the overall an iteration must reach
+   * before the controller accepts. Never lower than the pipeline's own —
+   * a request under it is refused (400) — and read by the controller alone;
+   * an adopted iteration is decided again under it.
+   */
+  acceptAt?: number;
   /**
    * A fixed rubric. When present the pipeline's derive-criteria stage is
    * skipped and these ids are the ones every lens cites — how a caller that

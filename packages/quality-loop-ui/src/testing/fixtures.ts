@@ -32,6 +32,7 @@ export const makeRun = (overrides: Partial<QualityRunDto> = {}): QualityRunDto =
     goal: PROMPT_MARKDOWN,
     outputProvided: false,
     criteriaProvided: false,
+    acceptAt: null,
 
     adoptedFrom: null,
     maxIterations: 1,
@@ -212,6 +213,7 @@ export const makeTwoIterationRun = (): QualityRunDto => {
       goal: PROMPT_MARKDOWN,
       outputProvided: false,
       criteriaProvided: false,
+      acceptAt: null,
 
       adoptedFrom: null,
       maxIterations: 3,

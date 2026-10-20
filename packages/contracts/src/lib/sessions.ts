@@ -225,11 +225,14 @@ export interface ListSessionsQuery {
  */
 export interface StartImproveFromDraftRequest extends DesignSubmission {
   maxIterations?: number;
+  /** The overall the coach must reach before it stops, above the pipeline's accept threshold; absent, the pipeline's stands. */
+  aim?: number;
 }
 export interface StartImproveFromRevisionRequest {
   /** A revision of this session whose grade is complete. */
   baseRevisionId: Uuid;
   maxIterations?: number;
+  aim?: number;
 }
 export type StartImproveRequest = StartImproveFromDraftRequest | StartImproveFromRevisionRequest;
 
@@ -306,6 +309,8 @@ export interface ImproveRunDto {
   /** Model calls made so far — a live signal between iterations. */
   exchangeCount: number;
   /** Every iteration the run has recorded — while it runs, the ones finished so far. */
+  /** The bar this run was asked to reach, or null when the pipeline's own stood. */
+  aim: number | null;
   iterations: ImproveIterationDto[];
   /** Why the run stopped; null until it has completed. */
   stopReason: StopReason | null;

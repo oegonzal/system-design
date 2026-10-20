@@ -30,9 +30,10 @@ import type { AdvisoryMemory, DerivedCriteria, ExchangeSink, Stages } from '../p
 import { rubricOverruns } from '../stages/derive-criteria';
 import { CRITERIA_STAGE, overrunDiagnostic } from '../stages/shared';
 import { lostProduce } from './briefing';
-import { runIteration } from './iteration';
+import { redecide, runIteration } from './iteration';
 import { materialize } from './materialize';
 import { beats, progressOf } from './progress';
+import { withAcceptAt } from '../policy';
 import { rubricProblems } from './rubric';
 
 export interface RunInput {
@@ -40,6 +41,8 @@ export interface RunInput {
   /** A supplied artifact to judge; iteration 1 takes it as provided instead of producing. */
   output?: unknown;
   maxIterations?: number;
+  /** A higher bar than the pipeline's accept threshold; one under it is never taken. */
+  acceptAt?: number;
   /** A fixed rubric; when present the derive-criteria stage is not called. */
   criteria?: readonly SuccessCriterion[];
   /**
@@ -106,11 +109,14 @@ export interface Loop<T> {
 
 export async function runLoop<T>(
   stages: Stages<T>,
-  definition: PipelineDefinition<T>,
+  declared: PipelineDefinition<T>,
   input: RunInput,
   now: () => number,
   onIteration?: IterationListener,
 ): Promise<RunTrace<T>> {
+  // The definition this run is held to: the declared one, its bar raised
+  // where the run asked for more than the pipeline would settle for.
+  const definition = withAcceptAt(declared, input.acceptAt);
   const { policy, task } = definition;
   const maxIterations = Math.max(1, input.maxIterations ?? policy.loop.maxIterations);
 
@@ -146,7 +152,7 @@ export async function runLoop<T>(
     const previous = iterations[iterations.length - 1] ?? null;
     const entry: IterationTrace<T> =
       mode === 'adopted'
-        ? adoptIteration(input.adopted as IterationTrace<T>, iteration)
+        ? redecide(loop, adoptIteration(input.adopted as IterationTrace<T>, iteration))
         : await runIteration(loop, iteration, mode, best, previous);
     iterations.push(entry);
 
@@ -198,9 +204,11 @@ function deriveOrAdopt<T>(
 }
 
 /**
- * A recorded iteration taken as this run's own: ledger, decision,
- * remediations and locations verbatim, renumbered, in mode `adopted`. The
- * loop then goes on exactly as it would from a decision it made itself.
+ * A recorded iteration taken as this run's own: ledger and locations
+ * verbatim, renumbered, in mode `adopted`, then decided again under this
+ * run's policy (`redecide`) — the same decision under the recorded bar, a
+ * fresh one under a raised bar. The loop then goes on exactly as it would
+ * from a decision it made itself.
  */
 const adoptIteration = <T>(source: IterationTrace<T>, iteration: number): IterationTrace<T> => ({
   ...structuredClone(source),

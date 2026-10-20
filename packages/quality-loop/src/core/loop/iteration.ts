@@ -208,6 +208,25 @@ function decide<T>(
 }
 
 /**
+ * A recorded iteration decided again under this run's policy: the controller
+ * reads the recorded ledger — deterministic, so under the recorded policy it
+ * decides as it did, and under a raised bar it decides afresh — and the
+ * remediations the next ask is handed follow that decision.
+ */
+export function redecide<T>(loop: Loop<T>, entry: IterationTrace<T>): IterationTrace<T> {
+  const { stages, contract } = loop;
+  const decision = stages.controller.decide(entry.ledger, loop.definition.policy);
+  const remediations = noteRemediations(
+    decision.selectedRemediations,
+    entry.ledger.findings,
+    contract,
+    entry.evaluators,
+    entry.validation,
+  );
+  return { ...entry, decision, remediations };
+}
+
+/**
  * The pipeline's declared refound pass — the engine correcting what the
  * judges found from facts the goal declares, a stop the page cannot be
  * showing, say — before the controller sees the ledger. Every criterion

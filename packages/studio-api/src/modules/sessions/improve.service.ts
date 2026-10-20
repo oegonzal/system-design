@@ -37,7 +37,8 @@ import { recordCoachingStatus } from './coaching-status';
 import { decisionBasisOf, findingsOf, iterationGrade, locationIndex } from './evaluation.mapper';
 import { EvaluationsService } from './evaluations.service';
 import { toCoachingRunSummaryDto, toRevisionDto } from './sessions.mapper';
-import { SessionsService, type RevisionCache } from './sessions.service';
+import { SessionsService } from './sessions.service';
+import type { RevisionCache } from './run-kinds';
 import { submissionProblems } from './submission';
 
 /**
@@ -89,10 +90,10 @@ export class ImproveService {
     );
     await this.sessions.ensureRubric(sessionId);
     if ('baseRevisionId' in request) {
-      return this.startFromRevision(sessionId, request.baseRevisionId, iterations);
+      return this.startFromRevision(sessionId, request.baseRevisionId, iterations, request.aim);
     }
-    const { maxIterations: _ignored, ...submission } = request;
-    return this.startFromDraft(sessionId, submission, iterations);
+    const { maxIterations: _ignored, aim, ...submission } = request;
+    return this.startFromDraft(sessionId, submission, iterations, aim);
   }
 
   /** The draft becomes the author's revision at `(runId, 1)`; the saved draft is cleared. */
@@ -100,6 +101,7 @@ export class ImproveService {
     sessionId: string,
     submission: DesignSubmission,
     maxIterations: number,
+    aim: number | undefined,
   ): Promise<StartImproveDto> {
     return this.sessions.withSessionLock(sessionId, async (em, session, prompt) => {
       this.sessions.assertSessionOpen(session, prompt);
@@ -110,6 +112,7 @@ export class ImproveService {
         { output: submission },
         maxIterations,
         'coach',
+        aim,
       );
       const base = await createRevision(em, sessionId, submission, 'user', {
         runId: started.runId,
@@ -138,6 +141,7 @@ export class ImproveService {
     sessionId: string,
     baseRevisionId: string,
     maxIterations: number,
+    aim: number | undefined,
   ): Promise<StartImproveDto> {
     const base = await this.em.findOne(DesignRevision, { id: baseRevisionId, session: sessionId });
     if (!base) throw notFound('revision', `no revision ${baseRevisionId} in session ${sessionId}`);
@@ -178,6 +182,7 @@ export class ImproveService {
         { adopt },
         maxIterations,
         'coach',
+        aim,
       );
       em.persist(
         em.create(CoachingRun, {
@@ -241,6 +246,8 @@ export class ImproveService {
       readAt: new Date().toISOString(),
       llm: run.llm,
       exchangeCount: run.exchanges.length,
+      // The bar the run was held to above the pipeline's, as the loop recorded the ask.
+      aim: run.request.acceptAt ?? null,
       stopReason: run.status === 'complete' ? (run.trace?.stopReason ?? null) : null,
       error: run.error?.message ?? null,
       // What the coach was handed before it revised, as the loop recorded it.

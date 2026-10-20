@@ -15,6 +15,7 @@ export const record = (overrides: Partial<RunRecord>): RunRecord => ({
     goal: '# Goal\n\nDo it.',
     outputProvided: false,
     criteriaProvided: false,
+    acceptAt: null,
 
     adoptedFrom: null,
     maxIterations: 3,

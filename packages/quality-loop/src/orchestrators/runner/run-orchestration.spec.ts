@@ -25,6 +25,7 @@ const child = (runId = 'tiny-run', failed = false): RunRecord => ({
     goal: 'g',
     outputProvided: false,
     criteriaProvided: false,
+    acceptAt: null,
     adoptedFrom: null,
     maxIterations: 1,
   },

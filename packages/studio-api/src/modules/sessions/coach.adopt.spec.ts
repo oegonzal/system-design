@@ -16,7 +16,7 @@ import { coached, draft, sessionsApi, submission, validGraph } from '../../test/
 
 describe('the coach', () => {
   const h = useHarness();
-  const { startSession, submit, startImprove, readImprove } = sessionsApi(h);
+  const { startSession, submit, startImprove, readImprove, evaluation } = sessionsApi(h);
 
   describe('adopting a grade, and holding the session', () => {
     it('[DEL-3] a graded revision is adopted as the run’s first iteration: nothing is graded or stored twice, and the draft is untouched', async () => {
@@ -85,6 +85,30 @@ describe('the coach', () => {
         status: 'complete',
         overall: 64,
       });
+    });
+
+    it('[DEL-11] an aim rides on the coaching run as the loop’s raised bar, is reported on the run, and is validated', async () => {
+      const { sessionId } = await startSession();
+      const graded = await submit(sessionId, submission());
+      h.loop.complete('fake-run-1', [{ overall: 78, decision: 'accept' }]);
+      await evaluation(graded.body.data.id);
+
+      const started = await startImprove(sessionId, {
+        baseRevisionId: graded.body.data.id,
+        maxIterations: 2,
+        aim: 90,
+      });
+      expect(started.status).toBe(202);
+      expect(h.loop.startRequests.at(-1)).toMatchObject({
+        adopt: { runId: 'fake-run-1', iteration: 1 },
+        acceptAt: 90,
+        maxIterations: 2,
+      });
+      const read = await readImprove(sessionId, started.body.data.runId);
+      expect(read.body.data.aim).toBe(90);
+
+      const over = await startImprove(sessionId, { baseRevisionId: graded.body.data.id, aim: 101 });
+      expect(over.status).toBe(400);
     });
 
     it('[DEL-3] a failed adopting run leaves the adopted revision’s grade alone', async () => {

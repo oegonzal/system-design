@@ -400,4 +400,9 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
     statement:
       'The criterion verdicts of named iterations are read in one call — `POST /runs/evidence` answers, for each (run, iteration) the loop recorded, when the run finished and how every criterion settled, leaves out an iteration it never recorded rather than inventing one, and validates the list it is asked for — so a caller that keeps iteration pointers reads competencies without whole traces and without the loop’s tables; the loop clients and the fake answer the same contract.',
   },
+  {
+    id: 'QL-80',
+    statement:
+      'A run may ask for a higher bar than its pipeline’s accept threshold (`acceptAt` on the request), never a lower one — the pipeline’s bar is a floor and a request under it is refused — and the controller alone reads it: the run is held to the raised bar, an adopted iteration is decided again under it, and the record keeps the bar the run asked for.',
+  },
 ];

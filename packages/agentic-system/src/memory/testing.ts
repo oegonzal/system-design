@@ -89,6 +89,7 @@ export function digestRecord(
       goal: request.goal,
       outputProvided: false,
       criteriaProvided: false,
+      acceptAt: null,
       adoptedFrom: null,
       maxIterations: request.maxIterations ?? 1,
       samples: null,

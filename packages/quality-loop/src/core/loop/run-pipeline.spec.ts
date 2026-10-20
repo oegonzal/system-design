@@ -114,6 +114,109 @@ describe('runPipeline', () => {
   });
 });
 
+describe('a raised bar', () => {
+  /** Two criteria of the tiny pipeline's two kinds, judged pass and fail: substance 100, form 0 — overall 60 under the weights 0.6 / 0.4. */
+  const sixty = fakeLlm(
+    {
+      criteria: [
+        { kind: 'must', statement: 'has text' },
+        { kind: 'nice', statement: 'has parts' },
+      ],
+    },
+    DRAFT_1,
+    { findings: [] },
+    {
+      results: [
+        result({ criterionId: 'c1', locationRefs: [] }),
+        result({ criterionId: 'c2', result: 'fail', locationRefs: [] }),
+      ],
+      advisoryVerdict: null,
+    },
+  );
+  /** Three criteria, the two `nice` ones split: substance 100, form 50 — overall 80, the tiny pipeline's own bar. */
+  const eighty = fakeLlm(
+    {
+      criteria: [
+        { kind: 'must', statement: 'has text' },
+        { kind: 'nice', statement: 'has parts' },
+        { kind: 'nice', statement: 'has more parts' },
+      ],
+    },
+    DRAFT_1,
+    { findings: [] },
+    {
+      results: [
+        result({ criterionId: 'c1', locationRefs: [] }),
+        result({ criterionId: 'c2', locationRefs: [] }),
+        result({ criterionId: 'c3', result: 'fail', locationRefs: [] }),
+      ],
+      advisoryVerdict: null,
+    },
+  );
+  const quiet = { sink: () => undefined, now: clock };
+
+  it('[QL-80] a run may raise its pipeline’s accept threshold: what the pipeline accepts at 80 is revised under a bar of 90, and the bar is on the decision’s record', async () => {
+    const own = await runPipeline(
+      tinyPipeline(),
+      { goal: 'g', maxIterations: 1 },
+      { llm: eighty, ...quiet },
+    );
+    expect(own.iterations[0]?.decision.scores.overall).toBe(80);
+    expect(own.finalDecision).toBe('accept');
+    expect(own.stopReason).toBe('accepted');
+
+    const raised = await runPipeline(
+      tinyPipeline(),
+      { goal: 'g', maxIterations: 1, acceptAt: 90 },
+      { llm: eighty, ...quiet },
+    );
+    expect(raised.iterations[0]?.decision.scores.overall).toBe(80);
+    expect(raised.finalDecision).toBe('revise');
+    expect(raised.stopReason).toBe('max-iterations');
+    const gate = raised.iterations[0]?.decision.trace.steps.find(
+      (step) => step.factor === 'accept-threshold',
+    );
+    expect(JSON.stringify(gate)).toContain('below 90');
+  });
+
+  it('[QL-80] a bar under the pipeline’s is never taken: the pipeline’s floor stands', async () => {
+    const lowered = await runPipeline(
+      tinyPipeline(),
+      { goal: 'g', maxIterations: 1, acceptAt: 50 },
+      { llm: sixty, ...quiet },
+    );
+    expect(lowered.iterations[0]?.decision.scores.overall).toBe(60);
+    expect(lowered.finalDecision).toBe('revise');
+  });
+
+  it('[QL-80] an adopted iteration is decided again under this run’s bar: accepted as recorded, revised under 90, verbatim otherwise', async () => {
+    const recorded = await runPipeline(
+      tinyPipeline(),
+      { goal: 'g', maxIterations: 1 },
+      { llm: eighty, ...quiet },
+    );
+    const adopted = recorded.iterations[0];
+    if (!adopted) throw new Error('the recorded run has an iteration');
+    const again = await runPipeline(
+      tinyPipeline(),
+      { goal: 'g', maxIterations: 1, criteria: recorded.contract.criteria, adopted },
+      { llm: fakeLlm(), ...quiet },
+    );
+    expect(again.iterations[0]?.mode).toBe('adopted');
+    expect(again.iterations[0]?.decision).toEqual(adopted.decision);
+    expect(again.finalDecision).toBe('accept');
+
+    const higher = await runPipeline(
+      tinyPipeline(),
+      { goal: 'g', maxIterations: 1, criteria: recorded.contract.criteria, adopted, acceptAt: 90 },
+      { llm: fakeLlm(), ...quiet },
+    );
+    expect(higher.iterations[0]?.mode).toBe('adopted');
+    expect(higher.iterations[0]?.decision.finalDecision).toBe('revise');
+    expect(higher.stopReason).toBe('max-iterations');
+  });
+});
+
 describe('the controller port', () => {
   it('[QL-8] the loop consults the controller the definition declares, whatever it decides', async () => {
     const alwaysRevise = composeController('always-revise', {

@@ -70,6 +70,7 @@ const requestSummary = (
   goal: request.goal,
   outputProvided: provided?.request.outputProvided ?? request.output !== undefined,
   criteriaProvided: provided?.request.criteriaProvided ?? request.criteria !== undefined,
+  acceptAt: provided?.request.acceptAt ?? request.acceptAt ?? null,
   // An orchestration composes its own children; none adopts an iteration.
   adoptedFrom: null,
   maxIterations,

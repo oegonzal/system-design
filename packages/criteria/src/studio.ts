@@ -188,6 +188,11 @@ export const STUDIO_CRITERIA: readonly Criterion[] = [
     statement:
       'An interviewer turn is one `interview-turn` run — the prompt as the interviewer’s notes, the rubric with ids, the transcript and the indexed items as its composed goal, the three fixed rules as its supplied rubric — claimed exactly once by its run id under a conditional update, its decision shown beside the reply and never gating it; a reply is validated against the goal’s declared index, never its prose; a run that left no reply is claimed as such and stands in the transcript.',
   },
+  {
+    id: 'DEL-11',
+    statement:
+      'A coaching run may be given an aim — the overall the coach must reach before it stops, above the pipeline’s accept threshold — which rides on the loop run as its raised bar, is reported back on the run, and lets a design be improved past the pipeline’s own bar through the coach and nothing else.',
+  },
   // STAR repository
   {
     id: 'STAR-1',

@@ -91,6 +91,7 @@ export function fakeRun(
       goal: 'fake goal',
       outputProvided: false,
       criteriaProvided: options.criteriaProvided ?? criteria.length > 0,
+      acceptAt: null,
       adoptedFrom: null,
       maxIterations: 1,
     },

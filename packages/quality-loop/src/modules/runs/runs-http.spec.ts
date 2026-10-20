@@ -228,6 +228,24 @@ describe('the HTTP surface', () => {
     expect(rows.map((row) => row.criterionId)).toEqual(['req-1', 'nfr-1']);
   });
 
+  it('[QL-80] a run may ask for a bar above its pipeline’s, which the record keeps; one under it is refused', async () => {
+    const lowered = await postJson(url, '/runs', {
+      pipeline: 'tiny',
+      goal: '# Goal',
+      acceptAt: 50,
+    });
+    expect(lowered.status).toBe(400);
+    expect(((await lowered.json()) as { message: string }).message).toContain('below the pipeline');
+    const raised = await postJson(url, '/runs', { pipeline: 'tiny', goal: '# Goal', acceptAt: 95 });
+    expect(raised.status).toBe(202);
+    const { data } = (await raised.json()) as Envelope<{ runId: string }>;
+    const run = await settledRun(data.runId);
+    expect(run.request.acceptAt).toBe(95);
+    const plain = await postJson(url, '/runs', { pipeline: 'tiny', goal: '# Goal' });
+    const other = (await plain.json()) as Envelope<{ runId: string }>;
+    expect((await settledRun(other.data.runId)).request.acceptAt).toBeNull();
+  });
+
   it('[QL-79] the verdicts of named iterations are read in one call; an iteration never recorded is left out, and the list is validated', async () => {
     const started = await postJson(url, '/runs', { pipeline: 'tiny', goal: '# Goal' });
     const { data } = (await started.json()) as Envelope<{ runId: string }>;

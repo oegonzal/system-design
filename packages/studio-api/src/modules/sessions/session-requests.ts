@@ -33,15 +33,19 @@ export const submitRevisionSchema = designSubmissionSchema.omit({ transcript: tr
 export const putSessionDraftSchema = sessionDraftSchema;
 
 const maxIterations = z.number().int().min(1).max(MAX_IMPROVE_ITERATIONS).optional();
+/** The bar the coach must reach before it stops; the loop refuses one under the pipeline's own. */
+const aim = z.number().int().min(0).max(100).optional();
 
 /** The coach starts from the draft, or from a graded revision of the session. */
 export const startImproveFromDraftSchema = z.strictObject({
   ...submitRevisionSchema.shape,
   maxIterations,
+  aim,
 });
 export const startImproveFromRevisionSchema = z.strictObject({
   baseRevisionId: z.uuid(),
   maxIterations,
+  aim,
 });
 export const startImproveSchema = z.union([
   startImproveFromDraftSchema,

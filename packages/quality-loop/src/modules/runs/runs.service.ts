@@ -152,6 +152,7 @@ export class RunsService {
     const definition = this.resolve(request.pipeline);
     this.assertRubric(request, definition);
     this.assertRecall(request, definition);
+    this.assertBar(request, definition);
     const adopted = await this.resolveAdoption(request, definition);
     const record = await this.open(request, definition, null);
     void this.perform(record, request, definition, adopted);
@@ -262,6 +263,20 @@ export class RunsService {
    * exists — the pipe's own 400 shape. Recall is for a producer that declares
    * it consumes memories; nothing else in a run can receive them.
    */
+  /** A run may raise its pipeline's accept threshold, never lower it: the pipeline's bar is a floor. */
+  private assertBar(
+    request: StartQualityRunRequest,
+    definition: PipelineDefinition<unknown>,
+  ): void {
+    const own = definition.policy.thresholds.acceptAt;
+    if (request.acceptAt !== undefined && request.acceptAt < own) {
+      throw new BadRequestException({
+        message: `acceptAt ${request.acceptAt} is below the pipeline's accept threshold ${own}; a run may raise the bar, never lower it`,
+        issues: [{ path: ['acceptAt'], message: `must be at least ${own}` }],
+      });
+    }
+  }
+
   private assertRecall(
     request: StartQualityRunRequest,
     definition: PipelineDefinition<unknown>,
@@ -291,6 +306,7 @@ export class RunsService {
       criteriaProvided: request.criteria !== undefined,
       adoptedFrom: request.adopt ?? null,
       maxIterations: request.maxIterations ?? definition.policy.loop.maxIterations,
+      acceptAt: request.acceptAt ?? null,
     };
     const record: RunRecord = {
       runId: makeRunId(Date.now(), 'quality'),
@@ -388,6 +404,7 @@ export class RunsService {
             goal: request.goal,
             output: request.output,
             maxIterations: request.maxIterations,
+            acceptAt: request.acceptAt,
             criteria: request.criteria,
             adopted: adoption?.iteration,
             memories,

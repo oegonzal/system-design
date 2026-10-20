@@ -48,6 +48,7 @@ export class FakeOrchestrations {
         goal: request.goal,
         outputProvided: request.output !== undefined,
         criteriaProvided: request.criteria !== undefined,
+        acceptAt: request.acceptAt ?? null,
         adoptedFrom: request.adopt ?? null,
         maxIterations: request.maxIterations ?? 1,
         samples: request.samples ?? null,

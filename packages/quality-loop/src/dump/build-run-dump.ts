@@ -43,6 +43,7 @@ function manifestOf(record: RunRecord) {
     iterations: trace?.iterations.length ?? 0,
     criteria: trace?.contract.criteria.length ?? 0,
     criteriaProvided: record.request.criteriaProvided,
+    acceptAt: record.request.acceptAt,
     adoptedFrom: record.request.adoptedFrom,
     parentRunId: record.parentRunId,
     recall: record.recall === null ? null : recallSummary(record.recall),

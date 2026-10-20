@@ -12,15 +12,11 @@ import {
   practiceFormat,
   PROMPT_COPY,
   regradable,
-  type AdoptedIterationRef,
-  type Decision,
   type DesignSubmission,
   type QualityRunStartedDto,
-  type QualityRunStatus,
   type SessionDraft,
   type SessionInFlightDto,
   type SessionStatus,
-  type StartQualityRunRequest,
   type SuccessCriterion,
 } from '@sysdesign/contracts';
 import {
@@ -42,28 +38,8 @@ import { recordCoachingStatus } from './coaching-status';
 import { EvaluationsService } from './evaluations.service';
 import type { ListRevisionsQueryInput, ListSessionsQueryInput } from './session-requests';
 import type { SessionDetail, SessionWithLatest } from './sessions.mapper';
+import { RUN_KINDS, type RevisionCache, type RunKind, type RunSource } from './run-kinds';
 import { submissionProblems } from './submission';
-
-/** The terminal values an import already knows, written with the row instead of after it. */
-export interface RevisionCache {
-  status: QualityRunStatus;
-  overall: number | null;
-  decision: Decision | null;
-}
-
-/** What a grading run is started over: the submission itself, or a recorded iteration to adopt. */
-export type RunSource = { output: DesignSubmission } | { adopt: AdoptedIterationRef };
-
-/**
- * What each kind of run asks of the loop beyond the run itself. A coach
- * recalls lessons from earlier runs for its producer — the lenses never see
- * them; a grade never recalls, so an author's score rests on the prompt alone.
- */
-const RUN_KINDS = {
-  grade: {},
-  coach: { recall: true },
-} as const satisfies Record<string, Pick<StartQualityRunRequest, 'recall'>>;
-export type RunKind = keyof typeof RUN_KINDS;
 
 /**
  * Who asks which run holds the slot. A `write` must know: the grader is
@@ -405,6 +381,7 @@ export class SessionsService {
     source: RunSource,
     maxIterations: number,
     kind: RunKind = 'grade',
+    acceptAt?: number,
   ): Promise<QualityRunStartedDto> {
     if (prompt.criteria.length === 0) {
       throw new ServiceUnavailableException(
@@ -416,6 +393,7 @@ export class SessionsService {
       goal: prompt.markdown,
       criteria: prompt.criteria,
       maxIterations,
+      ...(acceptAt !== undefined ? { acceptAt } : {}),
       ...source,
       ...RUN_KINDS[kind],
     });
