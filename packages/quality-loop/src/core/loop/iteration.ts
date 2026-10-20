@@ -15,6 +15,7 @@ import type {
   ValidationReport,
 } from '@sysdesign/contracts';
 
+import { carryParts } from '../contracts';
 import { annotate, noteRemediations } from '../evidence/annotate';
 import { normalize } from '../evidence/normalize';
 import { emptyUpstream } from '../ports';
@@ -73,9 +74,10 @@ export async function runIteration<T>(
 /**
  * Iteration 1 adopts a provided artifact exactly as handed in; every other
  * iteration asks the producer, and what it produced passes through the
- * output shape's `normalize` (when declared) before any validator sees it —
- * the normalized value is what the lenses judge and the trace stores. What
- * the producer reports comes back as diagnostics: why it answered nothing,
+ * output shape's `normalize` (when declared) before any validator sees it,
+ * and every part the task declares carried is then the revised artifact's,
+ * whatever the reply held — that value is what the lenses judge and the trace
+ * stores. What the producer reports comes back as diagnostics: why it answered nothing,
  * and one `overrun` per field it wrote past the size it was asked for.
  */
 async function produceOrAdopt<T>(
@@ -94,11 +96,12 @@ async function produceOrAdopt<T>(
     setbacks: setbacksOf(previous, best),
     memories: loop.input.memories ?? [],
   });
-  const { output } = loop.definition.task;
-  const artifact =
-    produced.output !== null && output.normalize
-      ? output.normalize(produced.output, loop.contract)
+  const { task } = loop.definition;
+  const normalized =
+    produced.output !== null && task.output.normalize
+      ? task.output.normalize(produced.output, loop.contract)
       : produced.output;
+  const artifact = carryParts(task, best?.artifact ?? null, normalized);
   return {
     artifact,
     diagnostics: [

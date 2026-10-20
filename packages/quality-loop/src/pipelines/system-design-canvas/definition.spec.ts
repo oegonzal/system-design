@@ -3,16 +3,19 @@ import {
   CANVAS_FINDING_TYPES,
   CANVAS_MAX_CRITERIA,
   CANVAS_STANDING_CRITERIA,
+  type DesignTranscript,
   submissionLocations,
+  TRANSCRIPT_VERSION,
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
+import { carryParts } from '../../core/contracts';
 import { describePipeline } from '../../core/describe-pipeline';
 import { validatePipeline } from '../../core/validate-pipeline';
 import { capsAgainstMeasured, seededCaps } from '../../core/testing';
 import { SYSTEM_DESIGN_CANVAS } from './definition';
 import measured from './measured.json';
-import { canvasOutput } from './output';
+import { canvasOutput, type CanvasSubmission } from './output';
 import { sampleSubmission } from './testing';
 
 describe('the system-design-canvas pipeline', () => {
@@ -113,6 +116,24 @@ describe('the system-design-canvas pipeline', () => {
         evaluator.criterionKinds.includes('tradeoff'),
       )?.id,
     ).toBe('evaluator.reasoning');
+  });
+
+  it('[QL-81] the transcript is carried: a coached design keeps the interview it was graded with, and the coach writes none of it', () => {
+    expect(SYSTEM_DESIGN_CANVAS.task.carried).toEqual(['transcript']);
+    const interview: DesignTranscript = {
+      version: TRANSCRIPT_VERSION,
+      turns: [{ role: 'candidate', phase: 'clarify', text: 'Who calls this API?' }],
+      phases: [{ id: 'clarify', startedAt: '2026-10-20T20:00:00.000Z', endedAt: null }],
+    };
+    const revised: CanvasSubmission = { ...sampleSubmission(), transcript: interview };
+    const rewritten: CanvasSubmission = { ...sampleSubmission(), transcript: null };
+    expect(carryParts(SYSTEM_DESIGN_CANVAS.task, revised, rewritten)?.transcript).toEqual(
+      interview,
+    );
+    // A coach cannot write an interview the design never had.
+    expect(carryParts(SYSTEM_DESIGN_CANVAS.task, sampleSubmission(), revised)).toEqual(
+      sampleSubmission(),
+    );
   });
 
   it('[QL-1] every dimension earns from a criterion kind, so none can only fall', () => {

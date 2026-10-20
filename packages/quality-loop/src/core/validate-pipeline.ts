@@ -13,6 +13,7 @@ import {
   WITHHOLDINGS,
 } from '@sysdesign/contracts';
 import { strictSchemaFaults } from '@sysdesign/llm';
+import { z } from 'zod';
 
 import { SCORES_FACTOR } from './controllers/compose';
 import { criterionLengthBound, providedStatementLimit } from './contracts';
@@ -217,12 +218,31 @@ function checkFixedCriteria(definition: Definition, fail: Fail): void {
   });
 }
 
+/** Every carried key is one the output schema declares, named once — a part of an object the loop can copy. */
+function checkCarried(definition: Definition, fail: Fail): void {
+  const carried = definition.task.carried ?? [];
+  if (carried.length === 0) return;
+  const { schema } = definition.task.output;
+  if (!(schema instanceof z.ZodObject)) {
+    fail(`task.carried names ${carried.join(', ')}, but the output schema is not an object`);
+    return;
+  }
+  const declared = Object.keys(schema.shape);
+  for (const key of carried) {
+    if (!declared.includes(key)) {
+      fail(`task.carried names ${key}, which the output schema does not declare`);
+    }
+  }
+  if (new Set(carried).size !== carried.length) fail('task.carried names a key twice');
+}
+
 function checkTask(definition: Definition, fail: Fail): void {
   if (!(GOAL_SOURCES as readonly string[]).includes(definition.goalSource)) {
     fail(`goalSource ${String(definition.goalSource)} is not one of ${GOAL_SOURCES.join(', ')}`);
   }
   if (!(definition.task.maxCriteria >= 1)) fail('task.maxCriteria must be ≥ 1');
   checkFixedCriteria(definition, fail);
+  checkCarried(definition, fail);
   // A rubric the pipeline derives must be one a caller can hand back, to adopt an iteration it
   // judged — every statement its deriver can return, kept past the ceiling, through the HTTP edge.
   const bound = criterionLengthBound(definition.task);

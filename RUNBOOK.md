@@ -189,7 +189,8 @@ by its run id — a run that left no reply is claimed as `(no reply — …)` an
 stands in the transcript. The submit closes the clock and composes the
 transcript onto the submission (`transcript.turns`, cited as `turn.N`; stored
 on the revision, exported as `transcript.md`); a submit body that carries a
-transcript of its own is refused.
+transcript of its own is refused. A coached revision carries the transcript of
+the revision it revises: the coach reads it and writes none of it.
 
 ## Re-grading a stored design
 

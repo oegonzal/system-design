@@ -209,7 +209,8 @@ the judges' decision as a badge. **Open the deep dive** asks the interviewer to
 probe the criteria your brief has not bound yet; the probes are chosen by rule,
 not by a model. Submitting ends the interview: the whole prompt and rubric are
 yours beside the grade, the transcript rides on the submission as `turn.N`
-lines the graders cite, and the export carries it as `transcript.md`.
+lines the graders cite, every coached revision keeps it unchanged, and the
+export carries it as `transcript.md`.
 
 ## The Properties panel
 

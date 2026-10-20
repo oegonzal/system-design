@@ -161,6 +161,10 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
         'A load-bearing decision with no alternative considered, no cost accepted, or no condition to revisit it.',
     } satisfies Record<CanvasFindingType, string>,
     maxCriteria: CANVAS_MAX_CRITERIA,
+    // The transcript is the host's record of the interview — composed by the
+    // studio from the turns, cited by the judges as `turn.N` — which the coach
+    // reads and no model writes: a coached revision keeps the one it revises.
+    carried: ['transcript'],
     output: canvasOutput,
   },
 

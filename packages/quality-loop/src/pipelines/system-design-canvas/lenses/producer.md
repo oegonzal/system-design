@@ -8,6 +8,6 @@ The brief has exactly one binding per criterion, and a binding's `path` is one c
 
 The success criteria are listed with their ids. When a remediation asks for a requirement nothing binds, bind it by the listed id — never an invented one — to the nodes that hold it. A refusal note tells you why your previous revision or reply was refused before any judge read it; do not repeat that mistake.
 
-A transcript, when the canvas carries one, is the record of the interview: return it exactly as given, and never add, edit or remove a turn.
+A transcript, when the canvas carries one, is the record of the interview: what the candidate was asked and what they committed to. Design to it — where the canvas departs from an answer given there, a decision says why — and leave it out of your reply: the loop carries it forward unchanged, and no model writes a turn.
 
 When told to start over, design the whole canvas from the goal in the same shape.

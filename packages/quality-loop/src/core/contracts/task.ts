@@ -63,6 +63,18 @@ export interface TaskSpec<T> {
    */
   readonly statementBound?: Bound;
 
+  /**
+   * Keys of the output the producer never writes: a part another party
+   * composed — an interview's transcript, the document under review — that a
+   * produced revision keeps exactly as the artifact it revises had it. After
+   * a reply is read, the loop copies each from the artifact under revision,
+   * whatever the reply held, and a part that artifact lacks stays absent; an
+   * artifact handed in, and the first produced with nothing to revise, stand
+   * as they are. Every key is one the output schema declares, so the loop can
+   * copy it (`validatePipeline`).
+   */
+  readonly carried?: readonly string[];
+
   readonly output: OutputShape<T>;
 }
 
@@ -88,6 +100,27 @@ export const overlongCriteria = (
   criteria
     .filter((criterion) => criterion.statement.length > providedStatementLimit(task))
     .map((criterion) => criterion.id);
+
+/**
+ * A produced artifact with every carried part the revised artifact's: copied
+ * where the revised artifact has it, removed where it lacks it. With no
+ * carried parts, nothing revised or nothing produced, the artifact as read.
+ */
+export function carryParts<T>(
+  task: Pick<TaskSpec<T>, 'carried'>,
+  revised: T | null,
+  produced: T | null,
+): T | null {
+  const carried = task.carried ?? [];
+  if (carried.length === 0 || revised === null || produced === null) return produced;
+  const from = revised as Record<string, unknown>;
+  const into: Record<string, unknown> = { ...(produced as Record<string, unknown>) };
+  for (const key of carried) {
+    if (key in from) into[key] = from[key];
+    else delete into[key];
+  }
+  return into as T;
+}
 
 /** The task contract for one run: the spec plus the goal and its derived criteria. */
 export interface TaskContract<T> extends TaskSpec<T> {

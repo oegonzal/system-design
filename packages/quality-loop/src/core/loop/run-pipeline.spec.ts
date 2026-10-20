@@ -2,7 +2,17 @@ import type { LlmExchange } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 import { composeController } from '../controllers';
 import { describePipeline } from '../describe-pipeline';
-import { DRAFT_1, fakeLlm, result, scriptedStages, tinyPipeline, tinyPolicy } from '../testing';
+import { carryParts } from '../contracts';
+import {
+  DRAFT_1,
+  DRAFT_2,
+  fakeLlm,
+  result,
+  scriptedProducer,
+  scriptedStages,
+  tinyPipeline,
+  tinyPolicy,
+} from '../testing';
 import { runLoop, runPipeline } from './run-pipeline';
 
 const clock = () => 0;
@@ -247,5 +257,32 @@ describe('the controller port', () => {
     ]);
     expect(trace.stopReason).toBe('max-iterations');
     expect(describePipeline(definition as never).controller.id).toBe('always-revise');
+  });
+});
+
+describe('a carried part', () => {
+  const carriesParts = () => {
+    const base = tinyPipeline();
+    return tinyPipeline({ task: { ...base.task, carried: ['parts'] } });
+  };
+
+  it('[QL-81] a produced revision keeps a carried part exactly as the artifact it revises had it, whatever the reply held', async () => {
+    const handedIn = { text: 'first', parts: ['kept'] };
+    const trace = await runLoop(
+      scriptedStages({ producer: scriptedProducer([DRAFT_2]) }),
+      carriesParts(),
+      { goal: 'g', output: handedIn, maxIterations: 2 },
+      clock,
+    );
+    expect(trace.iterations.map((iteration) => iteration.mode)).toEqual(['provided', 'revise']);
+    expect(trace.iterations[0]?.artifact).toEqual(handedIn);
+    expect(trace.iterations[1]?.artifact).toEqual({ text: DRAFT_2.text, parts: ['kept'] });
+  });
+
+  it('[QL-81] a part the revised artifact lacks stays absent, and with nothing to revise the reply stands as read', () => {
+    const task = { carried: ['note'] };
+    expect(carryParts(task, { text: 'a' }, { text: 'b', note: 'invented' })).toEqual({ text: 'b' });
+    expect(carryParts(task, null, { text: 'b', note: 'own' })).toEqual({ text: 'b', note: 'own' });
+    expect(carryParts({}, { text: 'a', note: 'x' }, { text: 'b' })).toEqual({ text: 'b' });
   });
 });

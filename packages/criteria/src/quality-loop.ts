@@ -405,4 +405,9 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
     statement:
       'A run may ask for a higher bar than its pipeline’s accept threshold (`acceptAt` on the request), never a lower one — the pipeline’s bar is a floor and a request under it is refused — and the controller alone reads it: the run is held to the raised bar, an adopted iteration is decided again under it, and the record keeps the bar the run asked for.',
   },
+  {
+    id: 'QL-81',
+    statement:
+      'A task may declare carried parts — keys of its output that another party composed and no producer writes — and a produced revision keeps each exactly as the artifact it revises had it, whatever the reply held, a part that artifact lacks staying absent; an artifact handed in stands as it is, and boot refuses a carried key the output schema does not declare.',
+  },
 ];

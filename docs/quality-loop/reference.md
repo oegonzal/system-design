@@ -92,7 +92,8 @@ the judging schemas under `core/stages/`, and on the normaliser or a controller 
 
 `PipelineDefinition<T>` is the interface everything else is written against: `id`, `version`,
 `description`, `goalSource`, `task` (criterion kinds, finding types, `maxCriteria`, any
-`fixedCriteria` that head every rubric, the output shape), then `deriveCriteria`, `producer` (its
+`fixedCriteria` that head every rubric, any `carried` parts a produced revision keeps from the one
+it revises, the output shape), then `deriveCriteria`, `producer` (its
 persona, what it `consumes`, and an optional `instruction` — the first-draft ask in the pipeline's
 own terms), `validators`, `critics`, `evaluators`, `controller`, `policy`, and an optional
 `refoundEvidence` pass that corrects the ledger from facts the goal declares.
@@ -102,7 +103,8 @@ Nothing outside a pipeline folder may import a concrete pipeline — the registr
 `validatePipeline` runs at boot and again at every run: lens ids unique and not reserved, every
 model-facing stage with a persona and a token cap, every criterion kind judged by exactly one
 evaluator, no evaluator consuming findings with no critic before it, under `cited` corroboration no
-evaluator of a gating kind reading the critics first (`checkCorroboration`), a valid controller
+evaluator of a gating kind reading the critics first (`checkCorroboration`), every carried part a
+key the output schema declares, a valid controller
 projection, and the output schema convertible to JSON Schema. `Controller.decide`
 is synchronous by contract, which is how "the controller never awaits a model" is held by the type
 rather than by review.

@@ -20,6 +20,17 @@ describe('validatePipeline', () => {
     expect(() => validatePipeline(asAny(tinyPipeline()))).not.toThrow();
   });
 
+  it('[QL-81] a carried part is a key the output schema declares, named once', () => {
+    const base = tinyPipeline();
+    const carrying = (carried: string[]) =>
+      asAny(tinyPipeline({ task: { ...base.task, carried } }));
+    expect(() => validatePipeline(carrying(['parts']))).not.toThrow();
+    expect(() => validatePipeline(carrying(['transcript']))).toThrow(
+      /task.carried names transcript, which the output schema does not declare/,
+    );
+    expect(() => validatePipeline(carrying(['parts', 'parts']))).toThrow(/names a key twice/);
+  });
+
   it('[QL-1] refuses two evaluators judging one kind, and a kind with no judge', () => {
     const base = tinyPipeline();
     const twice = tinyPipeline({
