@@ -40,10 +40,10 @@ const CONSTRAINT_ROWS_BOUND = bound(2, 'list');
 
 export const DESIGN_PROMPT_SCENARIO_BOUND = bound(2400);
 const NFR_KIND_BOUND = bound(24);
-const NFR_REQUIREMENT_BOUND = bound(160);
-const NFR_TARGET_BOUND = bound(60);
-const SCALE_METRIC_BOUND = bound(48);
-const SCALE_TARGET_BOUND = bound(40);
+const NFR_REQUIREMENT_BOUND = bound(250);
+const NFR_TARGET_BOUND = bound(70);
+const SCALE_METRIC_BOUND = bound(64);
+const SCALE_TARGET_BOUND = bound(56);
 
 /** How a table row composes into one criterion statement: its cells, in order, joined by this. */
 const STATEMENT_SEPARATOR = ' — ';

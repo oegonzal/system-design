@@ -1,16 +1,16 @@
 {
-  "since": "2026-09-30T02:47:07.680Z",
-  "until": "2026-10-01T01:35:58.485Z",
-  "runs": 4,
+  "since": "2026-10-20T20:12:30.753Z",
+  "until": "2026-10-20T21:09:14.793Z",
+  "runs": 6,
   "fields": {
-    "criteria": { "n": 4, "max": 12, "p99": 12, "overTarget": 0 },
-    "criteria[].statement": { "n": 45, "max": 166, "p99": 166, "overTarget": 0 }
+    "criteria": { "n": 6, "max": 12, "p99": 12, "overTarget": 0 },
+    "criteria[].statement": { "n": 72, "max": 209, "p99": 209, "overTarget": 0 }
   },
   "caps": {
-    "criteria": { "n": 4, "max": 637, "p99": 637, "maxApiCalls": null },
-    "critic.fidelity": { "n": 6, "max": 7592, "p99": 7592, "maxApiCalls": null },
-    "critic.gradeability": { "n": 6, "max": 4482, "p99": 4482, "maxApiCalls": null },
-    "evaluator.prompt": { "n": 6, "max": 5700, "p99": 5700, "maxApiCalls": null },
-    "producer": { "n": 6, "max": 6693, "p99": 6693, "maxApiCalls": null }
+    "criteria": { "n": 6, "max": 2031, "p99": 2031, "maxApiCalls": 1 },
+    "critic.fidelity": { "n": 11, "max": 9563, "p99": 9563, "maxApiCalls": 1 },
+    "critic.gradeability": { "n": 11, "max": 10840, "p99": 10840, "maxApiCalls": 1 },
+    "evaluator.prompt": { "n": 11, "max": 7197, "p99": 7197, "maxApiCalls": 1 },
+    "producer": { "n": 11, "max": 17887, "p99": 17887, "maxApiCalls": 1 }
   }
 }

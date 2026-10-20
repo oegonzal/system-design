@@ -111,23 +111,27 @@ describe('the draft’s bounds', () => {
     // row counts are policy: their targets sum to the canvas criteria cap, so
     // a draft is one rubric — and the drafts measured were asked for more.
     const rows = `the row targets sum to the room the standing criteria leave in the canvas cap (${CANVAS_MAX_CRITERIA})`;
-    // The data, interface and decision sections arrived with the generator's
-    // 2.0.0; no draft has written one yet. Their exemptions go once six live
-    // generations are measured with `pnpm measure:bounds --pipeline=design-prompt`.
-    const unwritten = 'added with the generator’s 2.0.0; no draft has written one yet';
+    // Every section is measured since the six live generations of
+    // 2026-10-20 (`pnpm measure:bounds --pipeline=design-prompt`), the data,
+    // interface and decision sections among them. A decision row maps to one
+    // criterion statement, so its bound is the engine's statement bound and
+    // cannot follow the writer up: those six runs wrote decision rows to 599
+    // characters, spelling every option out, and the writer is now told to
+    // name options in one sentence. Measured again after the next six
+    // generations, this exemption goes.
+    const spelledOut =
+      'measured to 599 over the six 2026-10-20 runs; the row is one criterion statement, bounded by the engine, and the writer now names options in a sentence — re-measure, then drop';
     expect(measured.runs).toBeGreaterThan(0);
     expect(
       boundsAgainstMeasured(designPromptDraftSchema, measured.fields, {
         exempt: {
           functionalRequirements: rows,
           domainAndData: rows,
-          'domainAndData[]': unwritten,
           interfaces: rows,
-          'interfaces[]': unwritten,
           nonFunctionalRequirements: rows,
           scale: rows,
           decisions: rows,
-          'decisions[]': unwritten,
+          'decisions[]': spelledOut,
           constraints: rows,
         },
       }),

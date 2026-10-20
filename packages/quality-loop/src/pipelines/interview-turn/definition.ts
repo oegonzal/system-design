@@ -68,10 +68,11 @@ export const INTERVIEW_TURN: PipelineDefinition<
     output: interviewTurnOutput,
   },
 
-  // Caps seeded from the design-prompt pipeline's measured stages — the one
-  // with the same lens shape over goals of the same size — a fifth or more
-  // above each (deriver 637, producer 6,693, critic 7,592, evaluator 5,700).
-  // Re-pinned from this pipeline's own `measured.json` once turns are recorded.
+  // Caps a fifth or more above what the first live turns wrote (2 runs,
+  // 2026-10-20: producer 349, conduct critic 13,254, turn evaluator 3,642 —
+  // the critic reasons at length over a short reply) or, for the deriver no
+  // studio turn calls, above the design-prompt deriver's 637; re-pinned from
+  // `measured.json` as turns accumulate.
   deriveCriteria: { persona: deriveCriteria, maxTokens: 2000 },
   producer: { persona: producer, maxTokens: 8500, consumes: ['criteria'] },
   validators: [referencesValidator, coverageValidator],
@@ -83,7 +84,7 @@ export const INTERVIEW_TURN: PipelineDefinition<
       persona: criticConduct,
       samples: 2,
       maxItems: 8,
-      maxTokens: 9500,
+      maxTokens: 16000,
       findingTypes: ['invented_fact', 'answer_leaked', 'undeclared_disclosure', 'unaddressed_item'],
     },
   ],

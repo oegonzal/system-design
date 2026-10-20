@@ -83,10 +83,12 @@ export const DESIGN_PROMPT: PipelineDefinition<ReturnType<typeof designPromptOut
     // revision its judges found no better than the best is named to it on the
     // next ask, so it does not write the same thing again. Every cap is sized
     // from the recorded runs with a fifth or more of headroom (the spec holds
-    // the measurements), and each is also the call's time limit.
+    // the measurements; re-pinned 2026-10-20 from the first six 2.0.0 runs,
+    // whose eight-section drafts run to 17,900 tokens), and each is also the
+    // call's time limit.
     producer: {
       persona: producer,
-      maxTokens: 10000,
+      maxTokens: 22000,
       consumes: ['criteria', 'setbacks'],
     },
 
@@ -99,14 +101,14 @@ export const DESIGN_PROMPT: PipelineDefinition<ReturnType<typeof designPromptOut
         persona: criticFidelity,
         samples: 1,
         maxItems: 8,
-        maxTokens: 10000,
+        maxTokens: 12000,
       },
       {
         id: 'critic.gradeability',
         persona: criticGradeability,
         samples: 1,
         maxItems: 8,
-        maxTokens: 8000,
+        maxTokens: 13500,
       },
     ],
 
@@ -116,7 +118,7 @@ export const DESIGN_PROMPT: PipelineDefinition<ReturnType<typeof designPromptOut
         persona: evaluatorPrompt,
         samples: 1,
         consumes: ['findings'],
-        maxTokens: 8000,
+        maxTokens: 9000,
         criterionKinds: ['fidelity', 'gradeability', 'scope'],
       },
     ],

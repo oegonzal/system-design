@@ -50,35 +50,26 @@ describe('the interview-turn pipeline', () => {
     expect([...owned].sort()).toEqual(Object.keys(INTERVIEW_TURN.task.findingTypes).sort());
   });
 
-  it('[QL-33] [QL-49] every declared output cap is a fifth above the seed it holds until this pipeline is measured', () => {
-    // No turn has been recorded yet: every stage holds the most the
-    // design-prompt pipeline's matching stage wrote (4 runs, 2026-09-30 to
-    // 10-01); `pnpm measure:bounds --pipeline=interview-turn` replaces a seed
-    // the moment a measurement exists.
-    const seeds = seededCaps({
-      criteria: 637,
-      producer: 6693,
-      'critic.conduct': 7592,
-      'evaluator.turn': 5700,
-    });
+  it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage has measurably written, and every reply field is asked for at least what was written', () => {
+    // `measured.json`, refreshed by `pnpm measure:bounds --pipeline=interview-turn`.
+    // A cap is also the call's time limit, so one a stage outwrites is a call
+    // cut short. The deriver is never called by a studio turn (the rubric is
+    // supplied), so its stage and fields hold the design-prompt deriver's
+    // measurement as a seed until a turn derives.
+    expect(measured.runs).toBeGreaterThan(0);
+    const seeds = seededCaps({ criteria: 637 });
     expect(capsAgainstMeasured(INTERVIEW_TURN, { ...seeds, ...measured.caps })).toEqual([]);
-    const unmeasured = 'declared with the pipeline; no turn has been recorded yet';
+    const fieldsUnder = (prefix: string) =>
+      Object.fromEntries(
+        Object.entries(measured.fields).filter(([path]) => path.startsWith(prefix)),
+      );
+    const unmeasured = 'the studio supplies every turn’s rubric; no turn has derived one';
     expect(
-      boundsAgainstMeasured(deriverSchema(INTERVIEW_TURN.task), measured.fields, {
+      boundsAgainstMeasured(deriverSchema(INTERVIEW_TURN.task), fieldsUnder('criteria'), {
         exempt: { criteria: unmeasured, 'criteria[].statement': unmeasured },
       }),
     ).toEqual([]);
-    expect(
-      boundsAgainstMeasured(interviewTurnOutputSchema, measured.fields, {
-        exempt: {
-          replies: unmeasured,
-          'replies[].to': unmeasured,
-          'replies[].text': unmeasured,
-          'replies[].disclosesCriterionIds': unmeasured,
-          'replies[].disclosesCriterionIds[]': unmeasured,
-        },
-      }),
-    ).toEqual([]);
+    expect(boundsAgainstMeasured(interviewTurnOutputSchema, fieldsUnder('replies'))).toEqual([]);
   });
 
   it('[QL-4] every reply is printed where a judge reads it, with what it discloses beside it', () => {
