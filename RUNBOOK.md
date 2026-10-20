@@ -260,8 +260,11 @@ with the Easy Apply mission, which declares the company as a unit's
 identity, any application at that company — and runs `field-answer` over
 them; a field the loop could not settle is put to you at the terminal and,
 with the notifications service running, on Telegram at once — the first
-answer is taken — and what you answer is taught back as a `guidance`
-document naming the unit of work it was given in by that identity. The
+answer is taken — and what you answer on any channel but one the operator
+settings' `untaught` names (the shipped file names the terminal, so an
+automated operator typing there teaches nothing) is taught back as a
+`guidance` document naming the unit of work it was given in by that identity
+and the channel it came on. The
 LinkedIn Easy Apply flow is `packages/browser-session/goals/linkedin-easy-apply.md`;
 the same program runs any goal.
 

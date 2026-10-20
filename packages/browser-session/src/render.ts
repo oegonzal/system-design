@@ -130,11 +130,14 @@ function endedBy(reason: string, cause: string | null): string {
   return cause === null ? reason : `the mission's stop ${cause}`;
 }
 
-/** One line for what `teach-again` did, or would do: the dumps held no answer are counted, the ones it could not link are named. */
+/** One line for what `teach-again` did, or would do: the dumps that held no answer and the answers left untaught are counted, the dumps it could not link are named. */
 export function renderTeachAgain(report: TeachAgainReport): string {
   const head = `${report.answers} answer(s) in ${report.sessions} session(s)`;
   const tail = [
     report.unanswered === 0 ? null : `${report.unanswered} dump(s) held no answer`,
+    report.untaught === 0
+      ? null
+      : `${report.untaught} answer(s) on a channel the operator settings do not teach, left as they were`,
     ...report.skipped,
   ]
     .filter((note): note is string => note !== null)

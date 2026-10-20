@@ -77,6 +77,8 @@ export interface RunSessionOptions {
   questionExpiresAfterMs: number;
   /** How many times a question is put back once the page refused the operator's answer to it. */
   asksAfterRefusal: number;
+  /** The channels whose answers are kept for the session alone, by the id each answer carries; every other channel's answers are taught. */
+  untaught: readonly string[];
   /** Which kinds of evidence-backed value are typed without asking the operator, by the kind each answer declares. */
   answering: AnsweringSettings;
   /** The settings files in force, by kind, as the manifest records them. */

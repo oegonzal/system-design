@@ -34,7 +34,7 @@ const older = (
   answer,
 });
 
-/** An item as a session writes it today, given in the unit of work named — null outside any. */
+/** An item as a session writes it today, given in the unit of work named — null outside any — and naming its channel. */
 const newer = (
   question: string,
   answer: string,
@@ -47,11 +47,20 @@ const newer = (
   context: { ...CONTEXT, unitKey },
   answer,
   chosen,
+  via: 'chat',
 });
 
-const withResult = (guidance: unknown, chosen: string | null = 'option') => ({
-  result: { guidance, chosen },
+/** A field's result as the dump records it: the item, what it was chosen from, and the channel it came on. */
+const withResult = (
+  guidance: unknown,
+  chosen: string | null = 'option',
+  via: string | null = 'chat',
+) => ({
+  result: { guidance, chosen, via },
 });
+
+/** The result's say beside an item, as `guidanceItemOf` takes it. */
+const result = (chosen: string | null = 'option', via: string | null = 'chat') => ({ chosen, via });
 
 const teaching = (
   decisionId: string,
@@ -89,6 +98,7 @@ function harness(digest: Partial<OrchestrationStepDto> = {}) {
       },
     },
     subject: 'the configured subject',
+    untaught: ['terminal'],
     log: (text) => logged.push(text),
     awaiting: {
       pollEveryMs: 0,
@@ -117,10 +127,10 @@ describe('teach-again over a folder of session dumps', () => {
     await rm(dumps, { recursive: true, force: true });
   });
 
-  it('[BRW-17] reads an older item under its label and context and a newer one under its question; a keyless item is nothing', () => {
+  it('[BRW-17] [BRW-20] reads an older item under its label and context and a newer one under its question, each on the channel its result or itself names; a keyless or channel-less item is nothing', () => {
     const old = guidanceItemOf(
       older('', 'Are you available for an Onsite job?', 'Yes', ['Yes', 'No']),
-      'option',
+      result(),
       null,
     );
     expect(old).toMatchObject({
@@ -131,27 +141,95 @@ describe('teach-again over a folder of session dumps', () => {
       },
       answer: 'Yes',
       chosen: null,
+      via: 'chat',
     });
     expect(
-      guidanceItemOf(older('Phone', 'Where can we reach you?', '555', null), null, null)?.field
-        .question,
+      guidanceItemOf(older('Phone', 'Where can we reach you?', '555', null), result(null), null)
+        ?.field.question,
     ).toBe('Phone. Where can we reach you?');
     // A pick from the drafts is the item's own say; a letter the page's options lettered is none.
     expect(
-      guidanceItemOf(newer('Will you require sponsorship?', 'No', 'record'), 'option', null)
+      guidanceItemOf(newer('Will you require sponsorship?', 'No', 'record'), result(), null)
         ?.chosen,
     ).toBe('record');
-    expect(guidanceItemOf(older('Notes', null, 'typed', null), 'transfer', null)?.chosen).toBe(
-      'transfer',
-    );
-    expect(guidanceItemOf(older('', null, 'Yes', ['Yes']), 'option', null)).toBeNull();
+    expect(
+      guidanceItemOf(older('Notes', null, 'typed', null), result('transfer'), null)?.chosen,
+    ).toBe('transfer');
+    expect(guidanceItemOf(older('', null, 'Yes', ['Yes']), result(), null)).toBeNull();
+    // An older item carries its channel only on its result; one that names none anywhere is nobody's to teach.
+    expect(
+      guidanceItemOf(older('Phone', null, '555', null), result(null, 'terminal'), null)?.via,
+    ).toBe('terminal');
+    expect(
+      guidanceItemOf(newer('Sponsorship?', 'No', null), result(null, 'terminal'), null)?.via,
+    ).toBe('chat');
+    expect(guidanceItemOf(older('Phone', null, '555', null), result(null, null), null)).toBeNull();
     // An item recorded before answers named their unit of work is given the unit open at its
     // step; a newer one keeps its own, none included.
     const unitOf = (raw: Record<string, unknown>) =>
-      guidanceItemOf(raw, null, 'company=acme')?.context.unitKey;
+      guidanceItemOf(raw, result(null), 'company=acme')?.context.unitKey;
     expect(unitOf(older('Phone', null, '555', null))).toBe('company=acme');
     expect(unitOf(newer('Sponsorship?', 'No', null, 'company=globex'))).toBe('company=globex');
     expect(unitOf(newer('Sponsorship?', 'No', null))).toBeNull();
+  });
+
+  it('[BRW-20] leaves an answer on a channel the settings keep untaught where it was: counted, untaught, its earlier digest kept, its row unlinked', async () => {
+    const { loop, deps, taught, logged } = harness();
+    const earlier = loop.orchestrations.start('document-memory', { goal: 'earlier' });
+    loop.orchestrations.complete(earlier.orchestrationRunId, {
+      digest: { runIds: ['d-old-terminal'] },
+      store: {},
+    });
+    const dump = join(dumps, '2026-10-19T21-00-00-000-999999-session');
+    await writeStep(
+      dump,
+      '05',
+      [
+        // An older item names no channel itself: its result's is the one the policy reads.
+        withResult(
+          older('What is your desired salary?', null, '$140,000', null),
+          'typed',
+          'terminal',
+        ),
+        withResult(newer('Will you require sponsorship?', 'No', null)),
+      ],
+      [teaching('dec-terminal', earlier.orchestrationRunId), teaching('dec-chat', null)],
+    );
+
+    const report = await teachAgain(deps, dumps, false);
+    expect(report).toMatchObject({
+      sessions: 1,
+      answers: 1,
+      documents: 1,
+      untaught: 1,
+      retracted: 0,
+    });
+    const goals = loop.orchestrations.startRequests.slice(1).map((posted) => posted.request.goal);
+    expect(goals).toHaveLength(1);
+    expect(goals[0]).toContain('Asked "Will you require sponsorship?"');
+    expect(goals[0]).toContain('answered via chat.');
+    expect(goals[0]).not.toContain('desired salary');
+    expect(loop.retracted).toEqual([]);
+    expect(taught.map((linked) => linked.decisionIds)).toEqual([['dec-chat']]);
+    expect(logged[0]).toContain('1 answer(s) taught again through');
+  });
+
+  it('[BRW-20] counts a dump whose every answer is on a channel the settings keep untaught as untaught, not as unanswered', async () => {
+    const { loop, deps } = harness();
+    const dump = join(dumps, '2026-10-19T22-00-00-000-888888-session');
+    await writeStep(
+      dump,
+      '03',
+      [withResult(older('', 'Portfolio', 'https://example.test', null), 'typed', 'terminal')],
+      [teaching('dec-1', null)],
+    );
+    expect(await teachAgain(deps, dumps, false)).toMatchObject({
+      sessions: 0,
+      answers: 0,
+      unanswered: 0,
+      untaught: 1,
+    });
+    expect(loop.orchestrations.startRequests).toHaveLength(0);
   });
 
   it('[BRW-17] [QL-71] teaches one document per unit of work a dump’s answers were given in, and one for those given outside any, each linking its own answers’ rows', async () => {
@@ -304,6 +382,7 @@ describe('teach-again over a folder of session dumps', () => {
       stored: 9,
       retracted: 1,
       unanswered: 1,
+      untaught: 0,
       skipped: [
         '2026-10-12T09-00-00-000-cccccc-session: 17 answer(s) but 16 teaching(s) — taught without linking rows or retracting',
       ],
@@ -356,6 +435,7 @@ describe('teach-again over a folder of session dumps', () => {
       stored: 0,
       retracted: 0,
       unanswered: 0,
+      untaught: 0,
       skipped: [],
     });
     expect(loop.orchestrations.startRequests).toHaveLength(0);

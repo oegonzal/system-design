@@ -37,7 +37,10 @@ import { SessionRefused } from '../../core/unit-advice';
  * digests, not a hundred, and each names the unit its answers were given in.
  * A new digest that left facts out of the store — memories bound to a unit of
  * work, of answers given outside any — retracts nothing: the earlier digests
- * stand beside it, and the dump is named in `skipped`.
+ * stand beside it, and the dump is named in `skipped`. The operator settings'
+ * `untaught` holds here as it does live: an answer recorded on a channel the
+ * list names — or on none — is counted and left where it was, its earlier
+ * digest untouched.
  */
 export interface TeachAgainReport {
   dryRun: boolean;
@@ -50,6 +53,8 @@ export interface TeachAgainReport {
   retracted: number;
   /** Dump folders that recorded no operator answer: nothing to teach. */
   unanswered: number;
+  /** Answers recorded on a channel the operator settings do not teach: left where they were, taught again by nobody. */
+  untaught: number;
   /** Dumps taught without their rows linked, whose document stored nothing, or left facts out and retracted nothing, with why. */
   skipped: string[];
 }
@@ -75,6 +80,8 @@ export interface TeachAgainDeps {
   ledger: Pick<LedgerPort, 'recordTeaching'>;
   /** Whom the answers are about when a dump's own teachings do not say. */
   subject: string;
+  /** The channels whose answers are kept untaught, by the id each answer carries — the operator settings' `untaught`. */
+  untaught: readonly string[];
   log: (text: string) => void;
   awaiting?: AwaitOptions;
 }
@@ -88,8 +95,18 @@ interface RecordedAnswer {
 
 interface StepFields {
   fields?: {
-    result?: { guidance?: Record<string, unknown> | null; chosen?: string | null } | null;
+    result?: {
+      guidance?: Record<string, unknown> | null;
+      chosen?: string | null;
+      via?: string | null;
+    } | null;
   }[];
+}
+
+/** What a field's result says of its answer besides the item: the basis it was chosen from, and the channel it came on. */
+interface AnswerResult {
+  chosen: unknown;
+  via: unknown;
 }
 
 interface StepTeaching {
@@ -107,15 +124,17 @@ const suggestionBasisOf = (chosen: unknown): SuggestionBasis | null =>
  * A recorded guidance item in today's shape. An older item carried `label`
  * (the field's name) and `question` (its context) and no `chosen`; the key is
  * what the field asked, as `fieldQuestionOf` reads both, and the basis the
- * answer was chosen from is the item's own, else the result's. An item
- * recorded before answers named their unit of work is given in the unit the
- * dump records open at its step (`openUnit`, null outside any); a newer one
- * names its own. Null for an item that asked nothing it can be told by, which
- * no probe could find again.
+ * answer was chosen from is the item's own, else the result's — as is the
+ * channel it came on, which an item before 2026-10-20 carried only on its
+ * result. An item recorded before answers named their unit of work is given
+ * in the unit the dump records open at its step (`openUnit`, null outside
+ * any); a newer one names its own. Null for an item that asked nothing it can
+ * be told by, which no probe could find again, and for one that names no
+ * channel anywhere, which nobody can vouch for.
  */
 export function guidanceItemOf(
   raw: Record<string, unknown>,
-  chosen: unknown,
+  result: AnswerResult,
   openUnit: string | null,
 ): OperatorGuidanceDto | null {
   const field = (raw['field'] ?? {}) as Record<string, unknown>;
@@ -130,7 +149,8 @@ export function guidanceItemOf(
     field: { question, type: field['type'], options: field['options'] ?? null },
     context: { ...given, unitKey: Object.hasOwn(given, 'unitKey') ? given['unitKey'] : openUnit },
     answer: raw['answer'],
-    chosen: suggestionBasisOf(raw['chosen'] ?? chosen),
+    chosen: suggestionBasisOf(raw['chosen'] ?? result.chosen),
+    via: raw['via'] ?? result.via,
   });
   return parsed.success ? (parsed.data as OperatorGuidanceDto) : null;
 }
@@ -191,7 +211,13 @@ async function readDump(dump: string): Promise<DumpRecord> {
       const guidance = field.result?.guidance;
       if (guidance == null) continue;
       // A keyless item still counts toward the order: the session taught it too.
-      items.push(guidanceItemOf(guidance, field.result?.chosen, openUnit));
+      items.push(
+        guidanceItemOf(
+          guidance,
+          { chosen: field.result?.chosen, via: field.result?.via },
+          openUnit,
+        ),
+      );
     }
     for (const teaching of (await readJson<StepTeaching[]>(join(stepsDir, step, 'teach.json'))) ??
       []) {
@@ -204,11 +230,23 @@ async function readDump(dump: string): Promise<DumpRecord> {
   return { items, teachings: [...teachings.values()], subject };
 }
 
-/** The answers one dump holds, each linked to its row and orchestration when the counts agree, unlinked when they do not. */
-function answersOf(record: DumpRecord): { answers: RecordedAnswer[]; linked: boolean } {
+/**
+ * The answers one dump holds that the settings teach, each linked to its row
+ * and orchestration when the counts agree, unlinked when they do not; the
+ * answers on a channel the settings keep untaught are counted and left out.
+ */
+function answersOf(
+  record: DumpRecord,
+  untaughtChannels: readonly string[],
+): { answers: RecordedAnswer[]; linked: boolean; untaught: number } {
   const linked = record.items.length === record.teachings.length;
+  let untaught = 0;
   const answers = record.items.flatMap((item, index) => {
     if (item === null) return [];
+    if (untaughtChannels.includes(item.via)) {
+      untaught += 1;
+      return [];
+    }
     const teaching = linked ? record.teachings[index] : undefined;
     return [
       {
@@ -218,7 +256,7 @@ function answersOf(record: DumpRecord): { answers: RecordedAnswer[]; linked: boo
       },
     ];
   });
-  return { answers, linked };
+  return { answers, linked, untaught };
 }
 
 /** The digest run an earlier teaching stored through, read off its orchestration; null when the loop no longer has it or it never digested. */
@@ -240,13 +278,15 @@ export async function teachAgain(
     stored: 0,
     retracted: 0,
     unanswered: 0,
+    untaught: 0,
     skipped: [],
   };
   for (const name of await subdirectories(dumpsDir)) {
     const record = await readDump(join(dumpsDir, name));
-    const { answers, linked } = answersOf(record);
+    const { answers, linked, untaught } = answersOf(record, deps.untaught);
+    report.untaught += untaught;
     if (answers.length === 0) {
-      report.unanswered += 1;
+      if (untaught === 0) report.unanswered += 1;
       continue;
     }
     if (!linked) {

@@ -8,6 +8,7 @@
 import { z } from 'zod';
 
 import { bounded } from '../bounds';
+import { channelIdSchema } from '../notifications/interactions';
 import type { IsoDateString, Uuid } from '../primitives';
 import {
   DOCUMENT_MAX_MEMORIES,
@@ -52,6 +53,13 @@ export const operatorGuidanceSchema = z.strictObject({
   answer: z.string().min(1).max(GUIDANCE_ANSWER_MAX_LENGTH),
   /** What the operator chose the answer from, when they chose a suggestion; a drafted one is said so the digest keeps it whole. */
   chosen: z.enum(SUGGESTION_BASES).nullable(),
+  /**
+   * The channel the answer was given on, by the id it carries — the one the
+   * operator settings' `untaught` list is read against. Never null: an answer
+   * no channel vouches for is taught by nobody. Rendered as provenance, never
+   * as fact.
+   */
+  via: channelIdSchema,
 });
 export type OperatorGuidanceDto = z.infer<typeof operatorGuidanceSchema> & {
   sessionId: Uuid;
@@ -62,15 +70,23 @@ const day = (at: IsoDateString): string => at.slice(0, 10);
 
 /**
  * How an answer becomes a memory a later question can rest on: the subject's
- * answer to its question, the question itself as the key, a declared scope,
- * and where it was asked as provenance that never enters the fact. Measured
- * 2026-10-10 and again 2026-10-12: answers stored as one unit of work's
- * events — "for that application, the operator answered…" — were recalled
- * for the same question reworded and refused by the grounding judge as
- * another application's, so the operator was asked again.
+ * answer to its question — with the options it was chosen among, where the
+ * question offered any — the question itself as the key, a declared scope,
+ * and where, when and on which channel it was asked as provenance that never
+ * enters the fact. Measured 2026-10-10 and again 2026-10-12: answers stored
+ * as one unit of work's events — "for that application, the operator
+ * answered…" — were recalled for the same question reworded and refused by
+ * the grounding judge as another application's, so the operator was asked
+ * again. Measured 2026-10-19: a "Yes" stored without the Yes | No it was
+ * chosen among read, to a later judge, as a figure's rival for a years
+ * question, and the record-correct figure was withheld. The options stay out
+ * of the key so the stored condition is still the text a field's probe is
+ * searched with.
  */
 export const GUIDANCE_RULE =
-  "A section records the subject's answer to one question: the insight is that answer, nothing more; the appliesWhen is the question as quoted; the scope is unit only when the answer would differ for another employer, role or application; where and when it was asked enters neither.";
+  "A section records the subject's answer to one question: the insight is that answer, with the options it was chosen among where the section lists them; the appliesWhen is the question as quoted; the scope is unit only when the answer would differ for another employer, role or application.";
+export const GUIDANCE_PROVENANCE_RULE =
+  'Where, when and on which channel the question was asked is provenance: it enters neither the insight nor the appliesWhen.';
 
 /** One answer as a section the digest can cite: the question and the answer first, the provenance after. */
 export function renderGuidanceSection(item: OperatorGuidanceDto): string {
@@ -80,7 +96,7 @@ export function renderGuidanceSection(item: OperatorGuidanceDto): string {
   const where =
     item.context.taskLabel === null ? '' : ` in the unit of work ${quoted(item.context.taskLabel)}`;
   const page = item.context.page === null ? '' : ` (${item.context.page})`;
-  return `Asked ${quoted(item.field.question)}${options}${drafted}, the subject answered ${quoted(item.answer)}. Asked on ${day(item.capturedAt)}${where}${page}.`;
+  return `Asked ${quoted(item.field.question)}${options}${drafted}, the subject answered ${quoted(item.answer)}. Asked on ${day(item.capturedAt)}${where}${page}; answered via ${item.via}.`;
 }
 
 /** The items in runs of at most `size`, in order. */
@@ -105,7 +121,7 @@ const guidanceDocument = (
   chunk: { index: 1, of: 1 },
   context: null,
   parts: items.map(renderGuidanceSection),
-  rules: [...DOCUMENT_RULES, GUIDANCE_RULE],
+  rules: [...DOCUMENT_RULES, GUIDANCE_RULE, GUIDANCE_PROVENANCE_RULE],
   maxMemories: items.length,
 });
 

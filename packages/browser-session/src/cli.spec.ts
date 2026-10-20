@@ -170,6 +170,7 @@ describe('execute', () => {
       stored: 18,
       retracted: 4,
       unanswered: 40,
+      untaught: 0,
       skipped: [
         'x-session: 3 answer(s) but 0 teaching(s) — taught without linking rows or retracting',
       ],
@@ -314,6 +315,7 @@ describe('execute', () => {
         stored: dryRun ? 0 : 18,
         retracted: dryRun ? 0 : 4,
         unanswered: 40,
+        untaught: 0,
         skipped: [
           'x-session: 3 answer(s) but 0 teaching(s) — taught without linking rows or retracting',
         ],

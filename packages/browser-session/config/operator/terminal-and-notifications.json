@@ -6,5 +6,6 @@
       "pullWaitMs": 25000,
       "eventsPerPull": 20
     }
-  }
+  },
+  "untaught": ["terminal"]
 }

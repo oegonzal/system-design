@@ -91,13 +91,19 @@ counts `{probes, candidates, evidence}` — of the memories bound to a unit of
 work, only that unit's — and whose `target` step reports `admission` and what
 it withheld; an operator prompt only for a field the report withheld, the
 model routed to you, or whose value rests on a kind the answering settings do
-not fill — and none when the record's own suggestion fills it (the answering
-settings' `drafts`), or when you answered the same question earlier in the
-same unit; for each answer you give, one `document-memory` orchestration at
-once, its document naming the unit the answer was given in, whose id lands on
-the decision row it came from — the step's `teach.json` lists them. The
-dump's `fields.json` per step names the route and source of every field, and
-what became of its suggestions.
+not fill — and none when a suggestion fills it (the answering settings'
+`drafts`: by the shipped file every basis is typed, the record's own, a
+transferable draft and an invented one alike, the withdrawal saying which),
+or when you answered the same question earlier in the same unit; for each
+answer given on any channel but one the operator settings' `untaught` names,
+one `document-memory` orchestration at once, its document naming the unit the
+answer was given in and the channel it came on, whose id lands on the
+decision row it came from — the step's `teach.json` lists them; an answer on
+a channel named there (the terminal, by the shipped file) is filled and
+cached, recorded on its row with its channel (`via`), taught to nobody, and
+the step says so. The dump's `fields.json` per
+step names the route, source and channel of every field, and what became of
+its suggestions.
 
 To read why a step did what it did, walk its debate from the dump: the step's
 `plan.json` names the loop run, and

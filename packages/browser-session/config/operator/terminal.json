@@ -1,5 +1,6 @@
 {
   "expiresAfterMs": 43200000,
   "asksAfterRefusal": 1,
-  "channels": {}
+  "channels": {},
+  "untaught": []
 }

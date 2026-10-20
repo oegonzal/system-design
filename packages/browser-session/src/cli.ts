@@ -54,7 +54,7 @@ export const USAGE = `usage: browser-session <command> [options]
   teach-again ${flag('sessions')} <dir> [${flag('subject')} <name>] [${flag('dryRun')}]
             teaches the operator answers recorded in a folder of session dumps again, in the canonical
             shape, and retracts what their earlier digests stored; the subject names whom a dump's own
-            teachings do not`;
+            teachings do not; an answer on a channel the operator settings do not teach is left as it was`;
 
 /** The commands, as data: what each takes as a positional, and whether it reads or writes the session's tables. */
 export const COMMANDS = {

@@ -3,6 +3,7 @@ import { relative, resolve } from 'node:path';
 import { CONFIG_DIR, ENGINE_FILE, readChosen, type ReadFile } from '@sysdesign/config-kit';
 import {
   answeringSettingsSchema,
+  channelIdSchema,
   recoverySchema,
   type AnsweringSettings,
   type SessionRailsDto,
@@ -132,6 +133,19 @@ const operatorSettingsSchema = z.strictObject({
    */
   asksAfterRefusal: z.number().int().nonnegative(),
   channels: z.strictObject({ notifications: notificationsChannelSchema.optional() }),
+  /**
+   * The channels whose answers are kept for the session alone, by the id each
+   * answer carries (`via.channel`): filled, cached for the unit of work,
+   * recorded on the row with the channel, and taught to nobody — the step
+   * says so. Every other channel's answers are taught to the memory as the
+   * subject's own. Named this way round because the session knows one channel
+   * by name, its own terminal (`terminal`); the channels the notifications
+   * service runs are the service's to name, never this package's. Measured
+   * 2026-10-19: answers typed at the terminal by an automated process on the
+   * owner's behalf were stored as the owner's facts and outranked his
+   * standing answers. An empty list teaches every answer.
+   */
+  untaught: z.array(channelIdSchema).refine(unique, 'names a channel twice'),
 });
 export type OperatorSettings = z.infer<typeof operatorSettingsSchema>;
 

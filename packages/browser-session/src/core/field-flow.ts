@@ -27,8 +27,9 @@ import { openUnitAnswers, openUnitFilled } from './session-state';
  * each field is routed by the declared table: filled, kept, left blank, or
  * put to the operator with the model's value as a suggestion and the reason
  * it was not trusted. The operator's answers are cached for the unit of work
- * they were given in and taught back the moment they are given. One decision
- * row per field settled.
+ * they were given in and, unless given on a channel the operator settings
+ * keep untaught, taught back the moment they are given. One decision row per
+ * field settled.
  * A fill the page refuses stops the flow where it is — the page may have
  * moved on — so the fields after it are not attempted, and the plan stops
  * with it; the failure is counted once, by the step. The operator's own
@@ -111,7 +112,7 @@ async function ask(
         if (filled.outcome === 'ok') {
           return {
             ...filled,
-            guidance: remember(ctx, field.field, reply.text, observation, chosen),
+            guidance: remember(ctx, field.field, reply.text, observation, chosen, asking.via),
           };
         }
         if (asked >= ctx.options.asksAfterRefusal) return filled;
@@ -136,7 +137,7 @@ async function ask(
         return {
           ...result(field, 'fill', 'operator', value, 'read-back'),
           ...asking,
-          guidance: remember(ctx, field.field, value, observation, chosen),
+          guidance: remember(ctx, field.field, value, observation, chosen, asking.via),
         };
       }
     }

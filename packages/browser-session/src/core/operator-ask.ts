@@ -9,6 +9,7 @@ import {
   type FieldSpec,
   type InteractionAnswer,
   type QualityRunDto,
+  type SuggestionBasis,
   type WithheldRef,
   excerpt,
   quoted,
@@ -39,10 +40,11 @@ import { formTaskOf } from './open-unit';
  * or offers nothing, leaves the question as it was asked.
  *
  * A suggestion the answering settings' `drafts` table fills — the first in
- * lettering order whose basis it says to type, the record's own by the shipped
- * file — is typed instead of asked: ready before the question, no question
- * goes out; arriving while one waits, the question is withdrawn saying what
- * was filled, an answer given in the same moment standing. Measured
+ * lettering order whose basis it says to type, every basis by the shipped
+ * file since 2026-10-15 — is typed instead of asked: ready before the
+ * question, no question goes out; arriving while one waits, the question is
+ * withdrawn saying what was filled and what it rests on, an answer given in
+ * the same moment standing. Measured
  * 2026-10-12: offered drafts, the operator picked a letter 19 times and typed
  * 4, and a record suggestion is the record's own words — asking only costs the
  * wait.
@@ -182,10 +184,17 @@ const SUPERSEDED: Withdrawal = { reason: 'superseded', note: 'suggested answers 
 /** How much of a typed suggestion the withdrawal quotes. */
 const FILLED_QUOTED = 60;
 
+/** What a typed suggestion rests on, as the withdrawal says it: total over the bases, so a draft is never called the record's. */
+const FILLED_FROM: Record<SuggestionBasis, string> = {
+  record: 'from your record',
+  transfer: 'with a transferable draft',
+  invented: 'with an invented draft, not in your record',
+};
+
 /** The question withdrawn because a suggestion was typed in its place. */
 const filledWithdrawal = (suggestion: OfferedSuggestion): Withdrawal => ({
   reason: 'superseded',
-  note: `filled from your record: ${quoted(excerpt(suggestion.text, FILLED_QUOTED))}`,
+  note: `filled ${FILLED_FROM[suggestion.basis]}: ${quoted(excerpt(suggestion.text, FILLED_QUOTED))}`,
 });
 
 /** The first suggestion in lettering order whose basis the settings type, or null when every one is offered. */

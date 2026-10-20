@@ -35,6 +35,8 @@ const COMMAND_ID = /^[a-z][a-z0-9_]{0,31}$/;
 export const WITHDRAWAL_NOTE_MAX_LENGTH = 300;
 const ID_MAX_LENGTH = 80;
 const CHANNEL_MAX_LENGTH = 40;
+/** A channel's id as an answer carries it (`via.channel`): what a policy over channels is keyed by. */
+export const channelIdSchema = z.string().min(1).max(CHANNEL_MAX_LENGTH);
 
 /** What a prompt may hold, for an asker to fit its question to: no part of a prompt is ever cut by the schema. */
 export const PROMPT_LIMITS = {
@@ -117,7 +119,7 @@ export const interactionAnswerSchema = z.strictObject({
   reply: interactionReplySchema,
   /** The channel it was given on, and that channel's reference for the message that gave it. */
   via: z.strictObject({
-    channel: z.string().min(1).max(CHANNEL_MAX_LENGTH),
+    channel: channelIdSchema,
     ref: z.string().min(1).max(ID_MAX_LENGTH),
   }),
 });

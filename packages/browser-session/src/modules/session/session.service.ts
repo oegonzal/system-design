@@ -51,6 +51,7 @@ export type RunOptions = Omit<
   | 'settingsSources'
   | 'questionExpiresAfterMs'
   | 'asksAfterRefusal'
+  | 'untaught'
   | 'answering'
 > & {
   subject?: string | undefined;
@@ -91,6 +92,11 @@ export class SessionService {
         .map(([kind, source]) => `${kind} ${source}`)
         .join(' · ')}`,
     );
+    this.operator.notify(
+      operator.untaught.length === 0
+        ? 'teaching: every operator answer is taught to the memory'
+        : `teaching: answers given via ${operator.untaught.join(', ')} are kept for this session alone; every other channel's are taught`,
+    );
     return runSession(
       {
         browser: this.browser,
@@ -116,6 +122,7 @@ export class SessionService {
         capture,
         questionExpiresAfterMs: operator.expiresAfterMs,
         asksAfterRefusal: operator.asksAfterRefusal,
+        untaught: operator.untaught,
         answering,
         settingsSources: sources,
       },
@@ -188,6 +195,7 @@ export class SessionService {
         client: this.client,
         ledger: this.ledger,
         subject: subjectFor(subject, this.config.subject),
+        untaught: this.config.settings.operator.untaught,
         log: (text) => this.operator.notify(text),
       },
       dumpsDir,

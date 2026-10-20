@@ -33,6 +33,9 @@ describe('the session settings', () => {
     // The operator is asked at the terminal and through the notifications service.
     expect(shipped.sources.operator).toMatch(/config\/operator\/terminal-and-notifications\.json$/);
     expect(Object.keys(shipped.operator.channels)).toEqual(['notifications']);
+    // [BRW-20] The terminal, where an automated operator may type, is the one channel whose answers are kept
+    // for the session alone; every channel the notifications service runs is the service's to name, and taught.
+    expect(shipped.operator.untaught).toEqual(['terminal']);
     // [BRW-16] What the session types without asking is a total table over the kinds a value may rest on.
     expect(shipped.sources.answering).toMatch(/config\/answering\/standard\.json$/);
     expect(shipped.answering.fills).toEqual({
@@ -48,11 +51,12 @@ describe('the session settings', () => {
       unit: 'fill',
       none: 'ask',
     });
-    // [BRW-18] The record's own suggestion is typed; a draft is offered.
+    // [BRW-18] Every basis a suggestion rests on is typed in the operator's place: the operator asked
+    // (2026-10-15) that an open question be answered rather than waited on; a typed draft is taught to nobody.
     expect(shipped.answering.drafts).toEqual({
       record: 'fill',
-      transfer: 'offer',
-      invented: 'offer',
+      transfer: 'fill',
+      invented: 'fill',
     });
     // One window per service the session rides out, all three declared on the session.
     expect(Object.keys(shipped.session)).toEqual([
@@ -128,10 +132,26 @@ describe('the session settings', () => {
         PACKAGE_ROOT,
         choosing(
           { capture: 'field-entries', session: 'standard', operator: 'terminal' },
-          { 'operator/terminal.json': '{"expiresAfterMs":1000,"channels":{"carrier-pigeon":{}}}' },
+          {
+            'operator/terminal.json':
+              '{"expiresAfterMs":1000,"asksAfterRefusal":1,"channels":{"carrier-pigeon":{}},"untaught":[]}',
+          },
         ),
       ),
     ).toThrow(EngineConfigError);
+    // [BRW-20] A channel named twice among those kept untaught is refused by name.
+    expect(() =>
+      readSessionSettings(
+        PACKAGE_ROOT,
+        choosing(
+          { capture: 'field-entries', session: 'standard', operator: 'terminal' },
+          {
+            'operator/terminal.json':
+              '{"expiresAfterMs":1000,"asksAfterRefusal":1,"channels":{},"untaught":["terminal","terminal"]}',
+          },
+        ),
+      ),
+    ).toThrow(/untaught: names a channel twice/);
     // A channel's own recovery window is a field no schema declares: the session's one bus window serves it.
     expect(() =>
       readSessionSettings(
@@ -140,7 +160,7 @@ describe('the session settings', () => {
           { capture: 'field-entries', session: 'standard', operator: 'terminal' },
           {
             'operator/terminal.json':
-              '{"expiresAfterMs":1000,"asksAfterRefusal":1,"channels":{"notifications":{"pullWaitMs":1000,"eventsPerPull":5,"recovery":{"windowMs":1,"pauseMs":1}}}}',
+              '{"expiresAfterMs":1000,"asksAfterRefusal":1,"channels":{"notifications":{"pullWaitMs":1000,"eventsPerPull":5,"recovery":{"windowMs":1,"pauseMs":1}}},"untaught":[]}',
           },
         ),
       ),

@@ -26,10 +26,11 @@ import { openUnitAnswers, openUnitFilled, openUnitKeyOf } from './session-state'
 /**
  * What the operator answered, kept for this session and taught to the memory:
  * `remember` caches an answer for the next form of the same unit of work that
- * asks the same and shapes it as the item the guidance document carries,
- * keyed by what the field asks and recorded for the unit it was given in;
- * `teach` hands one item to the memory as its own document the moment it is
- * given.
+ * asks the same and — unless the channel it came on is one the operator
+ * settings keep untaught — shapes it as the item the guidance document carries,
+ * keyed by what the field asks, recorded for the unit it was given in and
+ * naming its channel; `teach` hands one item to the memory as its own
+ * document the moment it is given.
  */
 
 /** How much of a taught question the log quotes. */
@@ -43,9 +44,11 @@ const suggestionBasisOf = (chosen: AnswerSource | null): SuggestionBasis | null 
 
 /**
  * Keep what the operator said for the next form of the same unit of work
- * that asks the same, and shape it as the item taught back at once — or null
- * for a field that asks nothing it can be told by, which no probe could ever
- * find again: kept for the session, taught to nobody, and said so.
+ * that asks the same, and shape it as the item taught back at once — or null,
+ * kept for the session, taught to nobody, and said so: for a field that asks
+ * nothing it can be told by, which no probe could ever find again, and for an
+ * answer given on a channel the operator settings keep untaught, which is
+ * nobody's fact to store as the subject's.
  */
 export function remember(
   ctx: EngineContext,
@@ -53,6 +56,7 @@ export function remember(
   answer: string,
   observation: PageObservation,
   chosen: AnswerSource | null,
+  via: string,
 ): OperatorGuidanceDto | null {
   const { state, deps } = ctx;
   settled(openUnitAnswers(state), field, answer);
@@ -61,6 +65,12 @@ export function remember(
   if (question === null) {
     deps.warn(
       `step ${state.step}: ${field.ref} asks nothing it can be taught by; the answer is kept for this session only`,
+    );
+    return null;
+  }
+  if (ctx.options.untaught.includes(via)) {
+    deps.log(
+      `step ${state.step}: ${field.ref} answered via ${via}, which the operator settings do not teach; kept for this session only`,
     );
     return null;
   }
@@ -81,6 +91,7 @@ export function remember(
     },
     answer: excerpt(answer, GUIDANCE_ANSWER_MAX_LENGTH),
     chosen: suggestionBasisOf(chosen),
+    via,
   }) as OperatorGuidanceDto;
 }
 

@@ -342,14 +342,17 @@ export class InMemoryLedger implements LedgerPort {
  * It answers a turn later, so a question can be withdrawn while it waits.
  */
 export class ScriptedOperator implements OperatorPort {
-  readonly name = 'scripted';
   readonly questions: OperatorQuestion[] = [];
   readonly notices: string[] = [];
   readonly unusedAnswers: Withdrawal[] = [];
   private readonly lines: string[];
   private answered = 0;
 
-  constructor(lines: readonly string[] = []) {
+  /** Named as the channel its answers carry (`via.channel`), so a spec can stand it for any channel the settings name or not. */
+  constructor(
+    lines: readonly string[] = [],
+    readonly name = 'scripted',
+  ) {
     this.lines = [...lines];
   }
 

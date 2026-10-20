@@ -9,6 +9,7 @@ import {
 } from '../quality-loop/document-digest';
 import { stripIndexSection } from '../quality-loop/goal-index';
 import {
+  GUIDANCE_PROVENANCE_RULE,
   GUIDANCE_RULE,
   guidanceDocuments,
   operatorGuidanceSchema,
@@ -30,6 +31,7 @@ const item = (overrides: Partial<OperatorGuidanceDto> = {}): OperatorGuidanceDto
   context: { taskLabel: 'Senior Engineer at Acme', unitKey: ACME, page: 'Additional questions' },
   answer: '6',
   chosen: null,
+  via: 'chat',
   ...overrides,
 });
 
@@ -38,9 +40,9 @@ const documentsOf = (items: readonly OperatorGuidanceDto[], subject = 'Alex Exam
   guidanceDocuments('session-1', subject, items, (one) => one).map(({ document }) => document);
 
 describe('guidance', () => {
-  it('[QL-40] [BRW-17] renders one answer as one section: the question and the answer first, where and when it was asked after', () => {
+  it('[QL-40] [BRW-17] [BRW-20] renders one answer as one section: the question and the answer first, where, when and on which channel it was asked after', () => {
     expect(renderGuidanceSection(item())).toBe(
-      'Asked "Years of experience with Python. Whole years, professional only.", the subject answered "6". Asked on 2026-10-02 in the unit of work "Senior Engineer at Acme" (Additional questions).',
+      'Asked "Years of experience with Python. Whole years, professional only.", the subject answered "6". Asked on 2026-10-02 in the unit of work "Senior Engineer at Acme" (Additional questions); answered via chat.',
     );
     expect(
       renderGuidanceSection(
@@ -48,10 +50,11 @@ describe('guidance', () => {
           field: { question: 'Authorised?', type: 'select', options: ['Yes', 'No'] },
           context: { taskLabel: null, unitKey: null, page: null },
           answer: 'Yes',
+          via: 'terminal',
         }),
       ),
     ).toBe(
-      'Asked "Authorised?", offering Yes | No, the subject answered "Yes". Asked on 2026-10-02.',
+      'Asked "Authorised?", offering Yes | No, the subject answered "Yes". Asked on 2026-10-02; answered via terminal.',
     );
     // A drafted suggestion the operator chose is said so, for the digest to keep it whole; the record's own is not.
     expect(renderGuidanceSection(item({ chosen: 'invented' }))).toContain(
@@ -60,10 +63,16 @@ describe('guidance', () => {
     expect(renderGuidanceSection(item({ chosen: 'record' }))).not.toContain('drafted');
   });
 
-  it('[BRW-17] takes only an item keyed by what its field asks', () => {
+  it('[BRW-17] [BRW-20] takes only an item keyed by what its field asks and naming the channel its answer came on', () => {
     expect(operatorGuidanceSchema.safeParse(item()).success).toBe(true);
     const keyless = { ...item(), field: { ...item().field, question: '' } };
     expect(operatorGuidanceSchema.safeParse(keyless).success).toBe(false);
+    // An answer no channel vouches for is nobody's to teach: the channel is never null and never absent.
+    const { via, ...unvouched } = item();
+    void via;
+    expect(operatorGuidanceSchema.safeParse(unvouched).success).toBe(false);
+    expect(operatorGuidanceSchema.safeParse({ ...item(), via: null }).success).toBe(false);
+    expect(operatorGuidanceSchema.safeParse({ ...item(), via: '' }).success).toBe(false);
   });
 
   it('[BRW-17] [QL-71] records the unit of work an answer was given in — null outside any, never absent — and keeps it out of the section the digest reads', () => {
@@ -113,14 +122,17 @@ describe('guidance', () => {
     expect(stripIndexSection(named)).not.toContain(ACME);
   });
 
-  it("[QL-40] asks the digest for the subject's answer to its question, the question as the key, a scope, and provenance kept out of both", () => {
+  it("[QL-40] [BRW-20] asks the digest for the subject's answer to its question with the options it was chosen among, the question as the key, a scope, and provenance — where, when, on which channel — kept out of both", () => {
     const [document] = documentsOf([item()], 'Alex');
-    expect(document.rules).toEqual([...DOCUMENT_RULES, GUIDANCE_RULE]);
+    expect(document.rules).toEqual([...DOCUMENT_RULES, GUIDANCE_RULE, GUIDANCE_PROVENANCE_RULE]);
     expect(GUIDANCE_RULE).toMatch(/the question as quoted/);
     expect(GUIDANCE_RULE).toMatch(/scope is unit only when/);
-    expect(GUIDANCE_RULE).toMatch(/where and when it was asked enters neither/);
-    // The digest reads the rule where it reads every rule of the document.
+    expect(GUIDANCE_RULE).toMatch(/with the options it was chosen among/);
+    expect(GUIDANCE_PROVENANCE_RULE).toMatch(/on which channel/);
+    expect(GUIDANCE_PROVENANCE_RULE).toMatch(/enters neither the insight nor the appliesWhen/);
+    // The digest reads the rules where it reads every rule of the document.
     expect(renderDocumentGoal(document)).toContain(`- ${GUIDANCE_RULE}`);
+    expect(renderDocumentGoal(document)).toContain(`- ${GUIDANCE_PROVENANCE_RULE}`);
   });
 
   it('[QL-40] splits one unit’s answers past what one document’s memories hold, and makes no document of none', () => {
