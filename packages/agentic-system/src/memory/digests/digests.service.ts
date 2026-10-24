@@ -130,13 +130,15 @@ export class DigestsService {
       record?.orchestrator === REGISTER_MEMORY_ORCHESTRATOR_ID
         ? readRegisterDigestIndex(record.request.goal)
         : null;
-    if (record === null || index?.spaceId !== spaceId) {
+    // A record carries every step its orchestrator declares; one without the
+    // digest step is not a digest this host can read, whatever it is.
+    const step = record?.steps[REGISTER_MEMORY_DIGEST_STEP];
+    if (record === null || index?.spaceId !== spaceId || step === undefined) {
       throw new HostRefused(
         'run.not_found',
         `memory space ${spaceId} has no digest ${orchestrationRunId}`,
       );
     }
-    const step = record.steps[REGISTER_MEMORY_DIGEST_STEP];
     const report = registerDigestReportSchema.safeParse(step.report);
     return { record, index, step, report: report.success ? report.data : null };
   }
