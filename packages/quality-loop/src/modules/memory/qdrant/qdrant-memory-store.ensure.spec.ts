@@ -83,7 +83,7 @@ describe('the Qdrant store’s payload indexes', () => {
     expect((await store.verify()).ready).toBe(true);
     expect(indexedBy(refusing.calls)).toEqual(Object.entries(INDEXED_FIELDS));
     expect(warnings).toEqual([
-      'memory store: payload index lineage.goalHash not ensured — no index on lineage.goalHash',
+      'memory store: payload index lineage.goalHash not ensured on quality-memory__v2__m__4: no index on lineage.goalHash',
     ]);
   });
 });

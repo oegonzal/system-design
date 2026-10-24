@@ -6,6 +6,7 @@
  */
 import type { Schemas } from '@qdrant/js-client-rest';
 import type { RecordScope } from '@sysdesign/contracts';
+import { collectionName as qdrantCollection } from '@sysdesign/qdrant-kit';
 
 import type { PointPayload, VisibilityFilter } from '../../ports';
 
@@ -19,7 +20,7 @@ const INDEX_GENERATION = 'v1';
 
 /** Bound to the generation, the model and the width, so vectors of two spaces never share a ranking. */
 export const collectionName = (model: string, dimensions: number): string =>
-  `agentic-memory__${INDEX_GENERATION}__${model.replace(/[^A-Za-z0-9_-]/g, '-')}__${dimensions}`;
+  qdrantCollection('agentic-memory', INDEX_GENERATION, model, dimensions);
 
 type Condition = Schemas['Condition'];
 type IndexSchema = Extract<Schemas['PayloadSchemaType'], 'keyword' | 'datetime'>;

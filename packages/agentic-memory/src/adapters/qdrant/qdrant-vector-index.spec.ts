@@ -1,13 +1,14 @@
 import { randomUUID } from 'node:crypto';
 
 import { QdrantClient } from '@qdrant/js-client-rest';
+import { DEFAULT_QDRANT_URL } from '@sysdesign/qdrant-kit';
 
 import type { PointPayload, VisibilityFilter } from '../../ports';
 import { pointVisible } from '../../testing/in-memory-vector-index';
 import { collectionName } from './collection';
 import { QdrantVectorIndex } from './qdrant-vector-index';
 
-const url = process.env['QDRANT_URL'] || 'http://localhost:6333';
+const url = process.env['QDRANT_URL'] || DEFAULT_QDRANT_URL;
 const client = new QdrantClient({ url, checkCompatibility: false });
 
 /** A model nobody else embeds with, so this run's collection is its own and is dropped after. */

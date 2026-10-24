@@ -9,7 +9,6 @@ import {
 } from '@nestjs/common';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
 import { EntityManager } from '@mikro-orm/postgresql';
-import { QdrantClient } from '@qdrant/js-client-rest';
 import {
   MemoryService,
   MikroOrmRecordStore,
@@ -21,6 +20,7 @@ import {
 import { startPeriodic, type Periodic } from '@sysdesign/contracts';
 import { MemoryRecord, MemorySpace, MemorySpaceDigest } from '@sysdesign/db';
 import { HttpLoopClient, LoopClient } from '@sysdesign/loop-client';
+import { qdrantClient } from '@sysdesign/qdrant-kit';
 
 import { CLOCK, type Clock } from '../common/clock';
 import { DigestsController } from './digests/digests.controller';
@@ -44,9 +44,6 @@ interface MemoryModuleOptions {
 
 /** Where a space's records are projected for recall by meaning: Qdrant, in production. */
 export const VECTOR_INDEX = Symbol('VECTOR_INDEX');
-
-/** A stalled vector store must not hold a request; a refused one is reported at once. */
-const QDRANT_TIMEOUT_MS = 5_000;
 
 const logger = new Logger('Memory');
 const warn = (message: string): void => logger.warn(message);
@@ -101,11 +98,7 @@ export class MemoryModule {
           provide: VECTOR_INDEX,
           useFactory: (): VectorIndex =>
             new QdrantVectorIndex(
-              new QdrantClient({
-                url: options.qdrantUrl,
-                timeout: QDRANT_TIMEOUT_MS,
-                checkCompatibility: false,
-              }),
+              qdrantClient({ url: options.qdrantUrl }),
               options.embedder,
               options.memory.scopeKeys,
               warn,

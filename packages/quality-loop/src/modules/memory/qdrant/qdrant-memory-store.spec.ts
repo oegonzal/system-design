@@ -1,9 +1,10 @@
 import { QdrantClient } from '@qdrant/js-client-rest';
 import type { MemoryScope } from '@sysdesign/contracts';
+import { DEFAULT_QDRANT_URL } from '@sysdesign/qdrant-kit';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { collectionName, INDEXED_FIELDS, pointId, toPayload } from './collection';
-import { DEFAULT_QDRANT_URL, QdrantMemoryStore } from './qdrant-memory-store';
+import { QdrantMemoryStore } from './qdrant-memory-store';
 import type { MemoryHit, MemoryProbe } from '../../../orchestrators/memory/ports';
 import { hitOf } from '../../../orchestrators/memory/testing';
 import { chunkSourceSchema } from '../../../pipelines/memory-recall/input';

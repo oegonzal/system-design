@@ -9,6 +9,7 @@ import {
   type MemoryScope,
   type MemoryStoreAvailabilityDto,
 } from '@sysdesign/contracts';
+import { ensureCollection } from '@sysdesign/qdrant-kit';
 import { describeError } from '@sysdesign/run-dump';
 
 import {
@@ -23,8 +24,6 @@ import {
   type StoredChunk,
 } from '../../../orchestrators/memory/ports';
 import { collectionName, fromPayload, INDEXED_FIELDS, pointId, toPayload } from './collection';
-
-export const DEFAULT_QDRANT_URL = 'http://localhost:6333';
 
 /** Over-fetch before deduping identical lessons from repeated runs of one prompt. */
 const DEDUPE_FACTOR = 3;
@@ -218,41 +217,30 @@ export class QdrantMemoryStore implements MemoryStore {
    * The collection exists and every declared payload index has been asked
    * for — on every boot rather than only with the collection, so a field
    * declared after a collection was built (a facet, the lineage paths) is
-   * indexed on the next boot without a generation bump.
+   * indexed on the next boot without a generation bump. The index type comes
+   * from the field's own declaration: a keyword index on a numeric field is
+   * accepted and then matches no integer filter, which would read as an empty
+   * result rather than as a failure.
    */
   private async ensure(collection: string): Promise<void> {
     if (this.ensured) return;
-    const { exists } = await this.client.collectionExists(collection);
-    if (!exists) {
-      // Two processes may boot at once: the loser of the create re-checks instead of failing.
-      const vectors = Object.fromEntries(
-        VECTOR_NAMES.map((name) => [name, { size: this.dimensions, distance: 'Cosine' as const }]),
-      );
-      await this.client.createCollection(collection, { vectors }).catch(async (error: unknown) => {
-        if (!(await this.client.collectionExists(collection)).exists) throw error;
-      });
-    }
-    // Every boot, not only at creation: a facet added to INDEXED_FIELDS has to
-    // reach the collection that already holds the corpus, and asking for an
-    // index that exists is a no-op. A refusal here is not fatal — an
-    // unindexed facet is a slower filter, not a wrong answer — so it is
-    // reported and the store stays usable. The index type comes from the
-    // field's own declaration: a keyword index on a numeric field is accepted
-    // and then matches no integer filter, which would read as an empty result
-    // rather than as a failure.
-    for (const [field, schema] of Object.entries(INDEXED_FIELDS)) {
-      try {
-        await this.client.createPayloadIndex(collection, {
-          field_name: field,
-          field_schema: schema,
-          wait: true,
-        });
-      } catch (error) {
-        this.warn(
-          `memory store: payload index ${field} not ensured — ${describeError(error).message}`,
-        );
-      }
-    }
+    await ensureCollection(
+      this.client,
+      collection,
+      {
+        vectors: Object.fromEntries(
+          VECTOR_NAMES.map((name) => [
+            name,
+            { size: this.dimensions, distance: 'Cosine' as const },
+          ]),
+        ),
+        payloadIndexes: Object.entries(INDEXED_FIELDS).map(([field, schema]) => ({
+          field,
+          schema,
+        })),
+      },
+      (message) => this.warn(`memory store: ${message}`),
+    );
     this.ensured = true;
   }
 }

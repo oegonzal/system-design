@@ -1,6 +1,5 @@
 import { Logger, Module } from '@nestjs/common';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
-import { QdrantClient } from '@qdrant/js-client-rest';
 import { MemoryEmbedding, MemorySupport } from '@sysdesign/db';
 import {
   createEmbeddingClientFromEnv,
@@ -8,6 +7,7 @@ import {
   type EmbeddingClient,
   type LlmClient,
 } from '@sysdesign/llm';
+import { DEFAULT_QDRANT_URL, qdrantClient } from '@sysdesign/qdrant-kit';
 
 import { CachedEmbeddings } from '../../orchestrators/memory/embeddings';
 import type { KnowledgePorts, SupportStore } from '../../orchestrators/knowledge/ports';
@@ -26,7 +26,7 @@ import { MemoryService } from './memory.service';
 import { MikroOrmEmbeddingCache } from './persistence/mikro-orm-embedding-cache';
 import { MikroOrmMemorySupport } from './persistence/mikro-orm-memory-support';
 import { LlmQueryProbes } from './query-probes/llm-query-probes';
-import { DEFAULT_QDRANT_URL, QdrantMemoryStore } from './qdrant/qdrant-memory-store';
+import { QdrantMemoryStore } from './qdrant/qdrant-memory-store';
 import {
   EMBEDDING_CACHE,
   EMBEDDING_CLIENT,
@@ -39,17 +39,12 @@ import {
 
 const logger = new Logger('Memory');
 
-/** A stalled store must not hold a request or boot; a refused one is reported at once. */
-const QDRANT_TIMEOUT_MS = 5_000;
-
 /** The store is bound to the embedding client's model and width at boot. */
 const qdrantStore = (client: EmbeddingClient): QdrantMemoryStore =>
   new QdrantMemoryStore(
-    new QdrantClient({
+    qdrantClient({
       url: process.env['QDRANT_URL'] || DEFAULT_QDRANT_URL,
       apiKey: process.env['QDRANT_API_KEY'] || undefined,
-      timeout: QDRANT_TIMEOUT_MS,
-      checkCompatibility: false,
     }),
     client.model,
     client.dimensions,

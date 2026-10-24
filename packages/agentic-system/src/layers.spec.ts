@@ -39,7 +39,7 @@ const RULES: readonly Rule[] = [
   {
     holds: under('memory'),
     reaches: (t) => under('memory')(t) || under('common')(t),
-    packages: ['contracts', 'db', 'nest-kit', 'loop-client', 'agentic-memory'],
+    packages: ['contracts', 'db', 'nest-kit', 'loop-client', 'agentic-memory', 'qdrant-kit'],
   },
   {
     // The composition root and its specs: main, config, settings, the app.

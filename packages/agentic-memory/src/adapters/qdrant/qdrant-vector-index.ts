@@ -8,7 +8,7 @@
  * collection: a write does nothing and a search finds nothing.
  */
 import type { QdrantClient } from '@qdrant/js-client-rest';
-import { errorMessage } from '@sysdesign/contracts';
+import { ensureCollection } from '@sysdesign/qdrant-kit';
 
 import type { PointPayload, VectorIndex, VisibilityFilter } from '../../ports';
 import { collectionName, filterOf, payloadIndexes } from './collection';
@@ -77,31 +77,16 @@ export class QdrantVectorIndex implements VectorIndex {
     return this.ensuring;
   }
 
-  /** The collection, made when missing, and every payload index asked for. */
-  private async prepare(collection: string): Promise<void> {
-    if (!(await this.client.collectionExists(collection)).exists) {
-      const vectors = { size: this.embedder.dimensions, distance: 'Cosine' as const };
-      // Two processes may boot at once: the loser of the create checks again instead of failing.
-      await this.client.createCollection(collection, { vectors }).catch(async (error: unknown) => {
-        if (!(await this.client.collectionExists(collection)).exists) throw error;
-      });
-    }
-    // Asked for even when the collection already stood — asking for an index
-    // that exists is a no-op — so a scope key a later policy declares is
-    // indexed too. A refusal is reported, not fatal: an unindexed field makes a
-    // slower filter, never a wrong one.
-    for (const { field, schema } of payloadIndexes(this.scopeKeys)) {
-      try {
-        await this.client.createPayloadIndex(collection, {
-          field_name: field,
-          field_schema: schema,
-          wait: true,
-        });
-      } catch (error) {
-        this.warn(
-          `vector index: payload index ${field} not ensured on ${collection}: ${errorMessage(error)}`,
-        );
-      }
-    }
+  /** The collection, made when missing, and every payload index asked for — a scope key a later policy declares included. */
+  private prepare(collection: string): Promise<void> {
+    return ensureCollection(
+      this.client,
+      collection,
+      {
+        vectors: { size: this.embedder.dimensions, distance: 'Cosine' },
+        payloadIndexes: payloadIndexes(this.scopeKeys),
+      },
+      (message) => this.warn(`vector index: ${message}`),
+    );
   }
 }

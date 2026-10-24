@@ -16,6 +16,7 @@ import {
   unitKeySchema,
   type MemoryLineageDto,
 } from '@sysdesign/contracts';
+import { collectionName as qdrantCollection } from '@sysdesign/qdrant-kit';
 import { z } from 'zod';
 
 import {
@@ -40,7 +41,7 @@ const INDEX_GENERATION = 'v2';
 
 /** Bound to the generation, the model and the width, so nothing ever mixes. */
 export const collectionName = (model: string, dimensions: number): string =>
-  `quality-memory__${INDEX_GENERATION}__${model.replace(/[^A-Za-z0-9_-]/g, '-')}__${dimensions}`;
+  qdrantCollection('quality-memory', INDEX_GENERATION, model, dimensions);
 
 /** The index types Qdrant builds, as it names them. */
 export const PAYLOAD_INDEX_SCHEMAS = [

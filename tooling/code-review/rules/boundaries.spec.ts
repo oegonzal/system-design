@@ -35,7 +35,7 @@ describe('the dependency matrix', () => {
     ['govcon-ui', ['contracts', 'design-system', 'web-kit', 'web-testing']],
     ['loop-client', ['contracts']],
     ['notifications-client', ['contracts']],
-    ['agentic-memory', ['contracts', 'db']],
+    ['agentic-memory', ['contracts', 'db', 'qdrant-kit']],
     [
       'agentic-system',
       [
@@ -47,11 +47,12 @@ describe('the dependency matrix', () => {
         'notifications-client',
         'agentic-memory',
         'llm',
+        'qdrant-kit',
       ],
     ],
     ['studio-testing', ['contracts', 'loop-client']],
     ['studio-api', ['contracts', 'db', 'nest-kit', 'loop-client', 'studio-testing']],
-    ['quality-loop', ['contracts', 'db', 'llm', 'run-dump', 'nest-kit']],
+    ['quality-loop', ['contracts', 'db', 'llm', 'run-dump', 'nest-kit', 'qdrant-kit']],
     [
       'govcon',
       ['contracts', 'db', 'nest-kit', 'notifications-client', 'loop-client', 'studio-testing'],

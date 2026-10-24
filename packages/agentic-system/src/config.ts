@@ -1,6 +1,7 @@
 import { resolve } from 'node:path';
 
 import { createEmbeddingClientFromEnv, type EmbeddingClient } from '@sysdesign/llm';
+import { DEFAULT_QDRANT_URL } from '@sysdesign/qdrant-kit';
 
 import type { AgenticSystemSettings } from './settings';
 
@@ -25,7 +26,7 @@ export const AGENTIC_SYSTEM_ENV = {
   /** The bus the service publishes design lifecycle events to. */
   notificationsUrl: { name: 'NOTIFICATIONS_URL', fallback: 'http://localhost:3005' },
   /** The vector store memory spaces project their records into. */
-  qdrantUrl: { name: 'QDRANT_URL', fallback: 'http://localhost:6333' },
+  qdrantUrl: { name: 'QDRANT_URL', fallback: DEFAULT_QDRANT_URL },
 } as const;
 
 export class AgenticSystemConfigError extends Error {
