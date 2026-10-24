@@ -56,6 +56,9 @@ export interface SupportStore {
 /** The key `countByPoint` answers under, so a caller never builds it by hand. */
 export const supportKey = (point: PointRef): string => `${point.runId}|${point.ref}`;
 
+/** The name the knowledge ports are bound under. */
+export const KNOWLEDGE_PORT_BUNDLE = 'knowledge';
+
 export type KnowledgePorts = Pick<MemoryPorts, 'embedding' | 'embeddings' | 'store'> & {
   support: SupportStore;
 };

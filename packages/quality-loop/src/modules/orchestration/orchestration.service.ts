@@ -21,8 +21,12 @@ import { heartbeatEveryMs, type RunJanitorOptions } from '../janitor/stale-after
 import { RUN_JANITOR_OPTIONS } from '../janitor/tokens';
 import { RunsService } from '../runs/runs.service';
 import { isOrchestrationRunId } from './orchestration-request';
-import type { OrchestrationListQuery, OrchestrationRunRepository, OrchestratorHost } from './ports';
-import { ORCHESTRATION_RUN_REPOSITORY, ORCHESTRATOR_HOSTS } from './tokens';
+import type {
+  OrchestrationListQuery,
+  OrchestrationRunRepository,
+  OrchestratorBinding,
+} from './ports';
+import { ORCHESTRATION_RUN_REPOSITORY, ORCHESTRATOR_BINDINGS } from './tokens';
 
 @Injectable()
 export class OrchestrationService {
@@ -31,11 +35,12 @@ export class OrchestrationService {
   constructor(
     private readonly runs: RunsService,
     @Inject(ORCHESTRATION_RUN_REPOSITORY) private readonly repository: OrchestrationRunRepository,
-    @Inject(ORCHESTRATOR_HOSTS) private readonly hosts: ReadonlyMap<string, OrchestratorHost>,
+    @Inject(ORCHESTRATOR_BINDINGS)
+    private readonly bindings: ReadonlyMap<string, OrchestratorBinding>,
     @Inject(RUN_JANITOR_OPTIONS) private readonly janitor: RunJanitorOptions,
   ) {
     // A malformed orchestrator fails boot, never a run.
-    for (const host of hosts.values()) validateOrchestrator(host.definition);
+    for (const binding of bindings.values()) validateOrchestrator(binding.definition);
   }
 
   async get(id: string): Promise<OrchestrationRunDto | null> {
@@ -55,9 +60,9 @@ export class OrchestrationService {
    * way its orchestrator declared it.
    */
   private sequenced(record: OrchestrationRunDto): OrchestrationRunDto {
-    const host = this.hosts.get(record.orchestrator);
-    if (!host) return record;
-    const declared = host.definition.steps.map((step) => step.id);
+    const binding = this.bindings.get(record.orchestrator);
+    if (!binding) return record;
+    const declared = binding.definition.steps.map((step) => step.id);
     const rest = Object.keys(record.steps).filter((id) => !declared.includes(id));
     return {
       ...record,
@@ -75,10 +80,10 @@ export class OrchestrationService {
     request: StartOrchestrationRequest,
   ): Promise<OrchestrationRunDto> {
     // BOOKMARK - great example for really drilling down on IoC understanding **personal note**
-    const host = this.host(orchestrator);
-    const normalized = this.admit(host, request);
-    const record = await this.open(host, normalized, null);
-    void this.perform(host, record, normalized, null);
+    const binding = this.binding(orchestrator);
+    const normalized = this.admit(binding, request);
+    const record = await this.open(binding, normalized, null);
+    void this.perform(binding, record, normalized, null);
     return record;
   }
 
@@ -92,21 +97,21 @@ export class OrchestrationService {
     orchestrator: string,
     body: StartOrchestrationFromRunRequest,
   ): Promise<OrchestrationRunDto> {
-    const host = this.host(orchestrator);
+    const binding = this.binding(orchestrator);
     const source = orNotFound(await this.runs.get(body.runId), `run ${body.runId} not found`);
     // Two different questions. Which run to seed: any step that stands in wants
     // it. Whether the composed-goal refusal may be waived: EVERY step that
     // would run the target must stand in, or one of them still runs it —
     // `second-opinion` stands in for its first judge and still runs a panel.
-    const seeds = host.definition.steps.some((step) => step.provided !== undefined);
-    const stands = host.definition.steps.every(
+    const seeds = binding.definition.steps.some((step) => step.provided !== undefined);
+    const stands = binding.definition.steps.every(
       (step) => typeof step.pipeline !== 'function' || step.provided !== undefined,
     );
     const normalized = this.admit(
-      host,
+      binding,
       openedAs<StartOrchestrationRequest>(
         {
-          ...(host.definition.takesTarget ? { pipeline: source.pipeline } : {}),
+          ...(binding.definition.takesTarget ? { pipeline: source.pipeline } : {}),
           goal: source.request.goal,
           maxIterations: source.request.maxIterations,
           ...(body.samples === undefined ? {} : { samples: body.samples }),
@@ -116,13 +121,13 @@ export class OrchestrationService {
       stands,
     );
     const provided = seeds ? source : null;
-    const record = await this.open(host, normalized, provided);
-    void this.perform(host, record, normalized, provided);
+    const record = await this.open(binding, normalized, provided);
+    void this.perform(binding, record, normalized, provided);
     return record;
   }
 
-  private host(orchestrator: string): OrchestratorHost {
-    return orNotFound(this.hosts.get(orchestrator), `unknown orchestrator ${orchestrator}`);
+  private binding(orchestrator: string): OrchestratorBinding {
+    return orNotFound(this.bindings.get(orchestrator), `unknown orchestrator ${orchestrator}`);
   }
 
   /**
@@ -131,31 +136,31 @@ export class OrchestrationService {
    * must be registered; the orchestrator's own `refuse` says the rest.
    */
   private admit(
-    host: OrchestratorHost,
+    binding: OrchestratorBinding,
     request: StartOrchestrationRequest,
     stood = false,
   ): StartOrchestrationRequest {
-    const normalized = host.definition.normalize?.(request) ?? request;
-    assertTargetDeclared(host, normalized);
+    const normalized = binding.definition.normalize?.(request) ?? request;
+    assertTargetDeclared(binding, normalized);
     // A named target must be registered — the same 404 a run would get.
     if (normalized.pipeline !== undefined) this.runs.summary(normalized.pipeline);
-    const refusal = host.definition.refuse?.(normalized, this.runs.pipelines(), stood);
+    const refusal = binding.definition.refuse?.(normalized, this.runs.pipelines(), stood);
     if (refusal !== null && refusal !== undefined) throw new BadRequestException(refusal);
     return normalized;
   }
 
   private async open(
-    host: OrchestratorHost,
+    binding: OrchestratorBinding,
     request: StartOrchestrationRequest,
     provided: QualityRunDto | null,
   ): Promise<OrchestrationRunDto> {
     // What the orchestrator observed, held to the shape it declares: a context
     // the shape refuses is a start that fails, never a row that lies.
-    const observed = host.definition.contextSchema.parse(
-      await host.definition.context(host.ports),
+    const observed = binding.definition.contextSchema.parse(
+      await binding.definition.context(binding.ports),
     ) as Record<string, unknown>;
     const record = openRecord(
-      host.definition,
+      binding.definition,
       request,
       provided,
       observed,
@@ -180,20 +185,20 @@ export class OrchestrationService {
   }
 
   private async perform(
-    host: OrchestratorHost,
+    binding: OrchestratorBinding,
     record: OrchestrationRunDto,
     request: StartOrchestrationRequest,
     provided: QualityRunDto | null,
   ): Promise<void> {
-    const label = `${host.definition.id} run ${record.orchestrationRunId}`;
+    const label = `${binding.definition.id} run ${record.orchestrationRunId}`;
     const ticker = startPeriodic(
       { everyMs: heartbeatEveryMs(this.janitor.staleAfterMs), atStart: false },
       () => this.repository.heartbeat(record.orchestrationRunId),
       (error) => this.logger.warn(`${label}: heartbeat not written: ${String(error)}`),
     );
     try {
-      await runOrchestration(host.definition, record, request, provided, {
-        ports: host.ports,
+      await runOrchestration(binding.definition, record, request, provided, {
+        ports: binding.ports,
         pipelines: () => this.runs.pipelines(),
         execute: (child, onOpened) => this.runs.execute(child, onOpened),
         flush: (current) => this.repository.update(current),
@@ -221,8 +226,11 @@ export class OrchestrationService {
 }
 
 /** The declaration decides whether a target is named at all. */
-function assertTargetDeclared(host: OrchestratorHost, request: StartOrchestrationRequest): void {
-  const { id, takesTarget } = host.definition;
+function assertTargetDeclared(
+  binding: OrchestratorBinding,
+  request: StartOrchestrationRequest,
+): void {
+  const { id, takesTarget } = binding.definition;
   if (takesTarget && request.pipeline === undefined) {
     throw new BadRequestException(`${id} takes a target pipeline; name one`);
   }

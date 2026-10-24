@@ -27,7 +27,7 @@ import { KNOWLEDGE_DIGEST_ID } from '../../pipelines/knowledge-digest/input';
 import { MEMORY_ARCHITECTURE_ID } from '../../pipelines/memory-architecture/definition';
 import { bareRequest, providedAsOutput } from '../common';
 import { digest, known, store, target, type KnowledgeOutputs } from '../knowledge/steps';
-import type { KnowledgePorts } from '../knowledge/ports';
+import { KNOWLEDGE_PORT_BUNDLE, type KnowledgePorts } from '../knowledge/ports';
 import type { OrchestratorDefinition } from '../runner/definition';
 
 export const MEMORY_DESIGN_ORCHESTRATOR_ID = 'memory-design';
@@ -40,6 +40,7 @@ export const MEMORY_DESIGN: OrchestratorDefinition<KnowledgeOutputs, KnowledgePo
   // The target is fixed to the memory-architecture pipeline, so a request naming
   // one is refused by the service; a finished run is provided instead.
   takesTarget: false,
+  ports: KNOWLEDGE_PORT_BUNDLE,
   reasons: KNOWLEDGE_STEP_REASONS,
 
   // The goal is taken bare, once: a goal that already carries remembered

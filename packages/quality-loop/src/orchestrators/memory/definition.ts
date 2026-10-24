@@ -15,7 +15,7 @@ import { EXPERIENCE_DIGEST_ID } from '../../pipelines/experience-digest/input';
 import { MEMORY_RECALL_ID } from '../../pipelines/memory-recall/input';
 import { bareRequest, providedAsOutput, refuseInternal } from '../common';
 import type { OrchestratorDefinition } from '../runner/definition';
-import type { MemoryPorts } from './ports';
+import { MEMORY_PORT_BUNDLE, type MemoryPorts } from './ports';
 import { digest, recall, store, target, type MemoryOutputs } from './steps';
 
 export const MEMORY: OrchestratorDefinition<MemoryOutputs, MemoryPorts> = {
@@ -24,6 +24,7 @@ export const MEMORY: OrchestratorDefinition<MemoryOutputs, MemoryPorts> = {
   description:
     'Recall what earlier runs learned, run the target with it, digest the result, store what the digest endorsed.',
   takesTarget: true,
+  ports: MEMORY_PORT_BUNDLE,
   reasons: MEMORY_STEP_REASONS,
 
   // The goal is taken bare, once, for the record and every child: a goal that

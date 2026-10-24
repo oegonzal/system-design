@@ -16,6 +16,9 @@ export interface BriefClassifier {
   classify(goal: string, routes: readonly RouteDto[]): Promise<Classification | null>;
 }
 
+/** The name the router's ports are bound under. */
+export const ROUTER_PORT_BUNDLE = 'router';
+
 /** The ports the router runs over; the module that owns the classifier binds them. */
 export interface RouterPorts {
   classifier: BriefClassifier;

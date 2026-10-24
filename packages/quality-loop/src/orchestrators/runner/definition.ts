@@ -83,6 +83,12 @@ export interface OrchestratorDefinition<O extends object = Record<string, unknow
   description: string;
   /** Whether the request names a target pipeline: required when true, refused when false. */
   takesTarget: boolean;
+  /**
+   * The port bundle its steps run over, by the name the host binds it under;
+   * absent for one that runs over none. Declared here so binding a new
+   * orchestrator never edits the host.
+   */
+  ports?: string;
   /** Reasons its steps may give beyond the runner's own. Closed, so a client maps tones and never prose. */
   reasons: readonly string[];
   /** The request as the record and every step should see it — a goal stripped of what a previous run appended, say. */

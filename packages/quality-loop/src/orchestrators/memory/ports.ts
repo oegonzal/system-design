@@ -233,6 +233,9 @@ export interface QueryProbes {
   derive(goal: string, focus?: readonly string[]): Promise<string[]>;
 }
 
+/** The name the memory ports are bound under, for every orchestrator that runs over them or a part of them. */
+export const MEMORY_PORT_BUNDLE = 'memory';
+
 /** The ports the memory orchestrator runs over; the module that owns the adapters binds them. */
 export interface MemoryPorts {
   embedding: LlmAvailabilityDto;

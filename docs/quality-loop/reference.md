@@ -410,11 +410,12 @@ nothing. Without an OpenAI key the tier degrades to disabled rather than failing
 
 ### `modules/orchestration/`
 
-Runs and records orchestrations. Tokens: `ORCHESTRATOR_HOSTS`, `ORCHESTRATION_RUN_REPOSITORY`.
-`ORCHESTRATOR_HOSTS` is the only place a declaration meets its adapters. `OrchestrationService`
-admits a request, resolves the iteration budget, starts a heartbeat and drives the generic runner.
-`OrchestrationRecordModule` is the record alone, so the janitor and the memory module can import it
-without pulling in the hosts.
+Runs and records orchestrations. Tokens: `ORCHESTRATOR_BINDINGS`, `ORCHESTRATION_RUN_REPOSITORY`.
+`ORCHESTRATOR_BINDINGS` is the only place a declaration meets its adapters: each definition names
+the port bundle it runs over (`ports`), and the module binds that bundle by name and refuses at boot
+a name no module binds. `OrchestrationService` admits a request, resolves the iteration budget,
+starts a heartbeat and drives the generic runner. `OrchestrationRecordModule` is the record alone,
+so the janitor and the memory module can import it without pulling in the bindings.
 
 Routes: `POST /orchestrations/:orchestrator` and `POST /orchestrations/:orchestrator/from-run` both
 answer 202; `GET /orchestrations` is a filtered page; `GET /orchestrations/:id` returns one, its

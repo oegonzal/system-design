@@ -1,18 +1,9 @@
 import { Module } from '@nestjs/common';
 
-import {
-  DOCUMENT_MEMORY_ORCHESTRATOR_ID,
-  FORM_MEMORY_ORCHESTRATOR_ID,
-  KNOWLEDGE_ORCHESTRATOR_ID,
-  MEMORY_ORCHESTRATOR_ID,
-  ROUTER_ORCHESTRATOR_ID,
-} from '@sysdesign/contracts';
-
 import { ORCHESTRATORS } from '../../orchestrators';
-import { MEMORY_DESIGN_ORCHESTRATOR_ID } from '../../orchestrators/memory-design/definition';
-import type { KnowledgePorts } from '../../orchestrators/knowledge/ports';
-import type { MemoryPorts } from '../../orchestrators/memory/ports';
-import type { RouterPorts } from '../../orchestrators/router/ports';
+import { KNOWLEDGE_PORT_BUNDLE, type KnowledgePorts } from '../../orchestrators/knowledge/ports';
+import { MEMORY_PORT_BUNDLE, type MemoryPorts } from '../../orchestrators/memory/ports';
+import { ROUTER_PORT_BUNDLE, type RouterPorts } from '../../orchestrators/router/ports';
 import { JanitorModule } from '../janitor/janitor.module';
 import { MemoryModule } from '../memory/memory.module';
 import { KNOWLEDGE_PORTS, MEMORY_PORTS } from '../memory/tokens';
@@ -22,17 +13,31 @@ import { RunsModule } from '../runs/runs.module';
 import { OrchestrationController } from './orchestration.controller';
 import { OrchestrationRecordModule } from './orchestration-record.module';
 import { OrchestrationService } from './orchestration.service';
-import type { OrchestratorHost } from './ports';
-import { ORCHESTRATOR_HOSTS } from './tokens';
+import type { OrchestratorBinding } from './ports';
+import { ORCHESTRATOR_BINDINGS } from './tokens';
 
-const host = (definition: unknown, ports: unknown): OrchestratorHost =>
-  ({ definition, ports }) as OrchestratorHost;
+/**
+ * A definition bound to the bundle it declared, or a boot failure naming the
+ * bundle nobody binds — an orchestrator must never start with its ports absent.
+ */
+const bind = (
+  definition: OrchestratorBinding['definition'],
+  bundles: Readonly<Record<string, unknown>>,
+): OrchestratorBinding => {
+  if (definition.ports === undefined) return { definition, ports: undefined };
+  if (!(definition.ports in bundles)) {
+    throw new Error(
+      `orchestrator ${definition.id} runs over the "${definition.ports}" ports, which no module binds`,
+    );
+  }
+  return { definition, ports: bundles[definition.ports] };
+};
 
 /**
  * The runner, the record and every registered orchestrator bound to its
  * ports. A definition is data in `orchestrators/`; the ports are adapters
  * owned by the module that built them, so the binding — and only the binding
- * — lives here. An orchestrator that declares ports gets them by id; one that
+ * — lives here. An orchestrator gets the bundle it declares by name; one that
  * declares none, like the two panels, is bound to nothing. The form and
  * document memory orchestrators declare a subset of the memory ports and are
  * bound to the same object, so one store and one embedding client serve all
@@ -46,24 +51,21 @@ const host = (definition: unknown, ports: unknown): OrchestratorHost =>
   providers: [
     OrchestrationService,
     {
-      provide: ORCHESTRATOR_HOSTS,
+      provide: ORCHESTRATOR_BINDINGS,
       useFactory: (
         memory: MemoryPorts,
         router: RouterPorts,
         knowledge: KnowledgePorts,
-      ): ReadonlyMap<string, OrchestratorHost> => {
-        const ports = new Map<string, unknown>([
-          [MEMORY_ORCHESTRATOR_ID, memory],
-          [FORM_MEMORY_ORCHESTRATOR_ID, memory],
-          [DOCUMENT_MEMORY_ORCHESTRATOR_ID, memory],
-          [ROUTER_ORCHESTRATOR_ID, router],
-          [KNOWLEDGE_ORCHESTRATOR_ID, knowledge],
-          [MEMORY_DESIGN_ORCHESTRATOR_ID, knowledge],
-        ]);
+      ): ReadonlyMap<string, OrchestratorBinding> => {
+        const bundles = {
+          [MEMORY_PORT_BUNDLE]: memory,
+          [ROUTER_PORT_BUNDLE]: router,
+          [KNOWLEDGE_PORT_BUNDLE]: knowledge,
+        };
         return new Map(
           [...ORCHESTRATORS.values()].map((definition) => [
             definition.id,
-            host(definition, ports.get(definition.id)),
+            bind(definition, bundles),
           ]),
         );
       },

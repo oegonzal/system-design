@@ -14,7 +14,7 @@ import {
 
 import { bareRequest } from '../common';
 import type { OrchestratorDefinition } from '../runner/definition';
-import type { RouterPorts } from './ports';
+import { ROUTER_PORT_BUNDLE, type RouterPorts } from './ports';
 import { classify, judge, type RouterOutputs } from './steps';
 
 export const ROUTER: OrchestratorDefinition<RouterOutputs, RouterPorts> = {
@@ -23,6 +23,7 @@ export const ROUTER: OrchestratorDefinition<RouterOutputs, RouterPorts> = {
   description: 'Read a brief, pick the registered judge built for it, and run that judge.',
   // The router chooses; a request that names a pipeline is refused by the service.
   takesTarget: false,
+  ports: ROUTER_PORT_BUNDLE,
   reasons: ROUTER_STEP_REASONS,
   normalize: bareRequest,
   context: (ports) => Promise.resolve({ classifier: ports.model } satisfies RouterContextDto),

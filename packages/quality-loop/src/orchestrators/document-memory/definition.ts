@@ -21,6 +21,7 @@ import {
 
 import { DOCUMENT_DIGEST_ID, readIndex } from '../../pipelines/document-digest/input';
 import type { OrchestratorDefinition } from '../runner/definition';
+import { MEMORY_PORT_BUNDLE } from '../memory/ports';
 import type { DocumentMemoryPorts } from './ports';
 import { digest, store, type DocumentMemoryOutputs } from './steps';
 
@@ -45,6 +46,7 @@ export const DOCUMENT_MEMORY: OrchestratorDefinition<DocumentMemoryOutputs, Docu
   description:
     'Digest one chunk of a document about a person into facts about them, and store what the digest endorsed.',
   takesTarget: false,
+  ports: MEMORY_PORT_BUNDLE,
   reasons: DOCUMENT_MEMORY_STEP_REASONS,
   refuse: refuseNonDocument,
   context: async (ports) =>

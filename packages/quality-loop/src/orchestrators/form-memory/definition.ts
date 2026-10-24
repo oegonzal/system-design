@@ -21,6 +21,7 @@ import {
 } from '@sysdesign/contracts';
 
 import type { OrchestratorDefinition } from '../runner/definition';
+import { MEMORY_PORT_BUNDLE } from '../memory/ports';
 import type { FormMemoryPorts } from './ports';
 import { recall, target, type FormMemoryOutputs } from './steps';
 
@@ -41,6 +42,7 @@ export const FORM_MEMORY: OrchestratorDefinition<FormMemoryOutputs, FormMemoryPo
   description:
     'Recall facts about the subject for the fields of one form page without a model call, then run the form pipeline the request names over them.',
   takesTarget: true,
+  ports: MEMORY_PORT_BUNDLE,
   reasons: FORM_MEMORY_STEP_REASONS,
   refuse: refuseNonForm,
   context: async (ports) =>

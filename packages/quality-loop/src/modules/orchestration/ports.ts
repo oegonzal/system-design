@@ -1,6 +1,6 @@
 /**
  * The orchestration module's ports. The record repository is MikroORM in
- * production; specs hand in fakes. A host is a definition bound to the ports
+ * production; specs hand in fakes. A binding is a definition and the ports
  * it declared — bound by the module that owns those adapters, never here.
  */
 import type { ListOrchestrationRunsQuery, OrchestrationRunDto } from '@sysdesign/contracts';
@@ -8,7 +8,7 @@ import type { ListOrchestrationRunsQuery, OrchestrationRunDto } from '@sysdesign
 import type { CloseOutcome } from '../../core/ports';
 import type { OrchestratorDefinition } from '../../orchestrators/runner/definition';
 
-export interface OrchestratorHost<O extends object = Record<string, unknown>, P = unknown> {
+export interface OrchestratorBinding<O extends object = Record<string, unknown>, P = unknown> {
   definition: OrchestratorDefinition<O, P>;
   ports: P;
 }

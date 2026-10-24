@@ -24,7 +24,7 @@ import {
 import { KNOWLEDGE_DIGEST_ID } from '../../pipelines/knowledge-digest/input';
 import { bareRequest, providedAsOutput, refuseInternal } from '../common';
 import type { OrchestratorDefinition } from '../runner/definition';
-import type { KnowledgePorts } from './ports';
+import { KNOWLEDGE_PORT_BUNDLE, type KnowledgePorts } from './ports';
 import { digest, known, store, target, type KnowledgeOutputs } from './steps';
 
 export const KNOWLEDGE: OrchestratorDefinition<KnowledgeOutputs, KnowledgePorts> = {
@@ -33,6 +33,7 @@ export const KNOWLEDGE: OrchestratorDefinition<KnowledgeOutputs, KnowledgePorts>
   description:
     'Learn from a finished run against what the store already knows: what it taught, typed, and what it confirms or contradicts.',
   takesTarget: true,
+  ports: KNOWLEDGE_PORT_BUNDLE,
   reasons: KNOWLEDGE_STEP_REASONS,
 
   // The goal is taken bare, once, for the record and every child: a goal that
