@@ -106,6 +106,17 @@ export const profileOf = (overrides: Partial<SearchProfile> = {}): SearchProfile
   },
   alerts: { ...DEFAULT_ALERT_POLICY },
   teaming: { subcontract: { ...DEFAULT_TEAMING_POLICY.subcontract } },
+  introduction: {
+    about: 'Precision Parts Co machines replacement parts to print.',
+    delivery: 'Made in Ohio, shipped within a week.',
+    offers: [
+      {
+        id: 'machining',
+        label: 'Machining',
+        line: 'Replacement parts machined to print in small runs.',
+      },
+    ],
+  },
   ...overrides,
 });
 

@@ -410,4 +410,9 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
     statement:
       'A task may declare carried parts — keys of its output that another party composed and no producer writes — and a produced revision keeps each exactly as the artifact it revises had it, whatever the reply held, a part that artifact lacks staying absent; an artifact handed in stands as it is, and boot refuses a carried key the output schema does not declare.',
   },
+  {
+    id: 'QL-82',
+    statement:
+      'The introduction-note pipeline writes a short note from one firm to a named reader at another about one named program, from a composed goal that indexes the program and the sender’s offers: four fixed rules — fidelity, relevance, restraint, clarity — two per dimension, judged by one claims critic and one evaluator at two samples; a note that names another program or makes an offer the goal never listed is refused by the references validator before any lens reads it; two iterations, nothing gating, so the composer shows the decision beside the note and a person sends it or not.',
+  },
 ];

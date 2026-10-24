@@ -28,6 +28,7 @@ import {
   Section,
   type ProfileIssue,
 } from './editor-fields';
+import { IntroductionSection } from './introduction-section';
 import { ScoringSections } from './scoring-sections';
 
 export type { ProfileIssue } from './editor-fields';
@@ -355,6 +356,13 @@ export function ProfileEditor({
         </Stack>
         <FieldIssues issues={issues} path="teaming" />
       </Section>
+
+      <IntroductionSection
+        value={value.introduction}
+        issues={issues}
+        disabled={saving}
+        onChange={(introduction) => patch({ introduction })}
+      />
       <Text tone="muted" size="sm">
         Saved as one document; the service validates it whole and writes nothing on an issue.
       </Text>

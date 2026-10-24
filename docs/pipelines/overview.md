@@ -228,7 +228,7 @@ login, and the process refuses to boot). An API key is never used.
 
 `packages/quality-loop` runs the generic doctrine from
 [`../pipeline-best-practices/overview.md`](../pipeline-best-practices/overview.md)
-over any task declared as data. Fourteen pipelines live as sibling folders
+over any task declared as data. Sixteen pipelines live as sibling folders
 under `src/pipelines/`: `system-design`, `agentic-design` and
 `memory-architecture` judge a text brief; `memory-recall` and
 `experience-digest` are the memory tier's, composed by
@@ -238,7 +238,9 @@ finished run by the knowledge and memory-design orchestrators;
 `system-design-canvas`, `design-prompt` and `interview-turn` are the studio's; `browser-step`,
 `field-answer` and `answer-suggestions` are the browser session's, `tool-step`
 a tool session's, `document-digest` the document ingester's and the browser
-session's, and `register-digest` a memory space's. Each of those twelve takes
+session's, `register-digest` a memory space's, and `introduction-note` govcon's —
+a note to a prime about one tracked award, composed from the award's record and
+the profile's offers. Each of those thirteen takes
 a goal its owner composed — never a brief a person types into the router.
 Every definition says which it is: `goalSource: 'brief' | 'composed'`,
 validated at boot and carried on the pipeline summary, so the loop UI offers

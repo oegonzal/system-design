@@ -42,6 +42,7 @@ export const TARGET_ACTIVITY_KIND_LABEL: Record<TargetActivityKind, string> = {
   called: 'Called',
   met: 'Met',
   replied: 'They replied',
+  drafted: 'Drafted',
 };
 
 /** The page each kind's subject opens at. */

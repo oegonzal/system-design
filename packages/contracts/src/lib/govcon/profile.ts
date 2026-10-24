@@ -107,6 +107,29 @@ export const DEFAULT_TEAMING_POLICY: TeamingPolicy = {
   subcontract: { min: 50_000, max: 2_000_000 },
 };
 
+/** One thing the company offers a prime, as an introduction may make it: a stable id the note cites, a label, and the line itself. */
+export interface Offer {
+  id: string;
+  label: string;
+  line: string;
+}
+
+/** What an introduction is written from: who the company is, how it delivers, and what it offers. */
+export interface IntroductionPolicy {
+  /** The company in one or two sentences, as the note's sender. */
+  about: string;
+  /** How the work is delivered: where, by whom, under what clearance. */
+  delivery: string;
+  offers: Offer[];
+}
+
+/** A profile from before introductions were written offers nothing until the person says what it does. */
+export const DEFAULT_INTRODUCTION_POLICY: IntroductionPolicy = {
+  about: '',
+  delivery: '',
+  offers: [],
+};
+
 export interface SearchProfile {
   /** A slug: the path segment and the key everything else joins on. */
   id: string;
@@ -126,6 +149,7 @@ export interface SearchProfile {
   scoring: ScoringPolicy;
   alerts: AlertPolicy;
   teaming: TeamingPolicy;
+  introduction: IntroductionPolicy;
 }
 
 /** A profile as stored: the document plus what the store knows about it. */

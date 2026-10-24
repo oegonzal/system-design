@@ -24,6 +24,9 @@ spec:
             - containerPort: 3004
           # Everything else is a code default: the stores are on the host, and
           # the SAM.gov key comes from the Secret the Tiltfile builds.
+          env:
+            - name: QUALITY_LOOP_URL
+              value: http://quality-loop-service:3003
           envFrom:
             - configMapRef:
                 name: local-stores

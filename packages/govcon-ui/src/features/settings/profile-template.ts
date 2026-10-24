@@ -1,5 +1,6 @@
 import {
   DEFAULT_ALERT_POLICY,
+  DEFAULT_INTRODUCTION_POLICY,
   DEFAULT_TEAMING_POLICY,
   type SearchProfile,
 } from '@sysdesign/contracts';
@@ -63,6 +64,7 @@ export const PROFILE_TEMPLATE: SearchProfile = {
   },
   alerts: { ...DEFAULT_ALERT_POLICY },
   teaming: { subcontract: { ...DEFAULT_TEAMING_POLICY.subcontract } },
+  introduction: { ...DEFAULT_INTRODUCTION_POLICY, offers: [...DEFAULT_INTRODUCTION_POLICY.offers] },
 };
 
 /** A profile duplicated under a new slug, its company marked as the copy. */

@@ -13,6 +13,6 @@ import { TARGET_REPOSITORY } from './tokens';
   imports: [MikroOrmModule.forFeature([GovconTarget]), SourcesModule],
   controllers: [TargetsController],
   providers: [TargetsService, { provide: TARGET_REPOSITORY, useClass: MikroOrmTargetRepository }],
-  exports: [TARGET_REPOSITORY],
+  exports: [TARGET_REPOSITORY, TargetsService],
 })
 export class TargetsModule {}

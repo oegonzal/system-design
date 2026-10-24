@@ -204,6 +204,7 @@ const ACTIVITY_PHRASE: Record<TargetActivityKind, string> = {
   called: 'you called',
   met: 'you met',
   replied: 'they replied',
+  drafted: 'a note was drafted',
 };
 
 /** How an award is named in a line: its PIID, or the source's id when it has none. */

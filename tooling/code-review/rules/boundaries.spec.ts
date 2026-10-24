@@ -52,7 +52,10 @@ describe('the dependency matrix', () => {
     ['studio-testing', ['contracts', 'loop-client']],
     ['studio-api', ['contracts', 'db', 'nest-kit', 'loop-client', 'studio-testing']],
     ['quality-loop', ['contracts', 'db', 'llm', 'run-dump', 'nest-kit']],
-    ['govcon', ['contracts', 'db', 'nest-kit', 'notifications-client']],
+    [
+      'govcon',
+      ['contracts', 'db', 'nest-kit', 'notifications-client', 'loop-client', 'studio-testing'],
+    ],
     [
       'browser-session',
       [

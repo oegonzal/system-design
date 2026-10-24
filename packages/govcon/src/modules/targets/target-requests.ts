@@ -71,6 +71,7 @@ const activitySchema = z.strictObject({
   at: z.iso.datetime({ offset: true }),
   kind: z.enum(TARGET_ACTIVITY_KINDS),
   summary: words,
+  ref: z.string().trim().min(1).max(MAX_TARGET_TEXT_LENGTH).nullable().default(null),
 });
 
 /** The body of `PUT /targets/:kind/:subject`. Omitted fields keep their stored value; the service merges, and a list given replaces the whole list. */

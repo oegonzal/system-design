@@ -88,6 +88,34 @@ export const ENFAV = {
   },
   // The subcontracts a firm this size could take: a prime is ranked by how many of these it reports.
   teaming: { subcontract: { min: 50_000, max: 2_000_000 } },
+  // What an introduction to a prime is written from: the company's own words, kept in Settings.
+  introduction: {
+    about:
+      'Enfav LLC is a software engineering firm that builds agentic AI workflows, document intelligence and retrieval, systems and data integration, and AI-assisted QA and browser automation.',
+    delivery: 'Remote delivery by a U.S.-citizen principal on unclassified work; travel available.',
+    offers: [
+      {
+        id: 'agentic-workflows',
+        label: 'Agentic workflow engineering',
+        line: 'Agents that carry a business process end to end under human approval, built on the systems the program already runs.',
+      },
+      {
+        id: 'document-intelligence',
+        label: 'Document intelligence and retrieval',
+        line: 'Pipelines that read, index and answer from large document sets, with every answer traced to its source.',
+      },
+      {
+        id: 'integration',
+        label: 'Systems and data integration',
+        line: 'APIs, data pipelines and modernization components that connect legacy systems to new ones.',
+      },
+      {
+        id: 'ai-qa',
+        label: 'AI-assisted QA and browser automation',
+        line: 'Automated regression suites and browser automation that shorten release cycles.',
+      },
+    ],
+  },
   scoring: {
     weights: {
       naics: 0.3,

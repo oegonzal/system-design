@@ -23,12 +23,13 @@ export interface TargetLink {
   label: string;
 }
 
-/** One thing done about a target, when, and in a line. */
+/** One thing done about a target, when, in a line — and what it points at, when it points at something: a drafted note's run id. */
 export interface TargetActivity {
   /** ISO 8601. */
   at: string;
   kind: TargetActivityKind;
   summary: string;
+  ref: string | null;
 }
 
 /**

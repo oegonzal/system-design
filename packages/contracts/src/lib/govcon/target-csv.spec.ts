@@ -14,8 +14,13 @@ describe('the tracker as a sheet', () => {
       contacts: [{ name: 'Jane Doe', role: 'sblo', channel: 'teaming@example.com', note: '' }],
       links: [{ kind: 'website', url: 'https://www.example.com/', label: 'Site' }],
       activity: [
-        { at: '2026-09-25T14:00:00.000Z', kind: 'emailed', summary: 'Sent the statement.' },
-        { at: '2026-09-20T10:00:00.000Z', kind: 'registered', summary: 'Portal' },
+        {
+          at: '2026-09-25T14:00:00.000Z',
+          kind: 'emailed',
+          summary: 'Sent the statement.',
+          ref: null,
+        },
+        { at: '2026-09-20T10:00:00.000Z', kind: 'registered', summary: 'Portal', ref: null },
       ],
       notes: 'two\nlines',
       reminderAt: '2026-09-29T15:00:00.000Z',

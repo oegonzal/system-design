@@ -6,7 +6,12 @@ import { quietTargetAlerts, TARGETS_DIGEST } from './targets';
 /** A Monday. */
 const T0 = new Date('2026-06-15T12:00:00Z');
 const TODAY = '2026-06-15';
-const EMAILED = { at: '2026-06-05T15:00:00.000Z', kind: 'emailed' as const, summary: 'Sent it.' };
+const EMAILED = {
+  at: '2026-06-05T15:00:00.000Z',
+  kind: 'emailed' as const,
+  summary: 'Sent it.',
+  ref: null,
+};
 
 const row = (overrides: Partial<TargetRecord> = {}): TargetRecord => ({
   id: 'target-1',
@@ -64,7 +69,12 @@ describe('the quiet-target rule', () => {
     none({ reminderAt: new Date('2026-06-06T09:00:00Z') });
     none({ activity: [] });
     none({}, { ...policy, followUpAfterBusinessDays: 0 });
-    none({ activity: [{ at: '2026-06-12T09:00:00.000Z', kind: 'replied', summary: '' }, EMAILED] });
+    none({
+      activity: [
+        { at: '2026-06-12T09:00:00.000Z', kind: 'replied', summary: '', ref: null },
+        EMAILED,
+      ],
+    });
     expect(
       quietTargetAlerts(
         [row({ reminderAt: new Date('2026-06-01T09:00:00Z') })],

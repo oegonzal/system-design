@@ -3,6 +3,7 @@ import type {
   AwardFamily,
   AwardSource,
   BidStage,
+  Decision,
   LeadTier,
   SliceOutcome,
   SourceCallOutcome,
@@ -94,6 +95,15 @@ export const TARGET_STAGE_TONE: Record<TargetStage, BadgeTone> = {
 };
 
 export const TARGET_KIND_TONE: Record<TargetKind, BadgeTone> = { firm: 'accent', award: 'medium' };
+
+/** The loop's verdict on a draft: accepted reads as done, a revision asked for as warm, anything stopped as critical. */
+export const DECISION_TONE: Record<Decision, BadgeTone> = {
+  accept: 'success',
+  revise: 'medium',
+  retry: 'medium',
+  escalate: 'high',
+  reject: 'critical',
+};
 
 export const ALERT_KIND_TONE: Record<AlertKind, BadgeTone> = {
   'award-ending': 'medium',

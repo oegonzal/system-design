@@ -29,7 +29,8 @@ describe('AwardClient', () => {
     );
     // One read of the source's record, and one of the store: whether the award is tracked.
     await screen.findByRole('button', { name: 'Track this award' });
-    expect(calls.map((call) => call.url)).toEqual([PATH, TRACKED]);
+    // The tracking panel and the introduction panel each read whether the award is tracked.
+    expect(calls.map((call) => call.url)).toEqual([PATH, TRACKED, TRACKED]);
     expect(screen.getByRole('table', { name: 'Award facts' })).toBeTruthy();
     expect(screen.getByRole('table', { name: 'Subcontracts under this award' })).toBeTruthy();
     expect(screen.getByRole('list', { name: 'Open notices' })).toBeTruthy();

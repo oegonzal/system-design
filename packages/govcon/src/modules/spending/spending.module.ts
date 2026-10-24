@@ -39,5 +39,6 @@ import { WatchedAwards } from './warm/watched-awards';
     { provide: SPENDING_SNAPSHOTS, useClass: MikroOrmSpendingSnapshotStore },
     { provide: SPENDING_WARM_POLICY, useFactory: () => spendingWarmPolicyFromEnv(process.env) },
   ],
+  exports: [SpendingService],
 })
 export class SpendingModule {}

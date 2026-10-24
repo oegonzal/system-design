@@ -25,6 +25,7 @@ export * from './view';
 export * from './bid';
 export * from './target';
 export * from './target-csv';
+export * from './introduction';
 export * from './business-days';
 export * from './award';
 export * from './entity';

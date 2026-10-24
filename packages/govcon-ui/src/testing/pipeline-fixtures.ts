@@ -58,7 +58,9 @@ export const FIRM_TARGET: Target = targetOf({
   nextAction: 'Ask for the program manager.',
   contacts: [{ name: 'Jane Doe', role: 'sblo', channel: 'teaming@example.com', note: '' }],
   links: [{ kind: 'supplier-portal', url: 'https://suppliers.example.com/', label: 'Portal' }],
-  activity: [{ at: '2026-09-25T14:00:00.000Z', kind: 'emailed', summary: 'Sent the statement.' }],
+  activity: [
+    { at: '2026-09-25T14:00:00.000Z', kind: 'emailed', summary: 'Sent the statement.', ref: null },
+  ],
   notes: 'Met at the industry day.',
   reminderAt: '2026-09-29T15:00:00.000Z',
   endsAt: null,

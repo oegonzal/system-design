@@ -106,6 +106,36 @@ describe('ProfileEditor', () => {
     expect(weightSum({ ...PROFILE.scoring.weights, naics: 0.5 })).toBe(1.2);
   });
 
+  it('[GOVU-29] edits what introductions are written from — the company in a line, how it delivers, and the offers as rows with a slug, a label and a line — and adds or removes an offer', () => {
+    const onChange = vi.fn();
+    renderWithTheme(<Default onChange={onChange} />);
+    expect(
+      (screen.getByLabelText('The company, in a line or two') as HTMLTextAreaElement).value,
+    ).toBe(PROFILE.introduction.about);
+    expect((screen.getByLabelText('Offer 1 slug') as HTMLInputElement).value).toBe('machining');
+    fireEvent.change(screen.getByLabelText('How the work is delivered'), {
+      target: { value: 'Shipped within a week, anywhere.' },
+    });
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        introduction: { ...PROFILE.introduction, delivery: 'Shipped within a week, anywhere.' },
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Add offer' }));
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        introduction: {
+          ...PROFILE.introduction,
+          offers: [...PROFILE.introduction.offers, { id: 'offer-2', label: '', line: '' }],
+        },
+      }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Remove offer 1' }));
+    expect(onChange).toHaveBeenLastCalledWith(
+      expect.objectContaining({ introduction: { ...PROFILE.introduction, offers: [] } }),
+    );
+  });
+
   it('[GOVU-10] puts every issue the service named beside its field, and all of them at the top', () => {
     renderWithTheme(<WithIssues />);
     const alerts = screen.getAllByRole('alert');

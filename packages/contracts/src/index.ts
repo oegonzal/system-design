@@ -27,6 +27,7 @@ export * from './lib/practice-formats';
 export * from './lib/progress';
 export * from './lib/markdown-sections';
 export * from './lib/interview';
+export * from './lib/introduction-note';
 export * from './lib/transcript.schema';
 export * from './lib/canvas-layout';
 export * from './lib/canvas-geometry';

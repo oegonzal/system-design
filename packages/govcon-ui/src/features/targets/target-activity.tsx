@@ -38,6 +38,7 @@ export function TargetActivityLog({
         at: fromReminderInput(when) ?? new Date(nowMs).toISOString(),
         kind,
         summary: summary.trim(),
+        ref: null,
       },
     ]);
     setSummary('');

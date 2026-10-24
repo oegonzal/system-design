@@ -1,11 +1,15 @@
 import {
   ALERT_AUDIENCES,
   DEFAULT_ALERT_POLICY,
+  DEFAULT_INTRODUCTION_POLICY,
   DEFAULT_TEAMING_POLICY,
   FACTOR_IDS,
   LEAD_TIERS,
   MAX_ALERT_ENDING_DAYS,
   MAX_FOLLOW_UP_BUSINESS_DAYS,
+  MAX_INTRODUCTION_FACT_LENGTH,
+  MAX_INTRODUCTION_LINE_LENGTH,
+  MAX_INTRODUCTION_OFFERS,
   MAX_PAGE_SIZE,
   MAX_PULL_DAYS,
   NOTICE_STATUSES,
@@ -96,6 +100,21 @@ const teamingPolicySchema = z.strictObject({
   subcontract: z.strictObject({ min: z.number().min(0), max: z.number().min(0) }),
 });
 
+/** What an introduction is written from: the company in a line or two, how it delivers, and the offers it makes — each under a stable slug the notes cite. A document from before introductions reads as offering nothing. */
+const introductionPolicySchema = z.strictObject({
+  about: z.string().trim().max(MAX_INTRODUCTION_FACT_LENGTH),
+  delivery: z.string().trim().max(MAX_INTRODUCTION_FACT_LENGTH),
+  offers: z
+    .array(
+      z.strictObject({
+        id: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/),
+        label: z.string().trim().min(1).max(MAX_INTRODUCTION_LINE_LENGTH),
+        line: z.string().trim().min(1).max(MAX_INTRODUCTION_LINE_LENGTH),
+      }),
+    )
+    .max(MAX_INTRODUCTION_OFFERS),
+});
+
 export const searchProfileSchema = z
   .strictObject({
     id: z.string().regex(/^[a-z][a-z0-9-]{0,39}$/),
@@ -141,6 +160,7 @@ export const searchProfileSchema = z
     }),
     alerts: alertPolicySchema.default(DEFAULT_ALERT_POLICY),
     teaming: teamingPolicySchema.default(DEFAULT_TEAMING_POLICY),
+    introduction: introductionPolicySchema.default(DEFAULT_INTRODUCTION_POLICY),
   })
   .superRefine((profile, ctx) => {
     const sum = Object.values(profile.scoring.weights).reduce((total, weight) => total + weight, 0);
@@ -168,6 +188,14 @@ export const searchProfileSchema = z
         code: 'custom',
         path: ['teaming', 'subcontract'],
         message: 'the smallest subcontract must not be above the largest',
+      });
+    }
+    const offerIds = profile.introduction.offers.map((offer) => offer.id);
+    if (new Set(offerIds).size !== offerIds.length) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['introduction', 'offers'],
+        message: 'each offer has an id of its own',
       });
     }
     if (profile.scoring.tiers.high <= profile.scoring.tiers.medium) {

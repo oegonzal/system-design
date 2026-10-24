@@ -165,8 +165,15 @@ export const TARGET_LINK_KINDS = [
 ] as const;
 export type TargetLinkKind = (typeof TARGET_LINK_KINDS)[number];
 
-/** What was done about a target, as its log records it. */
-export const TARGET_ACTIVITY_KINDS = ['registered', 'emailed', 'called', 'met', 'replied'] as const;
+/** What was done about a target, as its log records it; a draft is the loop's note, logged by the service when it is first read ready. */
+export const TARGET_ACTIVITY_KINDS = [
+  'registered',
+  'emailed',
+  'called',
+  'met',
+  'replied',
+  'drafted',
+] as const;
 export type TargetActivityKind = (typeof TARGET_ACTIVITY_KINDS)[number];
 
 /** Whether an activity of that kind leaves the company waiting on the other side — what the quiet-target rule counts from. */
@@ -176,6 +183,7 @@ export const TARGET_ACTIVITY_AWAITS_REPLY: Record<TargetActivityKind, boolean> =
   called: true,
   met: false,
   replied: false,
+  drafted: false,
 };
 
 /** Whose ending awards the daily warm raises: every award the scope's horizons list, or only the awards tracked as targets. */

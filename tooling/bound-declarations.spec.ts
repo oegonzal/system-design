@@ -32,6 +32,7 @@ const SCHEMA_FILES = [
   'packages/contracts/src/lib/model.schema.ts',
   'packages/contracts/src/lib/transcript.schema.ts',
   'packages/contracts/src/lib/interview.ts',
+  'packages/contracts/src/lib/introduction-note.ts',
   'packages/contracts/src/lib/design-prompt.schema.ts',
   'packages/contracts/src/lib/prompts.ts',
   'packages/contracts/src/lib/star-stories.ts',

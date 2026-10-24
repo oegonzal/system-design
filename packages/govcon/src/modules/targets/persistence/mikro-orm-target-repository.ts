@@ -22,7 +22,8 @@ const toRecord = (row: GovconTarget): TargetRecord => ({
   nextAction: row.nextAction,
   contacts: row.contacts.map((contact) => ({ ...contact })),
   links: row.links.map((link) => ({ ...link })),
-  activity: row.activity.map((item) => ({ ...item })),
+  // A log written before entries pointed at anything reads as pointing at nothing.
+  activity: row.activity.map((item) => ({ ...item, ref: item.ref ?? null })),
   reminderAt: row.reminderAt,
   endsAt: row.endsAt,
   stageChangedAt: row.stageChangedAt,

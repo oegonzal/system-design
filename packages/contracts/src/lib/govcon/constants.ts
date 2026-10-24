@@ -32,6 +32,10 @@ export const MAX_TARGET_LINKS = 20;
 export const MAX_TARGET_ACTIVITY = 200;
 /** Business days of silence after an outreach before a target is called quiet, at most. */
 export const MAX_FOLLOW_UP_BUSINESS_DAYS = 60;
+/** The offers a profile makes in an introduction, and how long each line and the sender's facts may run. */
+export const MAX_INTRODUCTION_OFFERS = 8;
+export const MAX_INTRODUCTION_LINE_LENGTH = 300;
+export const MAX_INTRODUCTION_FACT_LENGTH = 600;
 /** Awards one daily warm reads because they are tracked; each is one to three free requests. */
 export const MAX_WATCHED_AWARDS = 25;
 /** `GET /alerts` page size, and its ceiling. */

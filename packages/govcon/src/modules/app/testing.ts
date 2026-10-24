@@ -1,3 +1,5 @@
+import { LoopClient } from '@sysdesign/loop-client';
+import { FakeLoopClient } from '@sysdesign/studio-testing';
 import type { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import { EntityManager } from '@mikro-orm/postgresql';
@@ -99,9 +101,14 @@ export interface GovconHttp {
   spending: ScriptedSpendingSources;
   /** What the warm would have published — nothing, in this suite. */
   sink: RecordingAlertSink;
+  /** The quality loop as the fake the suite scripts. */
+  loop: LoopClient;
 }
 
-export async function bootGovconHttp(spending: SpendingScript = {}): Promise<GovconHttp> {
+export async function bootGovconHttp(
+  spending: SpendingScript = {},
+  loop: LoopClient = new FakeLoopClient(),
+): Promise<GovconHttp> {
   // Before anything connects: a database that is not a test one is refused here.
   await ensureDatabase();
   const scripted = scriptedSearch('sam.gov', PAGES);
@@ -136,6 +143,8 @@ export async function bootGovconHttp(spending: SpendingScript = {}): Promise<Gov
     .useValue({ everyMs: null })
     .overrideProvider(ALERT_SINK)
     .useValue(sink)
+    .overrideProvider(LoopClient)
+    .useValue(loop)
     .compile();
   const app = configureApp(moduleRef.createNestApplication());
   await app.listen(0);
@@ -146,6 +155,7 @@ export async function bootGovconHttp(spending: SpendingScript = {}): Promise<Gov
     scripted,
     spending: spendingSources,
     sink,
+    loop,
   };
 }
 

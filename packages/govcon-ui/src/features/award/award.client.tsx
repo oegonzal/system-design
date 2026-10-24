@@ -6,6 +6,7 @@ import { readFailureOf, UNREACHABLE_COPY, useResource } from '@sysdesign/web-kit
 import { api } from '../../api/client';
 import { FullPageNotice } from '../../components/full-page-notice';
 import { ProvenanceLine } from '../spending/provenance-line';
+import { IntroductionDraft } from '../targets/introduction.client';
 import { TrackTarget } from '../targets/track-target.client';
 import {
   AwardFacts,
@@ -59,6 +60,7 @@ export function AwardClient({ externalId }: AwardClientProps) {
         </Stack>
       </Surface>
       <TrackTarget kind="award" subject={data.externalId} label={data.piid ?? data.externalId} />
+      <IntroductionDraft awardExternalId={data.externalId} />
       <Surface as="section" aria-label="How it was bought">
         <AwardFacts award={data} />
       </Surface>

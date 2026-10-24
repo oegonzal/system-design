@@ -44,7 +44,9 @@ describe('the spending warmer’s alerts', () => {
         nextAction: 'Ask for the program manager.',
         contacts: [],
         links: [],
-        activity: [{ at: '2026-06-05T15:00:00.000Z', kind: 'emailed', summary: 'Sent it.' }],
+        activity: [
+          { at: '2026-06-05T15:00:00.000Z', kind: 'emailed', summary: 'Sent it.', ref: null },
+        ],
         reminderAt: null,
       },
       T0,

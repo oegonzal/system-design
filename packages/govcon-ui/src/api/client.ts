@@ -1,5 +1,8 @@
 import {
+  type GetIntroductionResponse,
   type GetTargetResponse,
+  type IntroductionDto,
+  type IntroductionStartedDto,
   type GetTargetSummaryResponse,
   type ListAlertsQuery,
   type ListAlertsResponse,
@@ -7,6 +10,8 @@ import {
   type ListTargetsResponse,
   type SaveTargetRequest,
   type SaveTargetResponse,
+  type StartIntroductionRequest,
+  type StartIntroductionResponse,
   type Target,
   type TargetKind,
   type TargetSummary,
@@ -245,6 +250,25 @@ export const api = {
   },
   async removeTarget(kind: TargetKind, subject: string): Promise<void> {
     await request<undefined>(targetPath(kind, subject), { method: 'DELETE' });
+  },
+
+  // Introductions: a note the quality loop drafts for a tracked firm or award about one program.
+  async startIntroduction(body: StartIntroductionRequest): Promise<IntroductionStartedDto> {
+    return unwrap(
+      await request<StartIntroductionResponse>('/introductions', { method: 'POST', body }),
+    );
+  },
+  async getIntroduction(
+    runId: string,
+    key: { kind: TargetKind; subject: string },
+    opts: GetOptions = {},
+  ): Promise<IntroductionDto> {
+    return unwrap(
+      await request<GetIntroductionResponse>(
+        `/introductions/${encode(runId)}${toQueryString({ ...key })}`,
+        opts,
+      ),
+    );
   },
 
   // Alerts: what the daily warm raised, newest first.

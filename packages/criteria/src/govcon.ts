@@ -142,11 +142,21 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
       'The primes ranking says in its last column which primes are already tracked as firms, each with the way to the pipeline, and tracks one that is not from its row in one click at the first stage of a firm’s pursuit — reading the tracked firms once per ranking, never over a firm already tracked, and offering nothing for a prime the source named without a UEI.',
   },
   {
+    id: 'GOVU-29',
+    statement:
+      'An award’s page drafts an introduction for the tracked award in one click, polls the run, shows the note with its subject, the decision and the score, copies it to the clipboard, and reopens the latest draft from the target’s log; Settings edits what introductions are written from — the company in a line, how it delivers, and its offers as rows with a slug, a label and a line.',
+  },
+  {
     id: 'GOVU-28',
     statement:
       'The tracker panel edits a target’s contacts, links and activity as rows — a contact in a declared role, a link of a declared kind that opens once it has an address, an activity of a declared kind logged at the instant given — and what to do next, writing every list whole; the pipeline’s rows show the first contact with its role, the next action and the latest activity; the dashboard’s due list says the next action beside a due target; and the whole tracker downloads as a CSV whose columns the contract declares, named for the day.',
   },
   // Government contracting: SAM.gov opportunities (packages/govcon)
+  {
+    id: 'GOV-40',
+    statement:
+      'An introduction for a tracked firm or award is one quality-loop run of the introduction-note pipeline: its goal is composed from the target, the award’s snapshot and the profile’s own words — the program by its contract number, the offers indexed by position, one ask — under the four fixed rules supplied as the rubric; the run is read back by its id as pending, ready with the note printed by the shared renderer and the judges’ decision beside it, or failed with why; the first ready read logs the draft on the target once; an untracked target is a 404, a loop nobody can reach a 503, and a goal past the engine’s budget a 422.',
+  },
   {
     id: 'GOV-38',
     statement:

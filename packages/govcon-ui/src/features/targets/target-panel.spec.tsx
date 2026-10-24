@@ -103,7 +103,7 @@ describe('TargetPanel', () => {
         links: [],
         activity: [
           ...FIRM_TARGET.activity,
-          { at: '2026-09-27T12:00:00.000Z', kind: 'called', summary: 'Left a message.' },
+          { at: '2026-09-27T12:00:00.000Z', kind: 'called', summary: 'Left a message.', ref: null },
         ],
       }),
     );
