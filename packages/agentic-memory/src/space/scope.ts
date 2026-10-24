@@ -31,10 +31,6 @@ const containedIn = (inner: RecordScope, outer: RecordScope): boolean =>
 export const visibleTo = (record: RecordScope, request: RecordScope): boolean =>
   containedIn(record, request);
 
-/** A record lies within a scope its own contains. */
-export const liesWithin = (record: RecordScope, scope: RecordScope): boolean =>
-  containedIn(scope, record);
-
 /** One spelling per scope, its keys sorted: what an identity, a group and a hash compare. */
 export const canonicalScope = (scope: RecordScope): string =>
   JSON.stringify(

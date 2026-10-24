@@ -1,4 +1,4 @@
-import { checkScope, liesWithin, visibleTo } from './scope';
+import { checkScope, visibleTo } from './scope';
 
 describe('scope', () => {
   it('[AGM-7] requires the partition and only declared keys', () => {
@@ -12,13 +12,12 @@ describe('scope', () => {
     });
   });
 
-  it('[AGM-7] shows a record to a request whose scope contains it, and reads within a scope everything at or below it', () => {
+  // Reading within a scope — everything at or below it — is the record store's, held by its contract suite.
+  it('[AGM-7] shows a record to a request whose scope contains it', () => {
     const tenant = { tenant: 't1' };
     const user = { tenant: 't1', user: 'u1' };
     expect(visibleTo(tenant, user)).toBe(true);
     expect(visibleTo(user, tenant)).toBe(false);
     expect(visibleTo(user, { tenant: 't1', user: 'u2' })).toBe(false);
-    expect(liesWithin(user, tenant)).toBe(true);
-    expect(liesWithin(tenant, user)).toBe(false);
   });
 });

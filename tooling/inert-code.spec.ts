@@ -102,6 +102,28 @@ const DISCOVERED: readonly { readonly path: string; readonly by: string }[] = [
   },
 ];
 
+/**
+ * The packages held to the stricter reading of the rule: an export only specs
+ * reach is reached by nothing the running system does, so it is inert too. A
+ * package joins this list once it holds to it.
+ */
+const SPEC_REACH_GUARDED: readonly string[] = [
+  'packages/agentic-memory',
+  'packages/browser-session',
+  'packages/qdrant-kit',
+  'packages/quality-loop',
+];
+
+/**
+ * What exists to support specs rather than to run: a spec, a `*.testing.ts` or
+ * `testing.ts` module and its `testing-*.ts` parts, a `testing/` folder, and
+ * any module that imports the test runner.
+ */
+const SPEC_FILE = /\.(spec|test)\.tsx?$/;
+const TEST_SUPPORT = /(^|[/.])testing([.-][\w-]+)?\.tsx?$|\/testing\//;
+const isTestSupport = (path: string, source: string): boolean =>
+  SPEC_FILE.test(path) || TEST_SUPPORT.test(path) || /from 'vitest'/.test(source);
+
 /** Storybook loads its stories by glob, naming each export as a story. */
 const STORY_FILE = /\.stories\.tsx?$/;
 
@@ -248,10 +270,12 @@ describe('inert code', () => {
   );
   const counts = new Map<string, Map<string, number>>();
   const imports = new Map<string, readonly string[]>();
+  const support = new Set<string>();
   for (const path of modules) {
     const source = readFileSync(path, 'utf8');
     counts.set(path, identifierCounts(source, path));
     imports.set(path, moduleSpecifiers(source));
+    if (isTestSupport(relative(REPO, path), source)) support.add(path);
   }
   for (const [path, component] of components) {
     counts.set(path, component.identifiers);
@@ -368,6 +392,32 @@ describe('inert code', () => {
     expect(
       inert,
       `nothing may be exported that nothing reaches — delete it, or give it the caller it was written for:\n  ${inert.join('\n  ')}`,
+    ).toEqual([]);
+  });
+
+  it('in a guarded package, every exported name is reached by something that runs, not only by specs', () => {
+    // What a running file reads, by name: every module but the spec support.
+    const running = new Map<string, number>();
+    for (const [path, own] of counts) {
+      if (support.has(path)) continue;
+      for (const [name, n] of own) running.set(name, (running.get(name) ?? 0) + n);
+    }
+    const guarded = (path: string): boolean =>
+      SPEC_REACH_GUARDED.some((root) => path.startsWith(join(REPO, root) + sep));
+    const specOnly: string[] = [];
+    for (const path of modules) {
+      if (!guarded(path) || support.has(path)) continue;
+      const own = counts.get(path);
+      for (const { name, line } of exportedNames(readFileSync(path, 'utf8'), path)) {
+        // Its own declaration is its one running occurrence, and something else names it.
+        if (running.get(name) === 1 && (own?.get(name) ?? 0) === 1 && (total.get(name) ?? 0) > 1) {
+          specOnly.push(`${relative(REPO, path)}:${line} ${name}`);
+        }
+      }
+    }
+    expect(
+      specOnly,
+      `an export only specs reach runs nowhere — delete it with its spec, move it into the spec support it serves, or give it the caller it was written for:\n  ${specOnly.join('\n  ')}`,
     ).toEqual([]);
   });
 

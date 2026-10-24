@@ -7,7 +7,7 @@
  * in the scope mode it names, ordered newest valid time first, then by id.
  * Copies go in and out, so a caller can never change a stored row.
  */
-import type { RegisterKind } from '@sysdesign/contracts';
+import type { RecordScope, RegisterKind } from '@sysdesign/contracts';
 
 import { byText } from '../order';
 import type {
@@ -19,7 +19,10 @@ import type {
   RecordStore,
   ResolveKey,
 } from '../ports';
-import { canonicalScope, liesWithin, visibleTo } from '../space/scope';
+import { canonicalScope, visibleTo } from '../space/scope';
+
+/** A record lies within a scope its own contains: visibility read the other way round, as `scope <@` is in SQL. */
+const liesWithin = (record: RecordScope, scope: RecordScope): boolean => visibleTo(scope, record);
 
 const copy = (record: MemoryRecord): MemoryRecord => structuredClone(record);
 
