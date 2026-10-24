@@ -61,6 +61,7 @@ export function TrackTarget({ kind, subject, label }: TrackTargetProps) {
             onRemove={() => void remove.run()}
             saving={save.pending || remove.pending}
             error={save.error ?? remove.error}
+            nowMs={Date.now()}
           />
         )}
         {target ? (

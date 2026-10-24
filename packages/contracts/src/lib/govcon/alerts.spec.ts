@@ -176,6 +176,36 @@ describe('the govcon alerts', () => {
     );
   });
 
+  it('[GOV-39] a quiet target carries the target, the outreach it has waited since and what to do next — a kind or an activity outside the vocabulary is refused — reads back by its kind, and is said in one line that names the next step, or that none is set', () => {
+    const payload = {
+      profileId: 'enfav',
+      kind: 'firm',
+      subject: 'JCBMLGPE6Z71',
+      label: 'BOOZ ALLEN HAMILTON INC',
+      stage: 'contacted',
+      lastActivityAt: '2026-06-05T15:00:00.000Z',
+      lastActivityKind: 'emailed',
+      quietBusinessDays: 6,
+      nextAction: 'Ask for the program manager.',
+    };
+    const key = {
+      kind: 'target-quiet' as const,
+      subject: 'firm:JCBMLGPE6Z71|2026-06-05T15:00:00.000Z',
+    };
+    const quiet = ALERT_DECLARATIONS['target-quiet'];
+    const read = quiet.read(key, payload);
+    expect(read).toEqual({ topic: GOVCON_TOPICS.targetQuiet, key, payload });
+    expect(quiet.read(key, { ...payload, kind: 'grant' })).toBeNull();
+    expect(quiet.read(key, { ...payload, lastActivityKind: 'texted' })).toBeNull();
+    if (read === null) throw new Error('expected the alert');
+    expect(describeAlert(read)).toBe(
+      'BOOZ ALLEN HAMILTON INC (firm, contacted) has been quiet 6 business day(s) since you emailed on 2026-06-05. Next: Ask for the program manager. One concise follow-up, then move on.',
+    );
+    const bare = quiet.read(key, { ...payload, nextAction: '' });
+    if (bare === null) throw new Error('expected the alert');
+    expect(describeAlert(bare)).toContain('Next: none set.');
+  });
+
   it('[GOV-36] a new lead carries its notice, when that is due, and the score and tier it was raised at — a tier outside the vocabulary is refused — reads back by its kind, is said in one line, and its tier is a floor: it and every better one', () => {
     expect(leadNewSchema.parse(LEAD)).toEqual(LEAD);
     expect(

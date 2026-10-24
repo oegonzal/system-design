@@ -14,7 +14,10 @@ describe('the target repository in Postgres', () => {
     label: 'N6660426P0205',
     stage: 'watching' as const,
     notes: '',
-    contact: '',
+    nextAction: '',
+    contacts: [],
+    links: [],
+    activity: [],
     reminderAt: null,
   };
 
@@ -46,14 +49,21 @@ describe('the target repository in Postgres', () => {
     expect(noted).toEqual({ ...kept, notes: 'Call in March.', updatedAt: t2 });
     const moved = await targets.save(
       AWARD,
-      { ...input, stage: 'researching', reminderAt: t3, contact: 'A. Officer' },
+      {
+        ...input,
+        stage: 'researching',
+        reminderAt: t3,
+        nextAction: 'Ask for the program manager.',
+        contacts: [{ name: 'A. Officer', role: 'program-manager', channel: '', note: '' }],
+      },
       t3,
     );
     expect(moved).toMatchObject({
       id: kept.id,
       stage: 'researching',
       reminderAt: t3,
-      contact: 'A. Officer',
+      nextAction: 'Ask for the program manager.',
+      contacts: [{ name: 'A. Officer', role: 'program-manager', channel: '', note: '' }],
       stageChangedAt: t3,
       createdAt: t1,
     });
@@ -102,7 +112,7 @@ describe('the target repository in Postgres', () => {
       orm.em
         .fork()
         .execute(
-          `insert into "govcon_target" (id, kind, subject, label, stage, notes, contact, stage_changed_at, created_at, updated_at) values (?, ?, 'S', 'L', ?, '', '', now(), now(), now())`,
+          `insert into "govcon_target" (id, kind, subject, label, stage, notes, next_action, contacts, links, activity, stage_changed_at, created_at, updated_at) values (?, ?, 'S', 'L', ?, '', '', '[]', '[]', '[]', now(), now(), now())`,
           [id, kind, stage],
         );
     await insert('00000000-0000-4000-8000-000000000001', 'firm', 'contacted');

@@ -38,8 +38,9 @@ export function AlertList({
         <Text tone="muted" size="sm">
           Nothing raised yet. The daily warm raises an alert when an award ends inside the profile’s
           window, when a tracked award’s end moves, when a stored notice may follow a tracked award,
-          and when a month obligates above every prior year’s; the daily pull raises one for each
-          notice the profile ranks in the tier it asks to hear about.
+          when a month obligates above every prior year’s, and when a tracked firm or award has
+          waited the profile’s business days for a reply; the daily pull raises one for each notice
+          the profile ranks in the tier it asks to hear about.
         </Text>
       ) : (
         <>

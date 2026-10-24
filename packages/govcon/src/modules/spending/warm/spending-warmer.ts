@@ -1,6 +1,7 @@
 import { HttpException, Inject, Injectable, Logger, type OnModuleDestroy } from '@nestjs/common';
 import {
   biddableSetAsides,
+  isoDateOf,
   WARM_TOP_AGENCIES,
   windowOf,
   type HorizonBody,
@@ -15,6 +16,8 @@ import {
   pulseAboveBandAlerts,
   SPENDING_DIGEST,
 } from '../../../core/alerts/spending';
+import { quietTargetAlerts, TARGETS_DIGEST } from '../../../core/alerts/targets';
+import type { TargetRepository } from '../../../core/ports';
 import { topAgencyCodes } from '../../../core/spending/agency';
 import type { ReadOptions } from '../../../core/spending/lens';
 import { messageOf } from '../../../core/text';
@@ -22,6 +25,7 @@ import { AlertRaiser, NOTHING_RAISED, type RaiseReport } from '../../alerts/aler
 import { ServeJob, type Cadence } from '../../app/serve-job';
 import { ProfilesService } from '../../profiles/profiles.service';
 import { CLOCK } from '../../sources/tokens';
+import { TARGET_REPOSITORY } from '../../targets/tokens';
 import {
   breakdownQuerySchema,
   horizonQuerySchema,
@@ -44,6 +48,8 @@ export interface WarmReport {
   profile: string | null;
   lenses: WarmLensOutcome[];
   alerts: RaiseReport;
+  /** The tracked firms and awards left quiet after an outreach, raised under their own digest. */
+  quiet: RaiseReport;
 }
 
 const NOTHING_WATCHED: WatchedReading = { alerts: [], observations: [] };
@@ -77,8 +83,9 @@ const refusalOf = (error: unknown): { status: number | null; message: string } =
  * the one whose walk reaches today where a wide scope's caps first — and its
  * outlook; then every tracked award's own record; then the alert rules over
  * the tracked awards, every horizon and the pulse, handed to the alert
- * raiser: each raised once per key and listed in one digest put to a person.
- * A job `serve()` starts, on the lifecycle every such job shares.
+ * raiser: each raised once per key and listed in one digest put to a person;
+ * then the tracked firms and awards left quiet after an outreach, under a
+ * digest of their own. A job `serve()` starts, on the lifecycle every such job shares.
  */
 @Injectable()
 export class SpendingWarmer implements OnModuleDestroy {
@@ -91,6 +98,7 @@ export class SpendingWarmer implements OnModuleDestroy {
     private readonly profiles: ProfilesService,
     private readonly watched: WatchedAwards,
     private readonly alerts: AlertRaiser,
+    @Inject(TARGET_REPOSITORY) private readonly targets: TargetRepository,
     @Inject(CLOCK) private readonly now: () => Date,
   ) {}
 
@@ -118,7 +126,7 @@ export class SpendingWarmer implements OnModuleDestroy {
     const profile = await this.profiles.defaultOrNull();
     if (profile === null) {
       this.logger.warn('warm skipped: no default profile');
-      return { profile: null, lenses: [], alerts: NOTHING_RAISED };
+      return { profile: null, lenses: [], alerts: NOTHING_RAISED, quiet: NOTHING_RAISED };
     }
     const lenses: WarmLensOutcome[] = [];
     const read = <T extends { provenance: Provenance }>(lens: string, load: () => Promise<T>) =>
@@ -178,7 +186,24 @@ export class SpendingWarmer implements OnModuleDestroy {
       SPENDING_DIGEST,
     );
     await this.settle(tracked);
-    return { profile: profile.id, lenses, alerts };
+    const quiet = await this.quietTargets(profile);
+    return { profile: profile.id, lenses, alerts, quiet };
+  }
+
+  /** The tracked firms and awards left quiet after an outreach, raised under the tracker's digest; a store that cannot be read raises none this run. */
+  private async quietTargets(profile: SearchProfile): Promise<RaiseReport> {
+    try {
+      const rows = await this.targets.listAll();
+      const today = isoDateOf(this.now().getTime());
+      return await this.alerts.raise(
+        profile,
+        quietTargetAlerts(rows, profile.alerts, profile.id, today),
+        TARGETS_DIGEST,
+      );
+    } catch (error) {
+      this.logger.warn(`quiet targets not read: ${messageOf(error)}`);
+      return NOTHING_RAISED;
+    }
   }
 
   /** The tracked awards read and ruled on; a target store that cannot be read is one logged line, and the scope's alerts still run. */

@@ -20,6 +20,8 @@ function harness() {
   };
 }
 
+const OFFICER = { name: 'A. Contracting Officer', role: 'other' as const, channel: '', note: '' };
+
 describe('the targets service', () => {
   it('[GOV-31] tracks a firm or an award once by what it is about, keeps what a later save leaves out, moves the stage’s day only with the stage, and answers whether something is tracked with the row or with nothing', async () => {
     const { service, later } = harness();
@@ -29,7 +31,8 @@ describe('the targets service', () => {
       label: 'N6660426P0205',
       stage: 'watching',
       notes: 'Recompete expected in the spring.',
-      contact: 'A. Contracting Officer',
+      contacts: [OFFICER],
+      nextAction: 'Ask when the recompete posts.',
       reminderAt: '2026-10-01T15:00:00.000Z',
     });
     expect(tracked).toEqual({
@@ -39,7 +42,10 @@ describe('the targets service', () => {
       label: 'N6660426P0205',
       stage: 'watching',
       notes: 'Recompete expected in the spring.',
-      contact: 'A. Contracting Officer',
+      nextAction: 'Ask when the recompete posts.',
+      contacts: [OFFICER],
+      links: [],
+      activity: [],
       reminderAt: '2026-10-01T15:00:00.000Z',
       endsAt: null,
       stageChangedAt: T1.toISOString(),
@@ -54,7 +60,8 @@ describe('the targets service', () => {
     expect(touched).toMatchObject({
       id: tracked.id,
       notes: 'Recompete expected in the spring.',
-      contact: 'A. Contracting Officer',
+      contacts: [OFFICER],
+      nextAction: 'Ask when the recompete posts.',
       reminderAt: '2026-10-01T15:00:00.000Z',
       stageChangedAt: T1.toISOString(),
       updatedAt: T2.toISOString(),
@@ -70,7 +77,7 @@ describe('the targets service', () => {
       stage: 'positioning',
       reminderAt: null,
       notes: '',
-      contact: 'A. Contracting Officer',
+      contacts: [OFFICER],
       stageChangedAt: T2.toISOString(),
       createdAt: T1.toISOString(),
     });

@@ -145,6 +145,39 @@ export type TargetStage<K extends TargetKind = TargetKind> = (typeof TARGET_STAG
 export const isTargetStage = (kind: TargetKind, stage: string): stage is TargetStage =>
   (TARGET_STAGES[kind] as readonly string[]).includes(stage);
 
+/** Who a contact kept on a target is: the liaison a prime names for small businesses, the people who run its suppliers, its programs or its captures, or anyone else. */
+export const TARGET_CONTACT_ROLES = [
+  'sblo',
+  'supplier-manager',
+  'program-manager',
+  'capture-manager',
+  'other',
+] as const;
+export type TargetContactRole = (typeof TARGET_CONTACT_ROLES)[number];
+
+/** What a link kept on a target opens: the firm's website, the portal its suppliers register at, its small-business page, a directory entry, or anything else. */
+export const TARGET_LINK_KINDS = [
+  'website',
+  'supplier-portal',
+  'small-business-page',
+  'directory',
+  'other',
+] as const;
+export type TargetLinkKind = (typeof TARGET_LINK_KINDS)[number];
+
+/** What was done about a target, as its log records it. */
+export const TARGET_ACTIVITY_KINDS = ['registered', 'emailed', 'called', 'met', 'replied'] as const;
+export type TargetActivityKind = (typeof TARGET_ACTIVITY_KINDS)[number];
+
+/** Whether an activity of that kind leaves the company waiting on the other side — what the quiet-target rule counts from. */
+export const TARGET_ACTIVITY_AWAITS_REPLY: Record<TargetActivityKind, boolean> = {
+  registered: true,
+  emailed: true,
+  called: true,
+  met: false,
+  replied: false,
+};
+
 /** Whose ending awards the daily warm raises: every award the scope's horizons list, or only the awards tracked as targets. */
 export const ALERT_AUDIENCES = ['scope', 'watched'] as const;
 export type AlertAudience = (typeof ALERT_AUDIENCES)[number];

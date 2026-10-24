@@ -107,7 +107,9 @@ describe('TargetsView', () => {
     await screen.findByRole('table', { name: 'Tracked firms and awards' });
     fireEvent.click(screen.getByRole('button', { name: `Edit ${TARGET.label}` }));
     fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'Recompete in March.' } });
-    fireEvent.change(screen.getByLabelText('Contact'), { target: { value: 'A. Officer' } });
+    fireEvent.change(screen.getByLabelText('Next action'), {
+      target: { value: 'Call A. Officer.' },
+    });
 
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect((await screen.findByRole('alert')).textContent).toBe('notes: too long');
@@ -122,7 +124,10 @@ describe('TargetsView', () => {
       label: TARGET.label,
       stage: 'watching',
       notes: 'Recompete in March.',
-      contact: 'A. Officer',
+      nextAction: 'Call A. Officer.',
+      contacts: [],
+      links: [],
+      activity: [],
       reminderAt: null,
     });
     await waitFor(() => expect(screen.queryByLabelText('Notes')).toBeNull());

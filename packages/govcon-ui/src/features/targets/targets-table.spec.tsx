@@ -14,7 +14,7 @@ const rowsOf = () =>
     .slice(1);
 
 describe('TargetsTable', () => {
-  it('[GOVU-20] rows every tracked firm and award by its kind and name, the name a link to its own page, with its reminder marked when due, an award’s end as last read, and who to reach', () => {
+  it('[GOVU-20] rows every tracked firm and award by its kind and name, the name a link to its own page, with its reminder marked when due, an award’s end as last read, who to reach, what to do next and what was last done', () => {
     renderWithTheme(<Default />);
     const [award, firm] = rowsOf();
     expect(within(award as HTMLElement).getByText('Award')).toBeTruthy();
@@ -35,7 +35,9 @@ describe('TargetsTable', () => {
     ).toBe('/primes/JCBMLGPE6Z71');
     expect(firm?.textContent).toContain('2026-09-29');
     expect(within(firm as HTMLElement).getByText('due')).toBeTruthy();
-    expect(firm?.textContent).toContain('teaming@example.com');
+    expect(firm?.textContent).toContain('Jane Doe · Small business liaison');
+    expect(firm?.textContent).toContain('Ask for the program manager.');
+    expect(firm?.textContent).toContain('2026-09-25 Emailed');
     expect(firm?.textContent).toContain('Met at the industry day.');
   });
 

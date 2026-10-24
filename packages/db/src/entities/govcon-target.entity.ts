@@ -19,7 +19,8 @@ const quoted = (words: readonly string[]): string => words.map((word) => `'${wor
  * thing is tracked once. Each kind has its own stages, so the check reads
  * the two together; `stage_changed_at` moves only when the stage does.
  * `ends_at` is an award's end as the daily warm last read it: what the next
- * warm compares against to say the end moved.
+ * warm compares against to say the end moved. Contacts, links and the
+ * activity log are the person's own lists, kept whole as JSON.
  */
 @Entity()
 @Unique({ properties: ['kind', 'subject'] })
@@ -58,8 +59,17 @@ export class GovconTarget {
   @Property({ type: 'text' })
   notes!: string;
 
-  @Property({ type: 'varchar', length: 300 })
-  contact!: string;
+  @Property({ type: 'text' })
+  nextAction!: string;
+
+  @Property({ type: 'json' })
+  contacts!: Contracts.TargetContact[];
+
+  @Property({ type: 'json' })
+  links!: Contracts.TargetLink[];
+
+  @Property({ type: 'json' })
+  activity!: Contracts.TargetActivity[];
 
   @Property({ type: 'timestamptz', nullable: true })
   reminderAt!: Date | null;

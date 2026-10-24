@@ -7,6 +7,8 @@ import {
 
 import { awardHref } from '../award-href';
 import { noticeHref } from '../notice-href';
+import { pipelineHref } from '../pipeline/views';
+import { TARGET_KIND_LABEL, targetHref } from '../targets/target-kinds';
 
 export const ALERT_KIND_LABEL: Record<AlertKind, string> = {
   'award-ending': 'Award ending',
@@ -14,6 +16,7 @@ export const ALERT_KIND_LABEL: Record<AlertKind, string> = {
   'award-notice': 'Possible follow-on',
   'pulse-above-band': 'Spending above its band',
   'lead-new': 'New lead',
+  'target-quiet': 'Quiet target',
 };
 
 export interface AlertLink {
@@ -31,6 +34,8 @@ const noticeLink = (noticeId: string): AlertLink => ({
   label: 'Notice',
   href: noticeHref(noticeId),
 });
+/** Where every tracked firm and award is listed. */
+const PIPELINE: AlertLink = { label: 'Pipeline', href: pipelineHref('targets') };
 
 /** Where a published alert leads: the pages of the things it names. */
 const linksOf = (alert: GovconAlert): AlertLink[] => {
@@ -44,6 +49,11 @@ const linksOf = (alert: GovconAlert): AlertLink[] => {
       return [PULSE];
     case GOVCON_TOPICS.leadNew:
       return [noticeLink(alert.payload.noticeId)];
+    case GOVCON_TOPICS.targetQuiet:
+      return [
+        { label: TARGET_KIND_LABEL[alert.payload.kind], href: targetHref(alert.payload) },
+        PIPELINE,
+      ];
   }
 };
 
@@ -51,7 +61,8 @@ const linksOf = (alert: GovconAlert): AlertLink[] => {
  * Where an alert kept without its payload still leads, from its key alone:
  * an ending award's subject is the award's id, a new lead's is its notice's,
  * and a pulse's finding is on the pulse. The other kinds key on two things
- * at once, and lead nowhere without the payload that names them apart.
+ * at once — a quiet target on the target and its outreach — and lead
+ * nowhere without the payload that names them apart.
  */
 const LINKS_BY_KEY: Record<AlertKind, (subject: string) => AlertLink[]> = {
   'award-ending': (subject) => [awardLink(subject)],
@@ -59,6 +70,7 @@ const LINKS_BY_KEY: Record<AlertKind, (subject: string) => AlertLink[]> = {
   'award-notice': () => [],
   'pulse-above-band': () => [PULSE],
   'lead-new': (subject) => [noticeLink(subject)],
+  'target-quiet': () => [],
 };
 
 export const alertLinks = (view: RaisedAlertView): AlertLink[] =>

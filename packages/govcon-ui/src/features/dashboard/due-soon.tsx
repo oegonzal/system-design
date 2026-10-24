@@ -1,4 +1,4 @@
-import { day, daysLeftLabel, DUE_SOON_DAYS } from '@sysdesign/contracts';
+import { DASH, day, daysLeftLabel, DUE_SOON_DAYS } from '@sysdesign/contracts';
 import { Badge, Heading, Stack, Table, Text } from '@sysdesign/design-system';
 
 import { useLink } from '../../components/link-context';
@@ -26,6 +26,7 @@ export function DueSoon({ items }: DueSoonProps) {
               <th>Title</th>
               <th>Deadline or end</th>
               <th>Reminder</th>
+              <th>Next action</th>
               <th>Left</th>
             </tr>
           </thead>
@@ -42,6 +43,7 @@ export function DueSoon({ items }: DueSoonProps) {
                 </td>
                 <td>{day(item.deadline)}</td>
                 <td>{day(item.reminder)}</td>
+                <td>{item.next ?? DASH}</td>
                 <td>{daysLeftLabel(item.left)}</td>
               </tr>
             ))}

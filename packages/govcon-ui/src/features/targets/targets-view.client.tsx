@@ -15,6 +15,7 @@ import { useState } from 'react';
 import { api } from '../../api/client';
 import { TARGET_KIND_LABEL } from './target-kinds';
 import { TargetSummaryTiles } from './target-summary-tiles';
+import { TargetsExport } from './targets-export.client';
 import { TargetsTable } from './targets-table';
 
 const EVERY_KIND = 'all';
@@ -23,7 +24,8 @@ const EVERY_KIND = 'all';
  * The tracked firms and awards: the counts, then the rows — of both kinds,
  * or of one — paged. A row's stage changes in place and the whole of it
  * opens under the row; every change is one write, after which the open
- * panel closes and the page and the counts are read again.
+ * panel closes and the page and the counts are read again. The whole
+ * tracker downloads as a sheet.
  */
 export function TargetsView() {
   const [shown, setShown] = useState<TargetKind | typeof EVERY_KIND>(EVERY_KIND);
@@ -94,6 +96,7 @@ export function TargetsView() {
                 </option>
               ))}
             </SelectField>
+            <TargetsExport nowMs={Date.now()} />
           </Stack>
           {page.data ? (
             <TargetsTable

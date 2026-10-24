@@ -3,7 +3,13 @@ import { z } from 'zod';
 import type { ApiListResponse } from '../envelope';
 import { FISCAL_PERIODS, periodMonthLabel } from './fiscal';
 import { agencyOf, compactMoney, day } from './format';
-import { AWARD_FAMILIES, LEAD_TIERS } from './vocab';
+import {
+  AWARD_FAMILIES,
+  LEAD_TIERS,
+  TARGET_ACTIVITY_KINDS,
+  TARGET_KINDS,
+  type TargetActivityKind,
+} from './vocab';
 
 /**
  * What govcon found worth a person's attention, as declared topics on the
@@ -11,7 +17,8 @@ import { AWARD_FAMILIES, LEAD_TIERS } from './vocab';
  * award whose end moved, a stored notice that may be a tracked award's
  * follow-on, a fiscal period obligating above its projection's band. After
  * the daily pull: a stored notice the profile ranks high enough to hear
- * about. Each event carries the profile it was found for and the key that
+ * about. From the warm too: a tracked firm or award left quiet after an
+ * outreach for the profile's business days. Each event carries the profile it was found for and the key that
  * makes it the same alert tomorrow, so whoever keeps a record — govcon's own
  * ledger first — raises it once. The digest a person reads is a separate
  * prompt; these are the record.
@@ -22,6 +29,7 @@ export const GOVCON_TOPICS = {
   awardNotice: 'govcon.award.notice',
   pulseAboveBand: 'govcon.pulse.above-band',
   leadNew: 'govcon.lead.new',
+  targetQuiet: 'govcon.target.quiet',
 } as const;
 
 export const ALERT_KINDS = [
@@ -30,13 +38,15 @@ export const ALERT_KINDS = [
   'award-notice',
   'pulse-above-band',
   'lead-new',
+  'target-quiet',
 ] as const;
 export type AlertKind = (typeof ALERT_KINDS)[number];
 
 /**
  * What makes one alert the same alert tomorrow, or in another scope: its kind
  * and its subject — an award's id, an award and the day its end moved to, an
- * award and a notice, a fiscal period, a notice's id. The scope it was found
+ * award and a notice, a fiscal period, a notice's id, a target and the
+ * outreach it has been quiet since. The scope it was found
  * in travels in the payload, not the key, so an award seen through two scopes
  * is one alert to the person who reads the digest.
  */
@@ -124,13 +134,29 @@ export const leadNewSchema = z.strictObject({
 });
 export type LeadNewAlert = z.infer<typeof leadNewSchema>;
 
+/** A tracked firm or award whose last activity awaits a reply and has for the profile's business days: raised once per outreach. */
+export const targetQuietSchema = z.strictObject({
+  profileId,
+  kind: z.enum(TARGET_KINDS),
+  subject: z.string().min(1),
+  label: z.string(),
+  stage: z.string().min(1),
+  /** ISO 8601: the activity the silence is counted from, and what it was. */
+  lastActivityAt: z.iso.datetime({ offset: true }),
+  lastActivityKind: z.enum(TARGET_ACTIVITY_KINDS),
+  quietBusinessDays: z.number().int().min(0),
+  nextAction: z.string(),
+});
+export type TargetQuietAlert = z.infer<typeof targetQuietSchema>;
+
 /** One alert as it is raised: its topic, its key, and the payload that topic's schema declares. */
 export type GovconAlert =
   | { topic: typeof GOVCON_TOPICS.awardEnding; key: AlertKey; payload: AwardEndingAlert }
   | { topic: typeof GOVCON_TOPICS.awardEndMoved; key: AlertKey; payload: AwardEndMovedAlert }
   | { topic: typeof GOVCON_TOPICS.awardNotice; key: AlertKey; payload: AwardNoticeAlert }
   | { topic: typeof GOVCON_TOPICS.pulseAboveBand; key: AlertKey; payload: PulseAboveBandAlert }
-  | { topic: typeof GOVCON_TOPICS.leadNew; key: AlertKey; payload: LeadNewAlert };
+  | { topic: typeof GOVCON_TOPICS.leadNew; key: AlertKey; payload: LeadNewAlert }
+  | { topic: typeof GOVCON_TOPICS.targetQuiet; key: AlertKey; payload: TargetQuietAlert };
 
 /** The alert published on one topic. */
 type AlertOn<T extends GovconAlert['topic']> = Extract<GovconAlert, { topic: T }>;
@@ -168,6 +194,16 @@ export const ALERT_DECLARATIONS: Record<AlertKind, AlertDeclaration> = {
   'award-notice': declared(GOVCON_TOPICS.awardNotice, awardNoticeSchema),
   'pulse-above-band': declared(GOVCON_TOPICS.pulseAboveBand, pulseAboveBandSchema),
   'lead-new': declared(GOVCON_TOPICS.leadNew, leadNewSchema),
+  'target-quiet': declared(GOVCON_TOPICS.targetQuiet, targetQuietSchema),
+};
+
+/** How a line names the outreach a target has been quiet since. */
+const ACTIVITY_PHRASE: Record<TargetActivityKind, string> = {
+  registered: 'you registered',
+  emailed: 'you emailed',
+  called: 'you called',
+  met: 'you met',
+  replied: 'they replied',
 };
 
 /** How an award is named in a line: its PIID, or the source's id when it has none. */
@@ -204,6 +240,12 @@ export function describeAlert(alert: GovconAlert): string {
       const lead = alert.payload;
       const buyer = agencyOf(lead.agencyPath) ?? 'agency not named';
       return `New ${lead.tier} lead, scored ${lead.score}: “${lead.title}” (${lead.noticeType ?? 'notice'}, ${dueOf(lead.responseDeadlineAt)}), ${buyer}.`;
+    }
+    case GOVCON_TOPICS.targetQuiet: {
+      const quiet = alert.payload;
+      const next =
+        quiet.nextAction.length > 0 ? quiet.nextAction.replace(/[.\s]+$/, '') : 'none set';
+      return `${quiet.label} (${quiet.kind}, ${quiet.stage}) has been quiet ${quiet.quietBusinessDays} business day(s) since ${ACTIVITY_PHRASE[quiet.lastActivityKind]} on ${day(quiet.lastActivityAt)}. Next: ${next}. One concise follow-up, then move on.`;
     }
   }
 }

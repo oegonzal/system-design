@@ -73,6 +73,7 @@ describe('the spending warmer', () => {
       profile: null,
       lenses: [],
       alerts: { found: 0, fresh: 0, published: 0, prompted: false },
+      quiet: { found: 0, fresh: 0, published: 0, prompted: false },
     });
     expect(empty.sources.requests.series).toHaveLength(0);
   });
@@ -114,6 +115,7 @@ describe('the spending warmer', () => {
       profile: null,
       lenses: [],
       alerts: { found: 0, fresh: 0, published: 0, prompted: false },
+      quiet: { found: 0, fresh: 0, published: 0, prompted: false },
     });
     const gone = harness({ policy: { everyMs: 60_000 } });
     const goneWarm = vi.spyOn(gone.warmer, 'warm');

@@ -1,4 +1,10 @@
-import type { TargetKind, TargetStage } from '@sysdesign/contracts';
+import type {
+  TargetActivity,
+  TargetContact,
+  TargetKind,
+  TargetLink,
+  TargetStage,
+} from '@sysdesign/contracts';
 
 /** What a target is about: its kind, and a UEI or an award's id. */
 export interface TargetKey {
@@ -11,7 +17,10 @@ export interface TargetInput {
   label: string;
   stage: TargetStage;
   notes: string;
-  contact: string;
+  nextAction: string;
+  contacts: TargetContact[];
+  links: TargetLink[];
+  activity: TargetActivity[];
   reminderAt: Date | null;
 }
 

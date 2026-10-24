@@ -13,6 +13,7 @@ const meta: Meta<typeof TargetPanel> = {
     target: null,
     onSave: fn(),
     onRemove: fn(),
+    nowMs: Date.parse('2026-09-27T12:00:00Z'),
   },
 };
 export default meta;
@@ -28,14 +29,17 @@ export const Tracked: Story = {
     target: {
       ...TARGET,
       stage: 'researching',
-      contact: 'A. Contracting Officer',
+      nextAction: 'Ask when the recompete posts.',
+      contacts: [
+        { name: 'A. Contracting Officer', role: 'program-manager', channel: '', note: '' },
+      ],
       notes: 'Recompete expected in the spring.',
       reminderAt: '2026-10-05T15:00:00.000Z',
     },
   },
 };
 
-/** A firm has its own stages. */
+/** A firm has its own stages — and here a contact, a link and one logged activity. */
 export const Firm: Story = {
   args: { kind: 'firm', label: FIRM_TARGET.label, target: FIRM_TARGET },
 };
@@ -44,5 +48,5 @@ export const Saving: Story = { args: { target: TARGET, saving: true } };
 
 /** The service refused the save. */
 export const Refused: Story = {
-  args: { target: TARGET, error: 'contact: Too big: expected string to have <=300 characters' },
+  args: { target: TARGET, error: 'nextAction: Too big: expected string to have <=300 characters' },
 };

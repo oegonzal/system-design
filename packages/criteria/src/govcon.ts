@@ -54,7 +54,7 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
   {
     id: 'GOVU-10',
     statement:
-      'The settings page edits a profile as data — codes, interests, weights with their live sum, prices, bands, tiers and the alert policy (the days an expiring award is flagged within, whose ending awards are raised, the least obligated on one found in the scope, whether a pulse above its band alerts, and the tier a stored notice is raised from, or none) — creates, copies, defaults and removes profiles, shows the service issues per field, and shows the sources and the full ledger.',
+      'The settings page edits a profile as data — codes, interests, weights with their live sum, prices, bands, tiers and the alert policy (the days an expiring award is flagged within, whose ending awards are raised, the least obligated on one found in the scope, whether a pulse above its band alerts, the tier a stored notice is raised from, or none, and the business days an unanswered outreach waits before a tracked firm or award is called quiet) — creates, copies, defaults and removes profiles, shows the service issues per field, and shows the sources and the full ledger.',
   },
   {
     id: 'GOVU-11',
@@ -104,7 +104,7 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
   {
     id: 'GOVU-20',
     statement:
-      'A firm or an award is tracked from its own page — one read of the store to say whether it is, one write to track it under the name the page gives it, from its kind’s own stages — and every tracked firm and award is listed under the pipeline’s second view, which the address names: counted by kind and stage, narrowed to one kind, its stage changed in the row, the whole of it — stage, contact, reminder and notes — opened under the row in the panel its page uses, and removed from there.',
+      'A firm or an award is tracked from its own page — one read of the store to say whether it is, one write to track it under the name the page gives it, from its kind’s own stages — and every tracked firm and award is listed under the pipeline’s second view, which the address names: counted by kind and stage, narrowed to one kind, its stage changed in the row, the whole of it — stage, next action, contacts, links, activity, reminder and notes — opened under the row in the panel its page uses, and removed from there.',
   },
   {
     id: 'GOVU-21',
@@ -141,7 +141,22 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
     statement:
       'The primes ranking says in its last column which primes are already tracked as firms, each with the way to the pipeline, and tracks one that is not from its row in one click at the first stage of a firm’s pursuit — reading the tracked firms once per ranking, never over a firm already tracked, and offering nothing for a prime the source named without a UEI.',
   },
+  {
+    id: 'GOVU-28',
+    statement:
+      'The tracker panel edits a target’s contacts, links and activity as rows — a contact in a declared role, a link of a declared kind that opens once it has an address, an activity of a declared kind logged at the instant given — and what to do next, writing every list whole; the pipeline’s rows show the first contact with its role, the next action and the latest activity; the dashboard’s due list says the next action beside a due target; and the whole tracker downloads as a CSV whose columns the contract declares, named for the day.',
+  },
   // Government contracting: SAM.gov opportunities (packages/govcon)
+  {
+    id: 'GOV-38',
+    statement:
+      'A target keeps who to reach as named contacts in declared roles, the pages kept on it as links of declared kinds, what was done as a log of declared kinds each with its instant, and what to do next — each list saved whole and bounded, read back as written, and written as the tracker’s sheet with the latest activity by its day; the free-text contact a target kept before is its first contact in the role other; a role or kind outside the vocabulary, a contact with no name, an address that is not a web address or a list over its bound is refused before anything is written.',
+  },
+  {
+    id: 'GOV-39',
+    statement:
+      'The daily warm raises a tracked firm or award whose latest logged activity awaits a reply and is at least the profile’s business days old with no reminder set after it — one alert per target and outreach, carrying what to do next, under the tracker’s own digest after the spending alerts — and nothing for a closed pursuit, an activity awaiting no reply, or a policy at zero; business days are the weekdays after the activity’s day through today, read as UTC, and a stored profile without the field reads as the declared default.',
+  },
   {
     id: 'GOV-1',
     statement:

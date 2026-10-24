@@ -8,6 +8,7 @@ const KINDS = [
   'award-notice',
   'pulse-above-band',
   'lead-new',
+  'target-quiet',
 ] as const satisfies ContractKinds;
 
 /**

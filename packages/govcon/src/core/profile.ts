@@ -5,6 +5,7 @@ import {
   FACTOR_IDS,
   LEAD_TIERS,
   MAX_ALERT_ENDING_DAYS,
+  MAX_FOLLOW_UP_BUSINESS_DAYS,
   MAX_PAGE_SIZE,
   MAX_PULL_DAYS,
   NOTICE_STATUSES,
@@ -82,6 +83,12 @@ const alertPolicySchema = z.strictObject({
   audience: z.enum(ALERT_AUDIENCES).default(DEFAULT_ALERT_POLICY.audience),
   minObligated: z.number().min(0).default(DEFAULT_ALERT_POLICY.minObligated),
   newLeadTier: z.enum(LEAD_TIERS).nullable().default(DEFAULT_ALERT_POLICY.newLeadTier),
+  followUpAfterBusinessDays: z
+    .number()
+    .int()
+    .min(0)
+    .max(MAX_FOLLOW_UP_BUSINESS_DAYS)
+    .default(DEFAULT_ALERT_POLICY.followUpAfterBusinessDays),
 });
 
 /** The size of subcontract the company could take; a document from before the policy reads as the declared default. */

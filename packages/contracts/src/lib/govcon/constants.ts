@@ -19,10 +19,19 @@ export const MAX_LEAD_LIMIT = 200;
 export const DEFAULT_CALL_LIMIT = 50;
 export const MAX_CALL_LIMIT = 200;
 
-/** A target's label, contact and notes, as a person types them. */
+/** A target's label, its next action, and the words of a contact, a link's label or an activity's summary, as a person types them; its notes. */
 export const MAX_TARGET_LABEL_LENGTH = 200;
-export const MAX_TARGET_CONTACT_LENGTH = 300;
+export const MAX_TARGET_NEXT_ACTION_LENGTH = 300;
+export const MAX_TARGET_TEXT_LENGTH = 300;
 export const MAX_TARGET_NOTES_LENGTH = 20_000;
+/** A link kept on a target. */
+export const MAX_TARGET_URL_LENGTH = 2000;
+/** Contacts, links and activities one target keeps. */
+export const MAX_TARGET_CONTACTS = 20;
+export const MAX_TARGET_LINKS = 20;
+export const MAX_TARGET_ACTIVITY = 200;
+/** Business days of silence after an outreach before a target is called quiet, at most. */
+export const MAX_FOLLOW_UP_BUSINESS_DAYS = 60;
 /** Awards one daily warm reads because they are tracked; each is one to three free requests. */
 export const MAX_WATCHED_AWARDS = 25;
 /** `GET /alerts` page size, and its ceiling. */

@@ -1,5 +1,35 @@
 import type { ApiListResponse, ApiResponse } from '../envelope';
-import type { TargetKind, TargetStage } from './vocab';
+import type {
+  TargetActivityKind,
+  TargetContactRole,
+  TargetKind,
+  TargetLinkKind,
+  TargetStage,
+} from './vocab';
+
+/** Someone to reach about a target: who, in what role, how, and a note. */
+export interface TargetContact {
+  name: string;
+  role: TargetContactRole;
+  /** How to reach them — an address, a number, a portal — as the person wrote it. */
+  channel: string;
+  note: string;
+}
+
+/** A page kept on a target: what it is, where, and what to call it. */
+export interface TargetLink {
+  kind: TargetLinkKind;
+  url: string;
+  label: string;
+}
+
+/** One thing done about a target, when, and in a line. */
+export interface TargetActivity {
+  /** ISO 8601. */
+  at: string;
+  kind: TargetActivityKind;
+  summary: string;
+}
 
 /**
  * Something the company pursues that is not a notice: a firm to work with,
@@ -15,8 +45,14 @@ export interface Target {
   label: string;
   stage: TargetStage;
   notes: string;
-  /** Who to reach about it, as the person wrote it. */
-  contact: string;
+  /** What to do next about it, in a line; the reminder says when. */
+  nextAction: string;
+  /** Who to reach about it. */
+  contacts: TargetContact[];
+  /** Its pages: website, supplier portal, small-business page. */
+  links: TargetLink[];
+  /** What was done about it, in the order it was logged. */
+  activity: TargetActivity[];
   /** ISO 8601; the client surfaces it when it is within `DUE_SOON_DAYS`. */
   reminderAt: string | null;
   /** An award's end as the daily warm last read it, ISO date; null for a firm, and for an award not read yet. */
@@ -26,12 +62,15 @@ export interface Target {
   updatedAt: string;
 }
 
-/** `PUT /targets/:kind/:subject`: the whole editable part; omitted fields keep their value. */
+/** `PUT /targets/:kind/:subject`: the whole editable part; an omitted field keeps its value, and a list given replaces the whole list. */
 export interface SaveTargetRequest {
   label: string;
   stage: TargetStage;
   notes?: string;
-  contact?: string;
+  nextAction?: string;
+  contacts?: TargetContact[];
+  links?: TargetLink[];
+  activity?: TargetActivity[];
   reminderAt?: string | null;
 }
 

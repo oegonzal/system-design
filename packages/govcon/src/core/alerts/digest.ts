@@ -37,12 +37,14 @@ export interface DigestInput {
 
 /**
  * Where each kind of alert stands in a digest: a tracked award's news
- * first, since someone chose to follow it, then a notice to answer, then a
- * finding about the whole scope, then the ending awards.
+ * first, since someone chose to follow it, then a notice to answer and a
+ * target gone quiet, then a finding about the whole scope, then the ending
+ * awards.
  */
 const DIGEST_RANK: Record<AlertKind, number> = {
   'award-end-moved': 0,
   'award-notice': 1,
+  'target-quiet': 1,
   'lead-new': 2,
   'pulse-above-band': 3,
   'award-ending': 4,

@@ -84,6 +84,7 @@ export const ENFAV = {
     audience: 'scope',
     minObligated: 0,
     newLeadTier: 'high',
+    followUpAfterBusinessDays: 5,
   },
   // The subcontracts a firm this size could take: a prime is ranked by how many of these it reports.
   teaming: { subcontract: { min: 50_000, max: 2_000_000 } },

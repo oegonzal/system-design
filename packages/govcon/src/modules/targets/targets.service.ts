@@ -19,7 +19,10 @@ const toTarget = (record: TargetRecord): Target => ({
   label: record.label,
   stage: record.stage,
   notes: record.notes,
-  contact: record.contact,
+  nextAction: record.nextAction,
+  contacts: record.contacts,
+  links: record.links,
+  activity: record.activity,
   reminderAt: record.reminderAt?.toISOString() ?? null,
   endsAt: record.endsAt,
   stageChangedAt: record.stageChangedAt.toISOString(),
@@ -30,8 +33,8 @@ const toTarget = (record: TargetRecord): Target => ({
 /**
  * What the company pursues that is not a notice: one row per firm or award.
  * A save is refused before any write when the stage is not one of the
- * kind's own; omitted fields keep their value; the stage's timestamp moves
- * only with the stage. Nothing here reads a source: what a target is called
+ * kind's own; omitted fields keep their value, a list given replaces the
+ * whole list; the stage's timestamp moves only with the stage. Nothing here reads a source: what a target is called
  * is the caller's to say.
  */
 @Injectable()
@@ -60,7 +63,10 @@ export class TargetsService {
         label: request.label,
         stage: request.stage,
         notes: request.notes ?? existing?.notes ?? '',
-        contact: request.contact ?? existing?.contact ?? '',
+        nextAction: request.nextAction ?? existing?.nextAction ?? '',
+        contacts: request.contacts ?? existing?.contacts ?? [],
+        links: request.links ?? existing?.links ?? [],
+        activity: request.activity ?? existing?.activity ?? [],
         reminderAt:
           request.reminderAt === undefined
             ? (existing?.reminderAt ?? null)

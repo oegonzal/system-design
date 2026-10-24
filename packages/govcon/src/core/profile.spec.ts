@@ -28,6 +28,7 @@ describe('the search profile', () => {
       audience: DEFAULT_ALERT_POLICY.audience,
       minObligated: DEFAULT_ALERT_POLICY.minObligated,
       newLeadTier: DEFAULT_ALERT_POLICY.newLeadTier,
+      followUpAfterBusinessDays: DEFAULT_ALERT_POLICY.followUpAfterBusinessDays,
     });
     expect(
       validateProfile({

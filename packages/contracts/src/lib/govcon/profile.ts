@@ -82,6 +82,8 @@ export interface AlertPolicy {
   minObligated: number;
   /** A stored notice the profile ranks in this tier or a better one is raised once, after the daily pull; null raises none. */
   newLeadTier: LeadTier | null;
+  /** A tracked firm or award whose last activity awaits a reply and is this many business days old raises one alert; 0 raises none. */
+  followUpAfterBusinessDays: number;
 }
 
 /** What a profile alerts on until it says otherwise; a stored document from before a field reads as this. */
@@ -91,6 +93,7 @@ export const DEFAULT_ALERT_POLICY: AlertPolicy = {
   audience: 'scope',
   minObligated: 0,
   newLeadTier: 'high',
+  followUpAfterBusinessDays: 5,
 };
 
 /** What the profile looks for in a prime to work under. */

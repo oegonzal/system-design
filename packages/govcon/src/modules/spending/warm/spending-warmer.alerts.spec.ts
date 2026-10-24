@@ -32,6 +32,37 @@ describe('the spending warmer’s alerts', () => {
     expect(quiet.sink.published.map((alert) => alert.topic)).toEqual(['govcon.award.ending']);
   });
 
+  it('[GOV-39] a warm raises the tracked firms and awards left quiet after an outreach under the tracker’s own digest, and a second warm raises them no more', async () => {
+    const made = harness();
+    await made.profiles.create(tinyProfile());
+    await made.targets.save(
+      { kind: 'firm', subject: 'JCBMLGPE6Z71' },
+      {
+        label: 'BOOZ ALLEN HAMILTON INC',
+        stage: 'contacted',
+        notes: '',
+        nextAction: 'Ask for the program manager.',
+        contacts: [],
+        links: [],
+        activity: [{ at: '2026-06-05T15:00:00.000Z', kind: 'emailed', summary: 'Sent it.' }],
+        reminderAt: null,
+      },
+      T0,
+    );
+    const first = await made.warmer.warm();
+    expect(first.quiet).toEqual({ found: 1, fresh: 1, published: 1, prompted: true });
+    expect(made.sink.published.map((alert) => alert.topic)).toContain('govcon.target.quiet');
+    expect(made.sink.prompts.map((prompt) => prompt.title)).toContain(
+      '1 quiet target for Tiny LLC',
+    );
+    expect((await made.warmer.warm()).quiet).toEqual({
+      found: 1,
+      fresh: 0,
+      published: 0,
+      prompted: false,
+    });
+  });
+
   it('[GOV-32] [GOV-33] a warm reads every tracked award after the scope and raises what its record shows once — its own record kept when a scope lists the same award — keeps what was published on the ledger, and writes back the end it read only once the alert for the move is raised', async () => {
     // The award the scope's horizon lists, tracked too: its record ends the same day, and its end was last read five days earlier.
     const id = horizonRowOf().externalId;
@@ -50,7 +81,10 @@ describe('the spending warmer’s alerts', () => {
       label: 'P',
       stage: 'watching' as const,
       notes: '',
-      contact: '',
+      nextAction: '',
+      contacts: [],
+      links: [],
+      activity: [],
       reminderAt: null,
     };
     const tracking = async (options: Parameters<typeof harness>[0] = { script }) => {

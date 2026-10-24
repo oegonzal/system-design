@@ -2,6 +2,7 @@ import {
   ALERT_AUDIENCES,
   LEAD_TIERS,
   MAX_ALERT_ENDING_DAYS,
+  MAX_FOLLOW_UP_BUSINESS_DAYS,
   MAX_PAGE_SIZE,
   type AlertAudience,
   type LeadTier,
@@ -244,7 +245,7 @@ export function ProfileEditor({
 
       <Section
         title="Alerts"
-        hint="What is put to a person for this profile. After the daily warm: an award ending inside this many days — one in its codes with at least the floor obligated on it, or one that is tracked, whatever is on it — and the fiscal period in progress obligating above every prior year's; a tracked award also says when its end moves and when a stored notice may follow it. After the daily pull: each stored notice ranked in the tier chosen here, once."
+        hint="What is put to a person for this profile. After the daily warm: an award ending inside this many days — one in its codes with at least the floor obligated on it, or one that is tracked, whatever is on it — and the fiscal period in progress obligating above every prior year's; a tracked award also says when its end moves and when a stored notice may follow it. After the daily pull: each stored notice ranked in the tier chosen here, once. A tracked firm or award whose latest outreach has waited this many business days with no reply logged is raised once, in the tracker's own digest; 0 raises none."
       >
         <Stack direction="row" gap={4} align="end" wrap>
           <SelectField
@@ -311,6 +312,17 @@ export function ProfileEditor({
             ))}
             <option value={NO_LEADS}>None</option>
           </SelectField>
+          <NumberField
+            label="Follow up after (business days)"
+            value={value.alerts.followUpAfterBusinessDays}
+            min={0}
+            max={MAX_FOLLOW_UP_BUSINESS_DAYS}
+            step={1}
+            disabled={saving}
+            onChange={(followUpAfterBusinessDays) =>
+              patch({ alerts: { ...value.alerts, followUpAfterBusinessDays } })
+            }
+          />
         </Stack>
         <FieldIssues issues={issues} path="alerts" />
       </Section>

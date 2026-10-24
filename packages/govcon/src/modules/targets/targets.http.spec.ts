@@ -44,7 +44,10 @@ describe('the target routes', () => {
       label: 'W912DY23F0468',
       stage: 'watching',
       notes: '',
-      contact: '',
+      nextAction: '',
+      contacts: [],
+      links: [],
+      activity: [],
       reminderAt: null,
       endsAt: null,
     });
@@ -53,13 +56,23 @@ describe('the target routes', () => {
     const firm = await put('/targets/firm/jcbmlgpe6z71', {
       label: 'BOOZ ALLEN HAMILTON INC',
       stage: 'contacted',
-      contact: 'teaming@example.com',
+      nextAction: 'Ask for the program manager.',
+      contacts: [{ name: 'Jane Doe', role: 'sblo', channel: 'teaming@example.com', note: '' }],
+      links: [{ kind: 'supplier-portal', url: 'https://suppliers.example.com/', label: 'Portal' }],
+      activity: [
+        { at: '2026-09-27T10:00:00.000Z', kind: 'emailed', summary: 'Sent the statement.' },
+      ],
       reminderAt: '2026-09-28T15:00:00.000Z',
     });
     expect((await json<Envelope<Target>>(firm)).data).toMatchObject({
       kind: 'firm',
       subject: 'JCBMLGPE6Z71',
-      contact: 'teaming@example.com',
+      nextAction: 'Ask for the program manager.',
+      contacts: [{ name: 'Jane Doe', role: 'sblo', channel: 'teaming@example.com', note: '' }],
+      links: [{ kind: 'supplier-portal', url: 'https://suppliers.example.com/', label: 'Portal' }],
+      activity: [
+        { at: '2026-09-27T10:00:00.000Z', kind: 'emailed', summary: 'Sent the statement.' },
+      ],
     });
     // The same row, however the UEI was typed.
     expect(
@@ -103,7 +116,12 @@ describe('the target routes', () => {
       { ...body, label: '   ' },
       { ...body, label: 'a'.repeat(201) },
       { ...body, stage: 'won' },
-      { ...body, contact: 'a'.repeat(301) },
+      { ...body, nextAction: 'a'.repeat(301) },
+      { ...body, contacts: [{ name: 'X', role: 'boss', channel: '', note: '' }] },
+      { ...body, contacts: [{ name: '', role: 'sblo', channel: '', note: '' }] },
+      { ...body, links: [{ kind: 'website', url: 'ftp://files.example.com/', label: '' }] },
+      { ...body, activity: [{ at: 'yesterday', kind: 'emailed', summary: '' }] },
+      { ...body, activity: [{ at: '2026-09-27T10:00:00.000Z', kind: 'texted', summary: '' }] },
       { ...body, reminderAt: 'tomorrow' },
       { ...body, endsAt: '2027-01-01' },
       { stage: 'watching' },

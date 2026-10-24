@@ -31,7 +31,16 @@ const { orders: _orders, subcontracts: _roster, ...RECORD } = awardBodyOf({ subc
 const ID = RECORD.externalId;
 const AWARD = { kind: 'award' as const, subject: ID };
 const PROFILE = tinyProfile({ alerts: { ...DEFAULT_ALERT_POLICY, audience: 'watched' } });
-const input = { label: 'P', stage: 'watching' as const, notes: '', contact: '', reminderAt: null };
+const input = {
+  label: 'P',
+  stage: 'watching' as const,
+  notes: '',
+  nextAction: '',
+  contacts: [],
+  links: [],
+  activity: [],
+  reminderAt: null,
+};
 
 function harness(script: SpendingScript = {}) {
   const clock = () => T0;

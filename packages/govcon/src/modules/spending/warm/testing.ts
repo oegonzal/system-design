@@ -103,6 +103,7 @@ export function harness(options: { script?: SpendingScript; policy?: Cadence } =
     profiles,
     new WatchedAwards(spending, targets, ledger, clock),
     new AlertRaiser(ledger, sink, clock),
+    targets,
     clock,
   );
   return {

@@ -216,7 +216,7 @@ id its record is read by. It is a bid's sibling, in its own table, one row
 per kind and subject, and each kind has its own stages (`TARGET_STAGES`): a
 firm is identified, contacted, talked with and teamed with; an award is
 watched, researched, positioned for and pursued; either can be passed on. A
-target keeps a stage, a contact, a reminder and notes. Tracking a firm reads
+target keeps a stage, named contacts in declared roles, links, a log of what was done, what to do next, a reminder and notes, and the whole tracker downloads as a CSV. Tracking a firm reads
 nothing on a schedule. Tracking an award makes the daily warm read it.
 
 **The daily pull runs by itself under `serve`.** Once at each start and

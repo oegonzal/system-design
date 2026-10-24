@@ -15,7 +15,12 @@ import { Fragment } from 'react';
 import { useLink } from '../../components/link-context';
 import { Pager } from '../search/pager';
 import { TARGET_KIND_TONE } from '../tones';
-import { TARGET_KIND_LABEL, targetHref } from './target-kinds';
+import {
+  TARGET_ACTIVITY_KIND_LABEL,
+  TARGET_CONTACT_ROLE_LABEL,
+  TARGET_KIND_LABEL,
+  targetHref,
+} from './target-kinds';
 import { TargetPanel } from './target-panel';
 
 const COLUMNS = [
@@ -25,9 +30,25 @@ const COLUMNS = [
   'Reminder',
   'Ends',
   'Contact',
+  'Next action',
+  'Last activity',
   'Notes',
   'Tracking',
 ] as const;
+
+/** The first contact kept, named with its role; a dash when none is. */
+const contactOf = (target: Target): string => {
+  const first = target.contacts[0];
+  return first === undefined
+    ? DASH
+    : clip(`${first.name} · ${TARGET_CONTACT_ROLE_LABEL[first.role]}`, 40);
+};
+
+/** The latest thing logged, by when it happened; a dash when nothing was. */
+const lastActivityOf = (target: Target): string => {
+  const [last] = [...target.activity].sort((a, b) => Date.parse(b.at) - Date.parse(a.at));
+  return last === undefined ? DASH : `${day(last.at)} ${TARGET_ACTIVITY_KIND_LABEL[last.kind]}`;
+};
 
 const editorIdOf = (id: string): string => `target-editor-${id}`;
 
@@ -54,8 +75,9 @@ export interface TargetsTableProps {
 /**
  * Every tracked firm and award: its name into its own page, its stage —
  * changed in the row, from its kind's own stages — its reminder, an award's
- * end as the warm last read it, and who to reach. The whole of it opens
- * under the row, in the panel its own page uses.
+ * end as the warm last read it, who to reach, what to do next and what was
+ * last done. The whole of it opens under the row, in the panel its own page
+ * uses.
  */
 export function TargetsTable({
   rows,
@@ -142,7 +164,9 @@ export function TargetsTable({
                     )}
                   </td>
                   <td>{day(target.endsAt)}</td>
-                  <td>{target.contact.length > 0 ? clip(target.contact, 40) : DASH}</td>
+                  <td>{contactOf(target)}</td>
+                  <td>{target.nextAction.length > 0 ? clip(target.nextAction, 40) : DASH}</td>
+                  <td>{lastActivityOf(target)}</td>
                   <td>{target.notes.length > 0 ? clip(target.notes, 50) : DASH}</td>
                   <td>
                     <Button
@@ -169,6 +193,7 @@ export function TargetsTable({
                         onRemove={() => onRemove(target)}
                         saving={saving}
                         error={error}
+                        nowMs={nowMs}
                       />
                     </td>
                   </tr>

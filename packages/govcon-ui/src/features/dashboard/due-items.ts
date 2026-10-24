@@ -15,6 +15,8 @@ export interface DueItem {
   /** When the thing itself wants an answer: a notice's response deadline, an award's end; null for a firm. */
   deadline: string | null;
   reminder: string | null;
+  /** What to do next about a tracked firm or award, when one was written; null for a bid. */
+  next: string | null;
   /** Days to the nearer of the marks that made it due; null when neither can be counted. */
   left: number | null;
 }
@@ -40,6 +42,7 @@ const bidItems = (rows: readonly PipelineRow[], nowMs: number): DueItem[] =>
         href: noticeHref(bid.noticeId),
         deadline: lead.opportunity.responseDeadlineAt,
         reminder: bid.reminderAt,
+        next: null,
         left: nearest(marks, nowMs),
       },
     ];
@@ -60,6 +63,7 @@ const targetItems = (targets: readonly Target[], nowMs: number): DueItem[] =>
         href: targetHref(target),
         deadline: target.endsAt,
         reminder: target.reminderAt,
+        next: target.nextAction.length > 0 ? target.nextAction : null,
         left: nearest([target.reminderAt], nowMs),
       },
     ];

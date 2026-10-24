@@ -47,7 +47,10 @@ describe('TrackTarget', () => {
       label: TARGET.label,
       stage: 'researching',
       notes: '',
-      contact: '',
+      nextAction: '',
+      contacts: [],
+      links: [],
+      activity: [],
       reminderAt: null,
     });
     // The panel shows what the write answered, without reading the store again.
@@ -77,14 +80,14 @@ describe('TrackTarget', () => {
         method: 'PUT',
         path: PATH,
         status: 400,
-        body: { statusCode: 400, message: 'contact: too long' },
+        body: { statusCode: 400, message: 'nextAction: too long' },
       },
     ]);
     mount();
     await screen.findByText('not tracked');
     fireEvent.change(screen.getByLabelText('Notes'), { target: { value: 'Keep this.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Track this award' }));
-    expect((await screen.findByRole('alert')).textContent).toBe('contact: too long');
+    expect((await screen.findByRole('alert')).textContent).toBe('nextAction: too long');
     await waitFor(() =>
       expect((screen.getByLabelText('Notes') as HTMLTextAreaElement).value).toBe('Keep this.'),
     );
