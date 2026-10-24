@@ -1,15 +1,18 @@
 import {
   ADVISOR_ROUTES,
   advisorDescriptorSchema,
+  bodyMessage,
+  JsonCallFailed,
   NO_RECOVERY,
   rideOut,
+  sendJson,
   unitAdviceSchema,
   type AdvisorDescriptor,
+  type JsonAnswer,
   type Recovery,
   type RecoveryClock,
   type UnitAdvice,
   type UnitAdviceRequest,
-  errorMessage,
 } from '@sysdesign/contracts';
 import type { ZodType } from 'zod';
 
@@ -32,14 +35,6 @@ export interface HttpUnitAdvisorOptions {
 
 /** The faults asked again within the recovery: the advisor never had the call, or failed it; a refusal or a bad answer stands. */
 const TRANSIENT: ReadonlySet<AdvisorFaultReason> = new Set(['unreachable', 'timeout', 'failed']);
-
-const isTimeout = (error: unknown): boolean =>
-  error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
-
-const messageOf = (body: unknown): string => {
-  const message = (body as { message?: unknown } | null)?.message;
-  return typeof message === 'string' ? message : JSON.stringify(body);
-};
 
 /**
  * An advisor over HTTP: the descriptor read from its base URL, the advice
@@ -108,31 +103,24 @@ export class HttpUnitAdvisor implements UnitAdvisorPort {
     body: unknown,
     schema: ZodType<T>,
   ): Promise<T> {
-    let response: Response;
+    let answer: JsonAnswer;
     try {
-      response = await this.fetchImpl(`${this.baseUrl}${path}`, {
+      answer = await sendJson(this.fetchImpl, this.baseUrl, path, {
         method,
-        headers: { accept: 'application/json', 'content-type': 'application/json' },
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: AbortSignal.timeout(this.timeoutMs),
+        body,
+        timeoutMs: this.timeoutMs,
       });
     } catch (error) {
-      const detail = `${method} ${path}: ${errorMessage(error)}`;
-      throw isTimeout(error)
+      if (!(error instanceof JsonCallFailed)) throw error;
+      throw error.failure === 'timeout'
         ? new AdvisorFaulted('timeout', `${method} ${path} took over ${this.timeoutMs} ms`)
-        : new AdvisorFaulted('unreachable', detail);
+        : new AdvisorFaulted('unreachable', error.message);
     }
-    const text = await response.text();
-    let parsed: unknown;
-    try {
-      parsed = text.length > 0 ? JSON.parse(text) : undefined;
-    } catch {
-      parsed = text;
-    }
-    if (!response.ok) {
+    const { status, body: parsed } = answer;
+    if (status < 200 || status >= 300) {
       throw new AdvisorFaulted(
-        response.status >= 500 ? 'failed' : 'refused',
-        `${method} ${path} answered ${response.status}: ${messageOf(parsed)}`,
+        status >= 500 ? 'failed' : 'refused',
+        `${method} ${path} answered ${status}: ${bodyMessage(parsed)}`,
       );
     }
     const read = schema.safeParse((parsed as { data?: unknown } | undefined)?.data);

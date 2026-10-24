@@ -1,10 +1,14 @@
 import {
+  bodyMessage,
   type EventEnvelope,
+  JsonCallFailed,
+  type JsonAnswer,
   NO_RECOVERY,
   type PublishEventRequest,
   type Recovery,
   type RecoveryClock,
   rideOut,
+  sendJson,
   type Settled,
   type SubscribeRequest,
   type Subscription,
@@ -40,11 +44,6 @@ export interface HttpBusOptions {
 
 type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
 
-interface Answer {
-  status: number;
-  body: unknown;
-}
-
 /**
  * Whether an attempt may be asked again within the declared recovery: one
  * that never reached the service, or a pull — the one GET this client makes,
@@ -56,7 +55,7 @@ interface Answer {
  * and given up at about 82 s if it times out again; a longer outage is a
  * wider window in the settings, never code here.
  */
-const repeatable = (method: Method, outcome: Settled<Answer>): boolean =>
+const repeatable = (method: Method, outcome: Settled<JsonAnswer>): boolean =>
   'error' in outcome &&
   (outcome.error instanceof BusUnreachable ||
     (method === 'GET' && outcome.error instanceof BusTimeout));
@@ -65,11 +64,6 @@ const segment = (value: string): string => encodeURIComponent(value);
 
 /** The `{data}` envelope's payload. */
 const dataOf = <T>(body: unknown): T => (body as { data: T }).data;
-
-const messageOf = (body: unknown): string => {
-  const message = (body as { message?: unknown } | null)?.message;
-  return typeof message === 'string' ? message : JSON.stringify(body);
-};
 
 /** The notifications bus over HTTP. */
 export class HttpBusClient extends BusClient {
@@ -140,7 +134,7 @@ export class HttpBusClient extends BusClient {
     body: unknown,
     timeoutMs = this.callTimeoutMs,
     signal?: AbortSignal,
-  ): Promise<Answer> {
+  ): Promise<JsonAnswer> {
     return rideOut(
       this.recovery,
       () => this.attempt(method, path, body, timeoutMs, signal),
@@ -155,32 +149,23 @@ export class HttpBusClient extends BusClient {
     body: unknown,
     timeoutMs: number,
     signal?: AbortSignal,
-  ): Promise<Answer> {
-    const timeout = AbortSignal.timeout(timeoutMs);
-    let response: Response;
+  ): Promise<JsonAnswer> {
     try {
-      response = await this.fetchImpl(`${this.baseUrl}${path}`, {
+      return await sendJson(this.fetchImpl, this.baseUrl, path, {
         method,
-        headers: { accept: 'application/json', 'content-type': 'application/json' },
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: signal === undefined ? timeout : AbortSignal.any([signal, timeout]),
+        body,
+        timeoutMs,
+        ...(signal === undefined ? {} : { signal }),
       });
     } catch (error) {
-      if (signal?.aborted) throw new BusCallAborted(`${method} ${path}`);
-      if (timeout.aborted) throw new BusTimeout(`${method} ${path}`, timeoutMs);
-      throw new BusUnreachable(error instanceof Error ? error.message : String(error));
+      if (!(error instanceof JsonCallFailed)) throw error;
+      if (error.failure === 'aborted') throw new BusCallAborted(error.route);
+      if (error.failure === 'timeout') throw new BusTimeout(error.route, timeoutMs);
+      throw new BusUnreachable(error.detail);
     }
-    const text = await response.text();
-    let parsed: unknown;
-    try {
-      parsed = text.length > 0 ? JSON.parse(text) : undefined;
-    } catch {
-      parsed = text;
-    }
-    return { status: response.status, body: parsed };
   }
 
-  private refused(route: string, answer: Answer): BusRefused {
-    return new BusRefused(answer.status, messageOf(answer.body), route);
+  private refused(route: string, answer: JsonAnswer): BusRefused {
+    return new BusRefused(answer.status, bodyMessage(answer.body), route);
   }
 }
