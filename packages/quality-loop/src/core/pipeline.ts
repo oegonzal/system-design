@@ -119,9 +119,9 @@ export interface PipelineDefinition<T> {
   /**
    * An optional pass that corrects the ledger from facts the goal already
    * declares, applied once per iteration before the controller decides — for a
-   * pipeline whose goal carries context the judges cannot be trusted to honour.
-   * browser-step uses it so a stop the page cannot be showing (a contentless
-   * page) does not gate the move that would leave it. A pipeline that declares
+   * pipeline whose goal carries context the judges cannot be trusted to honour:
+   * a finding the goal's own facts make impossible is retired before it can
+   * gate the move those facts call for. A pipeline that declares
    * none is unaffected; the controller still owns the decision, on a ledger the
    * engine has corrected rather than one a model alone wrote.
    */

@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import { EVIDENCE_KINDS, contentHash } from '../../../orchestrators/memory/ports';
 import { chunkSourceSchema } from '../../../pipelines/memory-recall/input';
-import { INDEXED_FIELDS, fromPayload, rootOf, toPayload } from './collection';
+import { INDEXED_FIELDS, fromPayload, toPayload } from './collection';
+
+/** The payload key a (possibly dotted) indexed field path begins at. */
+const rootOf = (field: string): string => field.split('.')[0];
 
 /** A fact digested from a document, as `chunksOf` shapes it: its evidence is a section, not a run's rows. */
 const factChunk = () => {

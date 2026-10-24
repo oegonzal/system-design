@@ -54,7 +54,6 @@ export const REASON_MAX = 200;
 export const STATEMENT_MAX = 300;
 /** An evidence alias — `f12`, `r3` — and the engine ids a finding carries. */
 export const ALIAS_MAX = 8;
-export const KEY_MAX = 200;
 export const REF_MAX = 40;
 export const LENS_MAX = 40;
 export const TRANSITION_DETAIL_MAX = 120;
@@ -130,7 +129,13 @@ export type RecordedCriterion = z.infer<typeof recordedCriterionSchema>;
 
 export const recordedFindingSchema = z.strictObject({
   alias,
-  key: bounded.id(KEY_MAX, { min: 1 }),
+  /**
+   * The engine's own identity for the finding (`findingKey`): its type and
+   * every ref it was ever located at, so as long as those make it — a finding
+   * merged across samples has measurably run past 200 characters. The
+   * goal budget, not a field cap, bounds what of it renders.
+   */
+  key: z.string().min(1),
   type: bounded.id(FINDING_TYPE_MAX, { min: 1 }),
   severity: z.enum(SEVERITIES),
   confidence: z.enum(AXIS_FACTOR_LEVELS),
@@ -262,9 +267,9 @@ const fresh = (
   severity: finding.severity,
   confidence: finding.confidence,
   fixability: finding.fixability,
-  // The record declares both bounds and nothing parses it at runtime, so they
-  // are held here. A canvas finding routinely spans a dozen refs — the widest
-  // few are the ones a reader needs, and the line is what a digest reads.
+  // Both bounds are the record's own, held here so its schema never refuses
+  // what the reduction wrote. A finding can span a dozen refs — the widest few
+  // are the ones a reader needs, and the line is what a digest reads.
   locationRefs: finding.locationRefs.slice(0, MAX_FINDING_REFS),
   criteria: finding.criterionIds.slice(0, MAX_FINDING_CRITERIA).map(aliasOf),
   lenses: [...finding.lenses],

@@ -123,7 +123,7 @@ export interface LlmRecordable {
 
 /** One call, attributed. What a run dump stores. */
 export interface LlmExchange extends LlmCall {
-  /** An eval pass id (`llm.critic`), or `prompt.enrich`. */
+  /** Who made the call, as the recorder's owner names it: a stage, or one lens's sample. */
   scope: string;
   /** 1-based within a scope, so two calls from one pass stay distinguishable. */
   ordinal: number;

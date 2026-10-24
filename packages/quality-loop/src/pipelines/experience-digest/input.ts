@@ -19,7 +19,6 @@ import {
   ADOPTED_FINDING_NOTE,
   ALIAS_MAX,
   ARTIFACT_MAX,
-  KEY_MAX,
   LENS_MAX,
   MAX_CRITERIA_ITEMS,
   MAX_EVIDENCE,
@@ -63,7 +62,6 @@ const RULES_BOUND = bound(MAX_RULES, 'list');
 export {
   ALIAS_MAX,
   ARTIFACT_MAX,
-  KEY_MAX,
   LENS_MAX,
   MAX_CRITERIA_ITEMS,
   MAX_EVIDENCE,
@@ -97,7 +95,8 @@ export type ExperienceRecord = z.infer<typeof recordShape>;
  * The shape plus the one invariant the caps alone cannot state: a record must
  * render under the engine's goal budget, or every stage would read a clipped
  * goal while the validators read the whole one. `from-run.ts` fits a record to
- * it; an orchestrator handing one over gets a refusal instead of a clip.
+ * it and then holds it to it, so a record the trims cannot bring under is
+ * refused rather than clipped.
  */
 export const experienceRecordSchema = recordShape.refine(
   (record) => textBytes(renderGoal(record)) <= GOAL_BUDGET_BYTES,

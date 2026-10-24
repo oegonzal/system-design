@@ -39,7 +39,11 @@ export interface OrchestrationDeps<P> {
   warn(message: string): void;
 }
 
-/** Which of a step's declared pipelines a call to `execute` runs; a throw here fails the step as `errored`. */
+/**
+ * Which of a step's declared pipelines a call to `execute` runs. A throw here
+ * escapes the step's own run, so it fails the step as `errored` and the whole
+ * record with it — an ambiguous choice is the orchestration's fault, not a step's.
+ */
 function chosen(step: string, declared: readonly string[], named: string | undefined): string {
   if (declared.length === 0) throw new Error(`step ${step} declares no pipeline to run`);
   if (named !== undefined) {

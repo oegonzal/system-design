@@ -1,6 +1,6 @@
 /**
  * The two adapters every panel orchestrator composes. `panelStep` runs each
- * of the step's declared pipelines `samples` times, one after another, and
+ * of the step's declared pipelines `samples` times, a bounded few at once, and
  * hands the finished runs on; `reconcileStep` reads them through the engine's
  * one view and reports where they agreed. Both are factories: the definition
  * says what a sample runs on and which runs are reconciled, so the map still

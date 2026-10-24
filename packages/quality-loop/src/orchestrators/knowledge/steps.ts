@@ -132,15 +132,14 @@ export async function known(ctx: Ctx): Promise<StepResult<KnowledgeOutputs['know
   };
 }
 
-/** A recalled hit as the record's codec takes it, with the hash the claim will be pinned to. */
-const recalled = (hit: MemoryHit): RecalledItem & { contentHash: string } => ({
+/** A recalled hit as the record's codec takes it. */
+const recalled = (hit: MemoryHit): RecalledItem => ({
   kind: hit.source.kind,
   runId: hit.source.runId,
   ref: hit.source.ref,
   pipeline: hit.source.pipeline,
   when: hit.source.when,
   text: hit.text,
-  contentHash: hit.contentHash,
 });
 
 /** The source pipeline's policy, which is where an item's dimension comes from. */

@@ -74,8 +74,8 @@ export type PayloadIndexSchema = (typeof PAYLOAD_INDEX_SCHEMAS)[number];
  * `iteration` is not indexed: the novelty screen compares iterations in code
  * after fusion, never in a store filter.
  *
- * A nested field is written as Qdrant addresses it, dotted (`a.b`); `rootOf`
- * gives the key the payload itself carries. A document memory's `scope` and
+ * A nested field is written as Qdrant addresses it, dotted (`a.b`), under the
+ * payload key its first segment names. A document memory's `scope` and
  * the `unitKey` of one bound to a unit of work are what every search leaves
  * other units' memories out by.
  */
@@ -96,9 +96,6 @@ export const INDEXED_FIELDS: Readonly<Record<string, PayloadIndexSchema>> = {
   'lineage.adoptedFrom.runId': 'keyword',
   'lineage.goalHash': 'keyword',
 };
-
-/** The payload key a (possibly dotted) indexed field path begins at. */
-export const rootOf = (field: string): string => field.split('.')[0];
 
 /** A UUID-shaped digest of (source run, ref): the same memory always lands on the same point. */
 export function pointId(sourceRunId: string, ref: string): string {

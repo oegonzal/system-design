@@ -18,7 +18,8 @@ import {
 } from '../../core/testing';
 import { KNOWLEDGE_DIGEST } from './definition';
 import measured from './measured.json';
-import { KNOWLEDGE_KINDS, knowledgeDigestOutput, polarityOf } from './output';
+import { KNOWLEDGE_KINDS } from './input';
+import { knowledgeDigestOutput, polarityOf } from './output';
 import { sampleDigest } from './testing';
 
 describe('the knowledge-digest pipeline', () => {

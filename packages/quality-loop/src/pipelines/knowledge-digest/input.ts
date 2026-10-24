@@ -19,12 +19,14 @@
  * bookkeeping back from the last fenced JSON block.
  */
 import {
+  KNOWLEDGE_ITEM_KINDS,
   MAX_QUALITY_RUN_ITERATIONS,
   renderIndexSection,
   TRANSITION_KINDS,
   GOAL_BUDGET_BYTES,
   textBytes,
   readFencedIndex,
+  type KnowledgeItemKind,
 } from '@sysdesign/contracts';
 import { z } from 'zod';
 
@@ -42,6 +44,21 @@ import {
 } from '../../core/outputs';
 
 export const KNOWLEDGE_DIGEST_ID = 'knowledge-digest';
+
+/**
+ * What each kind is, as the goal's limits tell the producer and the critics.
+ * Data beside the pipeline the way `criterionKinds` is, so a kind is described
+ * once; the vocabulary itself is the contract's, because the store's chunk
+ * kinds are built from it.
+ */
+export const KNOWLEDGE_KINDS = {
+  fact: 'A truth about the domain that holds with this design removed.',
+  anti_pattern: 'A mechanism that failed and why, resting on a confirmed finding.',
+  pattern:
+    'A mechanism that satisfied a criterion, resting on a criterion that held in every iteration it was assessed in, or on a finding that resolved.',
+  procedure:
+    'A change that resolved a defect, resting on a finding whose transition says resolved — so a single-iteration run has none.',
+} as const satisfies Record<KnowledgeItemKind, string>;
 
 /**
  * How many items this digest may propose. Twelve rather than the experience
@@ -111,7 +128,8 @@ const recordShape = experienceShape.extend({
  * The shape plus the one invariant the caps alone cannot state: a record must
  * render under the engine's goal budget, or every stage would read a clipped
  * goal while the validators read the whole one. `from-run.ts` fits a record to
- * it; a composer handing one over gets a refusal instead of a clip.
+ * it and then holds it to it, so a record the trims cannot bring under is
+ * refused rather than clipped.
  */
 export const knowledgeRecordSchema = recordShape.refine(
   (record) => textBytes(renderGoal(record)) <= GOAL_BUDGET_BYTES,
@@ -343,7 +361,8 @@ export function renderGoal(record: KnowledgeRecord): string {
     `- Propose at most ${record.maxMemories} items, each resting on 1–8 of the listed evidence aliases.`,
     '- Give every listed evidence alias exactly one place: under an item or under unused.',
     `- dimension is exactly one of: ${record.dimensions.join(', ')} — the dimension one of the item's own cited aliases lands on, as its line shows.`,
-    '- kind is one of: fact, anti_pattern, pattern, procedure. A procedure rests on a finding whose transition says resolved; a pattern on a criterion that held throughout or a finding that resolved; an anti_pattern on a finding.',
+    `- kind is one of: ${KNOWLEDGE_ITEM_KINDS.join(', ')}.`,
+    ...KNOWLEDGE_ITEM_KINDS.map((kind) => `  - ${kind}: ${KNOWLEDGE_KINDS[kind]}`),
     `- At most ${MAX_TOPICS} topics per item, each a general word a reader would search by.`,
     '- Validators check these limits; they are not criteria.',
     '',

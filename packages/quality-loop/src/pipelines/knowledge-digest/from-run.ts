@@ -20,6 +20,7 @@ import {
   MAX_LOCATION_IDS,
   KNOWN_TEXT_MAX,
   alias,
+  knowledgeRecordSchema,
   renderGoal,
   type DimensionMap,
   type KnowledgeRecord,
@@ -66,7 +67,9 @@ export const fit = (record: KnowledgeRecord, budget = GOAL_BUDGET_BYTES): Knowle
 
 /**
  * Null until the run has settled a trace: a run still going, or one that failed
- * before the loop, teaches nothing yet.
+ * before the loop, teaches nothing yet. A record the trims could not bring
+ * under the goal budget is refused here, so the step fails by name rather than
+ * every stage reading a clipped goal.
  */
 export function fromRun(
   run: QualityRunDto,
@@ -81,17 +84,27 @@ export function fromRun(
   const ids = (locations ?? []).map((location) => location.id);
   const known = (options.known ?? [])
     .slice(0, MAX_KNOWN)
-    .map((item, position) => ({ ...item, alias: alias(position), text: trimText(item.text) }));
+    .map(({ kind, runId, ref, pipeline, when, text }, position): KnownItem => ({
+      alias: alias(position),
+      kind,
+      runId,
+      ref,
+      pipeline,
+      when,
+      text: trimText(text),
+    }));
 
-  return fit({
-    ...experience,
-    source: { pipeline: source.pipeline, version: source.version },
-    dimensions: [...source.dimensions],
-    dimensionMap: source.map,
-    known,
-    locationIds: ids.slice(0, MAX_LOCATION_IDS),
-    omitted: { ...experience.omitted, locations: Math.max(0, ids.length - MAX_LOCATION_IDS) },
-    rules: [...(options.rules ?? KNOWLEDGE_RULES)],
-    maxMemories: options.maxMemories ?? MAX_ITEMS,
-  });
+  return knowledgeRecordSchema.parse(
+    fit({
+      ...experience,
+      source: { pipeline: source.pipeline, version: source.version },
+      dimensions: [...source.dimensions],
+      dimensionMap: source.map,
+      known,
+      locationIds: ids.slice(0, MAX_LOCATION_IDS),
+      omitted: { ...experience.omitted, locations: Math.max(0, ids.length - MAX_LOCATION_IDS) },
+      rules: [...(options.rules ?? KNOWLEDGE_RULES)],
+      maxMemories: options.maxMemories ?? MAX_ITEMS,
+    }),
+  );
 }

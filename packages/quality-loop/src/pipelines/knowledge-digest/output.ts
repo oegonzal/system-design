@@ -34,21 +34,6 @@ import { ALIAS_MAX, MAX_EVIDENCE } from '../../core/outputs';
 import { MAX_ITEMS, MAX_TOPICS, TOPIC_MAX } from './input';
 
 /**
- * What each kind is, as the producer and the critics are told it. Data beside
- * the pipeline the way `criterionKinds` is, so a kind is described once; the
- * vocabulary itself is the contract's, because the store's chunk kinds are
- * built from it.
- */
-export const KNOWLEDGE_KINDS = {
-  fact: 'A truth about the domain that holds with this design removed.',
-  anti_pattern: 'A mechanism that failed and why, resting on a confirmed finding.',
-  pattern:
-    'A mechanism that satisfied a criterion, resting on a criterion that held in every iteration it was assessed in, or on a finding that resolved.',
-  procedure:
-    'A change that resolved a defect, resting on a finding whose transition says resolved.',
-} as const satisfies Record<KnowledgeItemKind, string>;
-
-/**
  * Whether an item tells a reader to do something or to avoid it. A function of
  * the kind, so the producer is never asked for it and no rule has to check it;
  * a fact tells a reader what is true and neither.

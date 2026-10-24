@@ -5,10 +5,10 @@
  * is `core/testing`', because both digests reduce a run the same way. Pure
  * helpers only — no vitest imports.
  */
+import { findingKey } from '../../core/evidence/identity';
 import { fill } from '../../core/testing';
 import {
   ALIAS_MAX,
-  KEY_MAX,
   LENS_MAX,
   MAX_CRITERIA_ITEMS,
   MAX_FINDING_CRITERIA,
@@ -92,14 +92,19 @@ export const sampleDigest = (overrides: Partial<KnowledgeDigest> = {}): Knowledg
   ...overrides,
 });
 
+const maximalRefs = Array.from(
+  { length: MAX_FINDING_REFS },
+  (_, index) => `${fill(REF_MAX - 2)}${String(index).padStart(2, '0')}`,
+);
+
 const maximalFinding = (position: number): RecordedFinding => ({
   alias: `f${position + 1}`,
-  key: fill(KEY_MAX),
+  key: findingKey(fill(60), maximalRefs),
   type: fill(60),
   severity: 'critical',
   confidence: 'medium',
   fixability: 'fixable_local',
-  locationRefs: Array.from({ length: MAX_FINDING_REFS }, () => fill(REF_MAX)),
+  locationRefs: maximalRefs,
   criteria: Array.from({ length: MAX_FINDING_CRITERIA }, () => fill(ALIAS_MAX)),
   lenses: Array.from({ length: MAX_FINDING_LENSES }, () => fill(LENS_MAX)),
   iterations: Array.from({ length: 10 }, (_, index) => index + 1),
