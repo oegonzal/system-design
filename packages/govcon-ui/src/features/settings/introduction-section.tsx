@@ -48,6 +48,12 @@ export function IntroductionSection({
         disabled={disabled}
         onChange={(event) => onChange({ ...value, delivery: event.target.value })}
       />
+      <TextField
+        label="How the reader reaches you"
+        value={value.contact}
+        disabled={disabled}
+        onChange={(event) => onChange({ ...value, contact: event.target.value })}
+      />
       <Stack gap={2} aria-label="Offers" role="group">
         {value.offers.map((offer, index) => (
           // eslint-disable-next-line @eslint-react/no-array-index-key -- an offer row is its position while it is edited

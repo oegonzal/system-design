@@ -99,6 +99,7 @@ export function composeIntroductionGoal(brief: IntroductionBrief): string {
       '',
       `${brief.company}: ${introduction.about}`,
       introduction.delivery,
+      `Reach the sender at: ${introduction.contact.length > 0 ? introduction.contact : 'the address in the attached capability statement'}`,
       '',
       '## Offers',
       '',

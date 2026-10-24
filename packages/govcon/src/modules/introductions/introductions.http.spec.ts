@@ -62,6 +62,7 @@ describe('the introduction routes', () => {
       introduction: {
         about: 'builds agentic AI workflows.',
         delivery: 'Remote delivery by a U.S.-citizen principal; unclassified work.',
+        contact: 'teaming@tiny.example',
         offers: [
           {
             id: 'agentic-workflows',

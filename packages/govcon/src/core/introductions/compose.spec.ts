@@ -34,6 +34,7 @@ const brief = (overrides: Partial<IntroductionBrief> = {}): IntroductionBrief =>
   introduction: {
     about: 'builds agentic AI workflows and integrations.',
     delivery: 'Remote delivery by a U.S.-citizen principal; unclassified work.',
+    contact: 'teaming@precision-software.example',
     offers: [
       {
         id: 'agentic',
@@ -67,6 +68,7 @@ describe('the introduction goal', () => {
       '[offer.1] Agentic workflow engineering — Agents that carry a process end to end.',
     );
     expect(goal).toContain('[offer.2] AI-assisted QA — Automated regression suites.');
+    expect(goal).toContain('Reach the sender at: teaming@precision-software.example');
     expect(goal).toContain(INTRODUCTION_ASK);
     expect(readFencedIndex(goal, introductionIndexSchema)).toEqual({
       pipeline: 'introduction-note',
@@ -91,6 +93,12 @@ describe('the introduction goal', () => {
       }),
     );
     expect(bare).toContain('- Subcontracting plan: none stated');
+    const unnamed = composeIntroductionGoal(
+      brief({ introduction: { ...brief().introduction, contact: '' } }),
+    );
+    expect(unnamed).toContain(
+      'Reach the sender at: the address in the attached capability statement',
+    );
     expect(bare).toContain('- Type: BPA CALL\n');
     expect(bare).toContain('- Runs: 2019-09-27 to 2026-12-26\n');
   });

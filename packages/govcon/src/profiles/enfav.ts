@@ -93,6 +93,8 @@ export const ENFAV = {
     about:
       'Enfav LLC is a software engineering firm that builds agentic AI workflows, document intelligence and retrieval, systems and data integration, and AI-assisted QA and browser automation.',
     delivery: 'Remote delivery by a U.S.-citizen principal on unclassified work; travel available.',
+    // How a prime reaches the company, as the notes should say it: set in Settings, never guessed.
+    contact: '',
     offers: [
       {
         id: 'agentic-workflows',

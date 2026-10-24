@@ -40,6 +40,7 @@ export const sampleIntroductionGoal = (index: IntroductionIndex = sampleIndex())
     '',
     'Precision Software LLC builds agentic AI workflows and integrations for enterprise systems.',
     'Remote delivery by a U.S.-citizen principal; unclassified work; travel available.',
+    'Reach the sender at: teaming@precision-software.example',
     '',
     '## Offers',
     '',
@@ -73,7 +74,7 @@ export const sampleNote = (
   ],
   ask: 'Does the program need additional small-business engineering capacity, and could you introduce me to its program manager?',
   closing:
-    'Our capability statement is attached; I can be reached at the address in it, and deliver remotely as a U.S.-citizen principal on unclassified work.',
+    'Our capability statement is attached; reach me at teaming@precision-software.example. I deliver remotely as a U.S.-citizen principal on unclassified work.',
   ...overrides,
 });
 

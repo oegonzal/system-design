@@ -113,6 +113,9 @@ describe('ProfileEditor', () => {
       (screen.getByLabelText('The company, in a line or two') as HTMLTextAreaElement).value,
     ).toBe(PROFILE.introduction.about);
     expect((screen.getByLabelText('Offer 1 slug') as HTMLInputElement).value).toBe('machining');
+    expect((screen.getByLabelText('How the reader reaches you') as HTMLInputElement).value).toBe(
+      PROFILE.introduction.contact,
+    );
     fireEvent.change(screen.getByLabelText('How the work is delivered'), {
       target: { value: 'Shipped within a week, anywhere.' },
     });

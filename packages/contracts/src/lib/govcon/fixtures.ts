@@ -109,6 +109,7 @@ export const profileOf = (overrides: Partial<SearchProfile> = {}): SearchProfile
   introduction: {
     about: 'Precision Parts Co machines replacement parts to print.',
     delivery: 'Made in Ohio, shipped within a week.',
+    contact: 'orders@precision-parts.example',
     offers: [
       {
         id: 'machining',

@@ -120,6 +120,8 @@ export interface IntroductionPolicy {
   about: string;
   /** How the work is delivered: where, by whom, under what clearance. */
   delivery: string;
+  /** How a reader reaches the sender, as a note should say it — an address, a number; empty, the note points at the capability statement. */
+  contact: string;
   offers: Offer[];
 }
 
@@ -127,6 +129,7 @@ export interface IntroductionPolicy {
 export const DEFAULT_INTRODUCTION_POLICY: IntroductionPolicy = {
   about: '',
   delivery: '',
+  contact: '',
   offers: [],
 };
 

@@ -104,6 +104,7 @@ const teamingPolicySchema = z.strictObject({
 const introductionPolicySchema = z.strictObject({
   about: z.string().trim().max(MAX_INTRODUCTION_FACT_LENGTH),
   delivery: z.string().trim().max(MAX_INTRODUCTION_FACT_LENGTH),
+  contact: z.string().trim().max(MAX_INTRODUCTION_FACT_LENGTH),
   offers: z
     .array(
       z.strictObject({
