@@ -15,7 +15,8 @@ import {
   readoutTrace,
   recallHits,
 } from '../testing';
-import { bareGoal, MEMORY_HEADING, withMemory } from './inject';
+import { bareGoal, MEMORY_HEADING } from '../../common';
+import { withMemory } from './inject';
 import { probeSet } from './query';
 import { readPack, type UsableMemory } from './read-pack';
 

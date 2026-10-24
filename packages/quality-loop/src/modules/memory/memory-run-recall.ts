@@ -13,7 +13,7 @@ import type { RunRecallDto } from '@sysdesign/contracts';
 
 import { contentHash, type MemoryPorts } from '../../orchestrators/memory/ports';
 import { focusOf } from '../../orchestrators/memory/recall/focus';
-import { bareGoal } from '../../orchestrators/memory/recall/inject';
+import { bareGoal } from '../../orchestrators/common';
 import { knownOf, type RecallKnown } from '../../orchestrators/memory/recall/known';
 import { resolveLineage } from '../../orchestrators/memory/recall/lineage';
 import { provenanceOf } from '../../orchestrators/memory/recall/provenance';

@@ -24,6 +24,7 @@ import {
 import type { ZodType } from 'zod';
 
 import type { Validator } from '../ports';
+import type { TaskContract } from './task';
 
 /** Each output schema's declared bounds, indexed once: a schema is built at boot and read on every iteration. */
 const indexed = new WeakMap<ZodType, Readonly<Record<BoundPath, DeclaredBound>>>();
@@ -56,17 +57,39 @@ export const problem = (
   locationRefs: string[] = [],
 ): ValidationProblem => ({ severity, locationRefs, message });
 
+/** A rule reads a well-formed artifact against the contract it answers; what it finds are the problems. */
+export type ArtifactRule<A> = (artifact: A, contract: TaskContract<A>) => ValidationProblem[];
+
+/**
+ * A validator that runs `rule` on a well-formed artifact, with the gate it
+ * declares. A malformed artifact is the schema validator's to report, once, so
+ * it passes here with no problems; one a field past its size left well-formed
+ * is read whole, as the seam read it.
+ */
+export function artifactValidator<A>(
+  id: string,
+  gate: ValidatorGate,
+  rule: ArtifactRule<A>,
+): Validator<A> {
+  return {
+    id,
+    gate,
+    validate: (artifact, contract) => {
+      const parsed = readArtifact(contract.output.schema, artifact);
+      return { validatorId: id, gate, problems: parsed.ok ? rule(parsed.value, contract) : [] };
+    },
+  };
+}
+
 /** A rule reads a parsed artifact against the index; what it finds are the problems. */
 export type IndexedRule<A, I> = (artifact: A, index: I) => ValidationProblem[];
 
 /** A gate an indexed validator may declare: its problems refuse, one way or the other. */
-export type RefusingGate = Exclude<ValidatorGate, 'warn'>;
+type RefusingGate = Exclude<ValidatorGate, 'warn'>;
 
 /**
- * A refusing validator over an artifact and its goal's index, with the gate
- * it declares. A malformed artifact is the schema validator's to report, so
- * it passes here with no problems; a goal without an index yields
- * `whenNoIndex`.
+ * A refusing validator over a well-formed artifact and its goal's index, with
+ * the gate it declares; a goal without an index yields `whenNoIndex`.
  */
 export function indexedValidator<A, I>(
   id: string,
@@ -75,17 +98,10 @@ export function indexedValidator<A, I>(
   whenNoIndex: ValidationProblem[],
   gate: RefusingGate = 'block',
 ): Validator<A> {
-  return {
-    id,
-    gate,
-    validate: (artifact, contract) => {
-      const parsed = readArtifact(contract.output.schema, artifact);
-      if (!parsed.ok) return { validatorId: id, gate, problems: [] };
-      const index = readIndex(contract.goal);
-      const problems = index === null ? whenNoIndex : rule(parsed.value, index);
-      return { validatorId: id, gate, problems };
-    },
-  };
+  return artifactValidator<A>(id, gate, (artifact, contract) => {
+    const index = readIndex(contract.goal);
+    return index === null ? whenNoIndex : rule(artifact, index);
+  });
 }
 
 /**

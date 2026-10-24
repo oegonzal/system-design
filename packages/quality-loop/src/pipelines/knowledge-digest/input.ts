@@ -31,16 +31,18 @@ import {
 import { z } from 'zod';
 
 import {
-  ADOPTED_FINDING_NOTE,
   ALIAS_MAX,
   RECORD_EVIDENCE_KINDS,
   REF_MAX,
   adoptedOmittedLines,
+  criterionLine,
+  findingLine,
+  omittedLine,
+  outcomeLines,
   experienceShape,
   omittedShape,
   type RecordedCriterion,
   type RecordedFinding,
-  type Transition,
 } from '../../core/outputs';
 
 export const KNOWLEDGE_DIGEST_ID = 'knowledge-digest';
@@ -245,66 +247,22 @@ export const vocabularyOf = (index: KnowledgeIndex): RunVocabulary => ({
   locations: [...index.locations],
 });
 
-const signed = (value: number | null): string =>
-  value === null ? '' : ` (${value > 0 ? '+' : ''}${value})`;
-
-const scoreLine = (summary: KnowledgeRecord['iterations'][number]): string =>
-  Object.entries(summary.dimensions)
-    .map(
-      ([dimension, value]) =>
-        `${dimension} ${value ?? 'n/a'}${signed(summary.dimensionDeltas[dimension] ?? null)}`,
-    )
-    .join(' · ');
-
-const transitionText = (transitions: readonly Transition[]): string =>
-  transitions
-    .map((t) => `${t.kind} i${t.iterations[0]}→i${t.iterations[1]} (${t.detail})`)
-    .join(', ');
+/** The dimension an item's kind or type lands on, as a note after it. */
+const dimensionNote = (dimension: string | null): string => ` → ${dimension ?? 'no dimension'}`;
 
 /** A criterion line, with the dimension its kind lands on and whether it held throughout. */
-const criterionLine = (item: RecordedCriterion, map: DimensionMap): string => {
-  const dimension = dimensionOfCriterion(item, map);
-  const results = item.results.map((r) => `i${r.iteration} ${r.result}`).join(' → ');
-  const transitions = item.transitions.length > 0 ? ` — ${transitionText(item.transitions)}` : '';
-  const held = heldThroughout(item) ? ' · held throughout' : '';
-  return `- [${item.alias}] ${item.kind} → ${dimension ?? 'no dimension'}${held} · ${item.statement} — ${results}${transitions}`;
-};
+const criterionLineIn = (item: RecordedCriterion, map: DimensionMap): string =>
+  criterionLine(
+    item,
+    `${dimensionNote(dimensionOfCriterion(item, map))}${heldThroughout(item) ? ' · held throughout' : ''}`,
+  );
 
 /** A finding line, with the dimension its type lands on. */
-const findingLine = (item: RecordedFinding, map: DimensionMap): string => {
-  const dimension = dimensionOfFinding(item, map);
-  const parts = [
-    `${item.type} → ${dimension ?? 'no dimension'}`,
-    `${item.severity} · confidence ${item.confidence} · ${item.fixability}`,
-    item.locationRefs.length > 0 ? `at ${item.locationRefs.join(', ')}` : 'artifact-wide',
-    item.criteria.length > 0 ? `weakens ${item.criteria.join(', ')}` : null,
-    `by ${item.lenses.join(', ')}`,
-    `seen ${item.iterations.map((n) => `i${n}`).join(', ')}`,
-    item.adopted ? ADOPTED_FINDING_NOTE : null,
-    item.remediated ? 'remediated' : 'not remediated',
-    item.reconciledTo ? `reconciled to ${item.reconciledTo}` : null,
-    item.transitions.length > 0 ? transitionText(item.transitions) : null,
-  ].filter((part): part is string => part !== null);
-  return `- [${item.alias}] ${parts.join(' · ')}${item.rationale ? ` — ${item.rationale}` : ''}`;
-};
+const findingLineIn = (item: RecordedFinding, map: DimensionMap): string =>
+  findingLine(item, dimensionNote(dimensionOfFinding(item, map)));
 
 const knownLine = (item: KnownItem): string =>
   `- [${item.alias}] ${item.kind} · ${item.pipeline} · ${item.when} · run ${item.runId} · ref ${item.ref}: ${item.text}`;
-
-const omittedLine = (count: number, noun: string): string[] =>
-  count > 0 ? [`(${count} more ${noun} omitted)`] : [];
-
-/** What the run decided, iteration by iteration; one iteration alone can claim no change. */
-const outcomeLines = (record: KnowledgeRecord): string[] => [
-  `- Run ${record.runId} of ${record.pipeline}: final decision ${record.finalDecision}, stopped by ${record.stopReason}, best iteration i${record.bestIteration}.`,
-  ...(record.iterations.length === 1
-    ? ['- One iteration only: no transition exists, so no change in quality can be claimed.']
-    : []),
-  ...record.iterations.map(
-    (it) =>
-      `- i${it.iteration} (${it.mode}): ${it.decision} — overall ${it.overall}${signed(it.overallDelta)} — ${scoreLine(it)} — ${it.reason}`,
-  ),
-];
 
 /**
  * The heading the already-known items sit under. Deliberately not the marker
@@ -332,14 +290,14 @@ export function renderGoal(record: KnowledgeRecord): string {
     '## Criteria',
     '',
     ...(record.criteria.length > 0
-      ? record.criteria.map((item) => criterionLine(item, record.dimensionMap))
+      ? record.criteria.map((item) => criterionLineIn(item, record.dimensionMap))
       : ['(none)']),
     ...omittedLine(record.omitted.criteria, 'criteria'),
     '',
     '## Findings',
     '',
     ...(record.findings.length > 0
-      ? record.findings.map((item) => findingLine(item, record.dimensionMap))
+      ? record.findings.map((item) => findingLineIn(item, record.dimensionMap))
       : ['(none confirmed)']),
     ...omittedLine(record.omitted.findings, 'findings'),
     ...adoptedOmittedLines(record.omitted.adopted),

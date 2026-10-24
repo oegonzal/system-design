@@ -3,7 +3,7 @@
  * a reader of them withholds, how several runs' outputs compare, and the run
  * reduced to the facts a digest reasons over.
  */
-export * from './experience-record';
+export * from './experience';
 export * from './reconcile';
 export * from './run-outputs';
 export * from './withheld';

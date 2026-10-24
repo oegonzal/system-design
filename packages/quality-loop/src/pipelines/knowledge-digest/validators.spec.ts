@@ -8,7 +8,6 @@ import { renderGoal } from './input';
 import type { KnowledgeDigest } from './output';
 import { sampleDigest, sampleKnown, sampleSource } from './testing';
 import {
-  borrows,
   dimensionValidator,
   generalityValidator,
   kindsValidator,
@@ -84,11 +83,14 @@ describe('the knowledge-digest validators', () => {
   });
 
   it('[QL-42] an item that borrows this run’s vocabulary is faulted at that item, and a lookalike is not', () => {
-    // Whole tokens only, and only the ids the codec itself listed.
-    expect(borrows('summed across i1 and i2', 'i1')).toBe(true);
-    expect(borrows('the wifi1 radio', 'i1')).toBe(false);
-    expect(borrows('at node.30 the edge', 'node.3')).toBe(false);
-    expect(borrows('at flow.1, the read path', 'flow.1')).toBe(true);
+    // Whole tokens only, only the ids the codec itself listed, read with the
+    // grammar every reader of prose shares — a capitalised id is still the id.
+    expect(
+      messages(itemWith({ insight: 'The wifi1 radio queues f10.' }))['run-specificity'],
+    ).toEqual([]);
+    expect(
+      messages(itemWith({ insight: 'F1 says the upstream fails.' }))['run-specificity'],
+    ).toEqual(['memory.1 names f1 (an evidence alias), which another prompt cannot resolve']);
 
     const alias = itemWith({ insight: 'Do what f1 says about the upstream.' });
     expect(messages(alias)['run-specificity']).toEqual([

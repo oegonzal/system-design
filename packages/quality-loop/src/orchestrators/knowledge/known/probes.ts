@@ -13,6 +13,7 @@
  * from recorded fields, worst first, and capped.
  */
 import {
+  KNOWLEDGE_ITEM_KINDS,
   SEVERITIES,
   tokenWords,
   type ConfirmedFinding,
@@ -24,6 +25,7 @@ import {
 import { capText } from '@sysdesign/run-dump';
 
 import { annotate } from '../../../core/evidence/annotate';
+import { MAX_KNOWN } from '../../../pipelines/knowledge-digest/input';
 import { PROBE_BOUND } from '../../../pipelines/memory-recall/input';
 import { fuse } from '../../memory/recall/fusion';
 import {
@@ -32,7 +34,6 @@ import {
   type MemoryProbe,
   type ProbeFilter,
 } from '../../memory/ports';
-import { KNOWLEDGE_ITEM_KINDS } from '@sysdesign/contracts';
 
 /**
  * How many of the run's own lines are searched. Past this the batch costs more
@@ -42,8 +43,6 @@ import { KNOWLEDGE_ITEM_KINDS } from '@sysdesign/contracts';
 export const MAX_KNOWN_PROBES = 24;
 /** How many hits one line may contribute, per named vector, before fusion. */
 export const KNOWN_PER_PROBE = 4;
-/** How many known items the digest is shown; the codec's own cap on its section. */
-export const MAX_KNOWN = 12;
 
 /** A line is capped at the target a probe is asked for, as a recall's own probes are. */
 const cap = (text: string): string => capText(text.trim(), PROBE_BOUND.target).text;

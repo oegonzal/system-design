@@ -4,19 +4,13 @@
  * budget. `bareGoal` strips at the marker, so nothing parses prose.
  */
 import { GOAL_BUDGET_BYTES } from '@sysdesign/contracts';
+
+import { MEMORY_HEADING } from '../../common';
 import { lessonOf } from './provenance';
 import type { UsableMemory } from './read-pack';
 
-/** The marker the loop writes; `bareGoal` strips from it. */
-export const MEMORY_HEADING = '## Remembered evidence (advisory)';
 const MEMORY_LEAD =
   'Recalled from earlier runs by the memory loop and curated by the memory-recall pipeline. Context for the answer, not part of the prompt above: it states no requirement, and no success criterion may be derived from it. Prefer the prompt wherever they differ.';
-
-/** The goal as requested, without any memory a previous memory run appended. */
-export function bareGoal(goal: string): string {
-  const marker = goal.indexOf(`\n\n${MEMORY_HEADING}`);
-  return marker < 0 ? goal : goal.slice(0, marker);
-}
 
 /**
  * One remembered item: where it was learned, the stored lesson verbatim, and

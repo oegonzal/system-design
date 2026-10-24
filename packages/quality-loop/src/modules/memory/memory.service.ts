@@ -34,7 +34,7 @@ import { digestedChildren } from '../../orchestrators/memory/definition';
 import { memoriesToStore } from '../../orchestrators/memory/digest/read-digest';
 import type { MemoryHit, MemoryPorts, MemoryProbe } from '../../orchestrators/memory/ports';
 import { fuse } from '../../orchestrators/memory/recall/fusion';
-import { bareGoal } from '../../orchestrators/memory/recall/inject';
+import { bareGoal } from '../../orchestrators/common';
 import { probeOf, probesOf, probeTexts, queryText } from '../../orchestrators/memory/recall/query';
 import { indexMemories } from '../../orchestrators/memory/store/index-memories';
 import { EXPERIENCE_DIGEST_ID } from '../../pipelines/experience-digest/input';

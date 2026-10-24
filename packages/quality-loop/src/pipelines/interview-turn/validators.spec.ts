@@ -34,8 +34,8 @@ describe('the interview-turn validators', () => {
     });
     expect(messages(turn).references).toEqual([
       'reply.3 answers question.9, which the goal does not list',
-      'reply.3 discloses c9, which the rubric does not hold',
       'reply.4 answers question.1 a second time',
+      'reply.3 discloses c9, which the rubric does not hold',
     ]);
     // The same replies under a goal that lists question.9 are fine: the prose never decided.
     const wider = sampleInterviewGoal({

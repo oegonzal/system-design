@@ -25,6 +25,12 @@ export const isSettled = <T>(
   trace: RunTrace<T> | null,
 ): trace is RunTrace<T> & { stopReason: StopReason } => trace !== null && trace.stopReason !== null;
 
+/** A settled trace that recorded at least one iteration: the only kind there is anything to learn from. */
+export const hasSettledIterations = <T>(
+  trace: RunTrace<T> | null,
+): trace is RunTrace<T> & { stopReason: StopReason } =>
+  isSettled(trace) && trace.iterations.length > 0;
+
 /**
  * One run as the service holds it and the dump stores it: the wire shape plus
  * git and the full exchanges. Its `trace` follows the wire's rule — the

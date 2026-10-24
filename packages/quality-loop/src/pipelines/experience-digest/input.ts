@@ -16,7 +16,6 @@ import {
 import { z } from 'zod';
 
 import {
-  ADOPTED_FINDING_NOTE,
   ALIAS_MAX,
   ARTIFACT_MAX,
   LENS_MAX,
@@ -34,6 +33,10 @@ import {
   STATEMENT_MAX,
   TRANSITION_DETAIL_MAX,
   adoptedOmittedLines,
+  criterionLine,
+  findingLine,
+  omittedLine,
+  outcomeLines,
   experienceShape,
   recordedCriterionSchema,
   recordedFindingSchema,
@@ -131,46 +134,6 @@ const indexSchema = z.strictObject({
 });
 export type ExperienceIndex = z.infer<typeof indexSchema>;
 
-const signed = (value: number | null): string =>
-  value === null ? '' : ` (${value > 0 ? '+' : ''}${value})`;
-
-const scoreLine = (summary: IterationSummary): string =>
-  Object.entries(summary.dimensions)
-    .map(
-      ([dimension, value]) =>
-        `${dimension} ${value ?? 'n/a'}${signed(summary.dimensionDeltas[dimension] ?? null)}`,
-    )
-    .join(' · ');
-
-const transitionText = (transitions: readonly Transition[]): string =>
-  transitions
-    .map((t) => `${t.kind} i${t.iterations[0]}→i${t.iterations[1]} (${t.detail})`)
-    .join(', ');
-
-const criterionLine = (item: RecordedCriterion): string => {
-  const results = item.results.map((r) => `i${r.iteration} ${r.result}`).join(' → ');
-  const transitions = item.transitions.length > 0 ? ` — ${transitionText(item.transitions)}` : '';
-  return `- [${item.alias}] ${item.kind} · ${item.statement} — ${results}${transitions}`;
-};
-
-const findingLine = (item: RecordedFinding): string => {
-  const parts = [
-    `${item.type} · ${item.severity} · confidence ${item.confidence} · ${item.fixability}`,
-    item.locationRefs.length > 0 ? `at ${item.locationRefs.join(', ')}` : 'artifact-wide',
-    item.criteria.length > 0 ? `weakens ${item.criteria.join(', ')}` : null,
-    `by ${item.lenses.join(', ')}`,
-    `seen ${item.iterations.map((n) => `i${n}`).join(', ')}`,
-    item.adopted ? ADOPTED_FINDING_NOTE : null,
-    item.remediated ? 'remediated' : 'not remediated',
-    item.reconciledTo ? `reconciled to ${item.reconciledTo}` : null,
-    item.transitions.length > 0 ? transitionText(item.transitions) : null,
-  ].filter((part): part is string => part !== null);
-  return `- [${item.alias}] ${parts.join(' · ')}${item.rationale ? ` — ${item.rationale}` : ''}`;
-};
-
-const omittedLine = (count: number, noun: string): string[] =>
-  count > 0 ? [`(${count} more ${noun} omitted)`] : [];
-
 /** Iterations ascending, each once: where an item stood, and both ends of each change in it. */
 const iterationsOf = (stood: readonly number[], transitions: readonly Transition[]): number[] =>
   [...new Set([...stood, ...transitions.flatMap((transition) => transition.iterations)])].sort(
@@ -205,18 +168,6 @@ const indexOf = (record: ExperienceRecord): ExperienceIndex => ({
   ],
 });
 
-/** What the run decided, iteration by iteration; one iteration alone can claim no change. */
-const outcomeLines = (record: ExperienceRecord): string[] => [
-  `- Run ${record.runId} of ${record.pipeline}: final decision ${record.finalDecision}, stopped by ${record.stopReason}, best iteration i${record.bestIteration}.`,
-  ...(record.iterations.length === 1
-    ? ['- One iteration only: no transition exists, so no change in quality can be claimed.']
-    : []),
-  ...record.iterations.map(
-    (it) =>
-      `- i${it.iteration} (${it.mode}): ${it.decision} — overall ${it.overall}${signed(it.overallDelta)} — ${scoreLine(it)} — ${it.reason}`,
-  ),
-];
-
 export function renderGoal(record: ExperienceRecord): string {
   return [
     '# Source prompt',
@@ -233,12 +184,16 @@ export function renderGoal(record: ExperienceRecord): string {
     '',
     '## Criteria',
     '',
-    ...(record.criteria.length > 0 ? record.criteria.map(criterionLine) : ['(none)']),
+    ...(record.criteria.length > 0
+      ? record.criteria.map((item) => criterionLine(item))
+      : ['(none)']),
     ...omittedLine(record.omitted.criteria, 'criteria'),
     '',
     '## Findings',
     '',
-    ...(record.findings.length > 0 ? record.findings.map(findingLine) : ['(none confirmed)']),
+    ...(record.findings.length > 0
+      ? record.findings.map((item) => findingLine(item))
+      : ['(none confirmed)']),
     ...omittedLine(record.omitted.findings, 'findings'),
     ...adoptedOmittedLines(record.omitted.adopted),
     '',

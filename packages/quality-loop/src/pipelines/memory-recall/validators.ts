@@ -3,13 +3,14 @@
  * that cites what was never recalled, or leaves a candidate unjudged, cannot
  * be trusted by any lens, so both block.
  */
-import type { ValidationProblem } from '@sysdesign/contracts';
-
 import {
   indexedValidator,
   LIMITS_VALIDATOR_ID,
+  misplaced,
+  overLimit,
   problem,
   REFERENCES_VALIDATOR_ID,
+  unplaced,
   type IndexedRule,
 } from '../../core/contracts';
 import type { Validator } from '../../core/ports';
@@ -26,31 +27,23 @@ const verdicts = (pack: MemoryPack): string[] => [
   ...pack.dropped.map((item) => item.chunk),
 ];
 
-const references: Rule = (pack, index) => {
-  const known = new Set(index.candidates.map((candidate) => candidate.alias));
-  const seen = new Set<string>();
-  const problems: ValidationProblem[] = [];
-  for (const alias of verdicts(pack)) {
-    if (!known.has(alias)) problems.push(problem('critical', `${alias} is not a listed candidate`));
-    else if (seen.has(alias))
-      problems.push(problem('critical', `${alias} is given more than one verdict`, [alias]));
-    seen.add(alias);
-  }
-  return problems;
-};
+const candidatesOf = (index: MemoryIndex): string[] =>
+  index.candidates.map((candidate) => candidate.alias);
 
-const limits: Rule = (pack, index) => {
-  const given = new Set(verdicts(pack));
-  const problems = index.candidates
-    .filter((candidate) => !given.has(candidate.alias))
-    .map((candidate) => problem('high', `${candidate.alias} has no verdict`));
-  if (pack.kept.length > index.maxKept) {
-    problems.push(
-      problem('high', `${pack.kept.length} chunks kept; the limit is ${index.maxKept}`),
-    );
-  }
-  return problems;
-};
+const references: Rule = (pack, index) =>
+  misplaced(
+    candidatesOf(index),
+    verdicts(pack).map((ref) => ({ ref })),
+    {
+      unlisted: (alias) => `${alias} is not a listed candidate`,
+      repeated: (alias) => `${alias} is given more than one verdict`,
+    },
+  );
+
+const limits: Rule = (pack, index) => [
+  ...unplaced(candidatesOf(index), verdicts(pack), 'high', (alias) => `${alias} has no verdict`),
+  ...overLimit(pack.kept.length, index.maxKept, 'chunks kept'),
+];
 
 export const referencesValidator: Validator<MemoryPack> = indexedValidator(
   REFERENCES_VALIDATOR_ID,

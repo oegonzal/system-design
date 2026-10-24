@@ -13,7 +13,7 @@ import { rmSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { fakeLlm } from '../../core/testing';
-import { MEMORY_HEADING } from '../../orchestrators/memory/recall/inject';
+import { MEMORY_HEADING } from '../../orchestrators/common';
 import { GOAL } from '../../orchestrators/memory/testing';
 import {
   bootApp,

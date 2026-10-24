@@ -1,206 +1,47 @@
 /**
  * A finished run reduced to the facts the engine established: what was found,
  * what was acted on, what changed between iterations, around the run's own
- * prompt and artifact verbatim. Shape, caps and reducer, with no opinion about
- * what reads it.
+ * prompt and artifact verbatim.
  *
  * This lives in `core/outputs/` because more than one pipeline digests a run
  * and they must reduce it the same way — a second copy of the folding would
  * drift, and the two digests would then be learning from different accounts of
- * the same run. What stays with each codec is how the record is rendered as a
- * goal, what rules travel with it, and what else it carries; this file ends at
- * the facts.
+ * the same run.
  *
  * Nothing here judges. Deltas between iterations are the one figure computed,
  * and they come from the decisions' own scores.
  */
 import {
-  AXIS_FACTOR_LEVELS,
-  bound,
-  bounded,
-  CRITERION_ID_MAX_LENGTH,
-  CRITERION_KIND_MAX_LENGTH,
-  CRITERION_RESULTS,
-  DECISIONS,
-  exact,
-  FIXABILITIES,
-  ITERATION_MODES,
-  MAX_QUALITY_RUN_ITERATIONS,
   SEVERITIES,
-  STOP_REASONS,
-  TRANSITION_KINDS,
   type ConfirmedFinding,
   type IterationTrace,
   type Lesson,
   type QualityRunDto,
   type RunTrace,
-  textBytes,
 } from '@sysdesign/contracts';
 import { capText } from '@sysdesign/run-dump';
-import { z } from 'zod';
 
-import { round1 } from '../arithmetic';
-import { annotate } from '../evidence/annotate';
-import { outputsOf } from './run-outputs';
-
-/** Caps chosen so a maximal record renders well under the engine's goal budget. */
-export const MAX_FINDINGS = 32;
-export const MAX_CRITERIA_ITEMS = 24;
-export const MAX_EVIDENCE = MAX_FINDINGS + MAX_CRITERIA_ITEMS;
-export const PROMPT_MAX = 12_000;
-export const ARTIFACT_MAX = 16_000;
-export const RATIONALE_MAX = 200;
-export const REASON_MAX = 200;
-export const STATEMENT_MAX = 300;
-/** An evidence alias — `f12`, `r3` — and the engine ids a finding carries. */
-export const ALIAS_MAX = 8;
-export const REF_MAX = 40;
-export const LENS_MAX = 40;
-export const TRANSITION_DETAIL_MAX = 120;
-/** How many locations, criteria and lenses one recorded finding lists. */
-export const MAX_FINDING_REFS = 8;
-export const MAX_FINDING_CRITERIA = 4;
-export const MAX_FINDING_LENSES = 6;
-
-const FINDING_TYPE_MAX = 60;
-const DIMENSION_MAX = 40;
-const RUN_ID_MAX = 80;
-const PIPELINE_ID_MAX = 120;
-
-/*
- * The record is composed (`experienceOf`), never written by a model: each text
- * is capped where it is composed at its bound's target, and each list sliced
- * to its count, so the counts are exact and the prose is bounded — a record
- * another composer hands over a little past a target is still a record.
- */
-const PROMPT_BOUND = bound(PROMPT_MAX);
-const ARTIFACT_BOUND = bound(ARTIFACT_MAX);
-const RATIONALE_BOUND = bound(RATIONALE_MAX);
-const REASON_BOUND = bound(REASON_MAX);
-const STATEMENT_BOUND = bound(STATEMENT_MAX);
-const TRANSITION_DETAIL_BOUND = bound(TRANSITION_DETAIL_MAX);
-const PER_ITERATION_BOUND = exact(MAX_QUALITY_RUN_ITERATIONS);
-const TRANSITION_ENDS_BOUND = exact(2);
-const FINDINGS_BOUND = exact(MAX_FINDINGS);
-const CRITERIA_BOUND = exact(MAX_CRITERIA_ITEMS);
-const FINDING_REFS_BOUND = exact(MAX_FINDING_REFS);
-const FINDING_CRITERIA_BOUND = exact(MAX_FINDING_CRITERIA);
-const FINDING_LENSES_BOUND = exact(MAX_FINDING_LENSES);
-
-/** What a run's record offers an item to rest on: its confirmed findings and its judged criteria. */
-export const RECORD_EVIDENCE_KINDS = ['finding', 'criterion'] as const;
-
-const alias = bounded.id(ALIAS_MAX, { min: 1 });
-const iteration = z.number().int().min(1);
-const score = z.number().nullable();
-const dimension = bounded.id(DIMENSION_MAX);
-
-export const transitionSchema = z.strictObject({
-  kind: z.enum(TRANSITION_KINDS),
-  iterations: bounded.list(TRANSITION_ENDS_BOUND, iteration, { min: 2 }),
-  detail: bounded.text(TRANSITION_DETAIL_BOUND),
-});
-export type Transition = z.infer<typeof transitionSchema>;
-
-export const iterationSummarySchema = z.strictObject({
-  iteration,
-  mode: z.enum(ITERATION_MODES),
-  decision: z.enum(DECISIONS),
-  reason: bounded.text(REASON_BOUND),
-  overall: z.number(),
-  overallDelta: score,
-  dimensions: z.record(dimension, score),
-  dimensionDeltas: z.record(dimension, score),
-});
-export type IterationSummary = z.infer<typeof iterationSummarySchema>;
-
-export const recordedCriterionSchema = z.strictObject({
-  alias,
-  id: bounded.id(CRITERION_ID_MAX_LENGTH, { min: 1 }),
-  kind: bounded.id(CRITERION_KIND_MAX_LENGTH, { min: 1 }),
-  statement: bounded.text(STATEMENT_BOUND, { min: 1 }),
-  results: bounded.list(
-    PER_ITERATION_BOUND,
-    z.strictObject({ iteration, result: z.enum([...CRITERION_RESULTS, 'unassessed'] as const) }),
-  ),
-  transitions: bounded.list(PER_ITERATION_BOUND, transitionSchema),
-});
-export type RecordedCriterion = z.infer<typeof recordedCriterionSchema>;
-
-export const recordedFindingSchema = z.strictObject({
-  alias,
-  /**
-   * The engine's own identity for the finding (`findingKey`): its type and
-   * every ref it was ever located at, so as long as those make it — a finding
-   * merged across samples has measurably run past 200 characters. The
-   * goal budget, not a field cap, bounds what of it renders.
-   */
-  key: z.string().min(1),
-  type: bounded.id(FINDING_TYPE_MAX, { min: 1 }),
-  severity: z.enum(SEVERITIES),
-  confidence: z.enum(AXIS_FACTOR_LEVELS),
-  fixability: z.enum(FIXABILITIES),
-  locationRefs: bounded.list(FINDING_REFS_BOUND, bounded.id(REF_MAX)),
-  /** Aliases of the record's criteria the finding weakened. */
-  criteria: bounded.list(FINDING_CRITERIA_BOUND, alias),
-  lenses: bounded.list(FINDING_LENSES_BOUND, bounded.id(LENS_MAX)),
-  iterations: bounded.list(PER_ITERATION_BOUND, iteration, { min: 1 }),
-  rationale: bounded.text(RATIONALE_BOUND).nullable(),
-  /** The policy selected it for remediation in at least one iteration. */
-  remediated: z.boolean(),
-  reconciledTo: alias.nullable(),
-  transitions: bounded.list(PER_ITERATION_BOUND, transitionSchema),
-  /**
-   * Seen only in an iteration adopted from an earlier run: that run's judges
-   * confirmed it, and only its transitions are this run's own.
-   */
-  adopted: z.boolean(),
-});
-export type RecordedFinding = z.infer<typeof recordedFindingSchema>;
-
-/**
- * The facts themselves. A codec extends this with what its own stages read —
- * the rules that travel with the record, how many items it may propose, and
- * anything else it hands the model.
- */
-/**
- * What the record left out, counted: findings and criteria past their caps or
- * the goal budget, and findings seen only in an adopted iteration with no
- * transition — copies of an earlier run's evidence this run changed nothing
- * about, which that run's own digest already read. A codec that leaves out
- * more extends it.
- */
-export const omittedShape = z.strictObject({
-  findings: z.number().int().min(0),
-  criteria: z.number().int().min(0),
-  adopted: z.number().int().min(0),
-});
-
-/** How a record's reader is told a finding was confirmed by an earlier run's judges. */
-export const ADOPTED_FINDING_NOTE = 'adopted from an earlier run';
-
-/** The line a render gives the adopted findings a record left out; nothing when it left none. */
-export const adoptedOmittedLines = (count: number): string[] =>
-  count > 0
-    ? [
-        `(${count} more findings omitted: seen only in an iteration adopted from an earlier run, with no change this run judged)`,
-      ]
-    : [];
-
-export const experienceShape = z.strictObject({
-  runId: bounded.id(RUN_ID_MAX, { min: 1 }),
-  pipeline: bounded.id(PIPELINE_ID_MAX, { min: 1 }),
-  finalDecision: z.enum(DECISIONS),
-  stopReason: z.enum(STOP_REASONS),
-  bestIteration: iteration,
-  prompt: bounded.text(PROMPT_BOUND, { min: 1 }),
-  artifact: bounded.text(ARTIFACT_BOUND).nullable(),
-  iterations: bounded.list(PER_ITERATION_BOUND, iterationSummarySchema, { min: 1 }),
-  criteria: bounded.list(CRITERIA_BOUND, recordedCriterionSchema),
-  findings: bounded.list(FINDINGS_BOUND, recordedFindingSchema),
-  omitted: omittedShape,
-});
-export type Experience = z.infer<typeof experienceShape>;
+import { round1 } from '../../arithmetic';
+import { hasSettledIterations } from '../../contracts';
+import { annotate } from '../../evidence/annotate';
+import { outputsOf } from '../run-outputs';
+import {
+  ARTIFACT_MAX,
+  MAX_CRITERIA_ITEMS,
+  MAX_FINDING_CRITERIA,
+  MAX_FINDING_REFS,
+  MAX_FINDINGS,
+  PROMPT_MAX,
+  RATIONALE_MAX,
+  REASON_MAX,
+  STATEMENT_MAX,
+  TRANSITION_DETAIL_MAX,
+  type Experience,
+  type IterationSummary,
+  type RecordedCriterion,
+  type RecordedFinding,
+  type Transition,
+} from './schema';
 
 const delta = (now: number | null, before: number | null | undefined): number | null =>
   now === null || before === null || before === undefined ? null : round1(now - before);
@@ -391,7 +232,7 @@ function collectCriteria(trace: RunTrace): RecordedCriterion[] {
  */
 export function experienceOf(run: QualityRunDto): Experience | null {
   const { trace } = run;
-  if (trace === null || trace.stopReason === null || trace.iterations.length === 0) return null;
+  if (!hasSettledIterations(trace)) return null;
 
   const criteria = collectCriteria(trace);
   const criterionAlias = new Map(criteria.map((criterion) => [criterion.id, criterion.alias]));
@@ -415,59 +256,4 @@ export function experienceOf(run: QualityRunDto): Experience | null {
       adopted,
     },
   };
-}
-
-/** Below this, trimming the text loses more than dropping evidence would. */
-const TEXT_FLOOR = 2_000;
-
-const halve = (text: string): string => cap(text, Math.floor(textBytes(text) / 2));
-
-/**
- * The cheapest single trim left over the facts: the artifact text, then the
- * prompt, then a trailing finding, then a trailing criterion — each drop
- * counted under `omitted`. Null when there is nothing left to drop. A codec
- * that carries more than the facts tries its own cheaper trims first and falls
- * back to this.
- */
-export function trimExperience<R extends Experience>(record: R): R | null {
-  if (record.artifact !== null && textBytes(record.artifact) > TEXT_FLOOR) {
-    return { ...record, artifact: halve(record.artifact) };
-  }
-  if (textBytes(record.prompt) > TEXT_FLOOR) return { ...record, prompt: halve(record.prompt) };
-  if (record.findings.length > 0) {
-    return {
-      ...record,
-      findings: record.findings.slice(0, -1),
-      omitted: { ...record.omitted, findings: record.omitted.findings + 1 },
-    };
-  }
-  if (record.criteria.length > 0) {
-    return {
-      ...record,
-      criteria: record.criteria.slice(0, -1),
-      omitted: { ...record.omitted, criteria: record.omitted.criteria + 1 },
-    };
-  }
-  return null;
-}
-
-/**
- * Fit a record to a budget, deterministically, one cheapest trim at a time —
- * and give up rather than loop when the trim has nothing left to give. The
- * render is the codec's, because only the codec knows what the model will
- * read; the budget is measured over exactly that text.
- */
-export function fitToBudget<R>(
-  record: R,
-  render: (record: R) => string,
-  trim: (record: R) => R | null,
-  budget: number,
-): R {
-  let current = record;
-  while (textBytes(render(current)) > budget) {
-    const trimmed = trim(current);
-    if (trimmed === null) return current;
-    current = trimmed;
-  }
-  return current;
 }

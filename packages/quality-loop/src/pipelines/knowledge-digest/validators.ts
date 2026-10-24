@@ -21,14 +21,17 @@
  * Nothing here reads prose. Every rule is a lookup against ids the codec itself
  * wrote into the index.
  */
-import type { ValidationProblem } from '@sysdesign/contracts';
+import { refIdsIn } from '@sysdesign/contracts';
 
 import {
   LIMITS_VALIDATOR_ID,
   REFERENCES_VALIDATOR_ID,
   asWarning,
   indexedValidator,
+  misplaced,
+  overLimit,
   problem,
+  unplaced,
   type IndexedRule,
 } from '../../core/contracts';
 import type { Validator } from '../../core/ports';
@@ -52,17 +55,18 @@ const placements = (digest: KnowledgeDigest): string[] => [
   ...digest.unused,
 ];
 
+const evidenceOf = (index: KnowledgeIndex): string[] => index.evidence.map((item) => item.alias);
+
 const references: Rule = (digest, index) => {
-  const known = new Set(index.evidence.map((item) => item.alias));
   const recalled = new Set(index.known.map((item) => item.alias));
-  const seen = new Set<string>();
-  const problems: ValidationProblem[] = [];
-  for (const alias of placements(digest)) {
-    if (!known.has(alias)) problems.push(problem('critical', `${alias} is not listed evidence`));
-    else if (seen.has(alias))
-      problems.push(problem('critical', `${alias} is placed more than once`, [alias]));
-    seen.add(alias);
-  }
+  const problems = misplaced(
+    evidenceOf(index),
+    placements(digest).map((ref) => ({ ref })),
+    {
+      unlisted: (alias) => `${alias} is not listed evidence`,
+      repeated: (alias) => `${alias} is placed more than once`,
+    },
+  );
   digest.memories.forEach((item, position) => {
     const at = [itemLocation(position)];
     for (const alias of [...item.confirms, ...item.contradicts]) {
@@ -80,33 +84,15 @@ const references: Rule = (digest, index) => {
   return problems;
 };
 
-const limits: Rule = (digest, index) => {
-  const placed = new Set(placements(digest));
-  const problems = index.evidence
-    .filter((item) => !placed.has(item.alias))
-    .map((item) => problem('high', `${item.alias} is neither used nor listed as unused`));
-  if (digest.memories.length > index.maxMemories) {
-    problems.push(
-      problem(
-        'high',
-        `${digest.memories.length} items proposed; the limit is ${index.maxMemories}`,
-      ),
-    );
-  }
-  return problems;
-};
-
-/**
- * Whether `token` occurs in `text` as a whole token. The guard is any character
- * that is not a letter, a digit or an underscore, so a listed `i1` is found in
- * "at i1" and not in "wifi1", and a listed `node.3` is not found inside
- * `node.30`. The dot in an id is matched literally — this is a search for an id
- * the codec itself wrote, never a pattern over the shape of prose.
- */
-export function borrows(text: string, token: string): boolean {
-  const escaped = token.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  return new RegExp(`(^|[^A-Za-z0-9_])${escaped}([^A-Za-z0-9_]|$)`).test(text);
-}
+const limits: Rule = (digest, index) => [
+  ...unplaced(
+    evidenceOf(index),
+    placements(digest),
+    'high',
+    (alias) => `${alias} is neither used nor listed as unused`,
+  ),
+  ...overLimit(digest.memories.length, index.maxMemories, 'items proposed'),
+];
 
 const generality: Rule = (digest, index) => {
   const vocabulary = vocabularyOf(index);
@@ -116,9 +102,14 @@ const generality: Rule = (digest, index) => {
     ...vocabulary.iterations.map((token) => [token, 'an iteration of this run'] as const),
     ...vocabulary.locations.map((token) => [token, "a place in this run's artifact"] as const),
   ];
+  const ids = tokens.map(([token]) => token);
   return digest.memories.flatMap((item, position) => {
-    const texts = [item.insight, item.appliesWhen, ...item.topics];
-    const found = tokens.filter(([token]) => texts.some((text) => borrows(text, token)));
+    // Read with the one grammar prose names ids by, so `F1`, `edge.1-3` and
+    // `binding.3/7` are found here exactly as everywhere else.
+    const named = new Set(
+      [item.insight, item.appliesWhen, ...item.topics].flatMap((text) => refIdsIn(text, ids)),
+    );
+    const found = tokens.filter(([token]) => named.has(token));
     return found.length === 0
       ? []
       : [

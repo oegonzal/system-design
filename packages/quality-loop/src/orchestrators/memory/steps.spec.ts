@@ -11,7 +11,7 @@ import {
 } from '../../pipelines/experience-digest/testing';
 import { renderGoal as renderQuery } from '../../pipelines/memory-recall/input';
 import { samplePack } from '../../pipelines/memory-recall/testing';
-import { bareGoal, MEMORY_HEADING } from './recall/inject';
+import { bareGoal, MEMORY_HEADING } from '../common';
 import { probeSet } from './recall/query';
 import { digest, recall, store, target } from './steps';
 import { childRun as child, sampleHits as hits, stepContext as ctx } from './steps.testing';

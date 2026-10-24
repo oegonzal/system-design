@@ -7,67 +7,65 @@
  * defect the lenses are told about, not a refusal — the candidate still
  * gets what was answered.
  */
-import type { InterviewTurnOutput, ValidationProblem } from '@sysdesign/contracts';
+import type { InterviewIndex, InterviewTurnOutput } from '@sysdesign/contracts';
 
-import { problem, readArtifact, type TaskContract } from '../../core/contracts';
-import type { Validator } from '../../core/ports';
+import {
+  asWarning,
+  indexedValidator,
+  misplaced,
+  problem,
+  REFERENCES_VALIDATOR_ID,
+  unplaced,
+  type IndexedRule,
+} from '../../core/contracts';
 import { readInterviewIndex } from './input';
 
-export const REFERENCES_VALIDATOR_ID = 'references';
-export const COVERAGE_VALIDATOR_ID = 'coverage';
+const COVERAGE_VALIDATOR_ID = 'coverage';
 
-function references(output: InterviewTurnOutput, goal: string): ValidationProblem[] {
-  const index = readInterviewIndex(goal);
-  if (index === null) {
-    return [problem('critical', 'the goal carries no index of the items to address')];
-  }
-  const items = new Set(index.items.map((item) => item.id));
+type Rule = IndexedRule<InterviewTurnOutput, InterviewIndex>;
+
+const replyRef = (position: number): string => `reply.${position + 1}`;
+
+const references: Rule = (output, index) => {
   const criteria = new Set(index.criterionIds);
-  const seen = new Set<string>();
-  return output.replies.flatMap((reply, position) => {
-    const ref = `reply.${position + 1}`;
-    const problems: ValidationProblem[] = [];
-    if (!items.has(reply.to)) {
-      problems.push(
-        problem('critical', `${ref} answers ${reply.to}, which the goal does not list`, [ref]),
-      );
-    } else if (seen.has(reply.to)) {
-      problems.push(problem('critical', `${ref} answers ${reply.to} a second time`, [ref]));
-    }
-    seen.add(reply.to);
-    for (const id of reply.disclosesCriterionIds) {
-      if (!criteria.has(id)) {
-        problems.push(
-          problem('critical', `${ref} discloses ${id}, which the rubric does not hold`, [ref]),
-        );
-      }
-    }
-    return problems;
-  });
-}
+  const undisclosable = output.replies.flatMap((reply, position) =>
+    reply.disclosesCriterionIds
+      .filter((id) => !criteria.has(id))
+      .map((id) =>
+        problem(
+          'critical',
+          `${replyRef(position)} discloses ${id}, which the rubric does not hold`,
+          [replyRef(position)],
+        ),
+      ),
+  );
+  return [
+    ...misplaced(
+      index.items.map((item) => item.id),
+      output.replies.map((reply, position) => ({ ref: reply.to, at: [replyRef(position)] })),
+      {
+        unlisted: (id, at) => `${at.join(', ')} answers ${id}, which the goal does not list`,
+        repeated: (id, at) => `${at.join(', ')} answers ${id} a second time`,
+      },
+    ),
+    ...undisclosable,
+  ];
+};
 
-function coverage(output: InterviewTurnOutput, goal: string): ValidationProblem[] {
-  const index = readInterviewIndex(goal);
-  if (index === null) return [];
-  const answered = new Set(output.replies.map((reply) => reply.to));
-  return index.items
-    .filter((item) => !answered.has(item.id))
-    .map((item) => problem('medium', `${item.id} was not addressed`));
-}
+const coverage: Rule = (output, index) =>
+  unplaced(
+    index.items.map((item) => item.id),
+    output.replies.map((reply) => reply.to),
+    'medium',
+    (id) => `${id} was not addressed`,
+  );
 
-const validator = (
-  id: string,
-  gate: 'block' | 'warn',
-  rule: (output: InterviewTurnOutput, goal: string) => ValidationProblem[],
-): Validator<InterviewTurnOutput> => ({
-  id,
-  gate,
-  validate: (artifact, contract: TaskContract<InterviewTurnOutput>) => {
-    // An ill-formed artifact is the schema validator's to report, once.
-    const parsed = readArtifact(contract.output.schema, artifact);
-    return { validatorId: id, gate, problems: parsed.ok ? rule(parsed.value, contract.goal) : [] };
-  },
-});
-
-export const referencesValidator = validator(REFERENCES_VALIDATOR_ID, 'block', references);
-export const coverageValidator = validator(COVERAGE_VALIDATOR_ID, 'warn', coverage);
+export const referencesValidator = indexedValidator(
+  REFERENCES_VALIDATOR_ID,
+  readInterviewIndex,
+  references,
+  [problem('critical', 'the goal carries no index of the items to address')],
+);
+export const coverageValidator = asWarning(
+  indexedValidator(COVERAGE_VALIDATOR_ID, readInterviewIndex, coverage, []),
+);

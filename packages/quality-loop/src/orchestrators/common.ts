@@ -20,8 +20,16 @@ import type {
 
 import { outputsOf } from '../core/outputs';
 import type { RunInput } from '../core/loop/run-pipeline';
-import { bareGoal } from './memory/recall/inject';
 import type { StepContext, StepResult } from './runner/definition';
+
+/** The marker a memory step writes above what it appends to a goal; `bareGoal` strips from it. */
+export const MEMORY_HEADING = '## Remembered evidence (advisory)';
+
+/** The goal as requested, without any memory a previous memory run appended. */
+export function bareGoal(goal: string): string {
+  const marker = goal.indexOf(`\n\n${MEMORY_HEADING}`);
+  return marker < 0 ? goal : goal.slice(0, marker);
+}
 
 /**
  * The `refuse` of every orchestrator that takes a target: a pipeline that

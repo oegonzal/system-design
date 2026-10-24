@@ -13,7 +13,7 @@ import { skipped } from '../../common';
 import type { StepResult } from '../../runner/definition';
 import type { Digested } from '../digest/read-digest';
 import { contentHash, VECTOR_NAMES, type MemoryPorts, type VectorName } from '../ports';
-import { bareGoal } from '../recall/inject';
+import { bareGoal } from '../../common';
 import { chunkKind, chunksOf, type ChunkOrigin, type OwnedKinds } from './chunks';
 
 /** The calendar day of an ISO timestamp. */

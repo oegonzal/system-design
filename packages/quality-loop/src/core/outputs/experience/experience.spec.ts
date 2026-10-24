@@ -7,13 +7,8 @@ import {
   sampleIterations,
   sampleRun,
   sampleTrace,
-} from '../testing/experience';
-import {
-  MAX_FINDINGS,
-  MAX_FINDING_CRITERIA,
-  MAX_FINDING_REFS,
-  experienceOf,
-} from './experience-record';
+} from '../../testing/experience';
+import { MAX_FINDINGS, MAX_FINDING_CRITERIA, MAX_FINDING_REFS, experienceOf } from '.';
 
 describe('reducing a finished run to the facts a digest reasons over', () => {
   it('[QL-15] records what the engine established: remediation, reconciliation, transitions, deltas', () => {

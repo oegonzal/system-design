@@ -8,7 +8,7 @@
  */
 import type { DesignPromptDraft, ValidationProblem } from '@sysdesign/contracts';
 
-import { problem, readArtifact, type TaskContract } from '../../core/contracts';
+import { artifactValidator, problem } from '../../core/contracts';
 import type { Validator } from '../../core/ports';
 
 export const SHAPE_VALIDATOR_ID = 'shape';
@@ -44,17 +44,8 @@ function shape(draft: DesignPromptDraft): ValidationProblem[] {
   return problems;
 }
 
-export const shapeValidator: Validator<DesignPromptDraft> = {
-  id: SHAPE_VALIDATOR_ID,
-  gate: 'warn',
-  validate: (artifact, contract: TaskContract<DesignPromptDraft>) => {
-    // An ill-formed artifact is the schema validator's to report, once; one a
-    // field past its size left well-formed is read whole, as the seam read it.
-    const parsed = readArtifact(contract.output.schema, artifact);
-    return {
-      validatorId: SHAPE_VALIDATOR_ID,
-      gate: 'warn',
-      problems: parsed.ok ? shape(parsed.value) : [],
-    };
-  },
-};
+export const shapeValidator: Validator<DesignPromptDraft> = artifactValidator(
+  SHAPE_VALIDATOR_ID,
+  'warn',
+  shape,
+);

@@ -35,7 +35,7 @@ import {
   storeReadiness,
   UNADMITTED_REASON,
 } from '../common';
-import { bareGoal } from '../memory/recall/inject';
+import { bareGoal } from '../common';
 import { originOf } from '../memory/store/index-memories';
 import type { MemoryHit } from '../memory/ports';
 import type { StepContext, StepResult } from '../runner/definition';

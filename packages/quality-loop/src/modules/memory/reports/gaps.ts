@@ -23,7 +23,7 @@ import { createHash } from 'node:crypto';
 import type { GapDto, GapGroupDto, QualityRunDto, StandingGapsDto } from '@sysdesign/contracts';
 
 import { memoryPackSchema } from '../../../pipelines/memory-recall/output';
-import { bareGoal } from '../../../orchestrators/memory/recall/inject';
+import { bareGoal } from '../../../orchestrators/common';
 
 /** A recall run with the brief it was run for, when that could be established. */
 export interface AttributedRecall {

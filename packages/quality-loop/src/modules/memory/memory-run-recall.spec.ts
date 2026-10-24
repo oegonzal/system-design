@@ -6,7 +6,7 @@ import { toRunDto } from '../../core/contracts';
 import { confirmed, evidence, ledger, runDto, traceOf } from '../../core/testing';
 import { CachedEmbeddings } from '../../orchestrators/memory/embeddings';
 import { contentHash, type StoredChunk } from '../../orchestrators/memory/ports';
-import { MEMORY_HEADING } from '../../orchestrators/memory/recall/inject';
+import { MEMORY_HEADING } from '../../orchestrators/common';
 import { childRun, memoryPorts } from '../../orchestrators/memory/steps.testing';
 import { ACCEPT_AT, GOAL, passed, readoutTrace } from '../../orchestrators/memory/testing';
 import { samplePack } from '../../pipelines/memory-recall/testing';

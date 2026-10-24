@@ -24,15 +24,13 @@ import {
   validateModelReferences,
   validateNarration,
   type ValidationProblem,
-  type ValidationReport,
-  type ValidatorGate,
 } from '@sysdesign/contracts';
 
 import {
+  artifactValidator,
   problem,
-  readArtifact,
   REFERENCES_VALIDATOR_ID,
-  type TaskContract,
+  type ArtifactRule,
 } from '../../core/contracts';
 import type { Validator } from '../../core/ports';
 import type { CanvasSubmission } from './output';
@@ -40,24 +38,7 @@ import type { CanvasSubmission } from './output';
 export { REFERENCES_VALIDATOR_ID };
 export const STRUCTURE_VALIDATOR_ID = 'structure';
 
-type Rule = (
-  submission: CanvasSubmission,
-  contract: TaskContract<CanvasSubmission>,
-) => ValidationProblem[];
-
-function check(
-  validatorId: string,
-  gate: ValidatorGate,
-  artifact: CanvasSubmission,
-  contract: TaskContract<CanvasSubmission>,
-  rule: Rule,
-): ValidationReport {
-  // An ill-formed artifact is the schema validator's to report, once; one a
-  // field past its size left well-formed is read whole, as the seam read it.
-  const parsed = readArtifact(contract.output.schema, artifact);
-  if (!parsed.ok) return { validatorId, gate, problems: [] };
-  return { validatorId, gate, problems: rule(parsed.value, contract) };
-}
+type Rule = ArtifactRule<CanvasSubmission>;
 
 const references: Rule = ({ graph, brief, narrative, model }, contract) =>
   [
@@ -98,16 +79,14 @@ const structure: Rule = ({ graph }) => {
   return problems;
 };
 
-export const referencesValidator: Validator<CanvasSubmission> = {
-  id: REFERENCES_VALIDATOR_ID,
-  gate: 'block',
-  validate: (artifact, contract) =>
-    check(REFERENCES_VALIDATOR_ID, 'block', artifact, contract, references),
-};
+export const referencesValidator: Validator<CanvasSubmission> = artifactValidator(
+  REFERENCES_VALIDATOR_ID,
+  'block',
+  references,
+);
 
-export const structureValidator: Validator<CanvasSubmission> = {
-  id: STRUCTURE_VALIDATOR_ID,
-  gate: 'warn',
-  validate: (artifact, contract) =>
-    check(STRUCTURE_VALIDATOR_ID, 'warn', artifact, contract, structure),
-};
+export const structureValidator: Validator<CanvasSubmission> = artifactValidator(
+  STRUCTURE_VALIDATOR_ID,
+  'warn',
+  structure,
+);

@@ -4,7 +4,7 @@ import { describe, expect, it } from 'vitest';
 import { pointId } from '../../../modules/memory/qdrant/collection';
 import { InMemoryMemoryStore, vectorOf } from '../../../modules/memory/testing';
 import { contentHash, type StoredChunk } from '../ports';
-import { MEMORY_HEADING } from '../recall/inject';
+import { MEMORY_HEADING } from '../../common';
 import { childRun, memoryPorts } from '../steps.testing';
 import { FAKE_MODEL, readoutTrace } from '../testing';
 import { DEFAULT_CHUNK_KIND, type OwnedKinds } from './chunks';

@@ -24,7 +24,8 @@ import {
 import type { StepContext, StepResult } from '../runner/definition';
 import { memoriesToStore, type Digested } from './digest/read-digest';
 import type { MemoryPorts } from './ports';
-import { bareGoal, withMemory } from './recall/inject';
+import { bareGoal } from '../common';
+import { withMemory } from './recall/inject';
 import { recallMemory } from './recall/recall-memory';
 import { indexMemories } from './store/index-memories';
 import { DEFAULT_CHUNK_KIND } from './store/chunks';

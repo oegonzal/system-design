@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import { sampleRun } from '../../../core/testing';
 import { samplePack } from '../../../pipelines/memory-recall/testing';
-import { MEMORY_HEADING } from '../../../orchestrators/memory/recall/inject';
+import { MEMORY_HEADING } from '../../../orchestrators/common';
 import { faulting, readoutTrace } from '../../../orchestrators/memory/testing';
 import { gapsOf, goalHashOf, standingGaps } from './gaps';
 

@@ -3,13 +3,14 @@
  * digest that rests on evidence the record never held, or leaves evidence
  * unplaced, cannot be trusted by any lens, so both block.
  */
-import type { ValidationProblem } from '@sysdesign/contracts';
-
 import {
   indexedValidator,
   LIMITS_VALIDATOR_ID,
+  misplaced,
+  overLimit,
   problem,
   REFERENCES_VALIDATOR_ID,
+  unplaced,
   type IndexedRule,
 } from '../../core/contracts';
 import type { Validator } from '../../core/ports';
@@ -26,34 +27,27 @@ const placements = (digest: ExperienceDigest): string[] => [
   ...digest.unused,
 ];
 
-const references: Rule = (digest, index) => {
-  const known = new Set(index.evidence.map((item) => item.alias));
-  const seen = new Set<string>();
-  const problems: ValidationProblem[] = [];
-  for (const alias of placements(digest)) {
-    if (!known.has(alias)) problems.push(problem('critical', `${alias} is not listed evidence`));
-    else if (seen.has(alias))
-      problems.push(problem('critical', `${alias} is placed more than once`, [alias]));
-    seen.add(alias);
-  }
-  return problems;
-};
+const evidenceOf = (index: ExperienceIndex): string[] => index.evidence.map((item) => item.alias);
 
-const limits: Rule = (digest, index) => {
-  const placed = new Set(placements(digest));
-  const problems = index.evidence
-    .filter((item) => !placed.has(item.alias))
-    .map((item) => problem('high', `${item.alias} is neither used nor listed as unused`));
-  if (digest.memories.length > index.maxMemories) {
-    problems.push(
-      problem(
-        'high',
-        `${digest.memories.length} memories proposed; the limit is ${index.maxMemories}`,
-      ),
-    );
-  }
-  return problems;
-};
+const references: Rule = (digest, index) =>
+  misplaced(
+    evidenceOf(index),
+    placements(digest).map((ref) => ({ ref })),
+    {
+      unlisted: (alias) => `${alias} is not listed evidence`,
+      repeated: (alias) => `${alias} is placed more than once`,
+    },
+  );
+
+const limits: Rule = (digest, index) => [
+  ...unplaced(
+    evidenceOf(index),
+    placements(digest),
+    'high',
+    (alias) => `${alias} is neither used nor listed as unused`,
+  ),
+  ...overLimit(digest.memories.length, index.maxMemories, 'memories proposed'),
+];
 
 export const referencesValidator: Validator<ExperienceDigest> = indexedValidator(
   REFERENCES_VALIDATOR_ID,

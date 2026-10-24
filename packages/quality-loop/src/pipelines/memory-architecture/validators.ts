@@ -28,36 +28,15 @@ import {
   validateStrategyReferences,
   type MemoryStrategy,
   type ValidationProblem,
-  type ValidationReport,
-  type ValidatorGate,
 } from '@sysdesign/contracts';
 
-import {
-  problem,
-  readArtifact,
-  REFERENCES_VALIDATOR_ID,
-  type TaskContract,
-} from '../../core/contracts';
+import { artifactValidator, problem, REFERENCES_VALIDATOR_ID } from '../../core/contracts';
 import type { Validator } from '../../core/ports';
 
 const COVERAGE_VALIDATOR_ID = 'coverage';
 const EXECUTABILITY_VALIDATOR_ID = 'executability';
 
 type Rule = (strategy: MemoryStrategy) => ValidationProblem[];
-
-function check(
-  validatorId: string,
-  gate: ValidatorGate,
-  artifact: MemoryStrategy,
-  contract: TaskContract<MemoryStrategy>,
-  rule: Rule,
-): ValidationReport {
-  // A rule only ever reads a parsed strategy: one the schema cannot read is the schema
-  // validator's to report, and judged here by no rule.
-  const parsed = readArtifact(contract.output.schema, artifact);
-  if (!parsed.ok) return { validatorId, gate, problems: [] };
-  return { validatorId, gate, problems: rule(parsed.value) };
-}
 
 const references: Rule = (strategy) =>
   validateStrategyReferences(strategy).map((fault) =>
@@ -110,23 +89,20 @@ const executability: Rule = (strategy) =>
     ),
   );
 
-export const referencesValidator: Validator<MemoryStrategy> = {
-  id: REFERENCES_VALIDATOR_ID,
-  gate: 'block',
-  validate: (artifact, contract) =>
-    check(REFERENCES_VALIDATOR_ID, 'block', artifact, contract, references),
-};
+export const referencesValidator: Validator<MemoryStrategy> = artifactValidator(
+  REFERENCES_VALIDATOR_ID,
+  'block',
+  references,
+);
 
-export const coverageValidator: Validator<MemoryStrategy> = {
-  id: COVERAGE_VALIDATOR_ID,
-  gate: 'warn',
-  validate: (artifact, contract) =>
-    check(COVERAGE_VALIDATOR_ID, 'warn', artifact, contract, coverage),
-};
+export const coverageValidator: Validator<MemoryStrategy> = artifactValidator(
+  COVERAGE_VALIDATOR_ID,
+  'warn',
+  coverage,
+);
 
-export const executabilityValidator: Validator<MemoryStrategy> = {
-  id: EXECUTABILITY_VALIDATOR_ID,
-  gate: 'warn',
-  validate: (artifact, contract) =>
-    check(EXECUTABILITY_VALIDATOR_ID, 'warn', artifact, contract, executability),
-};
+export const executabilityValidator: Validator<MemoryStrategy> = artifactValidator(
+  EXECUTABILITY_VALIDATOR_ID,
+  'warn',
+  executability,
+);
