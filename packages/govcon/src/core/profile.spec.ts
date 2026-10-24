@@ -1,5 +1,6 @@
 import {
   DEFAULT_ALERT_POLICY,
+  DEFAULT_INTRODUCTION_POLICY,
   DEFAULT_TEAMING_POLICY,
   MAX_ALERT_ENDING_DAYS,
   type SearchProfile,
@@ -13,6 +14,16 @@ import { tinyProfile } from './testing';
 describe('the search profile', () => {
   it('[GOV-5] validates exactly the wire contract — the schema output and SearchProfile are one type', () => {
     expectTypeOf<z.output<typeof searchProfileSchema>>().toEqualTypeOf<SearchProfile>();
+  });
+
+  it('[GOV-5] [GOV-40] reads a document without an introduction as the declared default, and an introduction stored before it said how to be reached as reaching nobody', () => {
+    const { introduction: _introduction, ...bare } = tinyProfile();
+    expect(validateProfile(bare).introduction).toEqual(DEFAULT_INTRODUCTION_POLICY);
+    const { contact: _contact, ...early } = tinyProfile().introduction;
+    expect(validateProfile({ ...tinyProfile(), introduction: early }).introduction).toEqual({
+      ...early,
+      contact: DEFAULT_INTRODUCTION_POLICY.contact,
+    });
   });
 
   it('[GOV-5] [GOV-24] reads a document without an alert policy as the declared default', () => {

@@ -104,7 +104,12 @@ const teamingPolicySchema = z.strictObject({
 const introductionPolicySchema = z.strictObject({
   about: z.string().trim().max(MAX_INTRODUCTION_FACT_LENGTH),
   delivery: z.string().trim().max(MAX_INTRODUCTION_FACT_LENGTH),
-  contact: z.string().trim().max(MAX_INTRODUCTION_FACT_LENGTH),
+  // A section stored before the field reads as the declared default, as the alert policy's fields do.
+  contact: z
+    .string()
+    .trim()
+    .max(MAX_INTRODUCTION_FACT_LENGTH)
+    .default(DEFAULT_INTRODUCTION_POLICY.contact),
   offers: z
     .array(
       z.strictObject({
