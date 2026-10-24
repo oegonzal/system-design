@@ -16,7 +16,7 @@ import {
 
 import { PRODUCER_STAGE } from '../stages/shared';
 
-export const wasBlocked = <T>(entry: IterationTrace<T>): boolean =>
+const wasBlocked = <T>(entry: IterationTrace<T>): boolean =>
   entry.validation.some((report) => report.gate === 'block' && report.problems.length > 0);
 
 /** An iteration the loop asked the producer for, which answered nothing. */

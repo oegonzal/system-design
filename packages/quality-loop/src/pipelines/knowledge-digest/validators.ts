@@ -41,11 +41,11 @@ import { itemLocation, type KnowledgeDigest } from './output';
 export { LIMITS_VALIDATOR_ID, REFERENCES_VALIDATOR_ID };
 
 /** A dimension an item named that none of its own evidence lands on. */
-export const DIMENSION_VALIDATOR_ID = 'dimension';
+const DIMENSION_VALIDATOR_ID = 'dimension';
 /** An item that borrowed a token of this run: an alias, an iteration, a place in the artifact. */
-export const GENERALITY_VALIDATOR_ID = 'run-specificity';
+const GENERALITY_VALIDATOR_ID = 'run-specificity';
 /** An item whose kind its cited evidence cannot support. */
-export const KINDS_VALIDATOR_ID = 'kinds';
+const KINDS_VALIDATOR_ID = 'kinds';
 
 type Rule = IndexedRule<KnowledgeDigest, KnowledgeIndex>;
 

@@ -164,10 +164,10 @@ function itemFacets(
 }
 
 /** The ref an item is addressed by within its source run, which fixes its point id. */
-export const itemRef = (position: number): string => `knowledge.${position}`;
+const itemRef = (position: number): string => `knowledge.${position}`;
 
 /** The ref a finding chunk is addressed by: its position in the judged iteration's ledger. */
-export const findingRef = (position: number): string => `finding.${position + 1}`;
+const findingRef = (position: number): string => `finding.${position + 1}`;
 
 /**
  * One chunk per endorsed item. The dimension on the facet is the one the
@@ -208,7 +208,7 @@ export function itemChunks(
 }
 
 /** The judged iteration of a trace, or the last one that ran. */
-export const judgedIteration = (trace: RunTrace): IterationTrace | undefined =>
+const judgedIteration = (trace: RunTrace): IterationTrace | undefined =>
   trace.iterations.find((iteration) => iteration.iteration === trace.bestIteration) ??
   trace.iterations[trace.iterations.length - 1];
 

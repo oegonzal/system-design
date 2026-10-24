@@ -32,14 +32,12 @@ export interface RailState {
 }
 
 /** What a step can do to the failure count: these are the only events that move it. */
-export const STEP_FAILURE_EVENTS = [
-  'action-failed',
-  'expectation-unmet',
-  'plan-not-executed',
+export type StepFailureEvent =
+  | 'action-failed'
+  | 'expectation-unmet'
+  | 'plan-not-executed'
   /** A taskStart the session refused against the record it was composed with: no unit opened, and the plan stopped there. */
-  'unit-refused',
-] as const;
-export type StepFailureEvent = (typeof STEP_FAILURE_EVENTS)[number];
+  | 'unit-refused';
 
 interface Rail {
   /** A rail is the engine's own: it never ends a session as the mission's stop. */

@@ -46,7 +46,7 @@ export interface ElementFacts {
  * explains — the shape of a honeypot, read from what the page offers a person
  * rather than from a list of names.
  */
-export function elementFactsInPage(
+function elementFactsInPage(
   el: Element,
   { textMax, modal: modalDialogs }: { textMax: number; modal: typeof MODAL_DIALOGS },
 ): ElementFacts {

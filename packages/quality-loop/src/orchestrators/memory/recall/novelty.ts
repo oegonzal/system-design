@@ -79,7 +79,7 @@ const kinOf = (hit: MemoryHit, known: RecallKnown): boolean =>
   (hit.lineage === null || hit.lineage.goalHash === known.goalHash);
 
 /** The first rule a lesson matches, with what it matched; null when it brings something the producer does not hold. */
-export function matchOf(hit: MemoryHit, known: RecallKnown): Match | null {
+function matchOf(hit: MemoryHit, known: RecallKnown): Match | null {
   const linked = known.chain.find((link) => link.runId === hit.source.runId);
   if (linked !== undefined && hit.source.iteration <= linked.iteration) {
     return { reason: 'chain-iteration', matched: [linkLabel(linked)] };

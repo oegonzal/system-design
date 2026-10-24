@@ -81,7 +81,7 @@ export const MAX_TOPICS = 6;
 const RULE_MAX = 300;
 const MAX_RULES = 8;
 
-export const knownItemSchema = z.strictObject({
+const knownItemSchema = z.strictObject({
   /** `k1`, `k2` — engine-assigned, the position the recall handed it over in. */
   alias: z.string().min(1).max(ALIAS_MAX),
   /** The stored chunk's kind: a lesson, or one of the knowledge kinds. */
@@ -100,7 +100,7 @@ export type KnownItem = z.infer<typeof knownItemSchema>;
  * type, land on. Handed in as data by whoever composes the record, so the codec
  * reads no registry and branches on no pipeline id.
  */
-export const dimensionMapSchema = z.strictObject({
+const dimensionMapSchema = z.strictObject({
   criterionKinds: z.record(z.string().min(1).max(60), z.string().min(1).max(DIMENSION_MAX)),
   findingTypes: z.record(z.string().min(1).max(60), z.string().min(1).max(DIMENSION_MAX)),
 });

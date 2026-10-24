@@ -40,7 +40,7 @@ export {
 } from '@sysdesign/contracts';
 
 /** What a finding type or a validator that declares nothing withholds: every item it names. */
-export const UNDECLARED_WITHHOLDING: Withholding = 'every-ref';
+const UNDECLARED_WITHHOLDING: Withholding = 'every-ref';
 
 /**
  * What withholds what, as `withholdingOf` reads it off a definition:

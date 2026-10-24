@@ -30,7 +30,7 @@ import { digest, known, store, target, type KnowledgeOutputs } from '../knowledg
 import { KNOWLEDGE_PORT_BUNDLE, type KnowledgePorts } from '../knowledge/ports';
 import type { OrchestratorDefinition } from '../runner/definition';
 
-export const MEMORY_DESIGN_ORCHESTRATOR_ID = 'memory-design';
+const MEMORY_DESIGN_ORCHESTRATOR_ID = 'memory-design';
 
 export const MEMORY_DESIGN: OrchestratorDefinition<KnowledgeOutputs, KnowledgePorts> = {
   id: MEMORY_DESIGN_ORCHESTRATOR_ID,

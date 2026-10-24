@@ -73,14 +73,14 @@ const iteration = z.number().int().min(1);
 const score = z.number().nullable();
 const dimension = bounded.id(DIMENSION_MAX);
 
-export const transitionSchema = z.strictObject({
+const transitionSchema = z.strictObject({
   kind: z.enum(TRANSITION_KINDS),
   iterations: bounded.list(TRANSITION_ENDS_BOUND, iteration, { min: 2 }),
   detail: bounded.text(TRANSITION_DETAIL_BOUND),
 });
 export type Transition = z.infer<typeof transitionSchema>;
 
-export const iterationSummarySchema = z.strictObject({
+const iterationSummarySchema = z.strictObject({
   iteration,
   mode: z.enum(ITERATION_MODES),
   decision: z.enum(DECISIONS),

@@ -75,7 +75,7 @@ async function runSamples<O extends object, P>(
 }
 
 /** How many samples a panel runs at once unless its orchestrator declares otherwise. */
-export const DEFAULT_PANEL_CONCURRENCY = 2;
+const DEFAULT_PANEL_CONCURRENCY = 2;
 
 export const panelStep =
   <O extends object, P>(

@@ -9,7 +9,7 @@ import { MEMORY_FIELD_NAME, type MemoryTerm } from '@sysdesign/contracts';
 import { z } from 'zod';
 
 /** Which terms must expire: short-term memory is the state of a task in flight, never durable memory. */
-export const TERM_MUST_EXPIRE = {
+const TERM_MUST_EXPIRE = {
   short_term: true,
   long_term: false,
 } as const satisfies Record<MemoryTerm, boolean>;

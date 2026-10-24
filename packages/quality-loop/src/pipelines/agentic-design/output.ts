@@ -24,7 +24,7 @@ import { z } from 'zod';
 
 import { numbered, numberedSection, type OutputShape } from '../../core/contracts';
 
-export const agenticDesignSchema = z.strictObject({
+const agenticDesignSchema = z.strictObject({
   summary: bounded.text(bound(1600), {
     min: 1,
     description:

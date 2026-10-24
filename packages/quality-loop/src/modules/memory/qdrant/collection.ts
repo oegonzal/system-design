@@ -7,6 +7,7 @@
  */
 import { createHash } from 'node:crypto';
 
+import type { Schemas } from '@qdrant/js-client-rest';
 import {
   KNOWLEDGE_GROUNDINGS,
   KNOWLEDGE_POLARITIES,
@@ -43,17 +44,8 @@ const INDEX_GENERATION = 'v2';
 export const collectionName = (model: string, dimensions: number): string =>
   qdrantCollection('quality-memory', INDEX_GENERATION, model, dimensions);
 
-/** The index types Qdrant builds, as it names them. */
-export const PAYLOAD_INDEX_SCHEMAS = [
-  'keyword',
-  'integer',
-  'float',
-  'bool',
-  'datetime',
-  'uuid',
-  'text',
-] as const;
-export type PayloadIndexSchema = (typeof PAYLOAD_INDEX_SCHEMAS)[number];
+/** The index types Qdrant builds, as its client names them. */
+type PayloadIndexSchema = Schemas['PayloadSchemaType'];
 
 /**
  * Payload fields a filter may use, each declaring the index it needs. The

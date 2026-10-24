@@ -199,7 +199,7 @@ const filledWithdrawal = (suggestion: OfferedSuggestion): Withdrawal => ({
 });
 
 /** The first suggestion in lettering order whose basis the settings type, or null when every one is offered. */
-export function fillableSuggestion(
+function fillableSuggestion(
   suggestions: readonly OfferedSuggestion[],
   drafts: AnsweringSettings['drafts'],
 ): OfferedSuggestion | null {

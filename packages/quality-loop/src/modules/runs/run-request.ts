@@ -20,7 +20,7 @@ import { z } from 'zod';
  * row's, the statement's is the edge's — the pipeline's own bound is the
  * service's check, with the rest of the rubric's fit.
  */
-export const providedCriterionSchema = z.strictObject({
+const providedCriterionSchema = z.strictObject({
   id: z.string().min(1).max(CRITERION_ID_MAX_LENGTH),
   kind: z.string().min(1).max(CRITERION_KIND_MAX_LENGTH),
   statement: z.string().min(1).max(MAX_PROVIDED_STATEMENT_LENGTH),

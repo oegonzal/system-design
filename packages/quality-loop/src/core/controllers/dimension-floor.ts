@@ -9,7 +9,7 @@
 import type { Gate } from './compose';
 import { settleByRemediations } from './gates';
 
-export const DIMENSION_FLOOR_FACTOR = 'dimension-floor';
+const DIMENSION_FLOOR_FACTOR = 'dimension-floor';
 
 export function dimensionFloor(floor: number): Gate {
   if (!(floor >= 0 && floor <= 100)) {

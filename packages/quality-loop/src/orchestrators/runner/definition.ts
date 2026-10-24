@@ -117,7 +117,7 @@ export interface OrchestratorDefinition<O extends object = Record<string, unknow
   steps: readonly OrchestratorStep<O, P>[];
 }
 
-export const describeOrchestratorId = (
+const describeOrchestratorId = (
   definition: OrchestratorDefinition<Record<string, unknown>, unknown>,
 ): string => `${definition.id}@${definition.version}`;
 

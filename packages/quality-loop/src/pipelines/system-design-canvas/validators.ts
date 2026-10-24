@@ -36,7 +36,7 @@ import type { Validator } from '../../core/ports';
 import type { CanvasSubmission } from './output';
 
 export { REFERENCES_VALIDATOR_ID };
-export const STRUCTURE_VALIDATOR_ID = 'structure';
+const STRUCTURE_VALIDATOR_ID = 'structure';
 
 type Rule = ArtifactRule<CanvasSubmission>;
 

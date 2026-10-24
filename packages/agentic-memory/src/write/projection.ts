@@ -9,7 +9,7 @@ import { errorMessage } from '@sysdesign/contracts';
 
 import type { MemoryPorts, MemoryRecord, PointPayload } from '../ports';
 
-export const pointOf = (record: MemoryRecord): PointPayload => ({
+const pointOf = (record: MemoryRecord): PointPayload => ({
   spaceId: record.spaceId,
   register: record.register,
   partition: record.partition,

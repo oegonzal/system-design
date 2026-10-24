@@ -23,7 +23,7 @@ import {
 } from '../../core/unit-advice';
 
 /** An advisor answers at once: it reads its own record, never a model. */
-export const ADVISOR_TIMEOUT_MS = 15_000;
+const ADVISOR_TIMEOUT_MS = 15_000;
 
 export interface HttpUnitAdvisorOptions {
   /** How long a call rides out an advisor that is restarting; a probe never does. */

@@ -11,7 +11,7 @@ import type { DesignPromptDraft, ValidationProblem } from '@sysdesign/contracts'
 import { artifactValidator, problem } from '../../core/contracts';
 import type { Validator } from '../../core/ports';
 
-export const SHAPE_VALIDATOR_ID = 'shape';
+const SHAPE_VALIDATOR_ID = 'shape';
 
 /** Every gap in a draft is worth telling the lenses about, never blocking on. */
 const gap = (message: string, locationRefs: string[] = []): ValidationProblem =>

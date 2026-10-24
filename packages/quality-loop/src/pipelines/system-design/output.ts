@@ -11,7 +11,7 @@ import { z } from 'zod';
 
 import { numbered, numberedSection, type OutputShape } from '../../core/contracts';
 
-export const designAnswerSchema = z.strictObject({
+const designAnswerSchema = z.strictObject({
   summary: bounded.text(bound(1300), {
     min: 1,
     description:

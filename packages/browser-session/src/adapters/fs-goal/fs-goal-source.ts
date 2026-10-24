@@ -5,7 +5,7 @@ import { extname } from 'node:path';
 import type { GoalDocument, GoalSource } from '../../core/ports';
 
 /** A goal is a markdown file on disk; its hash is what groups sessions of the same mission. */
-export const GOAL_EXTENSION = '.md';
+const GOAL_EXTENSION = '.md';
 
 export class FsGoalSource implements GoalSource {
   async read(path: string): Promise<GoalDocument> {

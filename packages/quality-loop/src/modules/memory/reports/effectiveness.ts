@@ -106,7 +106,7 @@ export function resolvedShare(outcomes: readonly FocusOutcomeDto[]): number | nu
  * index, which is structural), whether the curator kept it, and whether it
  * reached the producer.
  */
-export function briefedLessons(entry: RecallingRun): EffectivenessRunDto['lessons'] {
+function briefedLessons(entry: RecallingRun): EffectivenessRunDto['lessons'] {
   const recall = entry.run.recall;
   if (recall === null) return [];
   const index = entry.recall === null ? null : readRecallIndex(entry.recall.request.goal);

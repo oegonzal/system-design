@@ -61,7 +61,7 @@ const byShortfall = (a: CriterionEvidence, b: CriterionEvidence): number =>
  * written in — the same shape a focused recall searches with, so a finding chunk
  * and a focus line meet as like with like.
  */
-export function findingLines(iteration: IterationTrace): string[] {
+function findingLines(iteration: IterationTrace): string[] {
   const annotated = annotate(iteration.ledger.findings, iteration.critics, iteration.locations);
   return iteration.ledger.findings
     .map((finding, position) => ({
@@ -77,7 +77,7 @@ export function findingLines(iteration: IterationTrace): string[] {
 }
 
 /** One line per judged criterion, in the register a condition is written in. */
-export function criterionLines(
+function criterionLines(
   iteration: IterationTrace,
   criteria: readonly SuccessCriterion[],
 ): string[] {

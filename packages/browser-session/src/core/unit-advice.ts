@@ -30,14 +30,7 @@ import type { EngineContext, RunSessionOptions, SessionDeps } from './engine-con
  */
 
 /** Why an advisor gave no answer; the first three are transient and ridden out. */
-export const ADVISOR_FAULT_REASONS = [
-  'unreachable',
-  'timeout',
-  'failed',
-  'refused',
-  'malformed',
-] as const;
-export type AdvisorFaultReason = (typeof ADVISOR_FAULT_REASONS)[number];
+export type AdvisorFaultReason = 'unreachable' | 'timeout' | 'failed' | 'refused' | 'malformed';
 
 export class AdvisorFaulted extends Error {
   override readonly name = 'AdvisorFaulted';
@@ -84,8 +77,7 @@ export interface ResolvedAdvisor {
 }
 
 /** What the consult came to this step: nobody to ask, every advisor answered, or one is being ridden on its last advice. */
-export const ADVICE_OUTCOMES = ['no-advisors', 'answered', 'stale'] as const;
-export type AdviceOutcome = (typeof ADVICE_OUTCOMES)[number];
+export type AdviceOutcome = 'no-advisors' | 'answered' | 'stale';
 
 /** What one advisor said this step, as the step's advice file and the plan row record it. */
 export interface AdvisorOutcome {

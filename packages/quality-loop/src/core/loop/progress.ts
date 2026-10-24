@@ -22,7 +22,7 @@ export const beats = <T>(entry: IterationTrace<T>, best: IterationTrace<T> | nul
     (!hasArtifact(best) || entry.decision.scores.overall > best.decision.scores.overall));
 
 /** The iteration the gate crowns among those recorded, taken in order; null before any. */
-export const bestOf = <T>(iterations: readonly IterationTrace<T>[]): IterationTrace<T> | null =>
+const bestOf = <T>(iterations: readonly IterationTrace<T>[]): IterationTrace<T> | null =>
   iterations.reduce<IterationTrace<T> | null>(
     (best, entry) => (beats(entry, best) ? entry : best),
     null,

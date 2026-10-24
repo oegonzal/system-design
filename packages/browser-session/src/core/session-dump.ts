@@ -17,14 +17,14 @@ import { causeOf, type BrowserActionKind, type DerivedRubric, type Termination }
  *
  * NOTE FOR READERS: these files contain the goal, page text and screenshots.
  */
-export const RUBRICS_FILE = '00-rubrics.json';
+const RUBRICS_FILE = '00-rubrics.json';
 export const STEPS_DIR = '01-steps';
 export const TASKS_FILE = '02-tasks.json';
 export const MANIFEST_FILE = 'manifest.json';
-export const GOAL_FILE = 'goal.md';
+const GOAL_FILE = 'goal.md';
 
 /** The files one step may leave: what was seen, what was decided, what went wrong. */
-export const STEP_FILES = {
+const STEP_FILES = {
   observation: 'observation.json',
   snapshot: 'snapshot.txt',
   screenshot: 'screenshot.png',
@@ -47,7 +47,7 @@ const pad = (value: number): string => String(value).padStart(2, '0');
 const withNewline = (text: string): string =>
   text.length === 0 || text.endsWith('\n') ? text : `${text}\n`;
 
-export const stepDir = (step: number): string => `${STEPS_DIR}/${pad(step)}`;
+const stepDir = (step: number): string => `${STEPS_DIR}/${pad(step)}`;
 export const stepFile = (step: number, name: StepFile): string =>
   `${stepDir(step)}/${STEP_FILES[name]}`;
 

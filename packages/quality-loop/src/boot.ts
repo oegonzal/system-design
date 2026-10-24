@@ -25,7 +25,7 @@ export interface Preflight {
 }
 
 /** Which of the three entry points the argv names. */
-export const commandOf = (argv: readonly string[]): Command =>
+const commandOf = (argv: readonly string[]): Command =>
   argv[0] === 'replay' ? 'replay' : argv[0] === 'run' ? 'run' : 'serve';
 
 /**
