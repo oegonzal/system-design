@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { PlaywrightBrowser } from './playwright-browser';
+import { specBrowserOptions } from './testing';
 
 /**
  * A dialog in front of the page that says it is still loading is read again
@@ -48,7 +49,7 @@ describe('the Playwright browser, on a dialog still loading', () => {
 
   beforeAll(async () => {
     profiles = mkdtempSync(join(tmpdir(), 'browser-session-profiles-'));
-    browser = new PlaywrightBrowser({ profilesDir: profiles, channel: undefined });
+    browser = new PlaywrightBrowser(specBrowserOptions(profiles));
     await browser.open('spec', { headed: false });
   });
 

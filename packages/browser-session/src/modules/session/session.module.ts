@@ -11,6 +11,7 @@ import { HttpLoopClient, LoopClient } from '@sysdesign/loop-client';
 import { HttpBusClient, InteractionClient } from '@sysdesign/notifications-client';
 
 import { HttpUnitAdvisor } from '../../adapters/advisor-http/http-unit-advisor';
+import { fsDumpStore } from '../../adapters/fs-dump/fs-dump-store';
 import { FsGoalSource } from '../../adapters/fs-goal/fs-goal-source';
 import { LoopBrain } from '../../adapters/loop-http/loop-brain';
 import { MikroOrmLedger } from '../../adapters/mikro-orm/mikro-orm-ledger';
@@ -24,7 +25,6 @@ import { TerminalOperator } from '../../adapters/terminal-operator/terminal-oper
 import type { SessionConfig } from '../../config';
 import { FirstAnswer } from '../../core/first-answer';
 import type { Clock, OperatorChannel, StopSignal } from '../../core/ports';
-import { fsDumpStore } from '../../core/session-dump';
 import type { ConfiguredAdvisor } from '../../core/unit-advice';
 import { SessionService } from './session.service';
 import {
@@ -149,7 +149,11 @@ export class SessionModule {
         {
           provide: BROWSER,
           useFactory: () =>
-            new PlaywrightBrowser({ profilesDir: config.profilesDir, channel: CHROME_CHANNEL }),
+            new PlaywrightBrowser({
+              profilesDir: config.profilesDir,
+              channel: CHROME_CHANNEL,
+              observe: config.settings.observe,
+            }),
         },
         { provide: LEDGER, useClass: MikroOrmLedger },
         { provide: TERMINAL, useFactory: () => new TerminalOperator() },

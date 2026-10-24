@@ -4,24 +4,10 @@ import type {
   PageObservation,
   SessionRailsDto,
 } from '@sysdesign/contracts';
-import {
-  appendIndexRow,
-  DUMP_SCHEMA_VERSION,
-  jsonSafe,
-  makeRunId,
-  writeDumpFiles,
-  type DumpBytes,
-  type DumpFile,
-} from '@sysdesign/run-dump';
+import { DUMP_SCHEMA_VERSION, jsonSafe, type DumpBytes, type DumpFile } from '@sysdesign/run-dump';
 
 import type { UnitContext } from './open-unit';
-import {
-  causeOf,
-  type BrowserActionKind,
-  type DerivedRubric,
-  type DumpStore,
-  type Termination,
-} from './ports';
+import { causeOf, type BrowserActionKind, type DerivedRubric, type Termination } from './ports';
 
 /**
  * The session dump: everything one session saw and decided, laid out the way
@@ -235,19 +221,3 @@ export const indexRowOf = (manifest: SessionManifest): string =>
     tasks: manifest.tasks.closed,
     decisions: manifest.decisions,
   })}\n`;
-
-/** The dump directory on disk, through the shared plumbing: temp-and-rename per file, one index row per session. */
-export function fsDumpStore(dir: string): DumpStore {
-  return {
-    open(now) {
-      const runId = makeRunId(now.getTime(), 'session');
-      return {
-        runId,
-        write: (files) => {
-          writeDumpFiles(runId, files, dir);
-        },
-        index: (row) => appendIndexRow(row, dir),
-      };
-    },
-  };
-}

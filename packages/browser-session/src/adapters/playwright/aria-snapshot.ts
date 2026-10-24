@@ -203,9 +203,6 @@ export function unreadSnapshotLines(snapshot: string, nodes: readonly SnapshotNo
   return snapshot.split('\n').filter((line) => line.trim() !== '').length;
 }
 
-/** How many times a ref-less read is taken again before the page is reported as it stands. */
-export const EMPTY_SNAPSHOT_READS = 4;
-
 /**
  * The first read that carries a ref, or the last read that came back at all.
  *
@@ -219,13 +216,14 @@ export const EMPTY_SNAPSHOT_READS = 4;
  *
  * `read` returns null when the document could not be read at all — mid-
  * navigation there is no body to match — and `between` is awaited before each
- * further read. The reader owns waiting for the load state; this owns only
- * how many times a ref-less answer is taken for an answer.
+ * further read, `reads` times at most (the observe policy's
+ * `emptySnapshotReads`). The reader owns waiting for the load state; this owns
+ * only how many times a ref-less answer is taken for an answer.
  */
 export async function settledSnapshot(
   read: () => Promise<string | null>,
   between: () => Promise<void>,
-  reads: number = EMPTY_SNAPSHOT_READS,
+  reads: number,
 ): Promise<string> {
   const limit = Math.max(1, reads);
   let last = '';

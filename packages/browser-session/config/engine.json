@@ -2,5 +2,6 @@
   "capture": "field-entries",
   "session": "standard",
   "operator": "terminal-and-notifications",
-  "answering": "standard"
+  "answering": "standard",
+  "observe": "standard"
 }

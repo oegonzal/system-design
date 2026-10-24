@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import type { ObservedElement, PageObservation } from '@sysdesign/contracts';
 
 import { PlaywrightBrowser } from './playwright-browser';
+import { specBrowserOptions } from './testing';
 
 /**
  * What a person can answer with, against the Chromium Playwright bundles,
@@ -53,7 +54,7 @@ describe('the Playwright browser, on what a person can answer with', () => {
 
   beforeAll(async () => {
     profiles = mkdtempSync(join(tmpdir(), 'browser-session-profiles-'));
-    browser = new PlaywrightBrowser({ profilesDir: profiles, channel: undefined });
+    browser = new PlaywrightBrowser(specBrowserOptions(profiles));
     await browser.open('spec', { headed: false });
   });
 

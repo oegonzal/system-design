@@ -1,6 +1,8 @@
 import { ELEMENT_NAME_BOUND, HIDDEN_TRAITS, type HiddenTrait } from '@sysdesign/contracts';
 import type { Locator } from 'playwright';
 
+import { MODAL_DIALOGS } from './dom-selectors';
+
 /**
  * The DOM facts about one interactive element, read in the page. The
  * function below is serialised into the browser by Playwright, so it is
@@ -30,33 +32,20 @@ export interface ElementFacts {
 }
 
 /**
- * Runs inside the page. The hidden traits are the deterministic half of trap
- * detection: `aria-hidden` by an ancestor, `offscreen` for a box no scrolling
- * could bring into view, `zero-size` by a collapsed or clipped box,
- * `tabindex-negative` by attribute, and `autocomplete-off-bait` for an
- * autocomplete-off input that no label, aria-label, placeholder or title
- * explains — the shape of a honeypot, read from what the page offers a person
- * rather than from a list of names.
- */
-/**
  * Every fact about one element, read inside the page. One function on
  * purpose — Playwright serialises it whole into the page, so nothing here may
  * reach outside it — read as four blocks: what the control is and holds,
  * what state the page puts it in, whether a person could see and reach it,
  * and the words around it.
+ *
+ * The hidden traits are the deterministic half of trap detection:
+ * `aria-hidden` by an ancestor, `offscreen` for a box no scrolling could
+ * bring into view, `zero-size` by a collapsed or clipped box,
+ * `tabindex-negative` by attribute, and `autocomplete-off-bait` for an
+ * autocomplete-off input that no label, aria-label, placeholder or title
+ * explains — the shape of a honeypot, read from what the page offers a person
+ * rather than from a list of names.
  */
-/**
- * A dialog in front of the page, as the page declares it: `aria-modal` on a
- * dialog role, or a native dialog opened modally. Declared once for every
- * in-page reader — the element facts and the busy read — and passed into the
- * page, where a module constant does not reach.
- */
-export const MODAL_DIALOGS = {
-  any: '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"], dialog:modal',
-  /** For an engine without `:modal`: the ARIA half alone. */
-  aria: '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"]',
-} as const;
-
 export function elementFactsInPage(
   el: Element,
   { textMax, modal: modalDialogs }: { textMax: number; modal: typeof MODAL_DIALOGS },
@@ -397,38 +386,6 @@ export async function readElementFacts(
   } catch {
     return null;
   }
-}
-
-/**
- * Each ref read until the budget is spent, and a count of those left unread.
- *
- * One observation used to be unbounded: a read per element, each inheriting
- * the fifteen-second action timeout, so a page of 128 elements whose renderer
- * had stalled could hold a single observation for over half an hour. Measured
- * live on 2026-10-03 — a session sat eighteen minutes past its own
- * eighteen-minute rail inside one observe, because the engine checks its rails
- * between phases and no phase was ending. A phase the rails cannot interrupt
- * has to bound itself.
- *
- * An unread element is counted, never guessed at and never listed: the adapter
- * cannot say whether it is enabled, visible or a trap, and the session may act
- * only on elements the observation listed.
- */
-export async function readWithinBudget<T>(
-  refs: readonly string[],
-  read: (ref: string) => Promise<T | null>,
-  now: () => number,
-  budgetMs: number,
-): Promise<{ facts: Map<string, T>; unread: number }> {
-  const deadline = now() + budgetMs;
-  const facts = new Map<string, T>();
-  let unread = 0;
-  for (const ref of refs) {
-    const value = now() < deadline ? await read(ref) : null;
-    if (value === null) unread += 1;
-    else facts.set(ref, value);
-  }
-  return { facts, unread };
 }
 
 /** Only the traits the contract declares, in its order. */

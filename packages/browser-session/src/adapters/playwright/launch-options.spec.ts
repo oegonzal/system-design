@@ -2,7 +2,7 @@ import { launchOptions } from './playwright-browser';
 
 describe('how the browser is launched', () => {
   it('[BRW-4] leaves the stop signals to the engine, so an interrupted session closes through its own path instead of Playwright exiting the process', () => {
-    const options = launchOptions({ profilesDir: 'profiles', channel: 'chrome' }, true);
+    const options = launchOptions({ channel: 'chrome' }, true);
     expect(options).toEqual({
       channel: 'chrome',
       headless: false,
@@ -10,8 +10,6 @@ describe('how the browser is launched', () => {
       handleSIGINT: false,
       handleSIGTERM: false,
     });
-    expect(launchOptions({ profilesDir: 'profiles', channel: undefined }, false).headless).toBe(
-      true,
-    );
+    expect(launchOptions({ channel: undefined }, false).headless).toBe(true);
   });
 });

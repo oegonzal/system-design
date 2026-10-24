@@ -30,6 +30,19 @@ describe('the session settings', () => {
     expect(shipped.session.headed).toBe(true);
     expect(shipped.sources.capture).toMatch(/config\/capture\/field-entries\.json$/);
     expect(shipped.sources.session).toMatch(/config\/session\/standard\.json$/);
+    // How the browser waits on and reads a page: the figures each measured live, declared rather than coded.
+    expect(shipped.sources.observe).toMatch(/config\/observe\/standard\.json$/);
+    expect(shipped.observe).toEqual({
+      actionTimeoutMs: 15000,
+      settleTimeoutMs: 10000,
+      settleRetryMs: 400,
+      emptySnapshotReads: 4,
+      factsTimeoutMs: 1000,
+      observeBudgetMs: 20000,
+      wholesaleReads: 3,
+      stableReads: 4,
+      scrollPx: 600,
+    });
     // The operator is asked at the terminal and through the notifications service.
     expect(shipped.sources.operator).toMatch(/config\/operator\/terminal-and-notifications\.json$/);
     expect(Object.keys(shipped.operator.channels)).toEqual(['notifications']);
@@ -72,16 +85,19 @@ describe('the session settings', () => {
     expect(profiles('capture').sort()).toEqual(['every-action', 'field-entries', 'observations']);
     expect(profiles('operator').sort()).toEqual(['terminal', 'terminal-and-notifications']);
     expect(profiles('answering')).toEqual(['standard']);
+    expect(profiles('observe')).toEqual(['standard']);
     for (const capture of profiles('capture')) {
       for (const session of profiles('session')) {
         for (const operator of profiles('operator')) {
           for (const answering of profiles('answering')) {
-            expect(() =>
-              readSessionSettings(
-                PACKAGE_ROOT,
-                choosing({ capture, session, operator, answering }),
-              ),
-            ).not.toThrow();
+            for (const observe of profiles('observe')) {
+              expect(() =>
+                readSessionSettings(
+                  PACKAGE_ROOT,
+                  choosing({ capture, session, operator, answering, observe }),
+                ),
+              ).not.toThrow();
+            }
           }
         }
       }

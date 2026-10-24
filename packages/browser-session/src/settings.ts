@@ -10,6 +10,7 @@ import {
 } from '@sysdesign/contracts';
 import { z } from 'zod';
 
+import type { ObservePolicy } from './adapters/playwright/observe-policy';
 import { SessionConfigError, targetWithinBudget } from './config';
 import type { CapturePolicy } from './core/engine-context';
 import { BROWSER_ACTION_KINDS } from './core/ports';
@@ -25,7 +26,7 @@ import { BROWSER_ACTION_KINDS } from './core/ports';
  * Each field's meaning, and what its value was measured against, is said
  * here; the value itself only in the file, so the two can never disagree.
  */
-type SettingsKind = 'capture' | 'session' | 'operator' | 'answering';
+type SettingsKind = 'capture' | 'session' | 'operator' | 'answering' | 'observe';
 
 const unique = (kinds: readonly string[]): boolean => new Set(kinds).size === kinds.length;
 
@@ -43,6 +44,19 @@ const capturePolicySchema = z.strictObject({
 }) satisfies z.ZodType<CapturePolicy>;
 
 const positive = z.number().int().positive();
+
+/** How the browser waits on and reads a page; each field's meaning is `ObservePolicy`'s. */
+const observePolicySchema = z.strictObject({
+  actionTimeoutMs: positive,
+  settleTimeoutMs: positive,
+  settleRetryMs: positive,
+  emptySnapshotReads: positive,
+  factsTimeoutMs: positive,
+  observeBudgetMs: positive,
+  wholesaleReads: positive,
+  stableReads: positive,
+  scrollPx: positive,
+}) satisfies z.ZodType<ObservePolicy>;
 
 /** The engine's own stop rules: each a limit that ends the session `stopped`, but `targetDone`, its goal. */
 const railsSchema = z
@@ -161,6 +175,8 @@ export interface SessionSettings {
    * operator with a known answer, 30 matched what the operator then typed.
    */
   answering: AnsweringSettings;
+  /** How the browser waits on and reads a page. */
+  observe: ObservePolicy;
   /** Where each kind's settings came from, as a path from the working directory. */
   sources: Readonly<Record<SettingsKind, string>>;
 }
@@ -185,16 +201,19 @@ export function readSessionSettings(root: string, read?: ReadFile): SessionSetti
   const session = chosen('session', sessionDefaultsSchema);
   const operator = chosen('operator', operatorSettingsSchema);
   const answering = chosen('answering', answeringSettingsSchema);
+  const observe = chosen('observe', observePolicySchema);
   return {
     capture: capture.config,
     session: session.config,
     operator: operator.config,
     answering: answering.config,
+    observe: observe.config,
     sources: {
       capture: capture.source,
       session: session.source,
       operator: operator.source,
       answering: answering.source,
+      observe: observe.source,
     },
   };
 }

@@ -11,6 +11,7 @@ import {
 
 import { ActionFailed } from '../../core/ports';
 import { PlaywrightBrowser } from './playwright-browser';
+import { specBrowserOptions } from './testing';
 
 /**
  * Against the Chromium Playwright bundles (no channel), headless, on a
@@ -171,7 +172,7 @@ describe('the Playwright browser', () => {
 
   beforeAll(async () => {
     profiles = mkdtempSync(join(tmpdir(), 'browser-session-profiles-'));
-    browser = new PlaywrightBrowser({ profilesDir: profiles, channel: undefined });
+    browser = new PlaywrightBrowser(specBrowserOptions(profiles));
     await browser.open('spec', { headed: false });
   });
 
@@ -304,11 +305,7 @@ describe('the Playwright browser', () => {
       expect: null,
       serves: [],
     });
-    const quick = new PlaywrightBrowser({
-      profilesDir: profiles,
-      channel: undefined,
-      actionTimeoutMs: 300,
-    });
+    const quick = new PlaywrightBrowser(specBrowserOptions(profiles, { actionTimeoutMs: 300 }));
     await quick.open('spec-quick', { headed: false });
     try {
       await quick.page.setContent(NEXT_PAGE);
@@ -420,11 +417,7 @@ describe('the Playwright browser', () => {
     // Measured live on 2026-10-07: thirteen observations in a row, each a
     // second after its own reload, reported a landing page without the search
     // control the screenshot taken moments later shows.
-    const patient = new PlaywrightBrowser({
-      profilesDir: profiles,
-      channel: undefined,
-      settleRetryMs: 150,
-    });
+    const patient = new PlaywrightBrowser(specBrowserOptions(profiles, { settleRetryMs: 150 }));
     await patient.open('spec-patient', { headed: false });
     try {
       await patient.page.setContent(LATE_PAGE);
@@ -446,11 +439,7 @@ describe('the Playwright browser', () => {
     // Measured 2026-10-08: three observations of a results page agreed twice
     // over on 33 elements of banner, navigation and search box, with a main
     // that had nothing beneath it yet; each plan made on them was wasted.
-    const patient = new PlaywrightBrowser({
-      profilesDir: profiles,
-      channel: undefined,
-      settleRetryMs: 150,
-    });
+    const patient = new PlaywrightBrowser(specBrowserOptions(profiles, { settleRetryMs: 150 }));
     await patient.open('spec-late-main', { headed: false });
     try {
       await patient.page.setContent(LATE_MAIN);

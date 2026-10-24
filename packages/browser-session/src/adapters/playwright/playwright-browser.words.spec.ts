@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { PlaywrightBrowser } from './playwright-browser';
+import { specBrowserOptions } from './testing';
 
 /**
  * The one production seam of a unit's statement: `observe()` keeps the tree it
@@ -35,7 +36,7 @@ describe('what the Playwright browser states under a landmark', () => {
 
   beforeAll(async () => {
     profiles = mkdtempSync(join(tmpdir(), 'browser-session-profiles-'));
-    browser = new PlaywrightBrowser({ profilesDir: profiles, channel: undefined });
+    browser = new PlaywrightBrowser(specBrowserOptions(profiles));
     await browser.open('spec', { headed: false });
   });
 

@@ -6,7 +6,7 @@ import {
 } from '@sysdesign/contracts';
 import type { Page } from 'playwright';
 
-import { MODAL_DIALOGS } from './element-facts';
+import { MODAL_DIALOGS } from './dom-selectors';
 import type { PageReading } from './observation-reading';
 
 /** What says a region is still loading, by ARIA: busy, or a progressbar with no current value. */

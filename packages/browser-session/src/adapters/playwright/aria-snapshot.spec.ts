@@ -1,5 +1,4 @@
 import {
-  EMPTY_SNAPSHOT_READS,
   decodeAriaSnapshot,
   fitSnapshot,
   carriesRefNode,
@@ -10,6 +9,9 @@ import {
   landmarkRolesOf,
   withoutUnlistedRefs,
 } from './aria-snapshot';
+
+/** How many reads a ref-less page is given here; the session's own number is its observe policy's. */
+const READS = 4;
 
 const SNAPSHOT = `- banner [ref=e1]:
   - link "Home" [ref=e2]:
@@ -329,6 +331,7 @@ describe('reading a page that has not settled', () => {
         paused += 1;
         return Promise.resolve();
       },
+      READS,
     );
     expect(text).toBe(settled);
     expect(taken).toBe(3);
@@ -345,9 +348,10 @@ describe('reading a page that has not settled', () => {
           return Promise.resolve(nothing);
         },
         () => Promise.resolve(),
+        READS,
       ),
     ).toBe(nothing);
-    expect(forever).toBe(EMPTY_SNAPSHOT_READS);
+    expect(forever).toBe(READS);
 
     // A document that never becomes readable yields the empty page, not a throw.
     expect(

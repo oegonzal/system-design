@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { readWithinBudget } from './element-facts';
+import { readWithinBudget } from './budgeted-read';
 
 /** A clock the test advances itself, so the budget is decided and not raced. */
 const clockOf = (stepMs: number) => {
@@ -13,7 +13,7 @@ const clockOf = (stepMs: number) => {
   };
 };
 
-describe('reading element facts within a budget', () => {
+describe('reading within a budget', () => {
   it('[BRW-2] stops reading when the budget is spent and counts what it never read, so one observation cannot outlast the rails that bound the session', async () => {
     // Six elements, each read costing 300ms against a 1s budget: four reads
     // fit (at 0, 300, 600, 900) and the fifth finds the deadline passed.

@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { PlaywrightBrowser } from './playwright-browser';
+import { specBrowserOptions } from './testing';
 
 /**
  * The images a session keeps, against the Chromium Playwright bundles,
@@ -25,7 +26,7 @@ describe('the Playwright browser, imaging the page', () => {
 
   beforeAll(async () => {
     profiles = mkdtempSync(join(tmpdir(), 'browser-session-profiles-'));
-    browser = new PlaywrightBrowser({ profilesDir: profiles, channel: undefined });
+    browser = new PlaywrightBrowser(specBrowserOptions(profiles));
     await browser.open('spec', { headed: false });
   });
 

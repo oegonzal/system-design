@@ -5,6 +5,7 @@ import { join } from 'node:path';
 import type { ObservedElement, PageObservation } from '@sysdesign/contracts';
 
 import { PlaywrightBrowser } from './playwright-browser';
+import { specBrowserOptions } from './testing';
 
 /**
  * A form's radio questions, against the Chromium Playwright bundles, headless.
@@ -62,7 +63,7 @@ describe('the Playwright browser, on radio questions', () => {
 
   beforeAll(async () => {
     profiles = mkdtempSync(join(tmpdir(), 'browser-session-profiles-'));
-    browser = new PlaywrightBrowser({ profilesDir: profiles, channel: undefined });
+    browser = new PlaywrightBrowser(specBrowserOptions(profiles));
     await browser.open('spec', { headed: false });
   });
 
@@ -100,11 +101,7 @@ describe('the Playwright browser, on radio questions', () => {
   });
 
   it('[BRW-2] says why an action gave up: the call log’s last reason travels with the failure', async () => {
-    const quick = new PlaywrightBrowser({
-      profilesDir: profiles,
-      channel: undefined,
-      actionTimeoutMs: 1_500,
-    });
+    const quick = new PlaywrightBrowser(specBrowserOptions(profiles, { actionTimeoutMs: 1_500 }));
     await quick.open('spec-quick', { headed: false });
     try {
       await quick.page.setContent(`<!doctype html><html><body>
