@@ -36,7 +36,7 @@ const ROLE_PHRASE: Record<TargetContactRole, string> = {
 
 /** The one thing every introduction asks, in the sender's voice. */
 export const INTRODUCTION_ASK =
-  'Ask whether the program needs additional small-business engineering capacity, and for an introduction to its program manager. The capability statement is attached.';
+  'Ask one thing of the reader: an introduction to the program’s manager. The capability statement is attached.';
 
 /** The positional id the goal gives the profile's offer at `position`. */
 export const offerIdAt = (position: number): string => `offer.${position + 1}`;

@@ -6,14 +6,7 @@ import {
 import { describe, expect, it } from 'vitest';
 
 import { describePipeline } from '../../core/describe-pipeline';
-import {
-  allStages,
-  capsAgainstMeasured,
-  deriverSchema,
-  seededCaps,
-  seededFields,
-  unseededFields,
-} from '../../core/testing';
+import { capsAgainstMeasured, deriverSchema, seededCaps } from '../../core/testing';
 import { validatePipeline } from '../../core/validate-pipeline';
 import { INTRODUCTION_NOTE } from './definition';
 import measured from './measured.json';
@@ -68,54 +61,28 @@ describe('the introduction-note pipeline', () => {
     expect([...owned].sort()).toEqual(Object.keys(INTRODUCTION_NOTE.task.findingTypes).sort());
   });
 
-  it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage is expected to write, and above what it has measurably written', () => {
-    // SEEDED: the deriver from the design-prompt deriver's 637; the critic and
-    // the evaluator from the interview turn's measured 13,254 and 3,642 (a
-    // critic reasons at length over a short artifact); the producer sized for
-    // a note of a few hundred words in JSON. The first live notes replace the
-    // seeds through `measured.json` (`pnpm measure:bounds --pipeline=introduction-note`).
-    const seeds = {
-      criteria: 637,
-      producer: 1_500,
-      'critic.claims': 13_254,
-      'evaluator.note': 3_642,
-    };
-    expect(capsAgainstMeasured(INTRODUCTION_NOTE, seededCaps(seeds))).toEqual([]);
-    const unrecorded =
-      measured.runs === 0 ? allStages(INTRODUCTION_NOTE, 'no introduction-note run recorded') : {};
-    expect(capsAgainstMeasured(INTRODUCTION_NOTE, measured.caps, { exempt: unrecorded })).toEqual(
-      [],
-    );
+  it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage has measurably written, and every note field is asked for at least what was written', () => {
+    // `measured.json`, refreshed by `pnpm measure:bounds --pipeline=introduction-note`.
+    // A cap is also the call's time limit, so one a stage outwrites is a call
+    // cut short. The deriver is never called for a note (the composer supplies
+    // the rubric), so its stage holds the design-prompt deriver's measurement
+    // as a seed and its fields are exempt until a note derives; the one fixture
+    // holds what the deriver and the producer write, so both schemas are held
+    // to it together.
+    expect(measured.runs).toBeGreaterThan(0);
+    const seeds = seededCaps({ criteria: 637 });
+    expect(capsAgainstMeasured(INTRODUCTION_NOTE, { ...seeds, ...measured.caps })).toEqual([]);
     const unmeasured = 'the composer supplies every note’s rubric; no note has derived one';
     expect(
       boundsAgainstMeasured(
-        deriverSchema(INTRODUCTION_NOTE.task),
-        {},
-        {
-          exempt: { criteria: unmeasured, 'criteria[].statement': unmeasured },
-        },
+        [deriverSchema(INTRODUCTION_NOTE.task), introductionNoteOutputSchema],
+        measured.fields,
+        { exempt: { criteria: unmeasured, 'criteria[].statement': unmeasured } },
       ),
     ).toEqual([]);
   });
 
-  it('[QL-4] every prose bound sits above the longest its path is expected to be written, and every part is printed where a judge reads it', () => {
-    // SEEDED from the sample note's own parts, lengthened by a third.
-    const seeds = {
-      subject: 70,
-      opening: 240,
-      'offerLines[].line': 160,
-      'offerLines[].offerId': 7,
-      'programReference.piid': 20,
-      ask: 170,
-      closing: 200,
-    };
-    const schema = introductionNoteOutput.schema;
-    expect(
-      boundsAgainstMeasured(introductionNoteOutputSchema, seededFields(seeds), {
-        exempt: unseededFields(schema, seeds, 'no introduction-note run recorded, and no seed'),
-      }),
-    ).toEqual([]);
-
+  it('[QL-4] every part of the note is printed where a judge reads it, in the order the note reads', () => {
     const note = sampleNote();
     const rendered = introductionNoteOutput.render(note);
     for (const location of introductionNoteOutput.locate(note)) {

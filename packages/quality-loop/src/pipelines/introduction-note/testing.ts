@@ -50,7 +50,7 @@ export const sampleIntroductionGoal = (index: IntroductionIndex = sampleIndex())
     '',
     '## Ask',
     '',
-    'Ask whether the program needs additional small-business engineering capacity, and for an introduction to its program manager. The capability statement is attached.',
+    'Ask one thing of the reader: an introduction to the program’s manager. The capability statement is attached.',
     '',
     renderIndexSection(index),
   ].join('\n');
@@ -72,7 +72,7 @@ export const sampleNote = (
       line: 'We stand up automated regression and browser test suites for the applications the order manages.',
     },
   ],
-  ask: 'Does the program need additional small-business engineering capacity, and could you introduce me to its program manager?',
+  ask: 'Would you introduce me to the program’s manager?',
   closing:
     'Our capability statement is attached; reach me at teaming@precision-software.example. I deliver remotely as a U.S.-citizen principal on unclassified work.',
   ...overrides,

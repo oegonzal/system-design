@@ -1,1 +1,20 @@
-{ "since": null, "until": null, "runs": 0, "fields": {}, "caps": {} }
+{
+  "since": "2026-10-24T03:06:36.423Z",
+  "until": "2026-10-24T05:11:55.231Z",
+  "runs": 2,
+  "fields": {
+    "ask": { "n": 4, "max": 150, "p99": 150, "overTarget": 0 },
+    "closing": { "n": 4, "max": 171, "p99": 171, "overTarget": 0 },
+    "offerLines": { "n": 4, "max": 3, "p99": 3, "overTarget": 0 },
+    "offerLines[].line": { "n": 11, "max": 214, "p99": 214, "overTarget": 0 },
+    "offerLines[].offerId": { "n": 11, "max": 7, "p99": 7, "overTarget": 0 },
+    "opening": { "n": 4, "max": 300, "p99": 300, "overTarget": 0 },
+    "programReference.piid": { "n": 4, "max": 17, "p99": 17, "overTarget": 0 },
+    "subject": { "n": 4, "max": 65, "p99": 65, "overTarget": 0 }
+  },
+  "caps": {
+    "critic.claims": { "n": 8, "max": 4737, "p99": 4737, "maxApiCalls": 1 },
+    "evaluator.note": { "n": 8, "max": 3185, "p99": 3185, "maxApiCalls": 1 },
+    "producer": { "n": 4, "max": 1168, "p99": 1168, "maxApiCalls": 1 }
+  }
+}

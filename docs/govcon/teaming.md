@@ -67,8 +67,8 @@ contact in their role, or the firm's small-business liaison team), the award
 as its record states it (contract number, buyer, type and vehicle, dates with
 options, funded against ceiling, the plan, the subcontracts reported, the
 description), the company's own words from **Settings → Introductions** (the
-company in a line, how it delivers, its offers as rows under stable slugs),
-and the one ask. The `introduction-note` pipeline writes the note under four
+company in a line, how it delivers, how a reader reaches it, its offers as
+rows under stable slugs), and the one ask. The `introduction-note` pipeline writes the note under four
 fixed rules — fidelity, relevance, restraint, clarity — with one claims critic
 and one evaluator; a note that names another program or makes an offer the
 profile never listed is refused by its validator before any judge reads it.
@@ -94,15 +94,26 @@ then move on.
 
 ## What the first live pass measured (2026-10-23/24)
 
-| Fact                                                                                  | Value                                                                        |
-| ------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
-| Contracts, NAICS 541511/541512/541519, FY2026–FY2027 to date, other-than-small primes | 16,507                                                                       |
-| Subcontracts reported under them, walked completely                                   | 6,057 rows, 5,952 distinct, 117 primes                                       |
-| Primes passing the shortlist rule                                                     | 10 of 20 groups read (14 passed; the ten with the most in-band subcontracts) |
-| Plan codes on the 40 largest DA01 awards by large primes                              | F 34, B 2, G 1, C 1, none 2                                                  |
-| A SAM.gov registration's `entityURL` on a large prime                                 | present                                                                      |
+| Fact                                                                                  | Value                                                                                       |
+| ------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Contracts, NAICS 541511/541512/541519, FY2026–FY2027 to date, other-than-small primes | 16,507                                                                                      |
+| Subcontracts reported under them, walked completely                                   | 6,057 rows, 5,952 distinct, 117 primes                                                      |
+| Primes passing the shortlist rule                                                     | 10 of 20 groups read (14 passed; the ten with the most in-band subcontracts)                |
+| Plan codes on the 40 largest DA01 awards by large primes                              | F 34, B 2, G 1, C 1, none 2                                                                 |
+| A SAM.gov registration's `entityURL` on a large prime                                 | present                                                                                     |
+| Introduction notes drafted live (2026-10-24)                                          | 2, both accepted on the second iteration: 55 → 85 and 65 → 80, in 2 min 46 s and 2 min 30 s |
+| The most a stage wrote, in output tokens (its cap)                                    | producer 1,168 (4,000); claims critic 4,737 (16,000); evaluator 3,185 (7,000)               |
 
 The Primes lens once read 200 of 4,763 in-band rows: the source answered one
 page in 28 seconds and the next not within the adapter's 30, so the read
 stopped and said so; a minute later the same pages answered in seconds, sorted
 by date or by amount alike. A slow spell at the source, not the order asked.
+
+The two live notes taught two things, both fixed in the declared data the
+same night. The first note closed with an address the goal never stated, so
+the profile's introduction section now says how a reader reaches the company
+and the producer is told never to supply an address the goal does not state.
+The claims critic read the goal's ask as two requests — whether the program
+needs capacity, and an introduction — in three of the four iterations, under
+the one-thing rule, and said the goal's owner had to pick one: the declared
+ask now asks for the introduction alone. Neither fix touched the engine.
