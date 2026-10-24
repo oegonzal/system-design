@@ -106,6 +106,7 @@ export const awardBodyOf = (overrides: Partial<AwardBody> = {}): AwardBody => ({
     pricing: 'TIME AND MATERIALS',
     solicitationId: null,
   },
+  subcontractingPlan: { code: 'F', description: 'INDIVIDUAL SUBCONTRACT PLAN' },
   subcontractCount: 7,
   subcontractAmount: 30_993_310.09,
   subcontracts: [

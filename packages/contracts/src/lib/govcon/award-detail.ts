@@ -30,6 +30,15 @@ export interface AwardCompetition {
   solicitationId: string | null;
 }
 
+/**
+ * The small-business subcontracting plan the latest action records: the
+ * code as FAR 19.7 states it and the source's own wording of it.
+ */
+export interface AwardSubcontractingPlan {
+  code: string;
+  description: string | null;
+}
+
 /** What was ordered under a vehicle. */
 export interface AwardOrders {
   /** Orders placed under it, directly or through a vehicle awarded under it. */
@@ -89,6 +98,8 @@ export interface AwardBody {
   pscDescription: string | null;
   placeOfPerformance: string | null;
   competition: AwardCompetition;
+  /** The subcontracting plan it carries; null when the record states none. */
+  subcontractingPlan: AwardSubcontractingPlan | null;
   /** Subcontracts reported under it, by the source's own count and total. */
   subcontractCount: number;
   subcontractAmount: number;

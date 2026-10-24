@@ -52,6 +52,12 @@
               "certificationExitDate": null
             }
           ]
+        },
+        "entityInformation": {
+          "entityURL": "www.example.com/rlm",
+          "entityStartDate": "2010-04-01",
+          "fiscalYearEndCloseDate": "12/31",
+          "submissionDate": "2026-01-19"
         }
       },
       "assertions": {

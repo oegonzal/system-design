@@ -18,9 +18,15 @@ export const Default: Story = {};
 /** The company itself, on the dashboard. */
 export const Own: Story = { args: { entity: OWN_ENTITY, headingLevel: 2 } };
 
-/** On the exclusions list: the card says so first. */
+/** On the exclusions list, with no website registered: the card says so first. */
 export const Excluded: Story = {
   args: {
-    entity: { ...ENTITY, registrationStatus: 'Expired', excluded: true, sbaCertifications: ['A6'] },
+    entity: {
+      ...ENTITY,
+      registrationStatus: 'Expired',
+      excluded: true,
+      sbaCertifications: ['A6'],
+      website: null,
+    },
   },
 };

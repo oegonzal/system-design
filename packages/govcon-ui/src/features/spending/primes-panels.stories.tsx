@@ -9,13 +9,19 @@ const hiredHrefOf = (uei: string): string => `/spending?recipient=${uei}&tab=pri
 const meta: Meta<typeof PrimesTable> = {
   title: 'Govcon/Spending/Primes',
   component: PrimesTable,
-  args: { rows: PRIMES.primes, primeCount: PRIMES.primeCount, hiredHrefOf },
+  args: {
+    rows: PRIMES.primes,
+    primeCount: PRIMES.primeCount,
+    hiredHrefOf,
+    tracked: new Set(['SMNWM6HN79X5']),
+    onTrack: () => undefined,
+  },
 };
 export default meta;
 
 type Story = StoryObj<typeof PrimesTable>;
 
-/** Three primes of 158: two with a UEI and a page of their own, one the source named without one. */
+/** Three primes of 158: two with a UEI and a page of their own — one of them tracked as a firm — and one the source named without one. */
 export const Ranking: Story = {};
 
 /** Nothing reported for the scope, the window and the size. */

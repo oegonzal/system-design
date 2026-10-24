@@ -16,6 +16,7 @@ const toRow = (entity: Entity): Omit<GovconEntity, never> => ({
   naics: entity.naics.map((item) => ({ ...item })),
   psc: [...entity.psc],
   excluded: entity.excluded,
+  website: entity.website,
   fetchedAt: new Date(entity.fetchedAt),
 });
 
@@ -31,6 +32,7 @@ const fromRow = (row: GovconEntity): Entity => ({
   naics: row.naics.map((item) => ({ ...item })),
   psc: [...row.psc],
   excluded: row.excluded,
+  website: row.website,
   fetchedAt: row.fetchedAt.toISOString(),
 });
 

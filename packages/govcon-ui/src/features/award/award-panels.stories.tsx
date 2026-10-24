@@ -24,12 +24,13 @@ type Story = StoryObj<typeof AwardFacts>;
 /** An order under a single-award vehicle, competed with three offers. */
 export const Facts: Story = {};
 
-/** A contract of its own, on a schedule record: no vehicle, and offers the buyer did not count. */
+/** A contract of its own, on a schedule record: no vehicle, offers the buyer did not count, and no subcontracting plan stated. */
 export const FactsStandalone: Story = {
   args: {
     award: {
       ...AWARD_DETAIL,
       vehicle: null,
+      subcontractingPlan: null,
       competition: {
         ...AWARD_DETAIL.competition,
         offers: null,

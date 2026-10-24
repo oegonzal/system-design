@@ -6,6 +6,7 @@ import {
   type SpendingPrimes,
 } from '@sysdesign/contracts';
 import {
+  Button,
   Disclosure,
   DisclosureButton,
   DisclosurePanel,
@@ -18,6 +19,7 @@ import {
 
 import { useLink } from '../../components/link-context';
 import { primeHref } from '../award-href';
+import { pipelineHref } from '../pipeline/views';
 
 const count = new Intl.NumberFormat('en-US');
 const percent = new Intl.NumberFormat('en-US', { style: 'percent', maximumFractionDigits: 0 });
@@ -100,6 +102,12 @@ export interface PrimesTableProps {
   primeCount: number;
   /** Where the primes that hired one subcontractor are ranked. */
   hiredHrefOf(uei: string): string;
+  /** The primes already tracked as firms, by UEI. */
+  tracked: ReadonlySet<string>;
+  /** Track a prime as a firm; offered only for a row the source named by UEI. */
+  onTrack(row: PrimeRow): void;
+  /** A track is being written; the buttons wait for it. */
+  tracking?: boolean;
 }
 
 /** The firms a prime reported most often, each a link to who else hires it. */
@@ -149,9 +157,17 @@ function TopSubcontractors({
  * and what each holds itself in the scope. A prime is its UEI, shown beside
  * its name since one firm may file under several; a prime the source gave
  * one for links to its own page, and one it did not is named and nothing
- * more.
+ * more. The last column says which primes are tracked as firms already and
+ * tracks one that is not in one click.
  */
-export function PrimesTable({ rows, primeCount, hiredHrefOf }: PrimesTableProps) {
+export function PrimesTable({
+  rows,
+  primeCount,
+  hiredHrefOf,
+  tracked,
+  onTrack,
+  tracking = false,
+}: PrimesTableProps) {
   const Link = useLink();
   if (rows.length === 0) {
     return (
@@ -173,6 +189,7 @@ export function PrimesTable({ rows, primeCount, hiredHrefOf }: PrimesTableProps)
             <th scope="col">Under service codes</th>
             <th scope="col">Holds in scope</th>
             <th scope="col">Hires</th>
+            <th scope="col">Tracking</th>
           </tr>
         </thead>
         <tbody>
@@ -195,6 +212,25 @@ export function PrimesTable({ rows, primeCount, hiredHrefOf }: PrimesTableProps)
               <td>{compactMoney(row.obligations)}</td>
               <td>
                 <TopSubcontractors row={row} hiredHrefOf={hiredHrefOf} />
+              </td>
+              <td>
+                {row.uei === null ? (
+                  DASH
+                ) : tracked.has(row.uei) ? (
+                  <Link href={pipelineHref('targets')} $variant="inline">
+                    Tracked
+                  </Link>
+                ) : (
+                  <Button
+                    variant="subtle"
+                    size="sm"
+                    disabled={tracking}
+                    onClick={() => onTrack(row)}
+                    aria-label={`Track ${row.name}`}
+                  >
+                    Track
+                  </Button>
+                )}
               </td>
             </tr>
           ))}

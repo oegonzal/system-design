@@ -19,6 +19,7 @@ export const samEntitySchema = z.looseObject({
   }),
   coreData: z
     .looseObject({
+      entityInformation: z.looseObject({ entityURL: text }).nullish(),
       businessTypes: z
         .looseObject({
           businessTypeList: z.array(z.looseObject({ businessTypeCode: text })).nullish(),

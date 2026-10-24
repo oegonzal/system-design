@@ -29,6 +29,8 @@ export interface Entity {
   naics: EntityNaics[];
   psc: string[];
   excluded: boolean;
+  /** The website it registered, absolute; null when it gave none. */
+  website: string | null;
   /** ISO 8601. */
   fetchedAt: string;
 }

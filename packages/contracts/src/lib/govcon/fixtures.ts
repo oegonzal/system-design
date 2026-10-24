@@ -345,6 +345,7 @@ export const entityOf = (overrides: Partial<Entity> = {}): Entity => ({
   naics: [{ code: '332710', small: true }],
   psc: ['5340'],
   excluded: false,
+  website: 'https://www.precision-parts.example',
   fetchedAt: '2026-09-27T04:05:00.000Z',
   ...overrides,
 });

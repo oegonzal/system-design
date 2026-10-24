@@ -117,9 +117,10 @@ declared facets, every chart with a data-table twin and a tooltip, every
 panel with its provenance; the view is its address, opens on the profile's
 NAICS and can be kept by name; its guide is [spending.md](spending.md)),
 **Award** (one award's record: its holder, buyer and vehicle, what it can
-reach, its end with and without options, how it was bought, who works under
-it, and for a vehicle what was ordered under it), **Firm** (one firm by UEI: its registration, and the spending lenses
-narrowed to it) and
+reach, its end with and without options, how it was bought and whether it
+carries a subcontracting plan, who works under it, and for a vehicle what
+was ordered under it), **Firm** (one firm by UEI: its registration with its
+website, and the spending lenses narrowed to it) and
 **Settings** (profiles as editable data with the service's issues per
 field; the sources and the full ledger). Every button that spends a request
 says so. Pure components carry stories and specs; containers are specified

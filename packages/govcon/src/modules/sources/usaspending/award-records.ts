@@ -4,6 +4,7 @@ import type {
   AwardOrders,
   AwardSubawardsRequest,
   AwardSubcontract,
+  AwardSubcontractingPlan,
   FirmRef,
 } from '@sysdesign/contracts';
 import { z } from 'zod';
@@ -71,6 +72,8 @@ const awardSchema = z.looseObject({
       naics_description: text,
       product_or_service_code: text,
       product_or_service_description: text,
+      subcontracting_plan: text,
+      subcontracting_plan_description: text,
     })
     .nullish(),
   awarding_agency: agencySchema,
@@ -117,6 +120,10 @@ const firmOf = (name: string | null | undefined, uei: string | null | undefined)
 /** `CITY, ST`, or whichever of the two the source gave. */
 const placeOf = (city: string | null, state: string | null): string | null =>
   city !== null && state !== null ? `${city}, ${state}` : (city ?? state);
+
+/** The plan the latest action codes, with the source's wording; no code is no plan stated. */
+const planOf = (code: string | null, description: string | null): AwardSubcontractingPlan | null =>
+  code === null ? null : { code, description };
 
 /**
  * One award as the source keeps it → the record a page reads. Null when it
@@ -193,6 +200,10 @@ export function normalizeAwardRecord(raw: unknown): AwardRecord | null {
       pricing: clean(terms?.type_of_contract_pricing_description),
       solicitationId: clean(terms?.solicitation_identifier),
     },
+    subcontractingPlan: planOf(
+      clean(terms?.subcontracting_plan),
+      clean(terms?.subcontracting_plan_description),
+    ),
     subcontractCount: Math.max(0, integer(award.subaward_count) ?? 0),
     subcontractAmount: amount(award.total_subaward_amount) ?? 0,
   };

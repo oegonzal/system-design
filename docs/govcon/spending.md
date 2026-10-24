@@ -141,8 +141,8 @@ sub-agency, recipient, NAICS, PSC or state, each a share of the scope's
 whole over that window (the whole is read separately, so the rows need not
 add up to it). The window opens on the last twelve months — a whole year on
 any day, where the fiscal year to date is thirteen days long on October 13 —
-with the fiscal year to date, the prior fiscal year and the one before it as
-presets.
+with the fiscal year to date, the prior fiscal year, both of those together
+and the one before them as presets.
 "Truncated" means more rows exist beyond the declared bound
 (`MAX_BREAKDOWN_ROWS`). When the window reaches past the last day a late
 agency has published, a note says the total and that agency's rows are
@@ -243,7 +243,10 @@ reported
 most, each a link to **who hires that firm**: this tab with the scope
 narrowed to that subcontractor, since in a subcontract search "Awarded to"
 matches the subcontractor. The same link works from any UEI typed under
-More filters.
+More filters. "Tracking" says which primes are tracked as firms already,
+each a link to the pipeline, and tracks one that is not in one click at the
+first stage of a firm's pursuit; a prime the source named without a UEI
+cannot be tracked, and its cell is blank.
 
 A subcontract search honours the scope's codes, agency, set-aside, placement
 and winner's size as facts about the prime's award. It cannot ask for a
@@ -257,6 +260,14 @@ the same six primes on top with the same counts once a firm's two UEIs are
 added together (CACI 325, General Dynamics IT 323, Booz Allen Hamilton 320,
 Leidos 308, Accenture Federal Services 269). Thirty-two requests.
 
+Checked 2026-10-23 on the same three codes, large primes, $50K to $2M,
+FY2026 to date: 4,763 held. The source answered one page in 28 seconds and
+the next not within the adapter's 30, so the read stopped at 200 rows and
+said so (capped, and not kept); a minute later the same pages answered in
+0.4 to 7 seconds whether sorted by date or by amount. A slow spell at the
+source, not the order asked for. The complete walk of the 6,057 rows the
+scope held that day is in the teaming shortlist report.
+
 ## One award, and one firm
 
 **An award** opens at `/awards/<id>` from the Horizon, from Intel for an
@@ -265,8 +276,9 @@ vehicle. It shows who holds it and who owns the holder, the buyer down to
 the office, what is obligated against what the award can reach, when it
 ends beside when it would end with every option, the vehicle it sits under,
 how it was competed (offers received, or that the buyer did not count
-them), how it is priced and coded, the largest subcontracts reported under
-it, and the open stored notices from the same buyer and code.
+them), how it is priced and coded, whether it carries a small-business
+subcontracting plan as its latest action codes it, the largest subcontracts
+reported under it, and the open stored notices from the same buyer and code.
 
 A vehicle is read differently, because its money is on its orders: its own
 obligations are usually zero. Its page shows what was ordered under it, in
@@ -284,8 +296,8 @@ ranked by recipient, Intel and an award. It is headed by the firm's name and
 what it was obligated in the active profile's codes over the last twelve
 months, which is the recipient ranking narrowed to that firm; until an award
 or a registration names it, the UEI heads the page. Its SAM.gov registration
-is shown as the store holds it, and looking it up is one budgeted request
-behind a button that says so. Under it are the Spending lenses narrowed to
+is shown as the store holds it, with the website it registered when it gave
+one, and looking it up is one budgeted request behind a button that says so. Under it are the Spending lenses narrowed to
 that firm in the profile's codes, each read only once its tab is opened: the
 awards it holds that are ending, who buys from it, the firms it reported
 hiring, and the primes that reported hiring it. The firm is one facet of a

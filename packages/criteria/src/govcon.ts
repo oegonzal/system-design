@@ -44,7 +44,7 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
   {
     id: 'GOVU-8',
     statement:
-      "The notice page shows the facts, the place of performance and contacts, the attachments as public links, the score trace, the description on demand, the awards of its solicitation and NAICS, the awardee's registration, and the bid panel that puts it in the pipeline.",
+      "The notice page shows the facts, the place of performance and contacts, the attachments as public links, the score trace, the description on demand, the awards of its solicitation and NAICS, the awardee's registration with its website when it registered one, and the bid panel that puts it in the pipeline.",
   },
   {
     id: 'GOVU-9',
@@ -59,7 +59,7 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
   {
     id: 'GOVU-11',
     statement:
-      'The spending page scopes its free lenses over one scope bar — among them fiscal periods with a seasonal projection, a ranked breakdown over a fiscal window, awards expiring by month, and an agency’s budget by fiscal year with its sub-agencies — every chart carries a data-table alternative, and every panel states its provenance and the source’s disclosures verbatim.',
+      'The spending page scopes its free lenses over one scope bar — among them fiscal periods with a seasonal projection, a ranked breakdown over a fiscal window — the year to date, the prior year, both together, the year before or the last twelve months —, awards expiring by month, and an agency’s budget by fiscal year with its sub-agencies — every chart carries a data-table alternative, and every panel states its provenance and the source’s disclosures verbatim.',
   },
   {
     id: 'GOVU-12',
@@ -94,7 +94,7 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
   {
     id: 'GOVU-18',
     statement:
-      'An award opens at /awards/<id> from every table that lists one by the id its record is read by: who holds it and who owns the holder, the buyer, the vehicle it sits under as a link, what is obligated against what it can reach, its end beside its end with every option — saying when options remain — how it was competed with uncounted offers said so, the largest subcontracts reported under it, and the open stored notices from the same buyer and code; an id the source does not have is a dead end with a way back.',
+      'An award opens at /awards/<id> from every table that lists one by the id its record is read by: who holds it and who owns the holder, the buyer, the vehicle it sits under as a link, what is obligated against what it can reach, its end beside its end with every option — saying when options remain — how it was competed with uncounted offers said so, the subcontracting plan it carries or that none is stated, the largest subcontracts reported under it, and the open stored notices from the same buyer and code; an id the source does not have is a dead end with a way back.',
   },
   {
     id: 'GOVU-19',
@@ -135,6 +135,11 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
     id: 'GOVU-26',
     statement:
       'The dashboard leads with what to act on: what is due inside the week across the tracked notices — by reminder or deadline — and the tracked firms and awards — by reminder — in one list, soonest first; what was raised; the open early notices ranked for the profile, with the way to every one of them; and the best leads. Then how much of the year’s new work in the profile’s codes was within reach, cut by cut, read as the daily warm reads it so that it is the day’s snapshot; then the sources and a pull by hand; then the registration. Each panel reads its own resource and says its own failure, and a pull makes every panel that reads the store read it again.',
+  },
+  {
+    id: 'GOVU-27',
+    statement:
+      'The primes ranking says in its last column which primes are already tracked as firms, each with the way to the pipeline, and tracks one that is not from its row in one click at the first stage of a firm’s pursuit — reading the tracked firms once per ranking, never over a firm already tracked, and offering nothing for a prime the source named without a UEI.',
   },
   // Government contracting: SAM.gov opportunities (packages/govcon)
   {
@@ -225,7 +230,7 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
   {
     id: 'GOV-18',
     statement:
-      "Registrants are looked up from SAM.gov's Entity Management in batches of at most MAX_UEI_BATCH UEIs, one gated request each, stored by UEI with their registration, claims and exclusion flag (no separate exclusions request is spent); a read answers from the store and the profile's own company is its entityUei.",
+      "Registrants are looked up from SAM.gov's Entity Management in batches of at most MAX_UEI_BATCH UEIs, one gated request each, stored by UEI with their registration, claims, website and exclusion flag (no separate exclusions request is spent); a read answers from the store and the profile's own company is its entityUei.",
   },
   {
     id: 'GOV-19',
@@ -280,7 +285,7 @@ export const GOVCON_CRITERIA: readonly Criterion[] = [
   {
     id: 'GOV-30',
     statement:
-      'One award is read by the source’s own id through the gate: its holder and parent, buyer, vehicle, obligations against what it can reach, its end and its end with every option, how it was competed — a not-counted offers placeholder read as unknown in every source that relays it — what was ordered under it when it is itself a vehicle, its own orders and those placed through the vehicles awarded under it as one count and one total, and the largest subcontracts reported under it, joined on every read to the open stored notices sharing its NAICS and buyer. An id the source does not have is a 404; an award that is no vehicle and has no subcontracts reported costs one request.',
+      'One award is read by the source’s own id through the gate: its holder and parent, buyer, vehicle, obligations against what it can reach, its end and its end with every option, how it was competed — a not-counted offers placeholder read as unknown in every source that relays it — the subcontracting plan its latest action codes, what was ordered under it when it is itself a vehicle, its own orders and those placed through the vehicles awarded under it as one count and one total, and the largest subcontracts reported under it, joined on every read to the open stored notices sharing its NAICS and buyer. An id the source does not have is a 404; an award that is no vehicle and has no subcontracts reported costs one request.',
   },
   {
     id: 'GOV-31',

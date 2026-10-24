@@ -12,7 +12,7 @@ import { bodyOf, httpOf, okValue } from './testing';
 const ID = 'CONT_AWD_89303019FET000003_8900_89303019AET000001_8900';
 
 describe('the USAspending award records', () => {
-  it('[GOV-11] [GOV-30] reads one award by its id and normalizes its holder and parent, buyer, vehicle, money, both end dates, how it was competed and what was subcontracted', async () => {
+  it('[GOV-11] [GOV-30] reads one award by its id and normalizes its holder and parent, buyer, vehicle, money, both end dates, how it was competed, the subcontracting plan it carries and what was subcontracted', async () => {
     const { http, urls, requests } = httpOf([{ body: detail }]);
     const { attempts, result } = await new UsaSpendingAwardRecords(http).detail({
       externalId: ID,
@@ -59,6 +59,7 @@ describe('the USAspending award records', () => {
         pricing: 'TIME AND MATERIALS',
         solicitationId: null,
       },
+      subcontractingPlan: { code: 'F', description: 'INDIVIDUAL SUBCONTRACT PLAN' },
       subcontractCount: 7,
       subcontractAmount: 30993310.09,
     });

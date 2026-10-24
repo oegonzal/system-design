@@ -1,7 +1,7 @@
 import { renderWithTheme } from '@sysdesign/web-testing';
 import { composeStories } from '@storybook/react';
 import { fireEvent, screen, within } from '@testing-library/react';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import * as stories from './primes-panels.stories';
 
@@ -99,6 +99,18 @@ describe('the primes panels', () => {
     ).toBe('/spending?recipient=JLW7WAKPEKD4&tab=primes');
     expect(most.textContent).toContain('A FIRM WITHOUT A UEI');
     expect(within(most).getAllByRole('link')).toHaveLength(1);
+  });
+
+  it('[GOVU-27] says which primes are tracked as firms, with the way to the pipeline, offers to track one the source named by UEI, and offers nothing for a prime without one', () => {
+    const onTrack = vi.fn();
+    renderWithTheme(<Ranking onTrack={onTrack} />);
+    expect(screen.getByRole('link', { name: 'Tracked' }).getAttribute('href')).toBe(
+      '/pipeline?view=targets',
+    );
+    const buttons = screen.getAllByRole('button', { name: /^Track / });
+    expect(buttons).toHaveLength(1);
+    fireEvent.click(buttons[0] as HTMLElement);
+    expect(onTrack).toHaveBeenCalledWith(expect.objectContaining({ uei: 'JCBMLGPE6Z71' }));
   });
 
   it('[GOVU-17] says when nothing was reported, and opens one firm’s own row out — or says it reported fewer than the last one listed', () => {

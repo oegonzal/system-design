@@ -194,6 +194,7 @@ export const awardBodySchema = z.strictObject({
     pricing: text,
     solicitationId: text,
   }),
+  subcontractingPlan: z.strictObject({ code, description: text }).nullable(),
   subcontractCount: count,
   subcontractAmount: amount,
   subcontracts: z.array(

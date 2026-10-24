@@ -19,6 +19,22 @@ const codes = (
   ...new Set((items ?? []).map((item) => clean(item.code)).filter((c): c is string => c !== null)),
 ];
 
+/**
+ * The website a registrant entered, as an absolute http(s) URL: a bare host
+ * is read as https, and anything that is not a web address is no website.
+ */
+const websiteOf = (value: string | null | undefined): string | null => {
+  const entered = clean(value);
+  if (entered === null) return null;
+  const spelled = /^[a-z][a-z0-9+.-]*:\/\//i.test(entered) ? entered : `https://${entered}`;
+  try {
+    const url = new URL(spelled);
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.toString() : null;
+  } catch {
+    return null;
+  }
+};
+
 function shape(record: SamEntity, legalName: string): EntityDraft {
   const registration = record.entityRegistration;
   const types = record.coreData?.businessTypes;
@@ -41,6 +57,7 @@ function shape(record: SamEntity, legalName: string): EntityDraft {
     }),
     psc: codes((goods?.pscList ?? []).map((p) => ({ code: p.pscCode }))),
     excluded: yesNo(registration.exclusionStatusFlag) === true,
+    website: websiteOf(record.coreData?.entityInformation?.entityURL),
   };
 }
 

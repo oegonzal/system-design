@@ -81,7 +81,7 @@ describe('the award panels', () => {
     ).toBeTruthy();
   });
 
-  it('[GOVU-18] says how the award was bought — the vehicle as a link to its own record, the offers or that none were counted, the set-aside, competition, pricing and codes', () => {
+  it('[GOVU-18] says how the award was bought — the vehicle as a link to its own record, the offers or that none were counted, the set-aside, the subcontracting plan or that none is stated, competition, pricing and codes', () => {
     const order = renderWithTheme(<Facts />);
     expect(screen.getByRole('link', { name: '89303019AET000001' }).getAttribute('href')).toBe(
       '/awards/CONT_IDV_89303019AET000001_8900',
@@ -89,6 +89,7 @@ describe('the award panels', () => {
     expect(factOf('Vehicle')).toBe('89303019AET000001 · BPA · SINGLE AWARD · Department of Energy');
     expect(factOf('Offers received')).toBe('3');
     expect(factOf('Set-aside')).toBe('NO SET ASIDE USED.');
+    expect(factOf('Subcontracting plan')).toBe('F INDIVIDUAL SUBCONTRACT PLAN');
     expect(factOf('Competition')).toBe('FULL AND OPEN COMPETITION');
     expect(factOf('Pricing')).toBe('TIME AND MATERIALS');
     expect(factOf('NAICS')).toBe('541511 CUSTOM COMPUTER PROGRAMMING SERVICES');
@@ -100,6 +101,7 @@ describe('the award panels', () => {
     expect(factOf('Offers received')).toBe('Not counted');
     // The code stands in when the source gave no description.
     expect(factOf('Set-aside')).toBe('SBA');
+    expect(factOf('Subcontracting plan')).toBe('None stated');
     // Only a vehicle is held by one firm or several.
     expect(screen.queryByRole('rowheader', { name: 'Held by' })).toBeNull();
     alone.unmount();

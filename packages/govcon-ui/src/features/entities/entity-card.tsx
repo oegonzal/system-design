@@ -9,7 +9,7 @@ export interface EntityCardProps {
   headingLevel?: 2 | 3;
 }
 
-/** A registrant as a bidder reads it: registered until when, claiming what, small where, excluded or not. */
+/** A registrant as a bidder reads it: registered until when, claiming what, small where, excluded or not, and its own website when it registered one. */
 export function EntityCard({ entity, headingLevel = 3 }: EntityCardProps) {
   return (
     <Stack gap={3}>
@@ -28,6 +28,14 @@ export function EntityCard({ entity, headingLevel = 3 }: EntityCardProps) {
         UEI {entity.uei} · CAGE {entity.cage ?? '—'} · registration expires{' '}
         {day(entity.registrationExpiresAt)} · looked up {day(entity.fetchedAt)}
       </Text>
+      {entity.website === null ? null : (
+        <Text size="sm">
+          Website{' '}
+          <a href={entity.website} target="_blank" rel="noreferrer">
+            {entity.website}
+          </a>
+        </Text>
+      )}
       <Stack direction="row" gap={2} wrap align="center">
         <Text as="span" tone="secondary" size="sm">
           NAICS

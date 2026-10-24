@@ -38,6 +38,9 @@ export class GovconEntity {
   @Property({ type: 'boolean' })
   excluded!: boolean;
 
+  @Property({ type: 'text', nullable: true })
+  website!: string | null;
+
   @Property({ type: 'timestamptz' })
   fetchedAt!: Date;
 }

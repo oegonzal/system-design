@@ -6,11 +6,13 @@ import { currentFiscalPeriod, fiscalYearEnd, fiscalYearStart, isoDateOf } from '
  * the same instant, and so key the same snapshot. Two whole fiscal years
  * are offered, not one: for a quarter after a fiscal year ends, an agency
  * that publishes late has not finished it, and the year before is the
- * latest that reads whole.
+ * latest that reads whole. Both together read the year that just closed and
+ * the one under way as one window.
  */
 export const WINDOW_PRESETS = [
   { id: 'fytd', label: 'Fiscal year to date' },
   { id: 'prior-fy', label: 'Prior fiscal year' },
+  { id: 'this-and-prior-fy', label: 'This and prior fiscal year' },
   { id: 'fy-before-last', label: 'Fiscal year before last' },
   { id: 'last-12-months', label: 'Last 12 months' },
 ] as const;
@@ -30,6 +32,8 @@ export function windowOf(preset: WindowPreset, nowMs: number): DateWindow {
       return { from: fiscalYearStart(fiscalYear), to: today };
     case 'prior-fy':
       return { from: fiscalYearStart(fiscalYear - 1), to: fiscalYearEnd(fiscalYear - 1) };
+    case 'this-and-prior-fy':
+      return { from: fiscalYearStart(fiscalYear - 1), to: today };
     case 'fy-before-last':
       return { from: fiscalYearStart(fiscalYear - 2), to: fiscalYearEnd(fiscalYear - 2) };
     case 'last-12-months': {

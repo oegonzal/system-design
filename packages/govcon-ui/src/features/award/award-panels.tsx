@@ -8,6 +8,7 @@ import {
   money,
   type AwardBody,
   type AwardFamily,
+  type AwardSubcontractingPlan,
   type FirmRef,
   type NoticeRef,
 } from '@sysdesign/contracts';
@@ -149,13 +150,19 @@ export interface AwardFactsProps {
   award: AwardBody;
 }
 
+/** The plan as the latest action codes and words it; a record that codes none states none. */
+const planLabel = (plan: AwardSubcontractingPlan | null): string =>
+  plan === null
+    ? 'None stated'
+    : [plan.code, plan.description].filter((part) => part !== null).join(' ');
+
 /** One fact as a row: what it is, and what the record says. */
 const fact = (label: string, value: ReactNode): { label: string; value: ReactNode } => ({
   label,
   value,
 });
 
-/** How it was bought: the vehicle it sits under, how it was competed and priced, and what it is coded as. */
+/** How it was bought: the vehicle it sits under, how it was competed and priced, the subcontracting plan it carries, and what it is coded as. */
 export function AwardFacts({ award }: AwardFactsProps) {
   const Link = useLink();
   const { vehicle, competition } = award;
@@ -186,6 +193,7 @@ export function AwardFacts({ award }: AwardFactsProps) {
       competition.offers === null ? 'Not counted' : String(competition.offers),
     ),
     fact('Set-aside', competition.setAside ?? competition.setAsideCode ?? DASH),
+    fact('Subcontracting plan', planLabel(award.subcontractingPlan)),
     fact('Competition', competition.extentCompeted ?? DASH),
     fact('Procedure', competition.solicitationProcedures ?? DASH),
     fact('Pricing', competition.pricing ?? DASH),

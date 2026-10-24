@@ -3,7 +3,7 @@ import fixture from './fixtures/entities-response.json';
 import { httpOf, KEY } from './testing';
 
 describe('the SAM.gov entity registry', () => {
-  it('[GOV-18] asks for a batch of UEIs with the three sections and the key, and normalizes registration, claims and the exclusion flag', async () => {
+  it('[GOV-18] asks for a batch of UEIs with the three sections and the key, and normalizes registration, claims, the website and the exclusion flag', async () => {
     const { http, urls } = httpOf([{ body: fixture }]);
     const warnings: string[] = [];
     const { attempts, result } = await new SamGovEntities(http, SAM_GOV_ENTITIES_URL, (m) =>
@@ -34,6 +34,7 @@ describe('the SAM.gov entity registry', () => {
         ],
         psc: [],
         excluded: false,
+        website: 'https://www.example.com/rlm',
       },
     ]);
     expect(warnings).toEqual(['sam.gov entities: 1 record(s) did not normalize']);

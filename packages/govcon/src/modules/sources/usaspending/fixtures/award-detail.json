@@ -34,6 +34,8 @@
     "extent_competed": "A",
     "type_set_aside": null,
     "type_set_aside_description": null,
+    "subcontracting_plan": "F",
+    "subcontracting_plan_description": "INDIVIDUAL SUBCONTRACT PLAN",
     "product_or_service_code": "D310",
     "naics": "541511",
     "naics_description": "CUSTOM COMPUTER PROGRAMMING SERVICES",
