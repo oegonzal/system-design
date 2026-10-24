@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { errorMessage } from '@sysdesign/contracts';
 
 import { preflight } from './boot';
 import { replayCli } from './cli/replay';
@@ -31,7 +32,7 @@ async function bootstrap(): Promise<void> {
   try {
     checked = await preflight(argv, process.env);
   } catch (error) {
-    console.error(error instanceof Error ? error.message : String(error));
+    console.error(errorMessage(error));
     process.exit(1);
   }
 

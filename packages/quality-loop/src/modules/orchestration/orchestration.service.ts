@@ -11,13 +11,14 @@ import type {
   StartOrchestrationFromRunRequest,
   StartOrchestrationRequest,
 } from '@sysdesign/contracts';
-import { DEFAULT_QUALITY_RUN_ITERATIONS, openedAs, startPeriodic } from '@sysdesign/contracts';
+import { DEFAULT_QUALITY_RUN_ITERATIONS, openedAs } from '@sysdesign/contracts';
 
 import { validateOrchestrator } from '../../orchestrators/runner/definition';
 import { openRecord } from '../../orchestrators/runner/record';
 import { runOrchestration } from '../../orchestrators/runner/run-orchestration';
 import { orNotFound } from '../http/or-not-found';
-import { heartbeatEveryMs, type RunJanitorOptions } from '../janitor/stale-after';
+import { closeRow, startHeartbeat } from '../janitor/liveness';
+import type { RunJanitorOptions } from '../janitor/stale-after';
 import { RUN_JANITOR_OPTIONS } from '../janitor/tokens';
 import { RunsService } from '../runs/runs.service';
 import { isOrchestrationRunId } from './orchestration-request';
@@ -191,10 +192,11 @@ export class OrchestrationService {
     provided: QualityRunDto | null,
   ): Promise<void> {
     const label = `${binding.definition.id} run ${record.orchestrationRunId}`;
-    const ticker = startPeriodic(
-      { everyMs: heartbeatEveryMs(this.janitor.staleAfterMs), atStart: false },
+    const ticker = startHeartbeat(
+      this.janitor.staleAfterMs,
       () => this.repository.heartbeat(record.orchestrationRunId),
-      (error) => this.logger.warn(`${label}: heartbeat not written: ${String(error)}`),
+      label,
+      this.logger,
     );
     try {
       await runOrchestration(binding.definition, record, request, provided, {
@@ -208,18 +210,7 @@ export class OrchestrationService {
     } finally {
       // A beat in flight is let finish before the close is written.
       await ticker.stop();
-      try {
-        const outcome = await this.repository.close(record);
-        if (outcome === 'reclaimed') {
-          this.logger.warn(
-            `${label}: the janitor had failed this row as interrupted; overwrote it with the true outcome`,
-          );
-        } else if (outcome === 'refused') {
-          this.logger.error(`${label}: not persisted: the row is already terminal`);
-        }
-      } catch (error) {
-        this.logger.error(`${label}: not persisted: ${String(error)}`);
-      }
+      await closeRow(() => this.repository.close(record), label, this.logger);
       this.logger.log(`${label} ${record.status}`);
     }
   }

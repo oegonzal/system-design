@@ -32,7 +32,12 @@ import { MEMORY_RECALL_ID } from '../../pipelines/memory-recall/input';
 import { outputsOf } from '../../core/outputs';
 import { digestedChildren } from '../../orchestrators/memory/definition';
 import { memoriesToStore } from '../../orchestrators/memory/digest/read-digest';
-import type { MemoryHit, MemoryPorts, MemoryProbe } from '../../orchestrators/memory/ports';
+import {
+  goalHashOf,
+  type MemoryHit,
+  type MemoryPorts,
+  type MemoryProbe,
+} from '../../orchestrators/memory/ports';
 import { fuse } from '../../orchestrators/memory/recall/fusion';
 import { bareGoal } from '../../orchestrators/common';
 import { probeOf, probesOf, probeTexts, queryText } from '../../orchestrators/memory/recall/query';
@@ -45,7 +50,7 @@ import { ORCHESTRATION_RUN_REPOSITORY } from '../orchestration/tokens';
 import { RunsService } from '../runs/runs.service';
 import { recallEffectiveness, type RecallingRun } from './reports/effectiveness';
 import { asHit, formRetrievalReport } from './reports/form-report';
-import { goalHashOf, standingGaps, type AttributedRecall } from './reports/gaps';
+import { standingGaps, type AttributedRecall } from './reports/gaps';
 import { MEMORY_PORTS } from './tokens';
 import { DEFAULT_CHUNK_KIND } from '../../orchestrators/memory/store/chunks';
 

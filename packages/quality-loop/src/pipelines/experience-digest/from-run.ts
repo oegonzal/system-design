@@ -1,6 +1,6 @@
 /**
  * A finished run → an experience record: the engine's own reduction of the run
- * (`core/outputs/experience-record`) plus what this codec's stages read — the
+ * (`core/outputs/experience`) plus what this codec's stages read — the
  * rules that travel with it and how many memories it may propose — fitted to
  * the goal budget this codec's own render measures.
  */

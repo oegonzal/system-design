@@ -12,8 +12,7 @@ import { outputsOf } from '../../../core/outputs';
 import { skipped } from '../../common';
 import type { StepResult } from '../../runner/definition';
 import type { Digested } from '../digest/read-digest';
-import { contentHash, VECTOR_NAMES, type MemoryPorts, type VectorName } from '../ports';
-import { bareGoal } from '../../common';
+import { goalHashOf, VECTOR_NAMES, type MemoryPorts, type VectorName } from '../ports';
 import { chunkKind, chunksOf, type ChunkOrigin, type OwnedKinds } from './chunks';
 
 /** The calendar day of an ISO timestamp. */
@@ -68,7 +67,7 @@ export const originOf = (
           ? adoptedFrom
           : { runId: source.runId, iteration },
       adoptedFrom,
-      goalHash: contentHash(bareGoal(trace.contract.goal)),
+      goalHash: goalHashOf(trace.contract.goal),
     },
   };
 };

@@ -2,7 +2,7 @@
  * A finished run the specs of everything that reads one can share: a
  * two-iteration system-design run with one finding remediated and resolved,
  * one that persisted unremediated, and one criterion that improved. Both
- * digests reduce a run through `core/outputs/experience-record`, so the sample
+ * digests reduce a run through `core/outputs/experience`, so the sample
  * they reduce lives beside it rather than in either pipeline. Pure helpers only
  * — no vitest imports — so the file compiles under the app tsconfig.
  */

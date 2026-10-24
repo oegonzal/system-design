@@ -18,6 +18,7 @@ import type {
 import type { ChunkKind, ChunkSource } from '../../pipelines/memory-recall/input';
 
 export type { ChunkKind };
+import { bareGoal } from '../common';
 import type { CachedEmbeddings } from './embeddings';
 
 /**
@@ -51,6 +52,9 @@ export type VectorName = (typeof VECTOR_NAMES)[number];
 /** How a text is identified wherever it is stored or cached: sha256 hex of the text itself. */
 export const contentHash = (text: string): string =>
   createHash('sha256').update(text, 'utf8').digest('hex');
+
+/** The hash a goal is stored and grouped under: its content hash with any appended memory stripped. */
+export const goalHashOf = (goal: string): string => contentHash(bareGoal(goal));
 
 /**
  * A stored point, named the way the store addresses it: the run it was

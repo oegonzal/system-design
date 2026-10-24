@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
+import { errorMessage } from '@sysdesign/contracts';
 
 import { CLOCK, type Clock } from '../common/clock';
 import {
@@ -11,9 +12,6 @@ import {
 } from './cycle';
 import { MemoryDesignDriver } from './driver';
 import { CYCLE_STORE, EVENT_SINK, type CycleStore, type DesignEventSink } from './ports';
-
-const messageOf = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
 
 /** A brief's digest: cycles over the same brief share it, and the brief itself stays on the run. */
 const digestOf = (goal: string): string =>
@@ -79,7 +77,7 @@ export class DesignsService {
       const orchestrationRunId = await this.driver.learn(runId);
       this.announce(await this.patch(id, { status: 'stored', orchestrationRunId }));
     } catch (error) {
-      const note = messageOf(error);
+      const note = errorMessage(error);
       this.logger.warn(`cycle ${id} failed: ${note}`);
       await this.patch(id, { status: 'failed', note });
     }
@@ -98,7 +96,7 @@ export class DesignsService {
     void this.events
       .emit(cycle)
       .catch((error: unknown) =>
-        this.logger.warn(`cycle ${cycle.id}: event not published: ${messageOf(error)}`),
+        this.logger.warn(`cycle ${cycle.id}: event not published: ${errorMessage(error)}`),
       );
   }
 }

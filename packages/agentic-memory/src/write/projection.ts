@@ -5,7 +5,8 @@
  * meanwhile — and a semantic hit is only returned once Postgres confirms the
  * record is still current, so a point left behind is never served.
  */
-import { messageOf } from '../errors';
+import { errorMessage } from '@sysdesign/contracts';
+
 import type { MemoryPorts, MemoryRecord, PointPayload } from '../ports';
 
 export const pointOf = (record: MemoryRecord): PointPayload => ({
@@ -43,7 +44,7 @@ export async function project(
   try {
     await ports.index.upsert(points);
   } catch (error) {
-    ports.warn(`projection: the index refused ${points.length} point(s): ${messageOf(error)}`);
+    ports.warn(`projection: the index refused ${points.length} point(s): ${errorMessage(error)}`);
     return { projected: [], failed: 'index_failed' };
   }
   const ids = points.map((point) => point.id);
@@ -59,7 +60,7 @@ export async function unproject(ports: MemoryPorts, ids: readonly string[]): Pro
     await ports.records.markProjected(ids, null);
     return true;
   } catch (error) {
-    ports.warn(`projection: ${ids.length} point(s) not removed yet: ${messageOf(error)}`);
+    ports.warn(`projection: ${ids.length} point(s) not removed yet: ${errorMessage(error)}`);
     return false;
   }
 }

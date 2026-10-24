@@ -8,8 +8,8 @@
  * collection: a write does nothing and a search finds nothing.
  */
 import type { QdrantClient } from '@qdrant/js-client-rest';
+import { errorMessage } from '@sysdesign/contracts';
 
-import { messageOf } from '../../errors';
 import type { PointPayload, VectorIndex, VisibilityFilter } from '../../ports';
 import { collectionName, filterOf, payloadIndexes } from './collection';
 
@@ -99,7 +99,7 @@ export class QdrantVectorIndex implements VectorIndex {
         });
       } catch (error) {
         this.warn(
-          `vector index: payload index ${field} not ensured on ${collection}: ${messageOf(error)}`,
+          `vector index: payload index ${field} not ensured on ${collection}: ${errorMessage(error)}`,
         );
       }
     }

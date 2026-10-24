@@ -9,6 +9,7 @@ import {
   type RecoveryClock,
   type UnitAdvice,
   type UnitAdviceRequest,
+  errorMessage,
 } from '@sysdesign/contracts';
 import type { ZodType } from 'zod';
 
@@ -116,7 +117,7 @@ export class HttpUnitAdvisor implements UnitAdvisorPort {
         signal: AbortSignal.timeout(this.timeoutMs),
       });
     } catch (error) {
-      const detail = `${method} ${path}: ${error instanceof Error ? error.message : String(error)}`;
+      const detail = `${method} ${path}: ${errorMessage(error)}`;
       throw isTimeout(error)
         ? new AdvisorFaulted('timeout', `${method} ${path} took over ${this.timeoutMs} ms`)
         : new AdvisorFaulted('unreachable', detail);

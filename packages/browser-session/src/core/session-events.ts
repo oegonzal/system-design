@@ -1,4 +1,5 @@
 import {
+  createWriteQueue,
   SESSION_TOPICS,
   type BrowserSessionDetailDto,
   type SessionEvent,
@@ -7,7 +8,6 @@ import {
 
 import type { EngineContext } from './engine-context';
 import type { OpenTask } from './session-state';
-import { createWriteQueue } from './write-queue';
 
 /**
  * What the session tells whoever keeps a record of its units beyond it: it

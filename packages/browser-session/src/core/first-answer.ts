@@ -3,6 +3,7 @@ import {
   excerpt,
   WITHDRAWAL_NOTE_MAX_LENGTH,
   type InteractionAnswer,
+  errorMessage,
 } from '@sysdesign/contracts';
 
 import {
@@ -15,9 +16,6 @@ import {
 } from './ports';
 
 type Settled = { index: number; answer: InteractionAnswer } | { index: number; error: unknown };
-
-const messageOf = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
 
 /**
  * The operator asked on every channel at once — the terminal always, and each
@@ -96,7 +94,7 @@ export class FirstAnswer implements OperatorPort {
           throw settled.error;
         }
         if (settled.error instanceof QuestionWithdrawn) continue;
-        failures.push(`${channel.name}: ${messageOf(settled.error)}`);
+        failures.push(`${channel.name}: ${errorMessage(settled.error)}`);
         this.failed(channel, settled.error, waiting.size > 0);
       }
       if (withdrawn(signal)) throw new QuestionWithdrawn(this.name);
@@ -136,7 +134,7 @@ export class FirstAnswer implements OperatorPort {
     if (this.failing.has(channel.name)) return;
     this.failing.add(channel.name);
     this.terminal.notify(
-      `${channel.name} could not ask: ${messageOf(error)}${othersAsking ? ' — asking on the others' : ''}`,
+      `${channel.name} could not ask: ${errorMessage(error)}${othersAsking ? ' — asking on the others' : ''}`,
     );
   }
 

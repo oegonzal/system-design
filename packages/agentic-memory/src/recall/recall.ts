@@ -7,17 +7,17 @@
  * confirms its record is current, unexpired and visible — a stale point is
  * dropped and counted, never served — and a route that cannot run says why.
  */
-import type {
-  RecallResultDto,
-  RecallRoute,
-  RecallRouteDto,
-  recallRecordsRequestSchema,
-  RouteSkip,
+import {
+  errorMessage,
+  type RecallResultDto,
+  type RecallRoute,
+  type RecallRouteDto,
+  type recallRecordsRequestSchema,
+  type RouteSkip,
 } from '@sysdesign/contracts';
 import type { z } from 'zod';
 
 import { recordDto } from '../dto';
-import { messageOf } from '../errors';
 import { byText } from '../order';
 import type { MemoryRecord, RecordQuery } from '../ports';
 import { refuse } from '../refusal';
@@ -64,7 +64,7 @@ async function semanticRoute(
       filter: { ...base, registers: projected, scopeKeys: ctx.space.policy.scopeKeys },
     });
   } catch (error) {
-    ctx.ports.warn(`recall: the index refused a search: ${messageOf(error)}`);
+    ctx.ports.warn(`recall: the index refused a search: ${errorMessage(error)}`);
     return skipped('index_failed');
   }
   const current = await ctx.ports.records.find({

@@ -3,6 +3,7 @@ import type {
   BROWSER_SESSION_PIPELINES,
   SessionRailsDto,
   SuccessCriterion,
+  WriteQueue,
 } from '@sysdesign/contracts';
 import type { DumpBytes, DumpFile } from '@sysdesign/run-dump';
 
@@ -25,7 +26,6 @@ import type { StepFailureEvent } from './rails';
 import type { SessionEvents, SessionEventsPort } from './session-events';
 import type { SessionState } from './session-state';
 import type { ConfiguredAdvisor, ResolvedAdvisor } from './unit-advice';
-import type { WriteQueue } from './write-queue';
 
 /**
  * What the engine is given, what it was asked, and what its step and field

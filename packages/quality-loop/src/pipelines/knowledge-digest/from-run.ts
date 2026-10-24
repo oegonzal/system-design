@@ -1,6 +1,6 @@
 /**
  * A finished run → a knowledge record: the engine's own reduction of the run
- * (`core/outputs/experience-record`) plus what this digest reads and the
+ * (`core/outputs/experience`) plus what this digest reads and the
  * experience digest does not — what the store already knows, the source
  * pipeline's dimension map, the artifact's own place ids — fitted to the goal
  * budget this codec's render measures.

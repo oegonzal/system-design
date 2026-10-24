@@ -13,6 +13,7 @@ import {
   type WithheldRef,
   excerpt,
   quoted,
+  errorMessage,
 } from '@sysdesign/contracts';
 
 import type { EngineContext } from './engine-context';
@@ -139,7 +140,7 @@ export class SuggestionsPrefetch {
           };
         },
         (error: unknown) => {
-          const message = error instanceof Error ? error.message : String(error);
+          const message = errorMessage(error);
           this.current = {
             ...this.current,
             state: 'faulted',

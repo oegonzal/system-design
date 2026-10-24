@@ -58,7 +58,7 @@ const SCHEMA_FILES = [
   'packages/contracts/src/lib/agentic-system/strategy.ts',
   'packages/contracts/src/lib/agentic-system/memory.ts',
   'packages/quality-loop/src/core/stages/schemas.ts',
-  'packages/quality-loop/src/core/outputs/experience-record.ts',
+  'packages/quality-loop/src/core/outputs/experience/schema.ts',
   'packages/quality-loop/src/pipelines/experience-digest/output.ts',
   'packages/quality-loop/src/pipelines/document-digest/output.ts',
   'packages/quality-loop/src/pipelines/register-digest/output.ts',

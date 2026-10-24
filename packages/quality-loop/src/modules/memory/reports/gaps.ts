@@ -18,12 +18,11 @@
  * groups once, under the hash of its bare goal. Pure over records already
  * written; the service does the paging.
  */
-import { createHash } from 'node:crypto';
-
 import type { GapDto, GapGroupDto, QualityRunDto, StandingGapsDto } from '@sysdesign/contracts';
 
 import { memoryPackSchema } from '../../../pipelines/memory-recall/output';
 import { bareGoal } from '../../../orchestrators/common';
+import { goalHashOf } from '../../../orchestrators/memory/ports';
 
 /** A recall run with the brief it was run for, when that could be established. */
 export interface AttributedRecall {
@@ -31,10 +30,6 @@ export interface AttributedRecall {
   /** The goal of the run the recall served, taken bare; null when it cannot be resolved. */
   goal: string | null;
 }
-
-/** The hash a brief groups under: sha256 of the goal with any appended memory stripped. */
-export const goalHashOf = (goal: string): string =>
-  createHash('sha256').update(bareGoal(goal), 'utf8').digest('hex');
 
 /** The first line or so of a brief, for a reader of the group. */
 const headOf = (goal: string): string => {

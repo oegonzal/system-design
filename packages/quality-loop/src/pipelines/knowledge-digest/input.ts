@@ -1,6 +1,6 @@
 /**
  * The input codec. A knowledge record is the engine's own reduction of a
- * finished run (`core/outputs/experience-record`) plus four things this digest
+ * finished run (`core/outputs/experience`) plus four things this digest
  * needs and the experience digest does not:
  *
  * - **what is already known**, so an item can be written as a delta — a run

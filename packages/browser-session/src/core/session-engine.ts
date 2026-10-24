@@ -1,5 +1,6 @@
 import {
   BROWSER_SESSION_PIPELINES,
+  createWriteQueue,
   startPeriodic,
   type BrowserSessionStatus,
 } from '@sysdesign/contracts';
@@ -25,7 +26,7 @@ import { createSessionEvents, startedEvent } from './session-events';
 import { createState, pushHistory, touchedBy } from './session-state';
 import { step } from './step-flow';
 import { resolveAdvisors } from './unit-advice';
-import { createWriteQueue, SESSION_HEARTBEAT_EVERY_MS } from './write-queue';
+import { SESSION_HEARTBEAT_EVERY_MS } from './write-queue';
 
 /**
  * The session loop. It decides nothing of its own: every plan, every field

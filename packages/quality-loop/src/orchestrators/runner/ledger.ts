@@ -3,20 +3,29 @@
  * serial chain, so writes land in order and a failed flush is logged rather
  * than thrown: the record in memory is the truth, and `close()` writes it whole.
  */
-import type { OrchestrationRunDto, OrchestrationStepDto } from '@sysdesign/contracts';
+import {
+  createWriteQueue,
+  type OrchestrationRunDto,
+  type OrchestrationStepDto,
+  type WriteQueue,
+} from '@sysdesign/contracts';
 import { describeError } from '@sysdesign/run-dump';
 
 import type { StepResult } from './definition';
 
 export class StepLedger {
-  private writes: Promise<void> = Promise.resolve();
+  private readonly writes: WriteQueue;
 
   constructor(
     readonly record: OrchestrationRunDto,
     private readonly flush: (record: OrchestrationRunDto) => Promise<void>,
     private readonly now: () => string,
-    private readonly warn: (message: string) => void = () => undefined,
-  ) {}
+    warn: (message: string) => void = () => undefined,
+  ) {
+    this.writes = createWriteQueue((what, error) =>
+      warn(`${what} not flushed: ${describeError(error).message}`),
+    );
+  }
 
   begin(step: string): Promise<void> {
     return this.patch(step, { status: 'running', startedAt: this.now() });
@@ -46,20 +55,12 @@ export class StepLedger {
 
   /** Every flush so far, settled — the terminal write waits on it. */
   settled(): Promise<void> {
-    return this.writes;
+    return this.writes.drain();
   }
 
-  /** Apply one transition to the record in memory, then queue its flush. */
+  /** Apply one transition to the record in memory, then flush the whole record behind every earlier flush. */
   private patch(step: string, patch: Partial<OrchestrationStepDto>): Promise<void> {
     this.record.steps[step] = { ...this.record.steps[step], ...patch };
-    return this.flushLater();
-  }
-
-  /** The whole record, flushed behind every earlier flush; a failure is logged, never thrown. */
-  private flushLater(): Promise<void> {
-    this.writes = this.writes
-      .then(() => this.flush(this.record))
-      .catch((error: unknown) => this.warn(`step not flushed: ${describeError(error).message}`));
-    return this.writes;
+    return this.writes.write('step', () => this.flush(this.record));
   }
 }

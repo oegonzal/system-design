@@ -1,17 +1,18 @@
 import type { Logger } from '@nestjs/common';
 import {
-  startPeriodic,
+  createWriteQueue,
   type Periodic,
   type PipelineSummary,
   type RunRecallDto,
   type RunTrace,
+  type WriteQueue,
 } from '@sysdesign/contracts';
 import type { LlmExchange } from '@sysdesign/llm';
 import { describeError } from '@sysdesign/run-dump';
 
 import { summariseExchange, type RunProgress, type RunRecord } from '../../core/contracts';
 import type { RunRepository, TraceStore } from '../../core/ports';
-import { heartbeatEveryMs } from '../janitor/stale-after';
+import { closeRow, startHeartbeat } from '../janitor/liveness';
 import type { RunRecallRecorder } from './recall/run-recall';
 
 /** The ports a recorder writes through, and where it says what it could not write. */
@@ -37,7 +38,7 @@ export interface RecorderPorts {
  * what runs; this records that it did.
  */
 export class RunRecorder {
-  private writes: Promise<void> = Promise.resolve();
+  private readonly writes: WriteQueue;
   private readonly ticker: Periodic;
 
   constructor(
@@ -45,13 +46,17 @@ export class RunRecorder {
     private readonly ports: RecorderPorts,
     staleAfterMs: number,
   ) {
-    this.ticker = startPeriodic(
-      { everyMs: heartbeatEveryMs(staleAfterMs), atStart: false },
+    this.writes = createWriteQueue((what, error) =>
+      ports.logger.warn(`run ${record.runId}: ${what} not recorded: ${String(error)}`),
+    );
+    this.ticker = startHeartbeat(
+      staleAfterMs,
       () => {
         this.beat();
         return ports.repository.heartbeat(record.runId);
       },
-      (error) => ports.logger.warn(`run ${record.runId}: heartbeat not written: ${String(error)}`),
+      `run ${record.runId}`,
+      ports.logger,
     );
   }
 
@@ -96,19 +101,8 @@ export class RunRecorder {
     record.finishedAt = new Date().toISOString();
     record.heartbeatAt = record.finishedAt;
     ports.traces.save(record, summary);
-    await this.writes;
-    try {
-      const outcome = await ports.repository.close(record);
-      if (outcome === 'reclaimed') {
-        ports.logger.warn(
-          `run ${record.runId}: the janitor had failed this row as interrupted; overwrote it with the true outcome`,
-        );
-      } else if (outcome === 'refused') {
-        ports.logger.error(`run ${record.runId}: not persisted: the row is already terminal`);
-      }
-    } catch (error) {
-      ports.logger.error(`run ${record.runId}: not persisted: ${String(error)}`);
-    }
+    await this.writes.drain();
+    await closeRow(() => ports.repository.close(record), `run ${record.runId}`, ports.logger);
   }
 
   private beat(): void {
@@ -117,10 +111,6 @@ export class RunRecorder {
 
   private write(what: string, task: () => Promise<void>): void {
     this.beat();
-    this.writes = this.writes
-      .then(task)
-      .catch((error: unknown) =>
-        this.ports.logger.warn(`run ${this.record.runId}: ${what} not recorded: ${String(error)}`),
-      );
+    void this.writes.write(what, task);
   }
 }

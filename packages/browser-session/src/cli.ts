@@ -18,7 +18,7 @@ import { parseArgs } from 'node:util';
 
 import { EntityManager } from '@mikro-orm/postgresql';
 import { NestFactory } from '@nestjs/core';
-import type { SessionRailsDto } from '@sysdesign/contracts';
+import { errorMessage, type SessionRailsDto } from '@sysdesign/contracts';
 import { assertMigrated } from '@sysdesign/db';
 
 import {
@@ -101,9 +101,6 @@ export type CliService = Pick<
 const isCommand = (value: string | undefined): value is Command =>
   value !== undefined && Object.hasOwn(COMMANDS, value);
 
-const messageOf = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
-
 const required = (value: string | undefined, key: keyof typeof SESSION_FLAGS): string => {
   if (value === undefined || value.trim() === '') {
     throw new SessionConfigError(`${SESSION_FLAGS[key].name} is required`);
@@ -179,7 +176,7 @@ export function parseOptions(argv: readonly string[], defaults: SessionDefaults)
         };
     }
   } catch (error) {
-    return error instanceof Error ? error : new Error(messageOf(error));
+    return error instanceof Error ? error : new Error(errorMessage(error));
   }
 }
 
@@ -228,7 +225,7 @@ export async function execute(options: Options, service: CliService, io: Io): Pr
       }
     }
   } catch (error) {
-    io.error(messageOf(error));
+    io.error(errorMessage(error));
     // A session refused before it had a row is a configuration problem, like a bad flag.
     return error instanceof SessionRefused ? 2 : 1;
   }
@@ -239,7 +236,7 @@ export async function cli(argv: readonly string[]): Promise<number> {
   try {
     config = { ...sessionConfigFromEnv(), settings: readSessionSettings(PACKAGE_ROOT) };
   } catch (error) {
-    console.error(messageOf(error));
+    console.error(errorMessage(error));
     return 2;
   }
   const options = parseOptions(argv, config.settings.session);
@@ -258,7 +255,7 @@ export async function cli(argv: readonly string[]): Promise<number> {
       try {
         await assertMigrated(app.get(EntityManager));
       } catch (error) {
-        console.error(messageOf(error));
+        console.error(errorMessage(error));
         return 2;
       }
     }
