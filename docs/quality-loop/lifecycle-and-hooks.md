@@ -77,7 +77,7 @@ no `@nestjs` or `@mikro-orm` symbol appears there.
 The vocabulary, so the three words stop blurring: `RunProgress` is
 `RunTrace & { stopReason: null }` (`core/contracts/run-record.ts:17`), the
 standing while the run goes on; `RunTrace` is the settled trace with its stop
-reason; `RunRecord` (`run-record.ts:34`) is the host's record around it —
+reason; `RunRecord` (`run-record.ts:40`) is the host's record around it —
 the wire DTO plus the full exchanges and the git context — and it carries
 `heartbeatAt` (`:84, :99`), which the host mutates.
 
@@ -155,9 +155,9 @@ own throw at `run-pipeline.ts:80-82` is a backstop, not the path.
 | what a sweep writes                | `mikro-orm-run-repository.ts:176-184`; orchestration twin `mikro-orm-orchestration-run-repository.ts:102-121` | header only: `status: failed`, `error: Interrupted`; recorded iterations stand. The orchestration sweep skips a stale row whose child run is still beating (`:113`) and closes its steps as `interrupted` (`:120`).              |
 | reclaim                            | `mikro-orm-run-repository.ts:122`                                                                             | the owner's late `close()` overwrites a swept row with the truth (`reclaimed`); every live write is guarded by `status: 'running'`, so nothing else resurrects a swept row.                                                      |
 | `/health`                          | `modules/app/health.controller.ts:22-27`                                                                      | `{ status: 'ok', llm: { model }, heartbeat: { heartbeatEveryMs, staleAfterMs } }` from the janitor's own options (`stale-after.ts:57`). Status is unconditional; it probes neither Postgres nor Qdrant.                          |
-| `OnModuleInit` (memory)            | `modules/memory/memory.service.ts:89-90`; `memory-run-recall.ts:35-36`                                        | `store.verify()` ensures the collection and payload indexes (a not-ready store is a warning, never a failed boot); the recall binds itself into the runs module's slot.                                                          |
+| `OnModuleInit` (memory)            | `modules/memory/memory.service.ts:94-95`; `memory-run-recall.ts:35-36`                                        | `store.verify()` ensures the collection and payload indexes (a not-ready store is a warning, never a failed boot); the recall binds itself into the runs module's slot.                                                          |
 | boot order                         | `main.ts:24, 32, 47`; `boot.ts:39, 48-49`                                                                     | `uncaughtException` handler → `preflight` (validates the threshold, then the provider's own login check; `replay` skips both) before any Nest module → `enableShutdownHooks` → `listen`. A preflight failure prints and exits 1. |
-| shutdown                           | `main.ts:47`; `run-janitor.ts:48`                                                                             | `serve` only: SIGTERM/SIGINT → `onModuleDestroy` (janitor stops) → `onApplicationShutdown` (MikroORM closes). `main.js run` reaches the hooks only through `app.close()` in `finally` (`cli/run.ts:81`).                         |
+| shutdown                           | `main.ts:48`; `run-janitor.ts:48`                                                                             | `serve` only: SIGTERM/SIGINT → `onModuleDestroy` (janitor stops) → `onApplicationShutdown` (MikroORM closes). `main.js run` reaches the hooks only through `app.close()` in `finally` (`cli/run.ts:81`).                         |
 | the column                         | `packages/db/src/migrations/Migration20260929300001_run_heartbeat.ts:13-15`                                   | `heartbeat_at timestamptz not null` on `quality_run` and `orchestration_run`, back-filled from `updated_at`.                                                                                                                     |
 
 The scheduling primitive is one shared helper, `startPeriodic`
@@ -190,7 +190,7 @@ Things a reader should know, measured in the code rather than remembered:
   by hand (`runs-liveness.spec.ts`); only `startPeriodic` itself is unit-pinned.
 - `browser-session` mirrors the design with its own `LedgerPort`
   (`heartbeat`, `failStale`), its own constants (15 s beat, 60 s stale —
-  `packages/browser-session/src/core/write-queue.ts:12-13`, served over no
+  `packages/browser-session/src/core/write-queue.ts:10-11`, served over no
   route) and a sweep at the start of every session (`session-close.ts:26-28`)
   rather than a periodic janitor. Its ledger heartbeat has no status guard
   (`adapters/mikro-orm/mikro-orm-ledger.ts:121-123`).
@@ -213,7 +213,7 @@ reports. One generic runner walks the list and names no step.
 | the Nest host        | `modules/orchestration/orchestration.service.ts:38, 73-81, 182, 189-199, 205-212`                        | validates every definition at boot; `start` opens the row and detaches `perform`; `perform` runs a heartbeat ticker, hands the deps inline (`execute` → `RunsService.execute`, `flush` → `repository.update`), then closes with the same `closed / reclaimed / refused` outcomes. |
 | ports                | `modules/orchestration/ports.ts:11, 20-35`                                                               | `OrchestratorBinding` is the `{ definition, ports }` pair the module builds from the bundle each definition declares — not the runner's seam. `OrchestrationRunRepository` has `update`, `heartbeat`, `close`, `failStale`.                                                       |
 | routes               | `modules/orchestration/orchestration.controller.ts:26, 37, 48, 56`                                       | `POST /orchestrations/:orchestrator`, `POST …/from-run` (both `202`), `GET /orchestrations`, `GET /orchestrations/:id`; `openedBy` rides as data on every child request.                                                                                                          |
-| reading a child back | `core/outputs/run-outputs.ts:31, 61, 74`; `core/outputs/reconcile.ts:104`; `orchestrators/common.ts:113` | `outputsOf`, `admission` (with the pipeline's own `acceptAt` from the registry), `reconcile` (tallies, holds no threshold).                                                                                                                                                       |
+| reading a child back | `core/outputs/run-outputs.ts:31, 61, 74`; `core/outputs/reconcile.ts:104`; `orchestrators/common.ts:121` | `outputsOf`, `admission` (with the pipeline's own `acceptAt` from the registry), `reconcile` (tallies, holds no threshold).                                                                                                                                                       |
 
 There is **no step-level listener** analogous to `onIteration`. The only
 callback the runner accepts, `onOpened`, it consumes itself (`:128`).
@@ -221,7 +221,7 @@ Orchestration progress is published solely by persisting the record at each
 transition (`flush` → `OrchestrationRunRepository.update`,
 `mikro-orm-orchestration-run-repository.ts:39-41`, guarded by `running`) for
 clients to poll. Heartbeat for an orchestration row has three writers: the
-ticker (`orchestration.service.ts:189-191`), every ledger flush (`update`
+ticker (`orchestration.service.ts:195-200`), every ledger flush (`update`
 refreshes it), and the sweep's proof-of-life through a still-beating child
 (`:113`).
 
@@ -243,13 +243,13 @@ The eventful leg is `browser-session → notifications bus → job-application`:
 | the topics             | `packages/contracts/src/lib/units/session-events.ts:16-20` — `session.started`, `session.unit.opened`, `session.unit.closed`, `session.ended`; declared to the bus with their schemas at `packages/contracts/src/lib/notifications/topics.ts:30-33`                              |
 | the port and the queue | `packages/browser-session/src/core/session-events.ts:19` (`SessionEventsPort`), `:41` (`createSessionEvents`: its own write queue so a bus riding out a restart never holds a task row), `:55-56` (`drain(windowMs)`)                                                            |
 | the builders           | `session-events.ts:70, 83, 92, 106`                                                                                                                                                                                                                                              |
-| where they fire        | `core/session-engine.ts:110` (started, right after `openSession`), `core/step-executor.ts:130` (unit opened, at `taskStart`), `:175` (unit closed, at `taskDone`), `core/session-close.ts:57` (ended, first thing in the close)                                                  |
+| where they fire        | `core/session-engine.ts:111` (started, right after `openSession`), `core/step-executor.ts:130` (unit opened, at `taskStart`), `:175` (unit closed, at `taskDone`), `core/session-close.ts:57` (ended, first thing in the close)                                                  |
 | the drain              | `session-close.ts:78-81` — one window (`eventsDrainMs` = the bus recovery window), then what stayed unsent is warned and recorded in the dump manifest (`:102`)                                                                                                                  |
-| the adapter            | `adapters/notifications-http/bus-session-events.ts:8-12` — publishes each event with source `browser-session`; bound at `modules/session/session.module.ts:167`                                                                                                                  |
+| the adapter            | `adapters/notifications-http/bus-session-events.ts:8-12` — publishes each event with source `browser-session`; bound at `modules/session/session.module.ts:171`                                                                                                                  |
 | the bus                | `packages/notifications/src/bus/bus.ts:50` (publish: schema and publisher checked, appended in seq order, waiting pulls woken), `:74` (subscribe), `:93` (long-poll pull), `:120` (ack, forward only)                                                                            |
 | the subscriber         | `packages/job-application/src/intake/session-events.consumer.ts:45, 57, 68-96, 101-103, 111-118` — `SessionIntake` subscribes as `job-application.sessions` to every session topic, then loops pull → `apply` → ack; `config/intake/standard.json` (25 s wait, 20 events a pull) |
 | its lifecycle          | `intake/intake.module.ts:22` — `IntakeLifecycle implements OnApplicationBootstrap, OnModuleDestroy`                                                                                                                                                                              |
-| the repair path        | `core/session-events.ts:116` (`sessionEventsOf` rebuilds a session's events from its rows) → `pnpm browser-session replay-events <id>` (`src/cli.ts:215`)                                                                                                                        |
+| the repair path        | `core/session-events.ts:116` (`sessionEventsOf` rebuilds a session's events from its rows) → `pnpm browser-session replay-events <id>` (`src/cli.ts:212`)                                                                                                                        |
 
 Other publishers on the same bus, for the pattern: the agentic-system's
 `HttpBusEventSink` (`packages/agentic-system/src/designs/events/http-bus-event-sink.ts`,
@@ -296,22 +296,22 @@ mission (## Unit identity, ## Advisors)      environment (UNIT_ADVISOR_URLS)
    `UNIT_ADVISOR_URLS` entry (`packages/browser-session/src/modules/session/session.module.ts:94, 166`;
    the variable at `src/config.ts:82`, grammar `[<id>=]<url>` at `:142`).
    `resolveAdvisors` runs before any row exists
-   (`core/session-engine.ts:87` → `core/unit-advice.ts:193`): it reads the
+   (`core/session-engine.ts:88` → `core/unit-advice.ts:185`): it reads the
    mission's `## Unit identity` and `## Advisors` sections
    (`packages/contracts/src/lib/units/mission-identity.ts:31-32, 101, 105`),
    refuses a session with advisors but no declared subject (`:202`), calls
    `GET /advisor` to learn who each advisor is and which facets it keeps
-   (`:206`, `http-unit-advisor.ts:69`), refuses an advisor keyed by a facet
+   (`:206`, `http-unit-advisor.ts:65`), refuses an advisor keyed by a facet
    the mission does not declare (`:220`), and asks each once as step 0
    (`:228`).
 2. **Every step.** `decide()` calls `recallAdvice` before `planStep`
    (`core/step-flow.ts:114`). The request is
    `{ subject, asker: { kind: 'browser-session', id: sessionId, label }, facets }`
-   (`unit-advice.ts:137-144`); `HttpUnitAdvisor.recall` posts it to
-   `ADVISOR_ROUTES.advice` (`http-unit-advisor.ts:79`; routes declared at
+   (`unit-advice.ts:129-136`); `HttpUnitAdvisor.recall` posts it to
+   `ADVISOR_ROUTES.advice` (`http-unit-advisor.ts:75`; routes declared at
    `packages/contracts/src/lib/units/advice.ts:28`). An advisor that faults
    opens a streak: the goal is composed from its last good advice and it is
-   probed once a step until it answers (`unit-advice.ts:266-295`). The
+   probed once a step until it answers (`unit-advice.ts:258-287`). The
    merged answer is `UnitsOnRecord` (`:247`).
 3. **The advisor answers from its record.** `AdvisorController`
    (`packages/job-application/src/advisor/advisor.controller.ts:22, 27`)
@@ -413,7 +413,7 @@ advised"):
   the advisor's order.
 - An advisor that faults mid-session leaves the goal on its last good advice,
   so a unit opened by a concurrent session after that answer is not forbidden
-  until the advisor answers again (`unit-advice.ts:281-295`).
+  until the advisor answers again (`unit-advice.ts:273-287`).
 
 ---
 
@@ -422,37 +422,28 @@ advised"):
 Each of these names a file, symbol or count the code no longer matches.
 Listed for the owner; nothing here was edited.
 
-| Where                                                                    | Says                                                                                | Code                                                                                                                               |
-| ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `docs/quality-loop/reference.md:352-353`                                 | `modules/http/` holds `goalRequestSchema` with `MAX_GOAL_LENGTH`                    | no `MAX_GOAL_LENGTH` exists; `goal-request.ts:15` bounds by `GOAL_BUDGET_BYTES` from contracts                                     |
-| `docs/quality-loop/reference.md:434-435`                                 | runs tokens: `QUALITY_LOOP_LLM`, `PIPELINES_TOKEN`, `TRACE_STORE`, `RUN_REPOSITORY` | `tokens.ts:7-11` also has `RUN_DUMP_DIR`, `RUN_RECALL_SLOT`, `RUN_RECALL_RECORDER`                                                 |
-| `docs/quality-loop/reference.md:447-450`                                 | live writes are exchanges plus heartbeat; one close transaction                     | progress snapshots per iteration, the ticker, and the `closed / reclaimed / refused` outcomes are missing                          |
-| `docs/quality-loop/reference.md:464`                                     | the orchestration step record is "written whole at the end"                         | `StepLedger` flushes every transition (`ledger.ts:59-60`); `docs/pipelines/memory-runs.md:437-441` has it right                    |
-| `docs/pipeline-best-practices/quality-loop.md:115`                       | the `MemoryStore` port at `src/modules/memory/ports.ts`                             | that file does not exist; the interface is `orchestrators/memory/ports.ts:167`                                                     |
-| `docs/pipeline-best-practices/quality-loop.md:224`                       | per-iteration streaming while the loop runs is not built (ENG-6)                    | built: `recordProgress` (`core/ports.ts:248`), `RunRecorder.onIteration` (`run-recorder.ts:68`), pinned by `runs-liveness.spec.ts` |
-| `docs/pipelines/memory-runs.md:466`                                      | the `interrupted` reason is raised at boot                                          | also on every sweep interval (`run-janitor.ts:37-44`)                                                                              |
-| `packages/llm/src/exchange.ts:126`                                       | scope examples `llm.critic`, `prompt.enrich`                                        | the loop stamps `criteria`, `producer`, `<lensId>.s<N>`                                                                            |
-| `packages/quality-loop/src/orchestrators/panel/steps.ts:3`               | samples run "one after another"                                                     | `mapConcurrent` at `:60`, concurrency 2 at `:78`                                                                                   |
-| `packages/quality-loop/src/orchestrators/runner/run-orchestration.ts:42` | a throw in `chosen()` "fails the step as errored"                                   | the throw escapes `step.run` into `closeOnError`, which fails the whole record (pinned by `run-orchestration.spec.ts`)             |
+| Where                                    | Says                                                                                | Code                                                                                                         |
+| ---------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `docs/quality-loop/reference.md:352-353` | `modules/http/` holds `goalRequestSchema` with `MAX_GOAL_LENGTH`                    | no `MAX_GOAL_LENGTH` exists; `goal-request.ts:15` bounds by `GOAL_BUDGET_BYTES` from contracts               |
+| `docs/quality-loop/reference.md:434-435` | runs tokens: `QUALITY_LOOP_LLM`, `PIPELINES_TOKEN`, `TRACE_STORE`, `RUN_REPOSITORY` | `tokens.ts:7-11` also has `RUN_DUMP_DIR`, `RUN_RECALL_SLOT`, `RUN_RECALL_RECORDER`                           |
+| `docs/quality-loop/reference.md:447-450` | live writes are exchanges plus heartbeat; one close transaction                     | progress snapshots per iteration, the ticker, and the `closed / reclaimed / refused` outcomes are missing    |
+| `docs/quality-loop/reference.md:464`     | the orchestration step record is "written whole at the end"                         | `StepLedger` flushes every transition (`ledger.ts:64`); `docs/pipelines/memory-runs.md:437-441` has it right |
+| `docs/pipelines/memory-runs.md:466`      | the `interrupted` reason is raised at boot                                          | also on every sweep interval (`run-janitor.ts:37-44`)                                                        |
 
 ---
 
 ## 8. Two paths to one answer, and exports nothing else reaches
 
-Findings for TOP RULE 1, not fixes. `tooling/inert-code.spec.ts` passes today,
-so each "exported, used only in its own file" row is a judgement for the owner
-rather than a failing gate.
+Findings for TOP RULE 1 still open. The chained write queue, the heartbeat and
+close logging, the settled-trace predicate, the host binding's name and its
+untyped map were resolved on 2026-10-24; `tooling/inert-code.spec.ts` now also
+fails an export only specs reach in the quality loop.
 
-| Kind                                | Where                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | Note                                                                                                                                                                                |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| chained write queue ×3              | `modules/runs/run-recorder.ts:118-125`; `orchestrators/runner/ledger.ts:59-64`; `packages/browser-session/src/core/write-queue.ts:24`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | the same `.then(task).catch(warn)` chain, never awaited by the caller, implemented three times                                                                                      |
-| heartbeat ticker + close logging ×2 | `modules/runs/run-recorder.ts:48-55, 101-108`; `modules/orchestration/orchestration.service.ts:189-193, 205-213`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      | `startPeriodic({ everyMs: heartbeatEveryMs(stale), atStart: false }, …, 'heartbeat not written')` and the `reclaimed` / `refused` branches repeat across the two run hosts          |
-| admission sequence ×2               | `modules/runs/runs.service.ts:144-152` and `:172-185`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | `resolve → assertRubric → assertRecall → resolveAdoption → open` in both `start` and `executeFor`                                                                                   |
-| settled-trace predicate ×2          | `core/outputs/experience-record.ts:389`; `orchestrators/knowledge/steps.ts:80-82`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | `trace === null \|\| trace.stopReason === null \|\| trace.iterations.length === 0` hand-rolled beside the shared `isSettled`                                                        |
-| threshold read ×2                   | `boot.ts:48`; `modules/janitor/stale-after.ts:44`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | `runStaleAfterMs` in `preflight` only to fail early, then again in the janitor's factory; same function, same answer                                                                |
-| exported, single-file               | `IterationListener` (`run-pipeline.ts:65`), `Produced` (`core/ports.ts:79`), `bestOf` (`progress.ts:25`), `RecorderPorts` (`run-recorder.ts:18`), `PipelineChooser` (`runner/definition.ts:60`), `OrchestrationRunRow` (`orchestration/persistence/orchestration-run-mapper.ts:19`), `providedCriterionSchema` (`runs/run-request.ts:22`), `RunHeadline` (`dump/render-run-markdown.ts:19`), `CallOverrun` (`dump/overruns.ts:59`), `StoreNotReady` (`orchestrators/common.ts:77`), `RefusingGate` (`core/contracts/validation.ts:63`), `FixedCriterion` (`core/contracts/task.ts:33`), `transitionSchema` and `iterationSummarySchema` (`core/outputs/experience-record.ts:99, 106`) | each is referenced only within its declaring file                                                                                                                                   |
-| naming                              | `modules/orchestration/ports.ts:11` vs `orchestrators/runner/run-orchestration.ts:29`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 | `OrchestratorHost` is the `{ definition, ports }` binding; the runner's actual host seam is `OrchestrationDeps` — two names for two different things in one layer                   |
-| untyped binding                     | `modules/orchestration/orchestration.module.ts:55`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    | ports are bound per orchestrator id through a `Map<string, unknown>`; an orchestrator missing from that map boots with `ports` undefined and fails only when a step dereferences it |
+| Kind                  | Where                                                                                                                                                                 | Note                                                                                                                                                                                                            |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| admission sequence ×2 | `modules/runs/runs.service.ts:144-152` and `:172-185`                                                                                                                 | `resolve → assertRubric → assertRecall → resolveAdoption → open` in both `start` and `executeFor`                                                                                                               |
+| threshold read ×2     | `boot.ts:48`; `modules/janitor/stale-after.ts:44`                                                                                                                     | `runStaleAfterMs` in `preflight` only to fail early, then again in the janitor's factory; same function, same answer; kept: the preflight is the fail-early read of the same declared parser, not a second rule |
+| exported, single-file | the types `IterationListener`, `Produced`, `RecorderPorts`, `PipelineChooser`, `OrchestrationRunRow`, `RunHeadline`, `CallOverrun`, `StoreNotReady`, `FixedCriterion` | each names a type a public signature of its file uses; the values in this row were made file-local (2026-10-24)                                                                                                 |
 
 ---
 
