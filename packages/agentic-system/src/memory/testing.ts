@@ -20,7 +20,7 @@ import type { LoopClient } from '@sysdesign/loop-client';
 
 import type { Clock } from '../common/clock';
 import { DigestsService } from './digests/digests.service';
-import { InMemoryDigestLedger } from './digests/persistence/in-memory-digest-ledger';
+import { InMemoryDigestLedger } from './digests/persistence/in-memory-digest-ledger.testing';
 import { SpacesService } from './spaces.service';
 
 /** Where the specs' spaces say their policy came from. */

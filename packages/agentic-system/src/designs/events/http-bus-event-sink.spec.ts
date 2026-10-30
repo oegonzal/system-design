@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import {
   DESIGN_TOPICS,
   INTERACTION_TOPICS,
@@ -40,7 +42,7 @@ class FakeBus {
 describe('the design event sink', () => {
   it('[AGS-7] records each transition on its design topic and pushes a matching person-facing prompt', async () => {
     const bus = new FakeBus();
-    const sink = new HttpBusEventSink(bus as unknown as BusClient, clock);
+    const sink = new HttpBusEventSink(bus as unknown as BusClient, clock, randomUUID);
 
     await sink.emit(cycle({ status: 'running' }));
     await sink.emit(cycle({ status: 'coached', designRunId: 'run-1' }));
@@ -84,6 +86,6 @@ describe('the design event sink', () => {
     // A coached cycle with no run id yet, and any failed cycle, carry neither a record nor a ping.
     expect(eventOf(cycle({ status: 'coached' }))).toBeNull();
     expect(eventOf(cycle({ status: 'failed' }))).toBeNull();
-    expect(designPromptOf(cycle({ status: 'failed' }), clock())).toBeNull();
+    expect(designPromptOf(cycle({ status: 'failed' }), clock(), randomUUID())).toBeNull();
   });
 });

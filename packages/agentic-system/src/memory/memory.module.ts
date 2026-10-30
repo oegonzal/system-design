@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto';
-
 import {
   Logger,
   Module,
@@ -23,6 +21,7 @@ import { HttpLoopClient, LoopClient } from '@sysdesign/loop-client';
 import { qdrantClient } from '@sysdesign/qdrant-kit';
 
 import { CLOCK, type Clock } from '../common/clock';
+import { IDS, type Ids } from '../common/ids';
 import { DigestsController } from './digests/digests.controller';
 import { DigestsService } from './digests/digests.service';
 import { DIGEST_LEDGER, type DigestLedger } from './digests/ledger';
@@ -106,17 +105,17 @@ export class MemoryModule {
         },
         {
           provide: MemoryService,
-          useFactory: (em: EntityManager, index: VectorIndex, clock: Clock) =>
+          useFactory: (em: EntityManager, index: VectorIndex, clock: Clock, ids: Ids) =>
             new MemoryService({
               records: new MikroOrmRecordStore(em),
               spaces: new MikroOrmSpaceStore(em),
               index,
               embedder: options.embedder,
               clock,
-              ids: randomUUID,
+              ids,
               warn,
             }),
-          inject: [EntityManager, VECTOR_INDEX, CLOCK],
+          inject: [EntityManager, VECTOR_INDEX, CLOCK, IDS],
         },
         {
           provide: SpacesService,

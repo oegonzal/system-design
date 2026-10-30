@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto';
-
 import {
   AGENTIC_SYSTEM_SOURCE,
   DESIGN_TOPICS,
@@ -9,6 +7,7 @@ import {
 import type { BusClient } from '@sysdesign/notifications-client';
 
 import type { Clock } from '../../common/clock';
+import type { Ids } from '../../common/ids';
 import type { MemoryDesignCycle } from '../cycle';
 import type { DesignEventSink } from '../ports';
 
@@ -69,11 +68,15 @@ const promptLine = (cycle: MemoryDesignCycle): { title: string; detail: string }
  * channel renders it as progress, never a question. Null for a status with no
  * event (a failed cycle is read off its row, not pushed).
  */
-export const designPromptOf = (cycle: MemoryDesignCycle, now: Date): InteractionPrompt | null => {
+export const designPromptOf = (
+  cycle: MemoryDesignCycle,
+  now: Date,
+  promptId: string,
+): InteractionPrompt | null => {
   const line = promptLine(cycle);
   if (line === null) return null;
   return {
-    id: randomUUID(),
+    id: promptId,
     origin: { kind: 'design-cycle', id: cycle.id, label: `cycle ${cycle.id.slice(0, 8)}` },
     title: line.title,
     details: [line.detail],
@@ -94,6 +97,7 @@ export class HttpBusEventSink implements DesignEventSink {
   constructor(
     private readonly bus: BusClient,
     private readonly clock: Clock,
+    private readonly ids: Ids,
   ) {}
 
   async emit(cycle: MemoryDesignCycle): Promise<void> {
@@ -104,7 +108,7 @@ export class HttpBusEventSink implements DesignEventSink {
       source: AGENTIC_SYSTEM_SOURCE,
       payload: event.payload,
     });
-    const prompt = designPromptOf(cycle, this.clock());
+    const prompt = designPromptOf(cycle, this.clock(), this.ids());
     if (prompt !== null) {
       await this.bus.publish({
         topic: INTERACTION_TOPICS.prompted,

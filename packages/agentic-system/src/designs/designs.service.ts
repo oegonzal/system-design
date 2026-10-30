@@ -1,9 +1,10 @@
-import { createHash, randomUUID } from 'node:crypto';
+import { createHash } from 'node:crypto';
 
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { errorMessage } from '@sysdesign/contracts';
 
 import { CLOCK, type Clock } from '../common/clock';
+import { IDS, type Ids } from '../common/ids';
 import {
   cycleDto,
   type CyclePatch,
@@ -35,13 +36,14 @@ export class DesignsService {
     private readonly driver: MemoryDesignDriver,
     @Inject(EVENT_SINK) private readonly events: DesignEventSink,
     @Inject(CLOCK) private readonly clock: Clock,
+    @Inject(IDS) private readonly ids: Ids,
   ) {}
 
   /** Record a running cycle for a brief; the row is returned at once, before any work runs. */
   async start(goal: string): Promise<MemoryDesignCycleDto> {
     const now = this.clock();
     const cycle: MemoryDesignCycle = {
-      id: randomUUID(),
+      id: this.ids(),
       goalDigest: digestOf(goal),
       status: 'running',
       designRunId: null,

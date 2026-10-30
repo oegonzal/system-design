@@ -1,6 +1,8 @@
+import { randomUUID } from 'node:crypto';
+
 import { DesignsService } from './designs.service';
 import { MemoryDesignDriver } from './driver';
-import { InMemoryCycleStore } from './persistence/in-memory-cycle-store';
+import { InMemoryCycleStore } from './persistence/in-memory-cycle-store.testing';
 import { FakeEventSink, FakeLoopClient } from './testing';
 import type { DesignSettings } from './settings';
 
@@ -24,6 +26,7 @@ describe('the design cycle', () => {
       new MemoryDesignDriver(loop, settings),
       events,
       clock,
+      randomUUID,
     );
 
     const started = await service.start(goal);
@@ -58,6 +61,7 @@ describe('the design cycle', () => {
       new MemoryDesignDriver(loop, { ...settings, maxIterations: 1 }),
       new FakeEventSink(),
       clock,
+      randomUUID,
     );
     const started = await service.start(goal);
     await service.execute(started.id, goal);
@@ -73,6 +77,7 @@ describe('the design cycle', () => {
       new MemoryDesignDriver(loop, settings),
       events,
       clock,
+      randomUUID,
     );
     const started = await service.start(goal);
     await service.execute(started.id, goal);

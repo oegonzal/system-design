@@ -1,4 +1,4 @@
-import { InMemoryCycleStore } from './in-memory-cycle-store';
+import { InMemoryCycleStore } from './in-memory-cycle-store.testing';
 import type { MemoryDesignCycle } from '../cycle';
 
 const cycle = (over: Partial<MemoryDesignCycle> = {}): MemoryDesignCycle => ({

@@ -5,6 +5,7 @@ import { HttpLoopClient, LoopClient } from '@sysdesign/loop-client';
 import { HttpBusClient } from '@sysdesign/notifications-client';
 
 import { CLOCK, type Clock } from '../common/clock';
+import { IDS, type Ids } from '../common/ids';
 
 import { DesignsController } from './designs.controller';
 import { DesignsService } from './designs.service';
@@ -38,9 +39,9 @@ export class DesignsModule {
         { provide: LoopClient, useFactory: () => new HttpLoopClient(options.loopUrl) },
         {
           provide: EVENT_SINK,
-          useFactory: (clock: Clock) =>
-            new HttpBusEventSink(new HttpBusClient(options.notificationsUrl), clock),
-          inject: [CLOCK],
+          useFactory: (clock: Clock, ids: Ids) =>
+            new HttpBusEventSink(new HttpBusClient(options.notificationsUrl), clock, ids),
+          inject: [CLOCK, IDS],
         },
         {
           provide: MemoryDesignDriver,

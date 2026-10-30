@@ -20,5 +20,4 @@ export {
   type MemoryDesignCycleDto,
   type MemoryDesignCycleStatus,
 } from './cycle';
-export { InMemoryCycleStore } from './persistence/in-memory-cycle-store';
 export { designSettingsSchema, type DesignSettings } from './settings';

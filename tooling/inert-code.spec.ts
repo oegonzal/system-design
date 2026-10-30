@@ -109,9 +109,23 @@ const DISCOVERED: readonly { readonly path: string; readonly by: string }[] = [
  */
 const SPEC_REACH_GUARDED: readonly string[] = [
   'packages/agentic-memory',
+  'packages/agentic-system',
   'packages/browser-session',
   'packages/qdrant-kit',
   'packages/quality-loop',
+];
+
+/**
+ * Code in a guarded package that only specs reach today and that the owner has
+ * decided to keep, each with that decision — so the exemption is a declared
+ * fact anyone can check, never a gap in the gate. An entry must still name a
+ * folder inside a guarded package.
+ */
+const SPEC_REACH_KEPT: readonly { readonly path: string; readonly why: string }[] = [
+  {
+    path: 'packages/agentic-system/src/catalog',
+    why: "the owner's 2026-10-23 decision to leave the component catalog in place as it is",
+  },
 ];
 
 /**
@@ -302,6 +316,14 @@ describe('inert code', () => {
       expect(statSync(join(REPO, path)).isDirectory(), `${path} is gone`).toBe(true);
       expect(by, `${path} must say what reaches it without importing it`).not.toBe('');
     }
+    for (const { path, why } of SPEC_REACH_KEPT) {
+      expect(statSync(join(REPO, path)).isDirectory(), `${path} is gone`).toBe(true);
+      expect(
+        SPEC_REACH_GUARDED.some((root) => path.startsWith(`${root}/`)),
+        `${path} is kept from a rule its package is not held to`,
+      ).toBe(true);
+      expect(why, `${path} must say who decided to keep it, and when`).not.toBe('');
+    }
   });
 
   it('the rules match what they are meant to', () => {
@@ -402,8 +424,11 @@ describe('inert code', () => {
       if (support.has(path)) continue;
       for (const [name, n] of own) running.set(name, (running.get(name) ?? 0) + n);
     }
+    const within = (roots: readonly string[], path: string): boolean =>
+      roots.some((root) => path.startsWith(join(REPO, root) + sep));
+    const kept = SPEC_REACH_KEPT.map((entry) => entry.path);
     const guarded = (path: string): boolean =>
-      SPEC_REACH_GUARDED.some((root) => path.startsWith(join(REPO, root) + sep));
+      within(SPEC_REACH_GUARDED, path) && !within(kept, path);
     const specOnly: string[] = [];
     for (const path of modules) {
       if (!guarded(path) || support.has(path)) continue;

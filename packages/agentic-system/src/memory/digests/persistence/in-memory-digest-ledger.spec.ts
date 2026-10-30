@@ -1,5 +1,5 @@
 import { digestLedgerContract } from './digest-ledger-contract';
-import { InMemoryDigestLedger } from './in-memory-digest-ledger';
+import { InMemoryDigestLedger } from './in-memory-digest-ledger.testing';
 
 digestLedgerContract('in memory', () =>
   Promise.resolve({
