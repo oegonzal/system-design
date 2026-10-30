@@ -15,6 +15,7 @@ import {
   SPEC_SUBJECT,
 } from './testing-session';
 import { sessionEventsOf } from './session-events';
+import { FixedClock } from './testing-clock';
 
 const JOURNEY = [PLANS.search, PLANS.results, PLANS.form, PLANS.done, PLANS.end].map((plan) =>
   decidedPlan(plan),
@@ -71,13 +72,25 @@ describe('what a session says happened', () => {
   it('[BRW-15] waits one window for the last events, then records what stayed unsent rather than waiting for good', async () => {
     const events = new RecordingEvents();
     events.held = new Promise<void>(() => undefined);
-    const started = Date.now();
+    // The window is the session's clock's: time passes on it while the close waits.
+    const clock = new FixedClock();
+    const arm = clock.at.bind(clock);
+    const fired: Date[] = [];
+    clock.at = (when, then) =>
+      arm(when, () => {
+        fired.push(when);
+        then();
+      });
+    const ticking = setInterval(() => clock.advance(SPEC_EVENTS_DRAIN_MS / 5), 1);
     const { outcome, dumps, warnings } = await run({
       script: { plans: [decidedPlan(PLANS.end)] },
       events,
-    });
+      clock,
+    }).finally(() => clearInterval(ticking));
     expect(outcome.status).toBe('complete');
-    expect(Date.now() - started).toBeGreaterThanOrEqual(SPEC_EVENTS_DRAIN_MS - 5);
+    // The close waited out its window — the one timer that fired — and left none armed.
+    expect(fired).toHaveLength(1);
+    expect(clock.pendingTimers).toBe(0);
     expect(JSON.parse(dumps.text('manifest.json')).unsentEvents).toEqual([
       'event 1 session.started',
       'event 2 session.ended',

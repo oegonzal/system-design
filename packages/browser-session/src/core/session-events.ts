@@ -7,6 +7,7 @@ import {
 } from '@sysdesign/contracts';
 
 import type { EngineContext } from './engine-context';
+import type { Clock } from './ports';
 import type { OpenTask } from './session-state';
 
 /**
@@ -26,13 +27,6 @@ export interface SessionEvents {
   drain(windowMs: number): Promise<string[]>;
 }
 
-/** A wait that never holds the process open. */
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => {
-    const timer = setTimeout(resolve, ms);
-    (timer as unknown as { unref?: () => void }).unref?.();
-  });
-
 const describe = (event: SessionEvent, ordinal: number): string => {
   const unit = 'unit' in event.payload ? ` (unit ${event.payload.unit.ordinal})` : '';
   return `event ${ordinal} ${event.topic}${unit}`;
@@ -41,6 +35,7 @@ const describe = (event: SessionEvent, ordinal: number): string => {
 export function createSessionEvents(
   port: SessionEventsPort,
   report: (what: string, error: unknown) => void,
+  clock: Clock,
 ): SessionEvents {
   const queue = createWriteQueue(report);
   const inFlight = new Set<string>();
@@ -53,7 +48,14 @@ export function createSessionEvents(
       queue.write(what, () => port.publish(event).finally(() => inFlight.delete(what)));
     },
     async drain(windowMs) {
-      await Promise.race([queue.drain(), sleep(windowMs)]);
+      // The window is kept by the session's clock, and cancelled once the
+      // queue drains first, so no timer outlives the close.
+      let cancel = (): void => undefined;
+      const windowEnds = new Promise<void>((resolve) => {
+        cancel = clock.at(new Date(clock.now().getTime() + windowMs), resolve);
+      });
+      await Promise.race([queue.drain(), windowEnds]);
+      cancel();
       return [...inFlight];
     },
   };

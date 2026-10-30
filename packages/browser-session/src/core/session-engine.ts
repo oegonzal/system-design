@@ -108,8 +108,10 @@ export async function runSession(
   });
   const warn = warnOf(deps, state.sessionId);
   const queue = createWriteQueue((what, error) => warn(`${what} not recorded`, error));
-  const events = createSessionEvents(deps.events, (what, error) =>
-    warn(`${what} not published`, error),
+  const events = createSessionEvents(
+    deps.events,
+    (what, error) => warn(`${what} not published`, error),
+    deps.clock,
   );
   events.publish(startedEvent({ state, options }));
   // Ctrl-C is the operator's word: the session ends after the step in flight,
