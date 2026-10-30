@@ -6,7 +6,7 @@ A Playwright program whose every decision is a quality-loop run. It opens Chrome
 pnpm browser-session login --profile smoke --url https://duckduckgo.com         # sign in once; the profile keeps the cookies
 pnpm browser-session run --goal packages/browser-session/goals/smoke-search.md --profile smoke --max-tasks 1 --max-minutes 5
 pnpm browser-session run --goal packages/browser-session/goals/linkedin-easy-apply.md --profile linkedin --max-tasks 2 --max-minutes 45
-pnpm browser-session run --goal <mission.md> --profile <name> --document resume=<path-to-résumé.pdf> --max-tasks 4 --max-minutes 90   # a file for each document the mission declares under Documents, by name; the planner uploads it into a file control, hidden or shown
+pnpm browser-session run --goal packages/browser-session/goals/builtin-apply.md --profile builtin --document resume=<path-to-résumé.pdf> --max-tasks 4 --max-minutes 90   # listing → job tab → employer's form tab; a unit's tabs close with it; --document supplies the file for each document the mission declares under Documents, by name
 pnpm browser-session sessions [--limit 20] [--json]
 pnpm browser-session show <id> [--json]
 pnpm browser-session replay-events <id>    # a recorded session's events again, for a record that missed them

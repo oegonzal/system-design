@@ -76,6 +76,11 @@ pnpm browser-session login --profile linkedin --url https://www.linkedin.com/log
 pnpm browser-session run --goal packages/browser-session/goals/linkedin-easy-apply.md \
   --profile linkedin --headed --subject "Your Name" \
   --url https://www.linkedin.com/jobs/search-results/ --max-tasks 2 --max-minutes 45
+# or the Built In flow, on a profile of its own, with the one document its mission declares:
+pnpm browser-session run --goal packages/browser-session/goals/builtin-apply.md \
+  --profile builtin --headed --subject "Your Name" \
+  --url "https://builtin.com/jobs/remote/hybrid?search=Software+Engineering&city=Los+Angeles&state=California&country=USA&allLocations=true" \
+  --document resume=<path-to-résumé.pdf> --max-tasks 2 --max-minutes 45
 ```
 
 `--url` opens the browser where the work begins, so no plan is ever made on
@@ -170,3 +175,28 @@ landmark or the page laid out none. The statement is the landmark's, not the
 unit's alone: on the shipped layout it names the other listed items before the
 opened one, the goal's title over it says so and counts the nodes shown, and
 the lenses read what it says of another item as no statement about this one.
+
+## 7. Tabs and documents
+
+A mission whose listing opens each item on a page of its own, and the item's
+apply control a third page on another site, runs on the same engine: the
+session follows the newest tab, and a unit's pages close with it. Then:
+
+```bash
+jq -r '.url' static/sessions/<id>/01-steps/NN/observation.json                   # the step after a card click reads the job page — never about:blank, never the listing still
+jq -r '.history[-1]' static/runs/<step run id>/...                                 # or read `## Recent actions` of the next step's goal: "closed 2 page(s) the unit opened — ok — the page in front is <url>"
+grep -n 'closed .* page(s) the unit opened' static/runs/<run id>/01-goal.md       # the next goal after a taskDone says how many pages closed and which page is in front
+jq -r '.plan.actions[] | select(.kind == "upload") | "\(.ref) \(.document)"' static/sessions/<id>/01-steps/NN/plan.json   # an upload names a document, never a path
+jq -r '.elements[] | select(.kind == "uploadable") | "\(.ref) \(.name) visible=\(.visible) value=\(.value)"' static/sessions/<id>/01-steps/NN/observation.json   # every file control, a hidden one under f1, f2…
+```
+
+What to read: after a `taskDone` the next `observation.json` is the listing at
+the same `page=N`, and the goal's recent actions carry the close; on a form
+step the file controls are listed whether or not the page shows them, the
+upload lands as a value on the control in the next observation and as an
+image in `captures.json`, and a plan that named a document the mission does
+not declare, or a control that is no file control, carries the cut in
+`plan.json`'s objections. `--document <name>=<path>` supplies the file for
+each row of the mission's `## Documents`; the session refuses, before any row,
+a declared document with no file, a file that is not there, or a file no
+section declares.

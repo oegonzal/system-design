@@ -41,6 +41,8 @@ const ENGINE = [
  */
 const FORBIDDEN = [
   'linkedin',
+  // The one-word site name: its two-word form would match "built inline" in an orchestrator's prose.
+  'builtin',
   'duckduckgo',
   'easy apply',
   'applicant',

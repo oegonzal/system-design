@@ -317,12 +317,14 @@ settings' `untaught` names (the shipped file names the terminal, so an
 automated operator typing there teaches nothing) is taught back as a
 `guidance` document naming the unit of work it was given in by that identity
 and the channel it came on. The
-LinkedIn Easy Apply flow is `packages/browser-session/goals/linkedin-easy-apply.md`;
+LinkedIn Easy Apply flow is `packages/browser-session/goals/linkedin-easy-apply.md`
+and the Built In flow is `packages/browser-session/goals/builtin-apply.md`;
 the same program runs any goal.
 
 Prerequisites: Postgres and the loop (`pnpm stack:db && pnpm db:migrate`,
 then `pnpm quality-loop:serve` or the stack), Google Chrome installed, and a
-signed-in profile:
+signed-in profile (one per site: a new session on a profile abandons that
+profile's open units, so two sites running at once keep their own):
 
 ```bash
 pnpm browser-session login --profile linkedin --url https://www.linkedin.com/login
@@ -333,6 +335,30 @@ pnpm browser-session run --goal packages/browser-session/goals/linkedin-easy-app
 pnpm browser-session sessions            # what ran, how it ended
 pnpm browser-session show <sessionId>    # units of work and every decision, by loop run id
 ```
+
+The Built In flow runs the same way on a profile of its own, with one more
+flag. A job opens in a tab of its own and an employer's form in a third; the
+session follows the newest tab and closes a unit's tabs at its `taskDone`, so
+the list is in front again. The mission declares one document under
+`## Documents`, the résumé, and `--document resume=<path>` is the one file the
+planner may upload — into a file control the page shows or hides. Sign the
+profile in by hand, and upload the résumé to the Built In profile too: its own
+Easy Apply applies with it.
+
+```bash
+pnpm browser-session login --profile builtin --url https://builtin.com/
+# Chrome opens on static/browser-profiles/builtin; sign in by hand, put your résumé on the Built In
+# profile, then press Enter in the terminal.
+export UNIT_ADVISOR_URLS=job-application=http://localhost:3006   # the record is shared with the LinkedIn profile: one subject, one company key
+caffeinate -i -s pnpm browser-session run --goal packages/browser-session/goals/builtin-apply.md \
+  --profile builtin --headed --subject "Your Name" \
+  --url "https://builtin.com/jobs/remote/hybrid?search=Software+Engineering&city=Los+Angeles&state=California&country=USA&allLocations=true" \
+  --document resume=<path-to-résumé.pdf> \
+  --target-done 3 --max-tasks 6 --max-minutes 120
+```
+
+A unit set aside at once (no apply control, the listing closed, an account wall
+on the employer's site) spends no `--max-tasks`; one that failed does.
 
 When a field needs you, the field is outlined in Chrome and the question —
 its options lettered, the loop's suggested value marked with why it was not
@@ -528,7 +554,11 @@ earlier session: nothing carried between sessions said which. Now
 `packages/job-application` keeps that record and the session asks it before
 every plan, and the mission says what to do with the answer. Three things make
 it work, and the session refuses to start — exit 2, before any row — when the
-first two are missing:
+first two are missing. The record is keyed by the subject and the company's
+exact lower-cased name alone, never by the site, so the LinkedIn and the
+Built In profiles share it: a company applied to on one is avoided on the
+other for the window, and since 2026-10-29 a unit that failed or was set
+aside is avoided too.
 
 1. **The service and the bus.** `pnpm notifications:serve` and
    `pnpm job-application:serve` (or `tilt up`); `pnpm db:migrate` once for the
