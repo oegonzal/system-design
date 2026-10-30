@@ -9,8 +9,8 @@ import {
   truncateTestTables,
 } from '@sysdesign/db';
 
-import type { Closing, StoredSpace } from '../../ports';
-import { recordFixture, strategyFixture, TEST_POLICY } from '../../testing/fixtures';
+import type { Closing } from '../../ports';
+import { recordFixture, spaceFixture } from '../../testing/fixtures';
 import { recordStoreContract } from '../../testing/record-store-contract';
 import { MikroOrmRecordStore } from './mikro-orm-record-store';
 import { MikroOrmSpaceStore } from './mikro-orm-space-store';
@@ -29,21 +29,11 @@ afterAll(async () => {
   await orm.close();
 });
 
-/** A space as its creation stores one: the strategy and the policy, as snapshots. */
-const storedSpace = (spaceId: string): StoredSpace => ({
-  id: spaceId,
-  designRunId: 'run-under-test',
-  strategy: strategyFixture(),
-  policy: TEST_POLICY,
-  policySource: 'spec',
-  createdAt: T0,
-});
-
 /** Empty tables and one space in them: every record names its space by a foreign key. */
 async function storeOverOneSpace(): Promise<{ store: MikroOrmRecordStore; spaceId: string }> {
   await truncateTestTables(orm.em.fork(), [MemoryRecordRow, MemorySpaceRow]);
   const spaceId = randomUUID();
-  await new MikroOrmSpaceStore(orm.em).insert(storedSpace(spaceId));
+  await new MikroOrmSpaceStore(orm.em).insert(spaceFixture({ id: spaceId }));
   return { store: new MikroOrmRecordStore(orm.em), spaceId };
 }
 
@@ -103,14 +93,5 @@ describe('the Postgres record store under concurrent writes', () => {
     expect(versions.map((row) => row.status)).toEqual(
       written === 'committed' ? ['superseded', 'active'] : ['invalidated'],
     );
-  });
-});
-
-describe('the Postgres space store', () => {
-  it('[AGM-10] keeps the strategy and the policy a space was created under, as written', async () => {
-    const { spaceId } = await storeOverOneSpace();
-    const spaces = new MikroOrmSpaceStore(orm.em);
-    expect(await spaces.get(spaceId)).toEqual(storedSpace(spaceId));
-    expect(await spaces.get(randomUUID())).toBeNull();
   });
 });

@@ -9,26 +9,21 @@ import {
   OBJECTIONS_MAX,
   SPENDING_TASK_OUTCOMES,
   TASK_OUTCOMES,
-  type DocumentChunk,
   type LastStep,
-  type PageObservation,
-  type RanAction,
   type SessionRailsDto,
-  type StepAction,
   type StepHistoryEntry,
   type Objection,
-  type StepPlan,
+  type OperatorGuidanceDto,
   type TaskLedgerSummary,
   type TaskOutcome,
   type UnitFacet,
   excerpt,
-  quoted,
-  ranActionOf,
   unitKeyOf,
 } from '@sysdesign/contracts';
 
 import type { PendingExpectation } from './expectations';
 import type { UnitContext } from './open-unit';
+import type { TeachReceipt } from './ports';
 import { remainingTasks, type RailState } from './rails';
 import type { CaptureRecord } from './session-dump';
 
@@ -36,7 +31,8 @@ import type { CaptureRecord } from './session-dump';
  * What the engine carries between steps: counts the rails read, the recent
  * past the next goal is told, the unit of work that is open, the operator's
  * answers so far. All of it is plain data a spec can inspect; none of it is
- * a judgement.
+ * a judgement. How a step's actions are worded for that past lives beside
+ * it, in `action-words.ts`.
  */
 export interface OpenTask {
   id: string;
@@ -51,11 +47,20 @@ export interface OpenTask {
 /** A record kept per unit of work (`unitKeyOf`; null outside any), then by what each field asks (`fieldQuestionOf`). */
 type ByUnit = Map<string | null, Map<string, string>>;
 
-/** One operator answer handed to the memory, as the step's dump records it. */
+/**
+ * One operator answer handed to the memory, as the step's dump records it:
+ * the row it came from, the answer, whom it was taught as — at the top, where
+ * `teach-again` reads it from a dump of any age — and what the memory did
+ * with it: the reference it left, the outcome in its own words, and the fault
+ * that stood in the way; a brain that answered nothing leaves the fault as
+ * the one record of the attempt, with no outcome.
+ */
 export interface Teaching {
   decisionId: string;
-  document: DocumentChunk;
-  orchestrationRunId: string | null;
+  answer: OperatorGuidanceDto;
+  subject: string;
+  ref: string | null;
+  outcome: TeachReceipt['outcome'] | null;
   fault: string | null;
 }
 
@@ -322,77 +327,4 @@ export function pushHistory(
   });
   if (state.history.length > HISTORY_MAX)
     state.history.splice(0, state.history.length - HISTORY_MAX);
-}
-
-/** The last step of a plan that ran nothing: refused whole, faulted, or never answered. */
-export const NOTHING_RAN: LastStep = { ran: 0, touched: [], held: [] };
-
-/** The page actions among those that ran, as the page would recognise them again: a wait, a scroll or a unit event has no such identity. */
-export const touchedBy = (
-  actions: readonly StepAction[],
-  elements: PageObservation['elements'],
-): RanAction[] =>
-  actions.flatMap((action) => {
-    const ran = ranActionOf(action, elements);
-    return ran === null ? [] : [ran];
-  });
-
-/**
- * An element as the next goal names it: by role and name. A ref is minted per
- * observation and names nothing on the next, so a history that carried refs
- * offered the planner tokens it could not cite. Measured 2026-10-08: a plan
- * cited `e114`, a ref from four observations before, and was refused.
- */
-const named = (ref: string, observation: PageObservation): string => {
-  const element = observation.elements.find((candidate) => candidate.ref === ref);
-  return element === undefined
-    ? 'an element no longer listed'
-    : `${element.role} ${quoted(element.name)}`;
-};
-
-/**
- * A plan that did not run, as one line: how many actions and of what kinds.
- * Never the actions' own words — a refused `terminate limit-reached` rendered
- * whole reads, a step later, as a limit that was reached.
- */
-export const describeRefusedPlan = (plan: StepPlan | null): string =>
-  plan === null
-    ? 'plan'
-    : `plan of ${plan.actions.length} action(s): ${plan.actions.map((action) => action.kind).join(', ')}`;
-
-/** One action as the next goal reads it back: its element by role and name, never by a ref the next page will not have. */
-export function describeAction(action: StepAction, observation: PageObservation): string {
-  switch (action.kind) {
-    case 'navigate':
-      return `navigate ${action.url}`;
-    case 'click':
-      return `click ${named(action.ref, observation)}`;
-    case 'fill':
-      return `fill ${named(action.ref, observation)} with ${quoted(action.value)}`;
-    case 'select':
-      return `select ${quoted(action.option)} in ${named(action.ref, observation)}`;
-    case 'press':
-      return `press ${action.key}`;
-    case 'scroll':
-      return `scroll ${action.direction}${action.ref === null ? '' : ` to ${named(action.ref, observation)}`}`;
-    case 'waitFor':
-      return `waitFor ${action.until} ${action.until === 'element' ? named(action.value, observation) : quoted(action.value)}`;
-    case 'screenshot':
-      return `screenshot ${quoted(action.label)}`;
-    case 'askFields':
-      return `askFields ${action.refs.map((ref) => named(ref, observation)).join(', ')}`;
-    case 'taskStart':
-      return `taskStart ${quoted(action.label)}`;
-    // A terminal action's detail is a claim about the page. An executed
-    // terminate ends the session, so one in the history by construction never
-    // ran; rendered with its words it read, a step later, as a limit that was
-    // reached. The kind and its cause or outcome are the fact; the words stay
-    // in the step's plan.json.
-    case 'taskDone':
-      return `taskDone ${action.outcome}`;
-    case 'terminate':
-      return `terminate ${action.cause}`;
-    case 'done':
-      return 'done';
-  }
 }

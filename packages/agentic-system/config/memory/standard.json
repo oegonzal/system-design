@@ -1,5 +1,5 @@
 {
-  "scopeKeys": ["tenant", "project", "user"],
+  "scopeKeys": ["tenant", "project", "user", "unit"],
   "terms": {
     "short_term": { "ttlSeconds": 3600 },
     "long_term": { "ttlSeconds": null }

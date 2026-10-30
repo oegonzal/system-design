@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 
 import { HttpException } from '@nestjs/common';
 import { MemoryRefused } from '@sysdesign/agentic-memory';
-import { strategyFixture } from '@sysdesign/agentic-memory/testing';
+import { strategyFixture, TEST_POLICY } from '@sysdesign/agentic-memory/testing';
 import {
   consolidateRequestSchema,
   fakeRun,
@@ -24,7 +24,7 @@ import { loopWith, memoryUnderTest } from './testing';
 const NOT_FOUND: readonly MemoryRefusal[] = ['space.not_found', 'record.not_found'];
 /** What each not-found names as missing. */
 const MISSING = { 'space.not_found': 'space', 'record.not_found': 'record' } as const;
-const MOVED_ON: readonly MemoryRefusal[] = ['record.not_current', 'conflict'];
+const MOVED_ON: readonly MemoryRefusal[] = ['record.not_current', 'conflict', 'space.name_taken'];
 const statusOf = (code: MemoryRefusal): number =>
   NOT_FOUND.includes(code) ? 404 : MOVED_ON.includes(code) ? 409 : 422;
 
@@ -42,8 +42,15 @@ const answerOf = async (call: Promise<unknown>): Promise<{ status: number; body:
 
 const runs = {
   strategy: fakeRun('memory-architecture', strategyFixture(), { runId: 'strategy' }),
+  other: fakeRun('memory-architecture', strategyFixture(), { runId: 'other' }),
   running: fakeRun('memory-architecture', null, { runId: 'running', status: 'running' }),
   empty: fakeRun('memory-architecture', null, { runId: 'empty' }),
+};
+/** A run whose strategy does not compile: an interface on a register it does not declare. */
+const brokenRun = () => {
+  const broken = strategyFixture();
+  broken.interfaces.push({ ...broken.interfaces[0], register: 'nowhere' });
+  return fakeRun('memory-architecture', broken, { runId: 'broken' });
 };
 const scope = { tenant: 't1' };
 const provenance = { source: 'spec', sourceRunId: null };
@@ -77,15 +84,15 @@ describe('the memory routes', () => {
   });
 
   it('[AGS-8] POST /spaces answers 201 with the space, 422 with a report, and each run refusal at its status', async () => {
-    const broken = strategyFixture();
-    broken.interfaces.push({ ...broken.interfaces[0], register: 'nowhere' });
-    const { memory, service } = memoryUnderTest(
-      loopWith({ ...runs, broken: fakeRun('memory-architecture', broken, { runId: 'broken' }) }),
-    );
+    const { memory, service } = memoryUnderTest(loopWith({ ...runs, broken: brokenRun() }));
     const controller = new MemoryController(service, memory);
 
     const created = await controller.create({ runId: 'strategy' });
-    expect(created.data).toMatchObject({ designRunId: 'strategy' });
+    expect(created.data).toMatchObject({
+      designRunId: 'strategy',
+      name: null,
+      scopeKeys: TEST_POLICY.scopeKeys,
+    });
     expect(await controller.get(created.data.id)).toEqual(created);
 
     expect(await answerOf(controller.create({ runId: 'broken' }))).toMatchObject({
@@ -106,6 +113,47 @@ describe('the memory routes', () => {
         body: { statusCode: status, code, issues: [] },
       });
     }
+  });
+
+  it('[AGS-12] PUT /spaces/by-name/:name answers the space under the name — made once, then found for the same run — 409 for another run’s claim, and GET by name reads it or 404s', async () => {
+    const { memory, service } = memoryUnderTest(loopWith({ ...runs, broken: brokenRun() }));
+    const controller = new MemoryController(service, memory);
+
+    const made = await controller.ensure('alpha', { runId: 'strategy' });
+    expect(made.data).toMatchObject({
+      created: true,
+      space: { name: 'alpha', designRunId: 'strategy', scopeKeys: TEST_POLICY.scopeKeys },
+    });
+    expect(await controller.ensure('alpha', { runId: 'strategy' })).toEqual({
+      data: { space: made.data.space, created: false },
+    });
+    expect(await answerOf(controller.ensure('alpha', { runId: 'other' }))).toMatchObject({
+      status: 409,
+      body: { statusCode: 409, code: 'space.name_taken', issues: [] },
+    });
+    expect(await controller.getByName('alpha')).toEqual({ data: made.data.space });
+    expect(await controller.get(made.data.space.id)).toEqual({ data: made.data.space });
+    expect(await answerOf(controller.getByName('beta'))).toMatchObject({
+      status: 404,
+      body: { code: 'space.not_found', missing: 'space' },
+    });
+
+    // An ensure is refused as a create is: for the run, and for a strategy that does not compile.
+    for (const [runId, status, code] of [
+      ['missing', 404, 'run.not_found'],
+      ['running', 409, 'run.in_flight'],
+      ['empty', 422, 'run.no_strategy'],
+    ] as const) {
+      expect(await answerOf(controller.ensure('gamma', { runId }))).toMatchObject({
+        status,
+        body: { statusCode: status, code, issues: [] },
+      });
+    }
+    expect(await answerOf(controller.ensure('gamma', { runId: 'broken' }))).toMatchObject({
+      status: 422,
+      body: { report: { problems: [{ code: 'interface.unknown_register' }] } },
+    });
+    expect(await answerOf(controller.getByName('gamma'))).toMatchObject({ status: 404 });
   });
 
   it('[AGS-8] answers a loop that cannot be reached, is too slow or refuses as its gateway status', async () => {

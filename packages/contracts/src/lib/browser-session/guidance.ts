@@ -17,6 +17,7 @@ import {
 } from '../quality-loop/document-digest';
 import { quoted } from '../text';
 import { unitKeySchema } from '../units/identity';
+import { MEMORY_SCOPES } from '../units/scope';
 import { OPTION_BOUND, OPTIONS_BOUND, TASK_LABEL_BOUND } from './observation.schema';
 import { FIELD_TYPES, SUGGESTION_BASES } from './vocab';
 
@@ -51,6 +52,15 @@ export const operatorGuidanceSchema = z.strictObject({
     page: z.string().max(GUIDANCE_PAGE_MAX_LENGTH).nullable(),
   }),
   answer: z.string().min(1).max(GUIDANCE_ANSWER_MAX_LENGTH),
+  /**
+   * Where the answer holds, as the answerer declared the question's scope
+   * (`FieldAnswer.about`): of the subject whoever asks, or of the one
+   * employer, role or application the field was asked for. Declared data for
+   * whoever stores the answer, never rendered into the section. Null when no
+   * artifact answered the field — the brain faulted, or nothing it wrote
+   * named the field.
+   */
+  about: z.enum(MEMORY_SCOPES).nullable(),
   /** What the operator chose the answer from, when they chose a suggestion; a drafted one is said so the digest keeps it whole. */
   chosen: z.enum(SUGGESTION_BASES).nullable(),
   /**

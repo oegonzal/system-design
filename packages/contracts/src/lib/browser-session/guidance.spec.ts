@@ -30,6 +30,7 @@ const item = (overrides: Partial<OperatorGuidanceDto> = {}): OperatorGuidanceDto
   },
   context: { taskLabel: 'Senior Engineer at Acme', unitKey: ACME, page: 'Additional questions' },
   answer: '6',
+  about: 'subject',
   chosen: null,
   via: 'chat',
   ...overrides,
@@ -84,6 +85,21 @@ describe('guidance', () => {
     // Where it was given is provenance the digest never reads: the section is the same either way.
     expect(renderGuidanceSection(item())).toBe(renderGuidanceSection(outside));
     expect(renderGuidanceSection(item())).not.toContain(ACME);
+  });
+
+  it('[BRW-17] carries the scope the answerer declared the question holds in — null when no artifact answered the field, never absent — as data for whoever stores the answer, never in the section', () => {
+    expect(operatorGuidanceSchema.safeParse(item({ about: 'unit' })).success).toBe(true);
+    expect(operatorGuidanceSchema.safeParse(item({ about: null })).success).toBe(true);
+    const { about, ...undeclared } = item();
+    void about;
+    expect(operatorGuidanceSchema.safeParse(undeclared).success).toBe(false);
+    expect(operatorGuidanceSchema.safeParse({ ...item(), about: 'everywhere' }).success).toBe(
+      false,
+    );
+    // The section is the same whatever the scope says: the digest reads the rules it is given, the teach reads the data.
+    expect(renderGuidanceSection(item({ about: 'unit' }))).toBe(
+      renderGuidanceSection(item({ about: null })),
+    );
   });
 
   it("[QL-40] composes a session's answers as a guidance chunk the document codec accepts and indexes", () => {

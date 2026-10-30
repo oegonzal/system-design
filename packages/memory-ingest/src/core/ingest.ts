@@ -1,7 +1,6 @@
 import { basename, resolve } from 'node:path';
 
 import { DOCUMENT_TITLE_MAX_LENGTH, type MemoryScope } from '@sysdesign/contracts';
-import { LoopRefused, LoopTimeout, LoopUnreachable } from '@sysdesign/loop-client';
 
 import type { IngestKind } from '../config';
 import { chunkDocument, type ChunkPlan } from './chunk';
@@ -14,7 +13,7 @@ import {
   type IngestReport,
 } from './ingest-report';
 import {
-  IngestWaitFailed,
+  SinkFault,
   type Clock,
   type DocumentReader,
   type IngestLedger,
@@ -22,38 +21,52 @@ import {
   type IngestStatus,
   type ManifestEntry,
   type PlannedChunk,
+  type SinkFaultKind,
 } from './ports';
-import { covers, documentKey, entryOf, identityOf, loopError, statusOf } from './record';
+import {
+  covers,
+  documentKey,
+  entryOf,
+  identityOf,
+  originOf,
+  statusOf,
+  throughStore,
+  type StoreIdentity,
+} from './record';
 import { replaceDocument, replacedRunsOf, unresolvedOf } from './retract';
 
 /**
  * The ingest, in two phases. `planIngest` reads and chunks every document
  * before anything is posted, so an unreadable file or a part that cannot fit
  * refuses the whole run up front. `runIngest` then posts one chunk at a time,
- * awaiting each orchestration to settle before the next, and records every
+ * awaiting each posting to come to its end before the next, and records every
  * outcome in the ledger. A chunk its document's latest posting of it covers —
  * its facts stored, or none to store (`covers`) — is skipped unless forced. A
  * document reads its own postings alone, found by its key and the chunk's
- * hash, so the same text in two documents is posted once for each, and
- * nothing one document replaces or retires is a fact another stands on.
+ * hash among the postings made through the configured store — the sink, and
+ * for a space the space and the scope written under — so the same text in two
+ * documents is posted once for each, a document posted to one store is posted
+ * again to the other, the same document seeded under two tenants is posted
+ * under each, and nothing one document replaces or retires is a fact another
+ * stands on.
  *
  * A document's digests follow its current text, make before break: once every
  * chunk of its current plan is covered — posted in this run, or skipped for a
- * posting of its own that stands — every other digest run its entries name is
- * retracted by its id and marked, by the rule retiring a document goes by
- * (`replacedRunsOf`). So an edit that keeps its chunks' hashes replaces only
- * the chunks it changed, a forced document is posted whole before anything of
- * it is taken out, and a document the run did not cover whole — halted,
- * refused, failed, or a chunk whose facts the loop left out of the store —
- * keeps everything it had, its report naming the chunk that held the
- * replacement back. Replacement goes by the document, not by the chunk hash,
- * because the hash is of the rendered goal, and a change to the goal's rules
- * renames every chunk at once (measured 2026-10-13: a forced résumé re-ingest
- * after a rules change matched no hash and left 48 facts beside their 50
- * replacements). A document that read as no text replaces nothing: retiring
- * one is `retract`'s.
+ * posting of its own that stands — every other digest run its entries through
+ * this sink name is retracted by its id and marked, by the rule retiring a
+ * document goes by (`replacedRunsOf`). So an edit that keeps its chunks'
+ * hashes replaces only the chunks it changed, a forced document is posted
+ * whole before anything of it is taken out, and a document the run did not
+ * cover whole — halted, refused, failed, or a chunk whose facts the digest
+ * left out of the store — keeps everything it had, its report naming the
+ * chunk that held the replacement back. Replacement goes by the document, not
+ * by the chunk hash, because the hash is of the rendered goal, and a change to
+ * the goal's rules renames every chunk at once (measured 2026-10-13: a forced
+ * résumé re-ingest after a rules change matched no hash and left 48 facts
+ * beside their 50 replacements). A document that read as no text replaces
+ * nothing: retiring one is `retract`'s.
  *
- * A refusal from the loop, or a start still unreachable once the client's
+ * A refusal from the service, or a start still unreachable once the client's
  * recovery window has passed, stops the run, because the next chunk would
  * meet the same answer.
  */
@@ -67,8 +80,9 @@ export interface IngestOptions {
   date: string | null;
   /**
    * The scope the documents declare for every memory they state, rendered
-   * into each chunk's goal and stamped by the store over the scope test; null
-   * when they declare none, and each memory is then scoped by that test.
+   * into each chunk's goal and stamped by the loop's store over the scope
+   * test; null when they declare none, and each memory is then scoped by that
+   * test. A space writes every memory under the tenant whatever this says.
    */
   scope: MemoryScope | null;
   /**
@@ -76,7 +90,7 @@ export interface IngestOptions {
    * null for every chunk. A run of one proves a document end to end — and
    * records that chunk under its document and hash, so the full run skips it
    * rather than digesting the same sections a second time into near-identical
-   * points.
+   * memories.
    */
   limit: number | null;
   dryRun: boolean;
@@ -92,8 +106,6 @@ export interface IngestDeps {
   sink: IngestSink;
   ledger: IngestLedger;
   clock: Clock;
-  /** Stamped on every record, so a manifest says which loop it speaks of. */
-  loopUrl: string;
 }
 
 export interface PlannedDocument {
@@ -150,11 +162,14 @@ export async function planIngest(
 const chunkKey = (document: string, chunkHash: string): string =>
   JSON.stringify([document, chunkHash]);
 
-/** The latest outcome of each chunk of each document — what a re-run reads. */
+/** The latest outcome of each chunk of each document through one store — what a re-run reads. */
 export function latestByChunk(
   entries: readonly ManifestEntry[],
+  store: StoreIdentity,
 ): ReadonlyMap<string, ManifestEntry> {
-  return new Map(entries.map((entry) => [chunkKey(entry.document, entry.chunkHash), entry]));
+  return new Map(
+    throughStore(entries, store).map((entry) => [chunkKey(entry.document, entry.chunkHash), entry]),
+  );
 }
 
 /** A posting's record, and whether the run stops on it. */
@@ -164,7 +179,29 @@ interface Posting {
   stops: boolean;
 }
 
-/** Post one chunk and say how it ended. Anything but a loop outcome is a fault and propagates. */
+/** What each kind of sink fault records: a refusal never started; the rest failed. */
+const FAULT_STATUS: Record<SinkFaultKind, IngestStatus> = {
+  refused: 'refused',
+  unreachable: 'failed',
+  timeout: 'failed',
+  unfinished: 'failed',
+};
+
+/**
+ * Which kinds of sink fault stop the run. A refusal would meet the next chunk
+ * too; the client rides a restarting service out within its recovery window,
+ * so a start still unreachable past it would hold every chunk after it for
+ * the same window. A call held past its time, and a posting that did not reach
+ * its end after the start, say nothing of the next chunk.
+ */
+const FAULT_STOPS: Record<SinkFaultKind, boolean> = {
+  refused: true,
+  unreachable: true,
+  timeout: false,
+  unfinished: false,
+};
+
+/** Post one chunk and say how it ended. Anything but a sink fault is a fault in the program and propagates. */
 async function postOne(
   planned: PlannedChunk,
   document: string,
@@ -172,59 +209,48 @@ async function postOne(
 ): Promise<Posting> {
   const base = {
     identity: identityOf(planned, document),
+    origin: originOf(deps.sink),
     ingestedAt: deps.clock.now(),
-    loopUrl: deps.loopUrl,
     // A fresh posting stands until a retraction marks it.
     retractedAt: null,
     retractedPoints: null,
   };
-  /** The record of a posting the loop never settled: refused, unreachable, unanswered, or lost mid-wait. */
-  const unsettled = (
-    status: IngestStatus,
-    orchestrationRunId: string | null,
-    error: string,
-  ): ManifestEntry => entryOf({ ...base, orchestrationRunId, orchestration: null, status, error });
   try {
-    const orchestration = await deps.sink.post(planned);
+    const outcome = await deps.sink.post(planned);
     const entry = entryOf({
       ...base,
-      orchestrationRunId: orchestration.orchestrationRunId,
-      orchestration,
-      status: statusOf(orchestration),
-      error: orchestration.error?.message ?? null,
+      orchestrationRunId: outcome.orchestrationRunId,
+      outcome,
+      status: statusOf(outcome),
+      error: outcome.error,
     });
     return { entry, stops: false };
   } catch (error) {
-    if (error instanceof LoopRefused) {
-      return { entry: unsettled('refused', null, loopError(error)), stops: true };
-    }
-    if (error instanceof IngestWaitFailed) {
-      const entry = unsettled('failed', error.orchestrationRunId, error.cause.message);
-      return { entry, stops: false };
-    }
-    // The client rides a restarting loop out within its recovery window: a start
-    // still unreachable past it would hold every chunk after it for the same window.
-    if (error instanceof LoopUnreachable) {
-      return { entry: unsettled('failed', null, error.message), stops: true };
-    }
-    if (error instanceof LoopTimeout) {
-      return { entry: unsettled('failed', null, error.message), stops: false };
-    }
-    throw error;
+    if (!(error instanceof SinkFault)) throw error;
+    // The record of a posting the service never brought to its end: refused, unreachable, unanswered, or lost after the start.
+    const entry = entryOf({
+      ...base,
+      orchestrationRunId: error.orchestrationRunId,
+      outcome: null,
+      status: FAULT_STATUS[error.kind],
+      error: error.message,
+    });
+    return { entry, stops: FAULT_STOPS[error.kind] };
   }
 }
 
-/** Phase two: one chunk at a time, each awaited to settle and recorded, in document order. */
+/** Phase two: one chunk at a time, each awaited to its end and recorded, in document order. */
 export async function runIngest(
   documents: readonly PlannedDocument[],
   options: Pick<IngestOptions, 'dryRun' | 'force' | 'limit'>,
   deps: IngestDeps,
 ): Promise<IngestReport> {
+  const store: StoreIdentity = deps.sink;
   let entries = await deps.ledger.load();
   // Entries before this index were recorded by earlier runs: postings append, and marks keep their place.
   const recordedBefore = entries.length;
   // Kept current through the run, so a chunk met twice in one invocation is posted once.
-  let known = new Map(latestByChunk(entries));
+  let known = new Map(latestByChunk(entries, store));
   const files: FileReport[] = documents.map(({ document, plan }) => ({
     document,
     parts: plan.parts,
@@ -308,17 +334,18 @@ export async function runIngest(
       // Make before break: every chunk of the current plan is covered, so what else of the document stands goes.
       const done = await replaceDocument(entries, document, standing, deps);
       entries = done.entries;
-      known = new Map(latestByChunk(entries));
+      known = new Map(latestByChunk(entries, store));
       file.replaced = done.retraction;
     } else {
       const row = file.chunks[blocking] as ChunkReport;
       file.heldBack = {
         chunk: row.index,
         outcome: row.outcome,
-        earlierRuns: replacedRunsOf(entries.slice(0, recordedBefore), document, standing).length,
+        earlierRuns: replacedRunsOf(entries.slice(0, recordedBefore), store, document, standing)
+          .length,
       };
     }
-    file.unresolved = unresolvedOf(entries, document);
+    file.unresolved = unresolvedOf(entries, store, document);
   }
   return report;
 }

@@ -8,7 +8,7 @@ import type {
   PromptLibraryDocumentDto,
   PromptLibraryEntryDto,
   QualityLoopHealthDto,
-  QualityRunDto,
+  QualityRunReadDto,
   QualityRunStartedDto,
   RetractedMemoryRunDto,
   StartOrchestrationFromRunRequest,
@@ -30,8 +30,8 @@ export abstract class LoopClient {
   /** The derive stage alone. Throws `DerivationFailed` (with the loop's diagnostic) when the model derived nothing. */
   abstract deriveCriteria(request: DeriveCriteriaRequest): Promise<DerivedCriteriaDto>;
   abstract startRun(request: StartQualityRunRequest): Promise<QualityRunStartedDto>;
-  /** Null when the loop has no such run. */
-  abstract getRun(runId: string): Promise<QualityRunDto | null>;
+  /** `GET /runs/:id` — the run read whole, its readout with it once it has settled; null when the loop has no such run. */
+  abstract getRun(runId: string): Promise<QualityRunReadDto | null>;
   /** `POST /runs/evidence` — the verdicts of named iterations in one read; an iteration never recorded is absent. */
   abstract iterationEvidence(refs: readonly IterationRef[]): Promise<IterationEvidenceDto[]>;
   abstract listPrompts(): Promise<PromptLibraryEntryDto[]>;

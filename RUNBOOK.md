@@ -365,6 +365,45 @@ pnpm memory-ingest ingest docs/ingestion/studio/studio-experiences.md --kind not
 pnpm memory-ingest status                                                                # how each chunk's digest went
 ```
 
+### The job assistant's own memory space
+
+The same documents go into a memory space on the memory host instead of the
+loop's store when `MEMORY_INGEST_SINK=space` — under the tenant named, into the
+space named, filed into the registers named. The space is made from a judged
+strategy, kept as data beside its brief under
+`docs/agentic-system/strategies/job-assistant/{brief.md,strategy.json}`:
+judge it once, write the settled run's id into
+`packages/browser-session/config/brain/memory.json` (`binding.space.runId`,
+`unjudged` until then — a brain told to bind under that value refuses by name
+and ensures nothing, since the first run to ensure a name holds it for good),
+and ensure the space under its name from that run, through the CLI's bind or
+once by hand; the compile report must show the four registers with their
+operations and `scopeKeys` ending in `unit`:
+
+```bash
+node --env-file-if-exists=.env packages/quality-loop/dist/main.js run --pipeline memory-architecture \
+  --goal docs/agentic-system/strategies/job-assistant/brief.md --output docs/agentic-system/strategies/job-assistant/strategy.json --iterations 1
+curl -sS -X PUT localhost:3007/spaces/by-name/job-assistant -H 'content-type: application/json' -d '{"runId":"<the settled run>"}'
+```
+
+The manifest records the store each posting went to — the sink, and for a
+space the space and the tenant written under — and every manifest command acts
+on one store at a time (`packages/memory-ingest/README.md`, "Two stores, one
+manifest"), so the same documents seeded first under a verification tenant and
+then under the live one from the same manifest home are posted whole to each,
+and retiring them under one tenant touches nothing of the other's:
+
+```bash
+MEMORY_INGEST_SINK=space MEMORY_TENANT=<tenant> MEMORY_SPACE_NAME=job-assistant MEMORY_INGEST_REGISTERS=profile_fact,profile_story,claim_boundary \
+  pnpm memory-ingest ingest docs/ingestion/Resume_2026_c.pdf --kind resume --subject "Your Name"
+pnpm browser-session teach-again --sessions static/sessions --subject "Your Name" --tenant <tenant>   # the recorded answers as standing answers, under the tenant named; run twice, every outcome is unchanged
+pnpm memory-ingest recall --space job-assistant --tenant <tenant> --text "years of experience with Postgres"   # what the space holds, by meaning
+pnpm memory-ingest recall --space job-assistant --tenant <tenant> --under project=job-assistant --text "notice period"   # … the assistant's taught answers too, kept under its project
+pnpm memory-ingest history <recordId> --space job-assistant --tenant <tenant> [--under project=job-assistant,unit=<hash>]   # every version of one record
+pnpm memory-ingest forget <recordId> --space job-assistant --tenant <tenant> --reason "stated of someone else" [--under …]   # close one record, the reason kept
+pnpm browser-session replay-fields --sessions static/sessions --tenant <tenant> [--judge --sample 40] [--retract 20]   # every recorded form page recalled for again against the tenant; the acceptance table's numbers
+```
+
 The export writes only what the studio declares yours. An example written for
 practice and a story drawn from one are withheld, and the report counts them
 under that origin (a line such as `5 records · 1 withheld as practice`); the

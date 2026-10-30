@@ -1,140 +1,27 @@
-import { LoopRefused } from '@sysdesign/loop-client';
-
 import { tableReader } from './adapters/readers/reader-table';
-import { execute, parseOptions, USAGE } from './cli';
-import { PARTS_PER_CHUNK } from './core/chunk';
-import { DEFAULT_CHUNK_BYTES, INGEST_ENV } from './config';
-import { cliDeps as deps, io, parsed } from './test/cli-harness';
+import { execute } from './cli';
+import { INGEST_ENV } from './config';
+import { SinkFault } from './core/ports';
+import { cliDeps as deps, ingestConfig, io, parsed } from './test/cli-harness';
 import {
   InMemoryLedger,
   manifestEntry,
+  MEMORY_URL,
   sampleExperience,
   ScriptedSink,
   ScriptedStudio,
-  settledOrchestration,
-  stepOf,
+  settledOutcome,
+  SPACE_ID,
 } from './test/fakes';
 
-describe('parseOptions', () => {
-  it('reads each command with its flags, defaulting what is not given', () => {
-    expect(
-      parsed([
-        'ingest',
-        'a.md',
-        'b.pdf',
-        '--kind',
-        'resume',
-        '--subject',
-        'Ada',
-        '--chunk-bytes',
-        '4000',
-        '--parts-per-chunk',
-        '5',
-        '--date',
-        '2026-10-02',
-        '--scope',
-        'subject',
-        '--limit',
-        '2',
-        '--dry-run',
-        '--force',
-        '--json',
-      ]),
-    ).toEqual({
-      command: 'ingest',
-      paths: ['a.md', 'b.pdf'],
-      kind: 'resume',
-      subject: 'Ada',
-      chunkBytes: 4000,
-      partsPerChunk: 5,
-      date: '2026-10-02',
-      scope: 'subject',
-      limit: 2,
-      dryRun: true,
-      force: true,
-      json: true,
-    });
-    expect(parsed(['ingest', 'a.md'])).toEqual({
-      command: 'ingest',
-      paths: ['a.md'],
-      kind: 'notes',
-      subject: undefined,
-      chunkBytes: DEFAULT_CHUNK_BYTES,
-      partsPerChunk: PARTS_PER_CHUNK,
-      date: null,
-      scope: null,
-      limit: null,
-      dryRun: false,
-      force: false,
-      json: false,
-    });
-    expect(parsed(['retract', 'a.md', 'b.pdf', '--dry-run', '--json'])).toEqual({
-      command: 'retract',
-      paths: ['a.md', 'b.pdf'],
-      dryRun: true,
-      json: true,
-    });
-    expect(parsed(['retract', 'a.md'])).toEqual({
-      command: 'retract',
-      paths: ['a.md'],
-      dryRun: false,
-      json: false,
-    });
-    expect(parsed(['status'])).toEqual({ command: 'status', refresh: false, json: false });
-    expect(parsed(['status', '--refresh', '--json'])).toEqual({
-      command: 'status',
-      refresh: true,
-      json: true,
-    });
-    expect(parsed(['export-studio', '--out', 'docs/ingestion/studio', '--json'])).toEqual({
-      command: 'export-studio',
-      out: 'docs/ingestion/studio',
-      json: true,
-    });
-  });
+const skipped = {
+  status: 'skipped' as const,
+  reason: 'upstream-skipped',
+  note: 'digest',
+  counts: {},
+};
 
-  it.each([
-    [[], USAGE],
-    [['--help'], USAGE],
-    [['fly'], USAGE],
-    [['ingest'], 'ingest takes at least one document path'],
-    [['ingest', 'a.md', '--kind', 'poems'], '--kind must be one of resume, notes'],
-    [['ingest', 'a.md', '--date', 'last tuesday'], '--date must be a day as YYYY-MM-DD'],
-    [['ingest', 'a.md', '--limit', '0'], '--limit must be a positive integer'],
-    [['ingest', 'a.md', '--scope', 'everywhere'], '--scope must be one of subject —'],
-    [['ingest', 'a.md', '--parts-per-chunk', '99'], '--parts-per-chunk must be a positive integer'],
-    [['ingest', 'a.md', '--chunk-bytes', 'lots'], '--chunk-bytes must be a positive integer'],
-    [
-      ['ingest', 'a.md', '--subject', 'x'.repeat(121)],
-      '--subject must name the subject in 1 to 120',
-    ],
-    [['ingest', 'a.md', '--subject', '  '], '--subject must name the subject in 1 to 120'],
-    [['ingest', 'a.md', '--refresh'], "Unknown option '--refresh'"],
-    [['retract'], 'retract takes at least one document path'],
-    [['retract', '--dry-run'], 'retract takes at least one document path'],
-    [['retract', 'a.md', '--force'], "Unknown option '--force'"],
-    [['retract', 'a.md', '--kind', 'resume'], "Unknown option '--kind'"],
-    [['status', '--force'], "Unknown option '--force'"],
-    [['status', 'a.md'], "Unexpected argument 'a.md'"],
-    [['export-studio'], '--out is required'],
-    [['export-studio', '--out', ' '], '--out is required'],
-    [['export-studio', '--out', 'd', 'a.md'], "Unexpected argument 'a.md'"],
-  ])('refuses %j', (argv, message) => {
-    const result = parseOptions(argv);
-    expect(result).toBeInstanceOf(Error);
-    expect((result as Error).message).toContain(message);
-  });
-
-  it('[ING-1] a file declares only a scope bound to no unit of work: a unit-bound one is refused by name, since a file names no unit', () => {
-    const result = parseOptions(['ingest', 'a.md', '--scope', 'unit']);
-    expect(result).toBeInstanceOf(Error);
-    expect((result as Error).message).toBe(
-      '--scope must be one of subject — a file names no unit of work — got unit',
-    );
-  });
-});
-
-/** Ingest, status and the studio export over the ports. `retract` and the lock are `cli.retract.spec.ts`. */
+/** Ingest, status and the studio export over the ports. `retract` and the lock are `cli.retract.spec.ts`; argv is `cli.parse.spec.ts`. */
 describe('execute', () => {
   it('[ING-1] a dry run prints the chunks and posts nothing, exiting 0', async () => {
     const { out, sink } = io();
@@ -146,7 +33,7 @@ describe('execute', () => {
     expect(out[0]).toMatch(/1\/1\s+[0-9a-f]{12}\s+\d+\s+4\s+pending/);
     expect(out[0]).toContain('dry run — nothing was posted and nothing was recorded');
     expect(d.scripted.posted).toHaveLength(0);
-    expect(d.memory.saves).toBe(0);
+    expect(d.ledger.saves).toBe(0);
   });
 
   it('posts, renders the report or prints it as JSON, and exits 0 when every chunk completed', async () => {
@@ -171,16 +58,9 @@ describe('execute', () => {
   it('takes the subject from the environment when the flag is absent, and refuses when neither names one', async () => {
     const { errors, sink } = io();
     expect(await execute(parsed(['ingest', 'notes.md', '--dry-run']), deps(), sink)).toBe(2);
-    expect(errors[0]).toContain(INGEST_ENV.subject);
+    expect(errors[0]).toContain(INGEST_ENV.subject.name);
 
-    const named = deps({
-      config: {
-        loopUrl: 'http://loop.test',
-        studioUrl: 'http://studio.test',
-        home: 'static/memory-ingest',
-        subject: 'Ada',
-      },
-    });
+    const named = deps({ config: ingestConfig({ subject: 'Ada' }) });
     expect(await execute(parsed(['ingest', 'notes.md', '--dry-run']), named, io().sink)).toBe(0);
   });
 
@@ -198,20 +78,57 @@ describe('execute', () => {
     expect(missing.errors[0]).toContain('ENOENT');
   });
 
-  it('exits 1 when a chunk failed, the loop refused one, or the loop settled one with nothing stored', async () => {
+  it('[ING-4] exits 2 before posting anything when the store cannot serve the run — a space that does not take the configured registers — naming the sink setting, and holds a chunk’s parts to the configured store’s digest', async () => {
+    const config = ingestConfig({
+      sink: { kind: 'space', tenant: 'north', space: 'notes-space', registers: ['facts'] },
+    });
+    const refused = deps({
+      config,
+      sink: () => Promise.reject(new Error('memory space notes-space does not serve the command')),
+    });
+    const { errors, sink } = io();
+    expect(await execute(parsed(['ingest', 'notes.md', '--subject', 'Ada']), refused, sink)).toBe(
+      2,
+    );
+    expect(errors[0]).toBe(
+      `${INGEST_ENV.sink.name}=space: memory space notes-space does not serve the command`,
+    );
+    expect(refused.ledger.saves).toBe(0);
+
+    const wide = deps({ config });
+    const parts = io();
+    expect(
+      await execute(
+        parsed(['ingest', 'notes.md', '--subject', 'Ada', '--parts-per-chunk', '17']),
+        wide,
+        parts.sink,
+      ),
+    ).toBe(2);
+    expect(parts.errors[0]).toBe(
+      `--parts-per-chunk must be at most 16 when ${INGEST_ENV.sink.name} is space, got 17`,
+    );
+    expect(wide.scripted.posted).toHaveLength(0);
+    // The loop's digest takes more: the same flag is fine there.
+    expect(
+      await execute(
+        parsed(['ingest', 'notes.md', '--subject', 'Ada', '--parts-per-chunk', '17', '--dry-run']),
+        deps(),
+        io().sink,
+      ),
+    ).toBe(0);
+  });
+
+  it('exits 1 when a chunk failed, the store refused one, or the digest settled one with nothing stored', async () => {
     const failed = deps({
-      sink: new ScriptedSink([
-        settledOrchestration({
-          status: 'failed',
-          error: { name: 'Error', message: 'digest threw', stack: null },
-        }),
-      ]),
+      sinkAdapter: new ScriptedSink([settledOutcome({ status: 'failed', error: 'digest threw' })]),
     });
     const { out, sink } = io();
     expect(await execute(parsed(['ingest', 'notes.md', '--subject', 'Ada']), failed, sink)).toBe(1);
     expect(out[0]).toMatch(/failed\s+orch-1\s+digest threw/);
 
-    const refused = deps({ sink: new ScriptedSink([new LoopRefused(400, 'no document index')]) });
+    const refused = deps({
+      sinkAdapter: new ScriptedSink([new SinkFault('refused', '400: no document index')]),
+    });
     const second = io();
     expect(
       await execute(parsed(['ingest', 'notes.md', '--subject', 'Ada']), refused, second.sink),
@@ -219,15 +136,17 @@ describe('execute', () => {
     expect(second.out[0]).toContain('stopped at notes.md chunk 1: 400: no document index');
 
     const unstored = deps({
-      sink: new ScriptedSink([
-        settledOrchestration({
+      sinkAdapter: new ScriptedSink([
+        settledOutcome({
+          digestRunId: null,
           steps: {
-            digest: stepOf({
+            digest: {
               status: 'skipped',
               reason: 'embeddings-disabled',
               note: 'no provider',
-            }),
-            store: stepOf({ status: 'skipped', reason: 'upstream-skipped', note: 'digest' }),
+              counts: {},
+            },
+            store: skipped,
           },
         }),
       ]),
@@ -243,11 +162,17 @@ describe('execute', () => {
 
     // Settled with no fact to store: the chunk is covered, and nothing is wrong.
     const empty = deps({
-      sink: new ScriptedSink([
-        settledOrchestration({
+      sinkAdapter: new ScriptedSink([
+        settledOutcome({
+          digestRunId: 'd-1',
           steps: {
-            digest: stepOf({ reason: 'no-memories', runIds: ['d-1'], counts: { memories: 0 } }),
-            store: stepOf({ status: 'skipped', reason: 'upstream-skipped', note: 'digest' }),
+            digest: {
+              status: 'complete',
+              reason: 'no-memories',
+              note: null,
+              counts: { memories: 0 },
+            },
+            store: skipped,
           },
         }),
       ]),
@@ -260,7 +185,7 @@ describe('execute', () => {
     expect(fourth.out[0]).toContain('posted 0 · no facts 1 · unstored 0');
   });
 
-  it('[ING-3] exits 1 and names what was left standing when replacing a document hit a retraction the loop did not carry out', async () => {
+  it('[ING-3] exits 1 and names what was left standing when replacing a document hit a retraction the store did not carry out', async () => {
     // An earlier digest of the document, from text it no longer has.
     const ledger = new InMemoryLedger([
       manifestEntry({ chunkHash: 'earlier', digestRunId: 'run-earlier' }),
@@ -268,7 +193,7 @@ describe('execute', () => {
     const d = deps({ ledger });
     d.scripted.failingRetractions.set(
       'run-earlier',
-      new LoopRefused(503, 'the store is unavailable'),
+      new SinkFault('refused', '503: the store is unavailable'),
     );
     const { out, sink } = io();
     expect(await execute(parsed(['ingest', 'notes.md', '--subject', 'Ada']), d, sink)).toBe(1);
@@ -277,12 +202,12 @@ describe('execute', () => {
     expect(ledger.entries[0]?.retractedAt).toBeNull();
   });
 
-  it('status prints the manifest, and --refresh rewrites what the loop has settled', async () => {
+  it('status prints the manifest, and --refresh rewrites what the store has settled — the other sink’s postings listed and kept', async () => {
     const empty = io();
     expect(await execute(parsed(['status']), deps(), empty.sink)).toBe(0);
     expect(empty.out[0]).toContain('the manifest is empty');
 
-    // A wait lost after the start: the loop has settled it since.
+    // A wait lost after the start: the loop has settled it since. A space posting beside it is another store's.
     const ledger = new InMemoryLedger([
       manifestEntry({
         chunkHash: 'abc',
@@ -291,33 +216,48 @@ describe('execute', () => {
         steps: { digest: null, store: null },
         error: 'lost',
       }),
+      manifestEntry({
+        chunkHash: 'space-1',
+        sink: 'space',
+        host: MEMORY_URL,
+        spaceId: SPACE_ID,
+        scope: { tenant: 'north' },
+        orchestrationRunId: 'digest-1',
+        digestRunId: 'register-digest-1',
+        recordIds: ['r-1'],
+      }),
     ]);
     const d = deps({ ledger });
     d.scripted.records.set(
       'orch-1',
-      settledOrchestration({
+      settledOutcome({
+        digestRunId: 'd-1',
         steps: {
-          digest: stepOf({ runIds: ['d-1'], counts: { memories: 2 } }),
-          store: stepOf({ counts: { chunks: 2 } }),
+          digest: { status: 'complete', reason: null, note: null, counts: { memories: 2 } },
+          store: { status: 'complete', reason: null, note: null, counts: { chunks: 2 } },
         },
       }),
     );
     const { out, sink } = io();
     expect(await execute(parsed(['status', '--refresh']), d, sink)).toBe(0);
     expect(out[0]).toMatch(
-      /notes\.md\s+1\/1\s+notes\s+complete\s+complete \(memories 2\)\s+complete \(chunks 2\)/,
+      /notes\.md\s+1\/1\s+notes\s+loop\s+complete\s+complete \(memories 2\)\s+complete \(chunks 2\)/,
     );
-    expect(out[0]).toContain('refreshed 1 · still running 0 · no longer at the loop 0');
+    expect(out[0]).toMatch(/notes\.md\s+1\/1\s+notes\s+space\s+complete/);
+    expect(out[0]).toContain(
+      'refreshed 1 · still running 0 · no longer at the service 0 · through another sink 1',
+    );
     expect(ledger.entries[0]).toMatchObject({
       status: 'complete',
       digestRunId: 'd-1',
       error: null,
     });
+    expect(ledger.entries[1]).toMatchObject({ sink: 'space', recordIds: ['r-1'] });
 
     const json = io();
     expect(await execute(parsed(['status', '--json']), d, json.sink)).toBe(0);
     expect(JSON.parse(json.out[0] ?? '')).toMatchObject({
-      entries: [{ chunkHash: 'abc', status: 'complete' }],
+      entries: [{ chunkHash: 'abc', status: 'complete' }, { chunkHash: 'space-1' }],
       refresh: null,
     });
   });

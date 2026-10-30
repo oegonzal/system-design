@@ -69,8 +69,12 @@ describe('the field-answer pipeline', () => {
     expect(FIELD_ANSWER.validators.find((validator) => validator.id === 'limits')?.withholds).toBe(
       'every-ref',
     );
-    // The judges name the kinds the answerer declares, in the words of one table.
+    // The judges name the kinds the answerer declares, in the words of one table — and the scope it
+    // declares, so a declared about that contradicts the question is faulted under a declared type.
     expect(FIELD_ANSWER.critics[0].persona).toContain('overstated');
+    expect(FIELD_ANSWER.critics[0].persona).toMatch(
+      /declared about that contradicts what the question asks[^.]*overstated/,
+    );
     expect(FIELD_ANSWER.critics[1].persona).toContain('misfit_option');
     for (const kind of [
       'stated',
@@ -186,9 +190,11 @@ describe('the field-answer pipeline', () => {
       'field.5',
     ]);
     expect(rendered).toContain(
-      '[field.1] e1 — answer "6" — rests stated — basis m1 — m1 states six years of Python',
+      '[field.1] e1 — answer "6" — about subject — rests stated — basis m1 — m1 states six years of Python',
     );
-    expect(rendered).toContain('[field.4] e4 — leave-blank — rests none — basis none');
+    expect(rendered).toContain(
+      '[field.4] e4 — leave-blank — about subject — rests none — basis none',
+    );
     expect(fieldAnswersOutput.schema.safeParse(answers).success).toBe(true);
   });
 

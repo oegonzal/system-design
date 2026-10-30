@@ -9,16 +9,15 @@ import {
   type UnitsOnRecord,
 } from '@sysdesign/contracts';
 
+import { describeRefusedPlan, NOTHING_RAN } from './action-words';
 import type { EngineContext } from './engine-context';
 import { checkExact, unmetNote } from './expectations';
 import { BrainFaulted, type Decided, type Termination } from './ports';
 import { checkRails } from './rails';
 import { observationFiles, stepJsonFile } from './session-dump';
 import {
-  describeRefusedPlan,
   ledgerSummaryOf,
   noteObservation,
-  NOTHING_RAN,
   progressOf,
   pushHistory,
   pushObjections,

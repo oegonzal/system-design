@@ -2,15 +2,16 @@ import type {
   DocumentChunk,
   DocumentKind,
   ExperienceProfileDto,
-  OrchestrationRunDto,
   OrchestrationStepStatus,
+  QualityRunStatus,
+  RecordScope,
   StarStoryDto,
 } from '@sysdesign/contracts';
 
 /**
  * What the ingester needs from the world, as ports. The core reads a
- * document, chunks it, hands each chunk to the loop and records the outcome;
- * where the text comes from, how the loop is reached and where the record
+ * document, chunks it, hands each chunk to a sink and records the outcome;
+ * where the text comes from, which store takes the chunk and where the record
  * lives are adapters, chosen in `cli.ts`.
  */
 
@@ -47,44 +48,35 @@ export interface PlannedChunk {
 }
 
 /**
- * The loop, as the ingester uses it: post one chunk and wait for its
- * orchestration to settle. A start the loop refuses or cannot be reached for
- * throws the loop client's own error; a wait that fails after the start
- * throws `IngestWaitFailed`, so the record keeps the orchestration id.
+ * The stores a chunk may be posted to: the quality loop's own memory store,
+ * through its document-memory orchestrator, or a memory space on the memory
+ * host, through a digest it applies. Each posting records which it went
+ * through, and every command acts on the postings made through the one it is
+ * configured for.
  */
-export interface IngestSink {
-  post(planned: PlannedChunk): Promise<OrchestrationRunDto>;
-  /** The orchestration as the loop has it now, or null when it no longer does. */
-  status(orchestrationRunId: string): Promise<OrchestrationRunDto | null>;
-  /** Every point a digest run stored, gone — how many went; a run the store never held removes nothing. */
-  retract(digestRunId: string): Promise<number>;
-}
-
-export class IngestWaitFailed extends Error {
-  override readonly name = 'IngestWaitFailed';
-  constructor(
-    readonly orchestrationRunId: string,
-    override readonly cause: Error,
-  ) {
-    super(`orchestration ${orchestrationRunId} was not awaited to the end: ${cause.message}`);
-  }
-}
+export const INGEST_SINKS = ['loop', 'space'] as const;
+export type IngestSinkKind = (typeof INGEST_SINKS)[number];
 
 /**
- * How a chunk's posting ended. `complete` is earned by the store step: what
- * the digest endorsed is in the store — every fact of the chunk, unless a
- * step's reason says some were left out (`leftFactsOut`). `unstored` is an
- * orchestration that settled without storing any — embeddings disabled, the
- * store unavailable, the digest judged and not accepted or finding nothing —
- * which the runner still marks complete, since no step failed. `failed` never
- * settled or settled failed; `refused` never started.
+ * The two phases every posting goes through, as the manifest summarizes them:
+ * the digest that judges the chunk into facts, and the store that keeps what
+ * the digest endorsed. The loop runs both as steps of its orchestration; a
+ * space runs the digest on the loop and the store is the sink's own apply.
  */
-export const INGEST_STATUSES = ['complete', 'unstored', 'failed', 'refused'] as const;
-export type IngestStatus = (typeof INGEST_STATUSES)[number];
+export const POSTING_STEPS = ['digest', 'store'] as const;
+export type PostingStep = (typeof POSTING_STEPS)[number];
 
-/** The document-memory orchestrator's steps, as the manifest summarizes them. */
-export const DOCUMENT_MEMORY_STEPS = ['digest', 'store'] as const;
-export type DocumentMemoryStep = (typeof DOCUMENT_MEMORY_STEPS)[number];
+/**
+ * Why a space posting's store step kept nothing, or not everything, beyond
+ * what its digest step says — the ingest's own reasons for the step it runs
+ * itself. `nothing-endorsed`: the digest left nothing to apply, its own step
+ * saying why. `not-applied`: the digest settled with memories to apply and
+ * the apply never happened — the wait was lost after the start, or the
+ * process ended first. `items-refused`: applied, and the runtime refused one
+ * or more of the endorsed memories, so facts of the chunk are not in the store.
+ */
+export const STORE_STEP_REASONS = ['nothing-endorsed', 'not-applied', 'items-refused'] as const;
+export type StoreStepReason = (typeof STORE_STEP_REASONS)[number];
 
 export interface ManifestStep {
   status: OrchestrationStepStatus;
@@ -94,6 +86,89 @@ export interface ManifestStep {
   counts: Record<string, number>;
 }
 
+/**
+ * What a posting came to, as either sink reports it: the run the sink
+ * started, whether it still runs, the digest's child run, the two steps as
+ * the manifest summarizes them, why a failed run failed, and the records the
+ * store left current. The loop names no records — its points carry the digest
+ * run's id, and that is what a retraction names — so a loop posting's list
+ * is empty.
+ */
+export interface PostingOutcome {
+  orchestrationRunId: string;
+  status: QualityRunStatus;
+  /** The digest step's child run — the run whose id names the loop's stored points, or the register digest a space applied. */
+  digestRunId: string | null;
+  steps: Record<PostingStep, ManifestStep | null>;
+  /** Why a failed run failed; null otherwise. */
+  error: string | null;
+  recordIds: string[];
+}
+
+/**
+ * How a sink fails a call, as the core reads it: the sink translates its
+ * client's own errors into one of these, so the core decides what to record
+ * and whether to go on from the kind alone, never from a message. `refused`:
+ * the service answered and would not do it — the next chunk would meet the
+ * same answer. `unreachable`: nobody answered within the client's recovery —
+ * the same. `timeout`: the service held the call past its time. `unfinished`:
+ * the posting was started and did not reach its end — the wait for it lost,
+ * or what it endorsed not applied — so the record keeps the run's id.
+ */
+export type SinkFaultKind = 'refused' | 'unreachable' | 'timeout' | 'unfinished';
+
+export class SinkFault extends Error {
+  override readonly name = 'SinkFault';
+  constructor(
+    readonly kind: SinkFaultKind,
+    message: string,
+    /** The run the sink started before it failed; null when none was. */
+    readonly orchestrationRunId: string | null = null,
+  ) {
+    super(message);
+  }
+}
+
+/**
+ * A store, as the ingester uses it: post one chunk and wait for it to come to
+ * its end, read a posting back, and take out what a posting stored. A call the
+ * sink cannot carry out is a `SinkFault`; anything else it throws is a fault
+ * in the program. A sink is asked only about postings made through the store
+ * it is — its kind, and for a space the space and the scope it writes under
+ * (`sameStore`): the core keeps every other store's apart.
+ */
+export interface IngestSink {
+  readonly kind: IngestSinkKind;
+  /** The service's base URL, as every posting records where it went. */
+  readonly host: string;
+  /** The space every posting goes to; null for the loop, whose store has none. */
+  readonly spaceId: string | null;
+  /** The scope every posting goes under — the tenant's partition, for a space; null for the loop, whose store has none. */
+  readonly scope: RecordScope | null;
+  post(planned: PlannedChunk): Promise<PostingOutcome>;
+  /** The posting as the service has it now, or null when it no longer does. */
+  status(entry: ManifestEntry): Promise<PostingOutcome | null>;
+  /**
+   * What the posting stored, gone — how many memories went; a posting the
+   * store holds nothing of removes nothing. `keep` names the records another
+   * standing posting through this store lists too — a fact two postings
+   * answered is one record — which stay current, whatever this posting lists.
+   */
+  retract(entry: ManifestEntry, keep: ReadonlySet<string>): Promise<number>;
+}
+
+/**
+ * How a chunk's posting ended. `complete` is earned by the store step: what
+ * the digest endorsed is in the store — every fact of the chunk, unless a
+ * step's reason says some were left out (`leftFactsOut`). `unstored` is a
+ * run that settled without storing any — embeddings disabled, the store
+ * unavailable, the digest judged and not accepted or finding nothing — which
+ * the loop's runner still marks complete, since no step failed. `failed`
+ * never settled or settled failed; `refused` never started.
+ */
+export const INGEST_STATUSES = ['complete', 'unstored', 'failed', 'refused'] as const;
+export type IngestStatus = (typeof INGEST_STATUSES)[number];
+
 /** One outcome, as recorded. The ledger keeps every outcome in order; the latest per hash is what a re-run reads. */
 export interface ManifestEntry {
   chunkHash: string;
@@ -101,22 +176,31 @@ export interface ManifestEntry {
   document: string;
   chunk: { index: number; of: number };
   kind: DocumentKind;
+  /** Which store the chunk was posted to. */
+  sink: IngestSinkKind;
+  /** The service the posting went through, by its base URL. */
+  host: string;
+  /** The space the posting went to; null for a loop posting. */
+  spaceId: string | null;
+  /** The scope a space posting wrote under; null for a loop posting, and for a space posting recorded before the manifest kept it. */
+  scope: RecordScope | null;
   orchestrationRunId: string | null;
-  /** The digest step's child run — the run whose id names the stored points. */
+  /** The digest step's child run — the run whose id names the loop's stored points. */
   digestRunId: string | null;
+  /** The records a space posting left current, as its apply answered them; empty for a loop posting. */
+  recordIds: string[];
   status: IngestStatus;
-  /** Null for a step the orchestration never reported. */
-  steps: Record<DocumentMemoryStep, ManifestStep | null>;
+  /** Null for a step the run never reported. */
+  steps: Record<PostingStep, ManifestStep | null>;
   /** Why a `failed` or `refused` posting ended that way; null otherwise — an `unstored` one is explained by its steps. */
   error: string | null;
   ingestedAt: string;
-  loopUrl: string;
   /**
-   * When what this posting's digest run stored was retracted — replaced by a
-   * later digest of the document, or the document retired; null while it stands.
+   * When what this posting stored was retracted — replaced by a later digest
+   * of the document, or the document retired; null while it stands.
    */
   retractedAt: string | null;
-  /** How many points that retraction removed — 0 when the store held none of them by then; null while it stands. */
+  /** How many memories that retraction removed — 0 when the store held none of them by then; null while it stands. */
   retractedPoints: number | null;
 }
 

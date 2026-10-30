@@ -1,0 +1,79 @@
+{
+  "adapter": "memory",
+  "binding": {
+    "space": {
+      "name": "job-assistant",
+      "runId": "2026-10-27T23-52-55-161-d2f2e4-quality"
+    },
+    "scope": {
+      "partition": "tenant",
+      "unit": "unit"
+    },
+    "registers": {
+      "profile-fact": {
+        "name": "profile_fact",
+        "kind": "semantic",
+        "operations": ["recall"],
+        "metadata": []
+      },
+      "profile-story": {
+        "name": "profile_story",
+        "kind": "semantic",
+        "operations": ["recall"],
+        "metadata": []
+      },
+      "claim-boundary": {
+        "name": "claim_boundary",
+        "kind": "semantic",
+        "operations": ["recall"],
+        "metadata": []
+      },
+      "standing-answer": {
+        "name": "standing_answer",
+        "kind": "semantic",
+        "operations": ["recall", "remember"],
+        "metadata": ["question", "channel"]
+      }
+    },
+    "recovery": {
+      "windowMs": 60000,
+      "pauseMs": 2000
+    }
+  },
+  "project": "job-assistant",
+  "facts": ["profile-fact", "profile-story", "claim-boundary", "standing-answer"],
+  "teach": "standing-answer",
+  "legend": [
+    {
+      "kind": "profile_fact",
+      "use": "one thing true of the subject that a field could take or compute from"
+    },
+    {
+      "kind": "profile_story",
+      "use": "a course of events the subject was part of, kept whole"
+    },
+    {
+      "kind": "claim_boundary",
+      "use": "a bound on what the subject may claim"
+    },
+    {
+      "kind": "standing_answer",
+      "use": "the subject's own answer to a question a form asked, with the options offered"
+    }
+  ],
+  "recall": {
+    "hitsPerFieldType": {
+      "text": 3,
+      "textarea": 10,
+      "number": 3,
+      "date": 3,
+      "select": 3,
+      "radio": 3,
+      "checkbox": 3,
+      "file": 3,
+      "unknown": 3
+    },
+    "maxEvidence": 24,
+    "concurrency": 4
+  }
+}

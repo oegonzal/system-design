@@ -4,7 +4,7 @@ import {
   type IterationTrace,
   type OrchestrationRunDto,
   type QualityLoopHealthDto,
-  type QualityRunDto,
+  type QualityRunReadDto,
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
@@ -16,7 +16,7 @@ import { LoopRunLost, LoopRunStale } from './loop-errors';
 const T0 = Date.parse('2026-10-02T12:00:00.000Z');
 const at = (offsetMs: number): string => new Date(T0 + offsetMs).toISOString();
 
-const run = (overrides: Partial<QualityRunDto>): QualityRunDto => ({
+const run = (overrides: Partial<QualityRunReadDto>): QualityRunReadDto => ({
   runId: 'r1',
   pipeline: 'p',
   status: 'running',
@@ -38,6 +38,7 @@ const run = (overrides: Partial<QualityRunDto>): QualityRunDto => ({
   trace: null,
   exchanges: [],
   error: null,
+  readout: null,
   ...overrides,
 });
 
@@ -74,7 +75,7 @@ class ScriptedClient extends LoopClient {
   }
   reads = 0;
   constructor(
-    private readonly runs: (QualityRunDto | null)[] = [],
+    private readonly runs: (QualityRunReadDto | null)[] = [],
     private readonly orchestrations: (OrchestrationRunDto | null)[] = [],
   ) {
     super();
@@ -86,7 +87,7 @@ class ScriptedClient extends LoopClient {
       heartbeat: { heartbeatEveryMs: 60_000, staleAfterMs: 180_000 },
     };
   }
-  async getRun(): Promise<QualityRunDto | null> {
+  async getRun(): Promise<QualityRunReadDto | null> {
     this.reads += 1;
     return this.runs.length > 1 ? (this.runs.shift() ?? null) : (this.runs[0] ?? null);
   }
@@ -127,14 +128,16 @@ function clock() {
 }
 
 describe('awaitRun', () => {
-  it('[LC-2] returns the run once it settles, polling at the given pace and reading the window from /health', async () => {
+  it('[LC-2] [QL-83] returns the run once it settles — its readout with it — polling at the given pace and reading the window from /health', async () => {
+    const readout = { admission: 'admitted' as const, withheld: [] };
     const client = new ScriptedClient([
       run({ status: 'running', heartbeatAt: at(0) }),
       run({ status: 'running', heartbeatAt: at(3_000) }),
-      run({ status: 'complete', finishedAt: at(6_000), heartbeatAt: at(6_000) }),
+      run({ status: 'complete', finishedAt: at(6_000), heartbeatAt: at(6_000), readout }),
     ]);
     const settled = await awaitRun(client, 'r1', { pollEveryMs: 3_000, ...clock() });
     expect(settled.status).toBe('complete');
+    expect(settled.readout).toEqual(readout);
     expect(client.reads).toBe(3);
   });
 
@@ -210,7 +213,7 @@ describe('awaitOrchestration', () => {
 describe('bestArtifact', () => {
   it('finds the best iteration by its number and reads it through the schema', () => {
     const iteration = (n: number, artifact: unknown) =>
-      ({ iteration: n, artifact }) as QualityRunDto['trace'] extends infer T
+      ({ iteration: n, artifact }) as QualityRunReadDto['trace'] extends infer T
         ? T extends { iterations: (infer I)[] }
           ? I
           : never

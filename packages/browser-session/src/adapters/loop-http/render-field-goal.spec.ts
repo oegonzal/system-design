@@ -9,7 +9,7 @@ import {
 
 import { unitContextOf, type FormTask } from '../../core/open-unit';
 import type { FieldsInput } from '../../core/ports';
-import { toBrainFault } from './loop-brain';
+import { guarded } from './loop-runs';
 import { composeFieldGoalWithinBudget, OPEN_UNIT_HEADING, renderFieldProse } from './render-goal';
 
 /**
@@ -22,7 +22,7 @@ const SESSION = { sessionId: 'session-1', step: 6 };
 const CRITERIA = [{ id: 'c1', kind: 'grounding', statement: 'Rest every value on the evidence.' }];
 
 describe('the form goal', () => {
-  it('[BRW-16] states under the open unit what the page laid out under the declared landmark — titled by that landmark, counting the nodes shown — and fits the statement to the budget by a declared ladder: cut at a node boundary before any field, dropped before the goal is refused', () => {
+  it('[BRW-16] states under the open unit what the page laid out under the declared landmark — titled by that landmark, counting the nodes shown — and fits the statement to the budget by a declared ladder: cut at a node boundary before any field, dropped before the goal is refused', async () => {
     const task: FormTask = {
       label: 'Senior Engineer at Acme',
       url: 'https://jobs.example.test/apply/42',
@@ -111,8 +111,8 @@ describe('the form goal', () => {
     expect(() =>
       composeFieldGoalWithinBudget(FIELD_ANSWER_PIPELINE_ID, input, without.bytes + 1),
     ).toThrow(GoalBudgetExceeded);
-    expect(toBrainFault(new GoalBudgetExceeded(65_000, 64_000))).toMatchObject({
-      reason: 'goal-budget',
-    });
+    await expect(
+      guarded(() => Promise.reject(new GoalBudgetExceeded(65_000, 64_000))),
+    ).rejects.toMatchObject({ reason: 'goal-budget' });
   });
 });

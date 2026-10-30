@@ -7,82 +7,47 @@ import {
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { MemoryRefused } from '@sysdesign/agentic-memory';
-import type {
-  ApiErrorResponse,
-  ApiValidationIssue,
-  CompileReportDto,
-  MemoryRefusal,
-  MemoryRefusalDto,
+import {
+  SPACE_REFUSAL_MISSING,
+  SPACE_REFUSAL_STATUS,
+  type ApiErrorResponse,
+  type ApiValidationIssue,
+  type CompileReportDto,
+  type MemoryRefusalDto,
+  type SpaceRefusal,
 } from '@sysdesign/contracts';
 import { LoopRefused, LoopTimeout, LoopUnreachable } from '@sysdesign/loop-client';
 
-import { HostRefused, type HostRefusal } from './host-refusal';
-
-/** A refusal from either vocabulary: the runtime's, or the host's own. */
-type Refusal = MemoryRefusal | HostRefusal;
+import { HostRefused } from './host-refusal';
 
 /** What a refusal answers: the framework's error shape around a `MemoryRefusalDto`, whichever vocabulary its code is from. */
-type RefusalBody = ApiErrorResponse & Omit<MemoryRefusalDto, 'code'> & { code: Refusal };
+type RefusalBody = ApiErrorResponse & Omit<MemoryRefusalDto, 'code'> & { code: SpaceRefusal };
 
-/**
- * Every refusal the memory routes answer, with its one status: what an address
- * does not find is 404; a record or a run that has moved on — still running,
- * superseded, a digest already applied — or a write that lost its race is 409;
- * and a request the space's declarations, or a digest's own record, do not
- * serve is 422. Declared with `satisfies`, so a refusal added to either
- * vocabulary does not compile until it has its status here.
- */
-const REFUSAL_STATUS = {
-  'run.not_found': 404,
-  'run.in_flight': 409,
-  'run.no_strategy': 422,
-  'digest.no_registers': 422,
-  'digest.too_large': 422,
-  'digest.no_report': 422,
-  'digest.applied': 409,
-  'space.not_found': 404,
-  'space.not_compiled': 422,
-  'register.unknown': 422,
-  'operation.undeclared': 422,
-  'scope.invalid': 422,
-  'candidate.invalid': 422,
-  'metadata.undeclared': 422,
-  'record.not_found': 404,
-  'record.not_current': 409,
-  'identity.mismatch': 422,
-  conflict: 409,
-  'consolidation.unavailable': 422,
-} as const satisfies Record<Refusal, number>;
+/** The refusals the contracts declare 404, each naming what is missing. */
+type NotFound = keyof typeof SPACE_REFUSAL_MISSING;
 
-type NotFound = {
-  [K in Refusal]: (typeof REFUSAL_STATUS)[K] extends 404 ? K : never;
-}[Refusal];
-
-/**
- * What each not-found names as missing, by kind (the envelope's rule for every
- * 404 an API raises itself). Typed over exactly the codes declared 404, so a
- * not-found added to either vocabulary does not compile until it says what.
- */
-const MISSING = {
-  'run.not_found': 'run',
-  'space.not_found': 'space',
-  'record.not_found': 'record',
-} as const satisfies Record<NotFound, string>;
-
-const isNotFound = (code: Refusal): code is NotFound => code in MISSING;
+const isNotFound = (code: SpaceRefusal): code is NotFound => code in SPACE_REFUSAL_MISSING;
 
 /** The framework's own fields of an error answered at a status. */
 const framed = (status: number) => ({ statusCode: status, error: STATUS_CODES[status] });
 
-/** A refusal by its code, at its declared status. */
-function refusal(code: Refusal, message: string, issues: ApiValidationIssue[] = []): HttpException {
-  const status = REFUSAL_STATUS[code];
+/**
+ * A refusal by its code, at the one status the contracts declare for it
+ * (`SPACE_REFUSAL_STATUS`): what an address does not find is 404, what has
+ * moved on or lost its race 409, what the space's declarations do not serve 422.
+ */
+function refusal(
+  code: SpaceRefusal,
+  message: string,
+  issues: ApiValidationIssue[] = [],
+): HttpException {
+  const status = SPACE_REFUSAL_STATUS[code];
   const body = {
     ...framed(status),
     code,
     message,
     issues,
-    ...(isNotFound(code) ? { missing: MISSING[code] } : {}),
+    ...(isNotFound(code) ? { missing: SPACE_REFUSAL_MISSING[code] } : {}),
   } satisfies RefusalBody;
   return new HttpException(body, status);
 }

@@ -1,11 +1,15 @@
 import { relative, resolve } from 'node:path';
 
+import { memoryBindingSchema } from '@sysdesign/agentic-memory-client';
 import { CONFIG_DIR, ENGINE_FILE, readChosen, type ReadFile } from '@sysdesign/config-kit';
 import {
   answeringSettingsSchema,
   channelIdSchema,
+  FIELD_TYPES,
+  recordScopeSchema,
   recoverySchema,
   type AnsweringSettings,
+  type HitsPerFieldType,
   type SessionRailsDto,
 } from '@sysdesign/contracts';
 import { z } from 'zod';
@@ -26,7 +30,7 @@ import { BROWSER_ACTION_KINDS } from './core/ports';
  * Each field's meaning, and what its value was measured against, is said
  * here; the value itself only in the file, so the two can never disagree.
  */
-type SettingsKind = 'capture' | 'session' | 'operator' | 'answering' | 'observe';
+type SettingsKind = 'capture' | 'session' | 'operator' | 'answering' | 'observe' | 'brain';
 
 const unique = (kinds: readonly string[]): boolean => new Set(kinds).size === kinds.length;
 
@@ -163,6 +167,133 @@ const operatorSettingsSchema = z.strictObject({
 });
 export type OperatorSettings = z.infer<typeof operatorSettingsSchema>;
 
+/**
+ * The brain that decides for a session: the loop alone, or the loop for plans
+ * and judgements with a memory space, served by the agentic-system host, for
+ * what a field's answer rests on and for what the operator teaches.
+ */
+const loopBrainSettingsSchema = z.strictObject({ adapter: z.literal('loop') });
+
+/**
+ * The run a binding names while nobody has judged the space's strategy yet:
+ * the file reads, so a command that binds nothing runs, and a brain asked to
+ * bind is refused by name before it could ensure a space from a run nobody
+ * chose — the space's name is held by the first run to ensure it, and no
+ * route gives it back. Replaced by the judged run's id (RUNBOOK, "The job
+ * assistant's own memory space").
+ */
+export const UNJUDGED_RUN = 'unjudged';
+
+/** A role as the binding keys it: what this program calls one kind of memory it keeps, whatever the register is named. */
+const role = z.string().min(1);
+
+/** One line, no whitespace at either end: what the goal prints as one line reads back as one. */
+const oneLine = (text: string): boolean => text === text.trim() && !/[\r\n\u2028\u2029]/.test(text);
+
+/** What the goal's legend says of one register the evidence may be of. */
+const legendEntrySchema = z.strictObject({
+  /** The register, by the name the binding gives a facts role's register. */
+  kind: z.string().min(1),
+  /** What the register's items are for, as the goal explains them over the evidence. */
+  use: z.string().min(1).refine(oneLine, 'is not one line'),
+});
+
+/**
+ * How deep a page's recall draws: hits per probe by the kind of control
+ * asking — a total table over the field types, so a new type is classified or
+ * the file refuses — the most items one goal lists, dealt by rank across the
+ * fields, and how many recalls run at once.
+ */
+const recallSettingsSchema = z.strictObject({
+  hitsPerFieldType: z.record(z.enum(FIELD_TYPES), positive) satisfies z.ZodType<HitsPerFieldType>,
+  maxEvidence: positive,
+  concurrency: positive,
+});
+
+const memoryBrainShape = z.strictObject({
+  adapter: z.literal('memory'),
+  /** What this program needs of the space, as the client declares it; checked against the host once at boot. */
+  binding: memoryBindingSchema,
+  /** The value every request names under the space's `project` key: this program's own partition within the tenant's. */
+  project: recordScopeSchema.valueType,
+  /** The roles whose registers are recalled for a field, in the order the legend lists them. */
+  facts: z.array(role).min(1).refine(unique, 'names a role twice'),
+  /** The role the operator's answers are taught to — one of `facts`, so what is taught is recalled. */
+  teach: role,
+  /** The legend the goal prints over the evidence: each facts role's register, and what its items are for. */
+  legend: z.array(legendEntrySchema),
+  recall: recallSettingsSchema,
+});
+
+/** One field at fault, by its path, in the words the refusal carries. */
+interface SettingsFault {
+  path: (string | number)[];
+  message: string;
+}
+
+/**
+ * What the memory brain's fields must agree on, beyond each field's own
+ * shape: every facts role is a role of the binding whose register is
+ * recalled; the teach role is among them and its register remembered to; and
+ * the legend explains each facts role's register once, and no other.
+ */
+function memoryBrainFaults({
+  binding,
+  facts,
+  teach,
+  legend,
+}: z.infer<typeof memoryBrainShape>): SettingsFault[] {
+  const faults: SettingsFault[] = [];
+  facts.forEach((name, index) => {
+    const need = binding.registers[name];
+    if (need === undefined) {
+      faults.push({ path: ['facts', index], message: `is no role of the binding: ${name}` });
+    } else if (!need.operations.includes('recall')) {
+      faults.push({
+        path: ['facts', index],
+        message: `role ${name} declares no recall, and a facts role is recalled`,
+      });
+    }
+  });
+  if (!facts.includes(teach)) {
+    faults.push({
+      path: ['teach'],
+      message: 'is not among facts: what is taught must be recalled',
+    });
+  } else if (!binding.registers[teach]?.operations.includes('remember')) {
+    faults.push({
+      path: ['teach'],
+      message: `role ${teach} declares no remember, and the teach role is written to`,
+    });
+  }
+  const declared = facts.flatMap((name) => binding.registers[name]?.name ?? []);
+  const explained = legend.map((entry) => entry.kind);
+  const unexplained = declared.filter((kind) => !explained.includes(kind));
+  const forNoRole = explained.filter((kind) => !declared.includes(kind));
+  if (!unique(explained)) faults.push({ path: ['legend'], message: 'explains a register twice' });
+  if (unexplained.length > 0) {
+    faults.push({ path: ['legend'], message: `explains no ${unexplained.join(', ')}` });
+  }
+  if (forNoRole.length > 0) {
+    faults.push({
+      path: ['legend'],
+      message: `explains ${forNoRole.join(', ')} for no facts role`,
+    });
+  }
+  return faults;
+}
+
+const memoryBrainSettingsSchema = memoryBrainShape.superRefine((settings, ctx) => {
+  for (const fault of memoryBrainFaults(settings)) ctx.addIssue({ code: 'custom', ...fault });
+});
+export type MemoryBrainSettings = z.infer<typeof memoryBrainSettingsSchema>;
+
+const brainSettingsSchema = z.discriminatedUnion('adapter', [
+  loopBrainSettingsSchema,
+  memoryBrainSettingsSchema,
+]);
+export type BrainSettings = z.infer<typeof brainSettingsSchema>;
+
 export interface SessionSettings {
   capture: CapturePolicy;
   session: SessionDefaults;
@@ -177,6 +308,12 @@ export interface SessionSettings {
   answering: AnsweringSettings;
   /** How the browser waits on and reads a page. */
   observe: ObservePolicy;
+  /**
+   * Which brain decides for the session, and under `memory` what it needs of
+   * the space: the binding is checked against the host once at boot, before
+   * any row, and a tenant left unnamed refuses it by name.
+   */
+  brain: BrainSettings;
   /** Where each kind's settings came from, as a path from the working directory. */
   sources: Readonly<Record<SettingsKind, string>>;
 }
@@ -202,18 +339,21 @@ export function readSessionSettings(root: string, read?: ReadFile): SessionSetti
   const operator = chosen('operator', operatorSettingsSchema);
   const answering = chosen('answering', answeringSettingsSchema);
   const observe = chosen('observe', observePolicySchema);
+  const brain = chosen('brain', brainSettingsSchema);
   return {
     capture: capture.config,
     session: session.config,
     operator: operator.config,
     answering: answering.config,
     observe: observe.config,
+    brain: brain.config,
     sources: {
       capture: capture.source,
       session: session.source,
       operator: operator.source,
       answering: answering.source,
       observe: observe.source,
+      brain: brain.source,
     },
   };
 }

@@ -129,6 +129,8 @@ export interface RecordStore {
 
 export interface StoredSpace {
   id: string;
+  /** The name it was ensured under; null for a space made without one. */
+  name: string | null;
   designRunId: string;
   strategy: unknown;
   policy: unknown;
@@ -137,8 +139,10 @@ export interface StoredSpace {
 }
 
 export interface SpaceStore {
-  insert(space: StoredSpace): Promise<void>;
+  /** Keep a space; `name_taken` when another space holds its name, and then nothing is kept. */
+  insert(space: StoredSpace): Promise<'inserted' | 'name_taken'>;
   get(id: string): Promise<StoredSpace | null>;
+  findByName(name: string): Promise<StoredSpace | null>;
 }
 
 /** What a point carries to be filtered on — never the text, which Postgres keeps. */

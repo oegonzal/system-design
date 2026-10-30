@@ -1,13 +1,13 @@
 import type { FileReport, IngestReport } from './core/ingest-report';
 import type { DocumentRetraction, RetractReport } from './core/retract';
 import { renderIngest, renderRetract, renderStatus } from './render';
-import { manifestEntry } from './test/fakes';
+import { LOOP_URL, manifestEntry } from './test/fakes';
 
-const LOOP_URL = 'http://loop.test';
-/** A digest run retracted through the configured loop, with the points it removed. */
-const run = (digestRunId: string, removed: number) => ({
+/** A digest run retracted through the configured loop, with the points it removed and the records kept for another posting. */
+const run = (digestRunId: string, removed: number, kept = 0) => ({
   digestRunId,
   removed,
+  kept,
   recordedUnder: null,
 });
 
@@ -150,7 +150,7 @@ describe('renderIngest', () => {
       'replacement held back at chunk 2 (failed): 3 earlier digest runs outside the current plan still stand',
     );
     expect(text).toContain(
-      'unresolved: 1 entry with an orchestration whose report was never read — status --refresh reads it back from the loop; then ingest again',
+      'unresolved: 1 entry with a run whose report was never read — status --refresh reads it back from its service; then ingest again',
     );
     const one = renderIngest({
       ...base,
@@ -179,12 +179,12 @@ describe('renderIngest', () => {
         empty,
       ],
     });
-    expect(text).toContain('replaced 3 digest runs (6 points)');
-    expect(text).toMatch(/digest run\s+points\n-+\s+-+\nrun-1\s+4\nrun-3\s+2/);
+    expect(text).toContain('replaced 3 digest runs (6 memories)');
+    expect(text).toMatch(/digest run\s+memories\n-+\s+-+\nrun-1\s+4\nrun-3\s+2/);
     expect(text).toContain('held nothing (1): run-2');
     expect(text).toContain('left standing (1): run-4 — 503: the store is unavailable');
     expect(text).toContain(
-      'chunks 3 · posted 1 · unstored 1 · skipped 0 · failed 1 · retracted 3 digest runs (6 points)',
+      'chunks 3 · posted 1 · unstored 1 · skipped 0 · failed 1 · retracted 3 digest runs (6 memories)',
     );
   });
 });
@@ -211,14 +211,32 @@ describe('renderRetract', () => {
   it('[ING-3] prints the points each run removed, the runs that removed none apart, what was retracted before, and what the record cannot say', () => {
     const text = renderRetract(retired);
     expect(text).toContain('Resume.pdf · 4 entries');
-    expect(text).toMatch(/digest run\s+points\n-+\s+-+\nrun-1\s+8\nrun-3\s+1/);
+    expect(text).toMatch(/digest run\s+memories\n-+\s+-+\nrun-1\s+8\nrun-3\s+1/);
     expect(text).toContain('held nothing (1): run-2');
     expect(text).toContain('already retracted (1): run-0');
-    expect(text).toContain('unresolved: 1 entry with an orchestration whose report was never read');
-    expect(text).toContain('retracted 3 digest runs (9 points)');
+    expect(text).toContain('unresolved: 1 entry with a run whose report was never read');
+    expect(text).toContain('retracted 3 digest runs (9 memories)');
+    // A record another standing posting lists too stays current, and the report says so by run.
+    const [document] = retired.documents as [DocumentRetraction];
+    const shared = renderRetract({
+      dryRun: false,
+      documents: [
+        {
+          ...document,
+          retraction: {
+            through: LOOP_URL,
+            retracted: [run('run-1', 2, 1), run('run-2', 0, 2)],
+            left: null,
+          },
+        },
+      ],
+    });
+    expect(shared).toContain(
+      'kept current, listed by a standing posting too (2): run-1 (1 record), run-2 (2 records)',
+    );
   });
 
-  it('[ING-3] lists the runs recorded under another loop apart, with what each removed through the configured one, never among the runs that held nothing', () => {
+  it('[ING-3] lists the runs recorded under another service apart, with what each removed through the configured one, never among the runs that held nothing', () => {
     const [document] = retired.documents as [DocumentRetraction];
     const other = 'http://localhost:3013';
     const text = renderRetract({
@@ -230,8 +248,8 @@ describe('renderRetract', () => {
             through: LOOP_URL,
             retracted: [
               run('run-1', 8),
-              { digestRunId: 'run-5', removed: 0, recordedUnder: other },
-              { digestRunId: 'run-6', removed: 2, recordedUnder: other },
+              { digestRunId: 'run-5', removed: 0, kept: 0, recordedUnder: other },
+              { digestRunId: 'run-6', removed: 2, kept: 0, recordedUnder: other },
             ],
             left: null,
           },
@@ -239,10 +257,10 @@ describe('renderRetract', () => {
       ],
     });
     expect(text).toContain(
-      `recorded under ${other}, retracted through ${LOOP_URL} (2): run-5 (0 points), run-6 (2 points)`,
+      `recorded under ${other}, retracted through ${LOOP_URL} (2): run-5 (0 memories), run-6 (2 memories)`,
     );
     expect(text).not.toContain('held nothing');
-    expect(text).toContain('retracted 3 digest runs (10 points)');
+    expect(text).toContain('retracted 3 digest runs (10 memories)');
   });
 
   it('lists what a dry run would retract and says nothing was', () => {
@@ -273,12 +291,20 @@ describe('renderStatus', () => {
     },
   });
 
-  it('prints each entry with its steps summarized — reason and note — and the refresh counts when there was one', () => {
-    const text = renderStatus([entry], { entries: [entry], refreshed: 1, running: 2, missing: 3 });
+  it('[ING-4] prints each entry with the sink it went through and its steps summarized — reason and note — and the refresh counts when there was one', () => {
+    const text = renderStatus([entry], {
+      entries: [entry],
+      refreshed: 1,
+      running: 2,
+      missing: 3,
+      elsewhere: 4,
+    });
     expect(text).toMatch(
-      /notes\.md\s+1\/2\s+notes\s+unstored\s+complete \(memories 3, kept 2\)\s+skipped: store-unavailable — qdrant refused the connection\s+2026-10-02T12:00:00\.000Z\s+orch-1/,
+      /notes\.md\s+1\/2\s+notes\s+loop\s+unstored\s+complete \(memories 3, kept 2\)\s+skipped: store-unavailable — qdrant refused the connection\s+2026-10-02T12:00:00\.000Z\s+orch-1/,
     );
-    expect(text).toContain('refreshed 1 · still running 2 · no longer at the loop 3');
+    expect(text).toContain(
+      'refreshed 1 · still running 2 · no longer at the service 3 · through another sink 4',
+    );
     expect(renderStatus([])).toBe('(the manifest is empty — nothing has been ingested)');
   });
 
@@ -286,9 +312,9 @@ describe('renderStatus', () => {
     const text = renderStatus([
       manifestEntry({ retractedAt: '2026-10-14T08:00:00.000Z', retractedPoints: 4 }),
     ]);
-    expect(text).toMatch(/document\s+chunk\s+kind\s+status\s+retracted\s+digest/);
+    expect(text).toMatch(/document\s+chunk\s+kind\s+sink\s+status\s+retracted\s+digest/);
     expect(text).toMatch(
-      /notes\.md\s+1\/1\s+notes\s+complete\s+2026-10-14T08:00:00\.000Z \(4 points\)\s+complete/,
+      /notes\.md\s+1\/1\s+notes\s+loop\s+complete\s+2026-10-14T08:00:00\.000Z \(4 memories\)\s+complete/,
     );
   });
 });

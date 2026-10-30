@@ -49,10 +49,12 @@ tooling/node_modules/
 # Quality-loop run dumps — local by default, unbounded, and full of author prose.
 /static/runs/
 
-# Browser session traces, the persistent Chrome profiles they sign in with, and the ingest manifest.
+# Browser session traces, the persistent Chrome profiles they sign in with, the ingest manifest,
+# and the reports a replay of recorded form pages writes.
 /static/sessions/
 /static/browser-profiles/
 /static/memory-ingest/
+/static/replays/
 /static/google/
 
 # Playwright output

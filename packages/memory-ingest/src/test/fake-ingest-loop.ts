@@ -7,7 +7,7 @@ import type {
 import { FakeLoop, FakeLoopClient } from '@sysdesign/studio-testing';
 
 import { LoopIngestSink } from '../adapters/loop-http/loop-ingest-sink';
-import { FIXED_NOW, storedSteps } from './fakes';
+import { FIXED_NOW, LOOP_URL, storedSteps } from './fakes';
 
 /**
  * The loop as the shared fake, behind the shipping sink — so a spec exercises
@@ -86,7 +86,7 @@ export function fakeIngestLoop(script: readonly SettleScript[] = []): FakeIngest
   const client = new ScriptedLoopClient(loop);
   const queue = [...script];
   let digests = 0;
-  const sink = new LoopIngestSink(client, {
+  const sink = new LoopIngestSink(client, LOOP_URL, {
     pollEveryMs: 0,
     staleAfterMs: 180_000,
     now: () => Date.parse(FIXED_NOW),

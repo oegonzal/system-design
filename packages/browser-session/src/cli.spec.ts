@@ -4,6 +4,9 @@ import { execute, parseOptions, USAGE, type CliService, type Io, type Options } 
 import { SPEC_RAILS } from './core/testing-session';
 import type { SessionOutcome } from './core/session-engine';
 import { SessionRefused } from './core/unit-advice';
+import type { ReplayFieldsReport } from './modules/session/replay-fields';
+import type { TeachAgainReport } from './modules/session/teach-again';
+import { renderReplayFields } from './render';
 import type { SessionDefaults } from './settings';
 
 /** The settings a parse reads its defaults from. */
@@ -41,6 +44,40 @@ const session = (overrides: Partial<BrowserSessionDto> = {}): BrowserSessionDto 
   finishedAt: '2026-10-03T10:04:00.000Z',
   error: null,
   ...overrides,
+});
+
+/** What a replay reports, as the fake service answers it. */
+const REPLAYED: ReplayFieldsReport = {
+  fields: 12,
+  pages: 3,
+  citedFound: 9,
+  cited: 10,
+  citedBy: { equal: 7, identity: 2, contained: 0 },
+  unitLeak: 0,
+  tenantLeak: 0,
+  latency: { p50: 120, p90: 310 },
+  recordedLatency: { p50: 400, p90: 900 },
+  judged: null,
+  unresolvedRuns: 1,
+  unresolvedOrchestrations: 0,
+  retraction: null,
+  outDir: 'static/replays/2026-10-24T10-00-00-000-abcdef',
+};
+
+/** What teach-again reports, as the fake service answers it: nineteen answers, each its own receipt. */
+const taughtAgain = (dryRun: boolean): TeachAgainReport => ({
+  dryRun,
+  sessions: 2,
+  answers: 19,
+  documents: 3,
+  outcomes: dryRun ? {} : { queued: 19 },
+  scopes: { declared: 19, fromDigest: 0, undeclared: 0 },
+  stored: dryRun ? 0 : 18,
+  retracted: dryRun ? 0 : 4,
+  unanswered: 40,
+  untaught: 0,
+  unreadable: [],
+  skipped: ['x-session: 3 answer(s) but 0 teaching(s) — taught without linking rows or retracting'],
 });
 
 const outcome = (status: SessionOutcome['status']): SessionOutcome => ({
@@ -110,11 +147,46 @@ describe('parseOptions', () => {
       command: 'teach-again',
       sessions: 'static/sessions',
       subject: 'Ada',
+      tenant: undefined,
       dryRun: true,
     });
-    expect(parsed(['teach-again', '--sessions', 'd'])).toMatchObject({
+    expect(parsed(['teach-again', '--sessions', 'd', '--tenant', 'verify-1'])).toMatchObject({
       subject: undefined,
+      tenant: 'verify-1',
       dryRun: false,
+    });
+    expect(
+      parsed([
+        'replay-fields',
+        '--sessions',
+        'static/sessions',
+        '--tenant',
+        'verify-1',
+        '--sample',
+        '40',
+        '--judge',
+        '--retract',
+        '20',
+        '--out',
+        'tmp/replays',
+      ]),
+    ).toEqual({
+      command: 'replay-fields',
+      sessions: 'static/sessions',
+      tenant: 'verify-1',
+      sample: 40,
+      judge: true,
+      retract: 20,
+      out: 'tmp/replays',
+    });
+    expect(parsed(['replay-fields', '--sessions', 'd'])).toEqual({
+      command: 'replay-fields',
+      sessions: 'd',
+      tenant: undefined,
+      sample: null,
+      judge: false,
+      retract: null,
+      out: 'static/replays',
     });
   });
 
@@ -137,6 +209,20 @@ describe('parseOptions', () => {
     [['replay-events'], 'replay-events takes one id'],
     [['teach-again'], '--sessions is required'],
     [['teach-again', 'extra', '--sessions', 'd'], 'teach-again takes no positional'],
+    [['replay-fields'], '--sessions is required'],
+    [['replay-fields', '--sessions', 'd', '--sample', '0'], '--sample must be a positive integer'],
+    [
+      ['replay-fields', '--sessions', 'd', '--retract', 'x'],
+      '--retract must be a positive integer',
+    ],
+    [['replay-fields', 'extra', '--sessions', 'd'], 'replay-fields takes no positional'],
+    // A flag a command does not read is refused by name, never taken and ignored.
+    [
+      ['run', '--goal', 'g.md', '--profile', 'p', '--tenant', 'verify-1'],
+      "Unknown option '--tenant'",
+    ],
+    [['teach-again', '--sessions', 'd', '--judge'], "Unknown option '--judge'"],
+    [['sessions', '--tenant', 'verify-1'], "Unknown option '--tenant'"],
   ])('refuses %j', (argv, message) => {
     const result = parseOptions(argv, DEFAULTS);
     expect(result).toBeInstanceOf(Error);
@@ -162,19 +248,8 @@ describe('execute', () => {
     list: async () => [session()],
     show: async () => detail(),
     replayEvents: async () => 4,
-    teachAgain: async () => ({
-      dryRun: false,
-      sessions: 2,
-      answers: 19,
-      documents: 3,
-      stored: 18,
-      retracted: 4,
-      unanswered: 40,
-      untaught: 0,
-      skipped: [
-        'x-session: 3 answer(s) but 0 teaching(s) — taught without linking rows or retracting',
-      ],
-    }),
+    teachAgain: async () => taughtAgain(false),
+    replayFields: async () => REPLAYED,
     ...overrides,
   });
 
@@ -302,24 +377,12 @@ describe('execute', () => {
     ).toBe(1);
     expect(missing.errors).toEqual(['no session nope']);
   });
-  it('[BRW-17] teaches a folder of dumps again and says what it did, or what it would do', async () => {
+  it('[BRW-17] teaches a folder of dumps again — under the tenant named, when one is — and says what it did, or what it would do', async () => {
     const { out, sink } = io();
-    const asked: [string, boolean, string | undefined][] = [];
-    const teachAgain: CliService['teachAgain'] = async (dir, dryRun, subject) => {
-      asked.push([dir, dryRun, subject]);
-      return {
-        dryRun,
-        sessions: 2,
-        answers: 19,
-        documents: 3,
-        stored: dryRun ? 0 : 18,
-        retracted: dryRun ? 0 : 4,
-        unanswered: 40,
-        untaught: 0,
-        skipped: [
-          'x-session: 3 answer(s) but 0 teaching(s) — taught without linking rows or retracting',
-        ],
-      };
+    const asked: [string, boolean, string | undefined, string | undefined][] = [];
+    const teachAgain: CliService['teachAgain'] = async (dir, dryRun, subject, tenant) => {
+      asked.push([dir, dryRun, subject, tenant]);
+      return taughtAgain(dryRun);
     };
     expect(
       await execute(
@@ -330,18 +393,64 @@ describe('execute', () => {
     ).toBe(0);
     expect(
       await execute(
-        parsed(['teach-again', '--sessions', 'static/sessions', '--dry-run']),
+        parsed([
+          'teach-again',
+          '--sessions',
+          'static/sessions',
+          '--dry-run',
+          '--tenant',
+          'verify-1',
+        ]),
         service({ teachAgain }),
         sink,
       ),
     ).toBe(0);
     expect(asked).toEqual([
-      ['static/sessions', false, 'Ada'],
-      ['static/sessions', true, undefined],
+      ['static/sessions', false, 'Ada', undefined],
+      ['static/sessions', true, undefined, 'verify-1'],
     ]);
+    const scopes =
+      "scopes: 19 declared · 0 from the earlier digests · 0 undeclared, left to the brain's rule";
     expect(out).toEqual([
-      '19 answer(s) in 2 session(s) taught again as 3 document(s): 18 fact(s) stored, 4 earlier digest(s) retracted; 40 dump(s) held no answer; x-session: 3 answer(s) but 0 teaching(s) — taught without linking rows or retracting',
-      '19 answer(s) in 2 session(s) would be taught again as 3 document(s); nothing was posted; 40 dump(s) held no answer; x-session: 3 answer(s) but 0 teaching(s) — taught without linking rows or retracting',
+      `19 answer(s) in 2 session(s) taught again as 3 document(s): queued 19 — 18 fact(s) kept by the loop's digests, 4 earlier digest(s) retracted; ${scopes}; 40 dump(s) held no answer; x-session: 3 answer(s) but 0 teaching(s) — taught without linking rows or retracting`,
+      `19 answer(s) in 2 session(s) would be taught again as 3 document(s); nothing was posted; ${scopes}; 40 dump(s) held no answer; x-session: 3 answer(s) but 0 teaching(s) — taught without linking rows or retracting`,
     ]);
+  });
+
+  it('replays a folder of dumps against the memory with the options as given, and renders the report', async () => {
+    const { out, sink } = io();
+    const asked: unknown[] = [];
+    expect(
+      await execute(
+        parsed([
+          'replay-fields',
+          '--sessions',
+          'static/sessions',
+          '--tenant',
+          'verify-1',
+          '--sample',
+          '40',
+          '--judge',
+        ]),
+        service({
+          replayFields: async (options) => {
+            asked.push(options);
+            return REPLAYED;
+          },
+        }),
+        sink,
+      ),
+    ).toBe(0);
+    expect(asked).toEqual([
+      {
+        sessionsDir: 'static/sessions',
+        tenant: 'verify-1',
+        sample: 40,
+        judge: true,
+        retract: null,
+        out: 'static/replays',
+      },
+    ]);
+    expect(out).toEqual([renderReplayFields(REPLAYED)]);
   });
 });

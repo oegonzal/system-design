@@ -1,34 +1,36 @@
 /**
  * What a form recall searches with, and what it makes of what comes back —
- * pure of every port. What a field asks (`fieldQuestionOf`) is the probe: a
- * taught answer's condition is written as that very text, so the stored
- * condition and the next probe are one, and no model is asked to derive one.
- * The search reads only what documents taught about the subject, and of what
- * was recorded for one unit of work, only the unit the page names. Each
- * field's hits are fused on their own, then dealt out by rank under one cap —
- * every field's best before any field's second — so neither the first fields
- * nor the last are crowded out by a long page.
+ * pure of every port. The probes and the dealing are the contracts' own
+ * (`fieldProbes`, `dealByRank`): what a field asks is its probe, and every
+ * field's best is dealt before any field's second. What is this store's alone
+ * stays here: how deep each kind of control draws, the named vectors each
+ * probe is asked of, the filter — only what documents taught about the
+ * subject, and of what was recorded for one unit of work, only the unit the
+ * page names — the fusion of a field's lists, and the evidence item a hit
+ * becomes.
  */
 import {
+  dealByRank,
   DEFAULT_MEMORY_SCOPE,
   DOCUMENT_MEMORY_KINDS,
   evidenceAlias,
-  EVIDENCE_TEXT_MAX_LENGTH,
-  fieldQuestionOf,
-  fieldTypeOf,
+  evidenceText,
   MAX_EVIDENCE,
   type DocumentMemoryKind,
   type EvidenceItem,
-  type FieldSpec,
-  type FieldType,
-  excerpt,
+  type FieldProbeSet,
+  type HitsPerFieldType,
 } from '@sysdesign/contracts';
 
-import { VECTOR_NAMES, type MemoryHit, type MemoryProbe, type ProbeFilter } from '../memory/ports';
+import {
+  VECTOR_NAMES,
+  type MemoryHit,
+  type MemoryProbe,
+  type PointRef,
+  type ProbeFilter,
+} from '../memory/ports';
 import { fuse } from '../memory/recall/fusion';
 
-/** How many distinct probes one page may search under; a page lists at most as many fields. */
-export const MAX_FIELD_PROBES = 40;
 /**
  * How many hits one probe contributes per named vector before its field's
  * fusion, by what kind of control asks. A control that takes one value — a
@@ -40,7 +42,7 @@ export const MAX_FIELD_PROBES = 40;
  * a story for ran to three. A table over every declared field type, so a new
  * kind is classified or the build refuses.
  */
-export const HITS_PER_FIELD_TYPE: Readonly<Record<FieldType, number>> = {
+export const HITS_PER_FIELD_TYPE: HitsPerFieldType = {
   text: 3,
   textarea: 10,
   number: 3,
@@ -51,41 +53,6 @@ export const HITS_PER_FIELD_TYPE: Readonly<Record<FieldType, number>> = {
   file: 3,
   unknown: 3,
 };
-
-/** The hits a field's probe takes per named vector. */
-export const hitsFor = (field: Pick<FieldSpec, 'role' | 'inputType'>): number =>
-  HITS_PER_FIELD_TYPE[fieldTypeOf(field)];
-
-export interface FieldProbeSet {
-  /** Distinct probe texts, in field order. */
-  texts: string[];
-  /** For each field, the index into `texts` it is searched under; null for a field with nothing to ask, or past the cap. */
-  byField: (number | null)[];
-  /** For each probe, the hits it takes per named vector: the most any field asking it takes. */
-  limits: number[];
-}
-
-/** One probe per distinct question the page asks, each field pointing at its own. */
-export function fieldProbes(fields: readonly FieldSpec[]): FieldProbeSet {
-  const texts: string[] = [];
-  const limits: number[] = [];
-  const positions = new Map<string, number>();
-  const byField = fields.map((field) => {
-    const text = fieldQuestionOf(field);
-    if (text === null) return null;
-    const known = positions.get(text);
-    if (known !== undefined) {
-      limits[known] = Math.max(limits[known] ?? 0, hitsFor(field));
-      return known;
-    }
-    if (texts.length === MAX_FIELD_PROBES) return null;
-    positions.set(text, texts.length);
-    texts.push(text);
-    limits.push(hitsFor(field));
-    return texts.length - 1;
-  });
-  return { texts, byField, limits };
-}
 
 /**
  * What a form's answer may rest on: what a document taught about the subject
@@ -128,10 +95,8 @@ export const distinctHits = (ranked: readonly (readonly MemoryHit[])[]): number 
 
 /**
  * The evidence for a page: each field's lists fused on their own, then dealt
- * out by rank — every field's best in field order, then every field's second —
- * one slot per distinct fact, capped. Measured 2026-10-10: joined field by
- * field, an eleven-field page spent the cap before its last fields, and the
- * question 37 stored facts about the subject spoke to was asked with none.
+ * out by rank — every field's best before any field's second — one slot per
+ * distinct fact, capped.
  */
 export function fieldEvidence(
   probes: FieldProbeSet,
@@ -141,19 +106,7 @@ export function fieldEvidence(
   const perField = probes.byField.map((probe) =>
     probe === null ? [] : fuse(probeLists(ranked, probe), probes.limits[probe] ?? 0),
   );
-  const deepest = Math.max(0, ...probes.limits);
-  const seen = new Set<string>();
-  const chosen: MemoryHit[] = [];
-  for (let rank = 0; rank < deepest; rank++) {
-    for (const hits of perField) {
-      const hit = hits[rank];
-      if (hit === undefined || seen.has(hit.contentHash)) continue;
-      if (chosen.length === limit) return chosen;
-      seen.add(hit.contentHash);
-      chosen.push(hit);
-    }
-  }
-  return chosen;
+  return dealByRank(perField, (hit) => hit.contentHash, limit);
 }
 
 /** A hit of a kind the form evidence holds — what documents taught about the subject. */
@@ -162,22 +115,22 @@ const isDocumentMemory = (
 ): hit is MemoryHit & { source: { kind: DocumentMemoryKind } } =>
   (DOCUMENT_MEMORY_KINDS as readonly string[]).includes(hit.source.kind);
 
+/** The address an evidence item names a stored point by: the run that stored it and its ref within it, as one token. */
+export const evidenceRef = (point: PointRef): string => `${point.runId}#${point.ref}`;
+
 /**
- * The hits as the goal lists them: aliased `m1..` in order, each with where it
- * came from and what the store holds it as. The search reads only document
- * kinds; a hit of any other kind is no evidence about the subject.
+ * The hits as the goal lists them: aliased `m1..` in order, each with what the
+ * store holds it as and where it came from — the pipeline that digested it,
+ * and the point's address. The search reads only document kinds; a hit of any
+ * other kind is no evidence about the subject.
  */
 export const evidenceItems = (hits: readonly MemoryHit[]): EvidenceItem[] =>
   hits.filter(isDocumentMemory).map((hit, position) => ({
     alias: evidenceAlias(position),
-    text: excerpt(hit.text, EVIDENCE_TEXT_MAX_LENGTH),
+    text: evidenceText(hit.text),
     when: hit.source.when,
     // A point written before scopes holds as every document fact did: of the subject.
     scope: hit.scope ?? DEFAULT_MEMORY_SCOPE,
-    source: {
-      runId: hit.source.runId,
-      pipeline: hit.source.pipeline,
-      ref: hit.source.ref,
-      kind: hit.source.kind,
-    },
+    kind: hit.source.kind,
+    source: { origin: hit.source.pipeline, ref: evidenceRef(hit.source) },
   }));

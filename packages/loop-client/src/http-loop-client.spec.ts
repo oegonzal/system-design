@@ -25,12 +25,17 @@ const json = (status: number, body: unknown) =>
   new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
 
 describe('HttpLoopClient', () => {
-  it('[LC-1] starts a run and reads it back, unwrapping the envelope; a missing run is null', async () => {
+  it('[LC-1] [QL-83] starts a run and reads it back whole, its readout with it, unwrapping the envelope; a missing run is null', async () => {
+    const settled = {
+      runId: 'r1',
+      status: 'complete',
+      readout: { admission: 'admitted', withheld: [] },
+    };
     const { fetch, calls } = scripted(({ url }) =>
       url.endsWith('/runs')
         ? json(202, { data: { runId: 'r1', status: 'running' } })
         : url.endsWith('/runs/r1')
-          ? json(200, { data: { runId: 'r1', status: 'running', trace: null } })
+          ? json(200, { data: settled })
           : json(404, { statusCode: 404, message: 'run r2 not found' }),
     );
     const client = new HttpLoopClient('http://loop', fetch);
@@ -44,7 +49,7 @@ describe('HttpLoopClient', () => {
       maxIterations: 1,
     });
 
-    expect((await client.getRun('r1'))?.runId).toBe('r1');
+    expect(await client.getRun('r1')).toEqual(settled);
     expect(await client.getRun('r2')).toBeNull();
   });
 

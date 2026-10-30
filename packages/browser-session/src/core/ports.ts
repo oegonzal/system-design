@@ -10,7 +10,6 @@ import type {
   EngineTermination,
   BrowserTaskStatus,
   AnswerBasis,
-  DocumentChunk,
   FieldAnswers,
   FieldSpec,
   InteractionAnswer,
@@ -18,6 +17,7 @@ import type {
   InteractionWithdrawn,
   LandmarkRole,
   LastStep,
+  OperatorGuidanceDto,
   PageObservation,
   QualityRunDto,
   SessionRailsDto,
@@ -32,6 +32,7 @@ import type {
   UnitFacet,
   UnitsOnRecord,
   WithheldRef,
+  WriteOutcome,
 } from '@sysdesign/contracts';
 import { MISSION_STOP } from '@sysdesign/contracts';
 import type { DumpBytes, DumpFile } from '@sysdesign/run-dump';
@@ -40,7 +41,8 @@ import type { FormTask } from './open-unit';
 
 /**
  * The ports the session engine drives. The engine is pure over these: a
- * browser that observes and acts, a brain that is the quality loop, a ledger
+ * browser that observes and acts, a brain that decides through the quality
+ * loop and keeps the operator's answers wherever it is bound to, a ledger
  * for the records, an operator at a terminal, a goal to read, a clock and a
  * dump to write, and the operator's interrupt. The advisor and the session
  * events ports live beside their flows, in `unit-advice.ts` and
@@ -190,10 +192,26 @@ export interface StepInput {
   onRecord: UnitsOnRecord;
 }
 
-/** What the form-memory orchestration reports of the run it opened: its admission, and the locations a reader withholds, each with what withheld it and why. */
+/**
+ * What the recall behind a form run did, as the brain reports it: how many
+ * requests it made, how many items of evidence reached the goal, how long it
+ * took, the fault that stopped it when one did, and what it passed over,
+ * named one by one in the brain's words. Null from a brain whose recall is
+ * the loop's own, read from the run.
+ */
+export interface RecallReport {
+  requests: number;
+  evidence: number;
+  latencyMs: number;
+  fault: string | null;
+  skipped: string[];
+}
+
+/** What the brain reports of the run it opened for a form: its admission, the locations a reader withholds, each with what withheld it and why, and what its recall did. */
 export interface FormReport {
   admission: Admission;
   withheld: readonly WithheldRef[];
+  recall: RecallReport | null;
 }
 
 export interface FieldsInput {
@@ -210,15 +228,48 @@ export interface DerivedRubric {
   dumpRunId: string | null;
 }
 
+/**
+ * What the memory did with one answer handed to it: where the teaching can
+ * be found again — the orchestration the loop digests it on when `queued`,
+ * the record's reference once written, nothing when `refused` — what the
+ * write did, in the memory's own words, and the fault that stood in the way,
+ * null when none did. One reference, so a decision row carries exactly the
+ * record or orchestration its own answer went to.
+ */
+export interface TeachReceipt {
+  ref: string | null;
+  outcome: WriteOutcome | 'queued' | 'refused';
+  fault: string | null;
+}
+
 export interface BrainPort {
+  /**
+   * Bind to whatever the brain keeps its memories in, before any session row
+   * is written: a brain that keeps them in a space is refused here by name —
+   * a tenant nobody chose, a space that does not serve it — as a bad flag is;
+   * one that keeps none does nothing. Called once by whoever runs a session
+   * or teaches through the brain, never by a command that only reads.
+   */
+  bind(): Promise<void>;
   /** The rubric for one pipeline, derived from the mission alone. */
   deriveRubric(pipeline: string, goal: string): Promise<DerivedRubric>;
   planStep(input: StepInput): Promise<Decided<StepPlan>>;
   answerFields(input: FieldsInput): Promise<Decided<FieldAnswers> & FormReport>;
   /** A few suggested answers for fields the operator is about to be asked, judged once. */
   suggestAnswers(input: FieldsInput): Promise<Decided<AnswerSuggestions> & FormReport>;
-  /** Hand a document to the memory; answers as soon as the orchestration is open. */
-  teach(document: DocumentChunk, session: SessionStepRef): Promise<{ orchestrationRunId: string }>;
+  /**
+   * Hand the operator's answers to the memory as the subject's own, and
+   * answer what it did with each, one receipt per answer in the answers'
+   * order: a brain that digests them on the loop answers as soon as the
+   * orchestration is open, one that writes them answers once they are
+   * written. A refusal of one answer is that answer's receipt and stops none
+   * of the others.
+   */
+  teach(
+    answers: readonly OperatorGuidanceDto[],
+    session: SessionStepRef,
+    subject: string,
+  ): Promise<readonly TeachReceipt[]>;
 }
 
 // ---- the ledger ---------------------------------------------------------------
@@ -308,8 +359,8 @@ export interface LedgerPort {
   openTask(task: NewTask): Promise<void>;
   closeTask(taskId: string, close: TaskClose): Promise<void>;
   recordDecision(decision: NewDecision): Promise<void>;
-  /** The teaching orchestration, written onto exactly the decision rows whose answers the document carried. */
-  recordTeaching(decisionIds: readonly string[], orchestrationRunId: string): Promise<void>;
+  /** The reference the teaching left (an orchestration id today, a memory record id under a memory-backed brain), written onto exactly the decision rows whose answers it carried. */
+  recordTeaching(decisionIds: readonly string[], ref: string): Promise<void>;
   closeSession(sessionId: string, close: SessionClose): Promise<void>;
   /**
    * Every session still `running` whose beat is older than `before` closed

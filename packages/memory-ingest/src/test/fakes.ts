@@ -4,6 +4,7 @@ import type {
   ExperienceProfileDto,
   OrchestrationRunDto,
   OrchestrationStepDto,
+  RecordScope,
   StarStoryDto,
 } from '@sysdesign/contracts';
 
@@ -13,8 +14,10 @@ import type {
   DocumentWriter,
   IngestLedger,
   IngestSink,
+  IngestSinkKind,
   ManifestEntry,
   PlannedChunk,
+  PostingOutcome,
   StudioSource,
 } from '../core/ports';
 
@@ -23,8 +26,22 @@ import type {
  * answers from a script, a clock that does not move, and a sink that answers
  * each post from a queue. Test code only — this folder is outside the app
  * build (`tsconfig.app.json`) and nothing reachable from `main.ts` imports it.
- * The shared fake loop behind the shipping sink is `fake-ingest-loop.ts`.
+ * The shared fake loop behind the shipping loop sink is `fake-ingest-loop.ts`;
+ * the scripted memory host behind the shipping space sink is
+ * `fake-memory-client.ts`.
  */
+
+/** The loop every fake posting is recorded under — the one the fakes and the harnesses are configured for. */
+export const LOOP_URL = 'http://loop.test';
+/** The memory host a space posting is recorded under. */
+export const MEMORY_URL = 'http://memory.test';
+export const SPACE_ID = '0f2a1c4e-6b7d-4e8f-9a0b-1c2d3e4f5a6b';
+/** The scope the space postings of these specs write under: the north tenant's partition. */
+export const NORTH: RecordScope = { tenant: 'north' };
+/** The loop's store, as a command configured for it identifies postings. */
+export const LOOP_STORE = { kind: 'loop', spaceId: null, scope: null } as const;
+/** The space under the north tenant, as a command configured for it identifies postings. */
+export const SPACE_STORE = { kind: 'space', spaceId: SPACE_ID, scope: NORTH } as const;
 
 /**
  * The ledger in memory. Loading and saving copy, as a file does, so `entries`
@@ -74,24 +91,50 @@ export const scriptedReader = (documents: Readonly<Record<string, string>>): Doc
 export const FIXED_NOW = '2026-10-02T12:00:00.000Z';
 export const fixedClock = (at: string = FIXED_NOW): Clock => ({ now: () => at });
 
-/** A posting as the manifest records one: its facts stored and standing, unless the overrides say otherwise. */
+/** A step complete with nothing to say but its counts. */
+const completeStep = (counts: Record<string, number>) => ({
+  status: 'complete' as const,
+  reason: null,
+  note: null,
+  counts,
+});
+
+/** A posting as the manifest records one: through the loop, its facts stored and standing, unless the overrides say otherwise. */
 export const manifestEntry = (overrides: Partial<ManifestEntry> = {}): ManifestEntry => ({
   chunkHash: 'a'.repeat(64),
   document: 'notes.md',
   chunk: { index: 1, of: 1 },
   kind: 'notes',
+  sink: 'loop',
+  host: LOOP_URL,
+  spaceId: null,
+  scope: null,
   orchestrationRunId: 'orch-1',
   digestRunId: 'digest-run-1',
+  recordIds: [],
   status: 'complete',
   steps: {
-    digest: { status: 'complete', reason: null, note: null, counts: { memories: 3, kept: 3 } },
-    store: { status: 'complete', reason: null, note: null, counts: { chunks: 3, embedded: 3 } },
+    digest: completeStep({ memories: 3, kept: 3 }),
+    store: completeStep({ chunks: 3, embedded: 3 }),
   },
   error: null,
   ingestedAt: FIXED_NOW,
-  loopUrl: 'http://loop.test',
   retractedAt: null,
   retractedPoints: null,
+  ...overrides,
+});
+
+/** A posting's outcome as the loop reports a settled, stored chunk: both steps complete under digest run `digest-run-1`. */
+export const settledOutcome = (overrides: Partial<PostingOutcome> = {}): PostingOutcome => ({
+  orchestrationRunId: 'orch-1',
+  status: 'complete',
+  digestRunId: 'digest-run-1',
+  steps: {
+    digest: completeStep({ memories: 3, kept: 3 }),
+    store: completeStep({ chunks: 3, embedded: 3 }),
+  },
+  error: null,
+  recordIds: [],
   ...overrides,
 });
 
@@ -108,7 +151,7 @@ export const stepOf = (overrides: Partial<OrchestrationStepDto> = {}): Orchestra
   ...overrides,
 });
 
-/** Both steps complete — the digest run kept three facts and the store took them. */
+/** Both loop steps complete — the digest run kept three facts and the store took them. */
 export const storedSteps = (
   digestRunId = 'digest-run-1',
 ): Record<string, OrchestrationStepDto> => ({
@@ -142,39 +185,65 @@ export const settledOrchestration = (
   ...overrides,
 });
 
-/** A sink that answers each post from a queue — a settled record, or an error to throw. */
+/** Where a scripted sink stands for: the loop unless a spec says a space, under a scope. */
+interface ScriptedSinkOrigin {
+  kind: IngestSinkKind;
+  host: string;
+  spaceId: string | null;
+  scope: RecordScope | null;
+}
+
+/** A sink that answers each post from a queue — a settled outcome, or an error to throw. */
 export class ScriptedSink implements IngestSink {
+  readonly kind: IngestSinkKind;
+  readonly host: string;
+  readonly spaceId: string | null;
+  readonly scope: RecordScope | null;
   readonly posted: PlannedChunk[] = [];
-  readonly records = new Map<string, OrchestrationRunDto>();
-
-  constructor(private readonly outcomes: (OrchestrationRunDto | Error)[] = []) {}
-
-  /** Points the store holds by digest run, as a spec sets them; a retraction removes a run's once. */
+  /** The records each retraction was told to keep, in order — what another standing posting lists too. */
+  readonly kept: string[][] = [];
+  /** What `status` answers, by run id: whatever was posted, and whatever a spec sets. */
+  readonly records = new Map<string, PostingOutcome>();
+  /** Memories the store holds by digest run, as a spec sets them; a retraction removes a run's once. */
   readonly points = new Map<string, number>();
   /** Retractions that fail, by digest run: each throws its error and removes nothing. */
   readonly failingRetractions = new Map<string, Error>();
   /** Digest runs retracted, in order. */
   readonly retracted: string[] = [];
 
-  retract(digestRunId: string): Promise<number> {
-    const failure = this.failingRetractions.get(digestRunId);
-    if (failure !== undefined) return Promise.reject(failure);
-    this.retracted.push(digestRunId);
-    const removed = this.points.get(digestRunId) ?? 0;
-    this.points.delete(digestRunId);
-    return Promise.resolve(removed);
+  constructor(
+    private readonly outcomes: (PostingOutcome | Error)[] = [],
+    origin: ScriptedSinkOrigin = { kind: 'loop', host: LOOP_URL, spaceId: null, scope: null },
+  ) {
+    this.kind = origin.kind;
+    this.host = origin.host;
+    this.spaceId = origin.spaceId;
+    this.scope = origin.scope;
   }
 
-  async post(planned: PlannedChunk): Promise<OrchestrationRunDto> {
+  async post(planned: PlannedChunk): Promise<PostingOutcome> {
     this.posted.push(planned);
-    const next = this.outcomes.shift() ?? settledOrchestration();
+    const next = this.outcomes.shift() ?? settledOutcome();
     if (next instanceof Error) throw next;
     this.records.set(next.orchestrationRunId, next);
     return next;
   }
 
-  async status(orchestrationRunId: string): Promise<OrchestrationRunDto | null> {
-    return this.records.get(orchestrationRunId) ?? null;
+  async status(entry: ManifestEntry): Promise<PostingOutcome | null> {
+    return entry.orchestrationRunId === null
+      ? null
+      : (this.records.get(entry.orchestrationRunId) ?? null);
+  }
+
+  retract(entry: ManifestEntry, keep: ReadonlySet<string>): Promise<number> {
+    if (entry.digestRunId === null) return Promise.resolve(0);
+    const failure = this.failingRetractions.get(entry.digestRunId);
+    if (failure !== undefined) return Promise.reject(failure);
+    this.retracted.push(entry.digestRunId);
+    this.kept.push([...keep].sort());
+    const removed = this.points.get(entry.digestRunId) ?? 0;
+    this.points.delete(entry.digestRunId);
+    return Promise.resolve(removed);
   }
 }
 

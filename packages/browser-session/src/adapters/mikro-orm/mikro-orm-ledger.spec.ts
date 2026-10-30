@@ -193,7 +193,7 @@ describe('the ledger in Postgres', () => {
       },
     ]);
     // The teaching lands on the rows the document carried, and on no other operator row.
-    expect(detail?.decisions.map((d) => [d.id, d.taskId, d.teachOrchestrationId])).toEqual([
+    expect(detail?.decisions.map((d) => [d.id, d.taskId, d.teachingRef])).toEqual([
       [planId, null, null],
       [askedId, taskId, 'teach-1'],
       [cachedId, taskId, null],

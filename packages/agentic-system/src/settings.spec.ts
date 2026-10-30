@@ -25,7 +25,7 @@ describe('the service settings', () => {
   it('[AGS-5] reads the shipped memory settings: a policy, the sweep schedule beside it, and the name it was chosen by', () => {
     const settings = readSettings(PACKAGE_ROOT);
     expect(settings.memory).toMatchObject({
-      scopeKeys: ['tenant', 'project', 'user'],
+      scopeKeys: ['tenant', 'project', 'user', 'unit'],
       terms: { short_term: { ttlSeconds: 3600 }, long_term: { ttlSeconds: null } },
       sweep: { everyMs: 60_000 },
     });

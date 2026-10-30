@@ -22,7 +22,10 @@ import type { SessionSettings } from './settings';
  * it reaches the operator beyond the terminal through the notifications
  * service, at `NOTIFICATIONS_URL`, and asks what is on record of units beyond
  * the session at the advisors `UNIT_ADVISOR_URLS` lists — the mission names
- * which of them, the environment only where each is.
+ * which of them, the environment only where each is. A brain that keeps its
+ * memories in a space asks the host at `AGENTIC_SYSTEM_URL`, for the tenant
+ * `MEMORY_TENANT` names — the settings say which brain, the environment only
+ * where and for whom.
  */
 
 /** The package itself — `dist/..` as built, `src/..` under test — whose `config/` holds the settings. */
@@ -69,6 +72,27 @@ export const SESSION_FLAGS = {
     help: 'a folder of session dumps whose operator answers are taught again',
   },
   dryRun: { name: '--dry-run', valued: false, help: 'plan what would be taught; post nothing' },
+  tenant: {
+    name: '--tenant',
+    valued: true,
+    help: "the tenant whose memories are addressed, over the environment's — a verification tenant, say; a run never reads it",
+  },
+  sample: {
+    name: '--sample',
+    valued: true,
+    help: 'how many recorded fields to judge again, drawn across the dumps',
+  },
+  judge: {
+    name: '--judge',
+    valued: false,
+    help: 'judge the replayed pages through the loop too, beyond recalling for them',
+  },
+  retract: {
+    name: '--retract',
+    valued: true,
+    help: 'close this many of the records a replay recalled, in the tenant replayed against, and recall again: the retraction measure; none unless given',
+  },
+  out: { name: '--out', valued: true, help: 'the folder a replay writes its report under' },
 } as const;
 export type SessionFlag = keyof typeof SESSION_FLAGS;
 
@@ -80,10 +104,19 @@ export const SESSION_ENV = {
   profilesDir: { name: 'BROWSER_PROFILES_DIR', fallback: 'static/browser-profiles' },
   subject: { name: 'BROWSER_SESSION_SUBJECT', fallback: 'the subject' },
   advisors: { name: 'UNIT_ADVISOR_URLS', fallback: 'none' },
+  memoryUrl: { name: 'AGENTIC_SYSTEM_URL', fallback: 'http://localhost:3007' },
+  memoryTenant: { name: 'MEMORY_TENANT', fallback: 'none' },
 } as const;
 
 /** The value that configures no advisor: a mission naming one is then refused by name, never run blind. */
 export const NO_ADVISORS = 'none';
+
+/**
+ * The value that names no tenant: a brain that keeps memories in a space is
+ * then refused by name at boot, never run under a tenant nobody chose — the
+ * partition every request names is the one fact the environment alone holds.
+ */
+export const NO_TENANT = 'none';
 
 export const DEFAULT_LIST_LIMIT = 20;
 
@@ -97,6 +130,10 @@ export interface SessionEnv {
   subject: string;
   /** The advisors configured, in order; none under `none`. */
   advisors: AdvisorEntry[];
+  /** The memory host a brain that keeps memories in a space asks; unread under any other brain. */
+  memoryUrl: string;
+  /** The tenant that brain reads and writes for — the partition every request names; `none` when nobody chose one. */
+  memoryTenant: string;
 }
 
 /**
@@ -199,6 +236,8 @@ export function sessionConfigFromEnv(env: NodeJS.ProcessEnv = process.env): Sess
     profilesDir: nonEmpty(env, SESSION_ENV.profilesDir),
     subject: nonEmpty(env, SESSION_ENV.subject),
     advisors: advisorEntries(env, SESSION_ENV.advisors),
+    memoryUrl: url(env, SESSION_ENV.memoryUrl),
+    memoryTenant: nonEmpty(env, SESSION_ENV.memoryTenant),
   };
 }
 
@@ -265,13 +304,17 @@ export function headedOf(values: { headed?: boolean; headless?: boolean }, base:
   return values.headed ?? base;
 }
 
-/** The `parseArgs` option table, derived from the declaration so no flag is spelled twice. */
-export function parseArgsOptions(): Record<string, { type: 'string' | 'boolean' }> {
+/**
+ * The `parseArgs` option table for the flags a command takes, derived from the
+ * declaration so no flag is spelled twice: a flag the command does not read is
+ * not in its table, so `parseArgs` refuses it by name rather than the command
+ * ignoring it.
+ */
+export function parseArgsOptions(
+  flags: readonly SessionFlag[],
+): Record<string, { type: 'string' | 'boolean' }> {
   return Object.fromEntries(
-    Object.values(SESSION_FLAGS).map((flag) => [
-      flag.name.slice(2),
-      { type: flag.valued ? 'string' : 'boolean' },
-    ]),
+    flags.map((key) => [flagKey(key), { type: SESSION_FLAGS[key].valued ? 'string' : 'boolean' }]),
   );
 }
 

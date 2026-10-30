@@ -1,4 +1,5 @@
 import {
+  fakeReadout,
   openingRecall,
   type DeriveCriteriaRequest,
   type DerivedCriteriaDto,
@@ -12,9 +13,11 @@ import {
   type PromptLibraryEntryDto,
   type QualityLoopHealthDto,
   type QualityRunDto,
+  type QualityRunReadDto,
   type QualityRunStartedDto,
   type RetractedMemoryRunDto,
   type RunHeartbeatDto,
+  type RunReadoutDto,
   type RunRecallDto,
   type StartOrchestrationFromRunRequest,
   type StartOrchestrationRequest,
@@ -51,8 +54,16 @@ import {
  * transport's call. A run that asks to recall opens as the loop records it —
  * `recalling`, or skipped at once when it can never call its producer — and a
  * recalling one settles, to the fake's fixed lessons unless a spec says
- * otherwise, before any iteration lands.
+ * otherwise, before any iteration lands. A run is read whole, its readout
+ * with it, as the loop answers a read: null until it settles, then admitted
+ * on an accept and fallen short otherwise, unless a spec scripts one.
  */
+
+/** How a spec settles a run beyond its iterations: what the coach writes, and what the readout says over the fake's own reading. */
+interface SettleOptions {
+  coach?: CoachScript;
+  readout?: Partial<RunReadoutDto>;
+}
 
 export class FakeLoop {
   readonly runs = new Map<string, QualityRunDto>();
@@ -83,6 +94,8 @@ export class FakeLoop {
   private readonly heartbeat: RunHeartbeatDto;
   private readonly scenarios = new Map<string, RunScenario>();
   private readonly adoptions = new Map<string, IterationTrace>();
+  /** What a spec scripted over the fake's own reading of a run's readout, by run. */
+  private readonly readouts = new Map<string, Partial<RunReadoutDto>>();
   private sequence = 0;
 
   constructor(options: FakeLoopOptions = {}) {
@@ -112,6 +125,7 @@ export class FakeLoop {
     this.requests.clear();
     this.orchestrations.reset();
     this.adoptions.clear();
+    this.readouts.clear();
     this.startRequests.length = 0;
     this.criteriaRequests.length = 0;
     this.scenarios.clear();
@@ -241,9 +255,11 @@ export class FakeLoop {
     return this.orchestrations.digested;
   }
 
-  getRun(runId: string): QualityRunDto | null {
+  /** The run read whole, with its readout as the loop answers it. */
+  getRun(runId: string): QualityRunReadDto | null {
     if (this.unreachable) throw new LoopUnreachable();
-    return this.runs.get(runId) ?? null;
+    const run = this.runs.get(runId);
+    return run === undefined ? null : { ...run, readout: this.readoutOf(run) };
   }
 
   /** The verdicts of the named iterations, from the traces this fake settled; an iteration it never recorded is left out. */
@@ -300,12 +316,13 @@ export class FakeLoop {
    * `'auto'` is what the stub grades from the request alone — its coach
    * writing what `coach` says too; a list is what the spec says. An adopting
    * run's iteration 1 is the adopted iteration, copied verbatim in mode
-   * `adopted`, and the list describes what follows.
+   * `adopted`, and the list describes what follows. A scripted `readout` is
+   * read over what the fake derives from the trace, field by field.
    */
   complete(
     runId: string,
     iterations: readonly FakeIteration[] | 'default' | 'auto' = 'default',
-    coach: CoachScript = {},
+    { coach = {}, readout }: SettleOptions = {},
   ): void {
     const run = this.require(runId);
     this.recalled(run);
@@ -313,6 +330,7 @@ export class FakeLoop {
     run.finishedAt = this.now();
     run.heartbeatAt = run.finishedAt;
     run.trace = this.traceOf(runId, iterations, coach);
+    if (readout !== undefined) this.readouts.set(runId, readout);
   }
 
   /**
@@ -351,6 +369,7 @@ export class FakeLoop {
     this.runs.delete(runId);
     this.requests.delete(runId);
     this.adoptions.delete(runId);
+    this.readouts.delete(runId);
   }
 
   /** Settle a running run by its goal's scenario — the stub's timer calls this; a spec may too. */
@@ -362,7 +381,7 @@ export class FakeLoop {
     this.consume(run.request.goal, scenario);
     if (scenario.outcome === 'fail') return this.fail(runId, scenario.message);
     if (scenario.outcome === 'complete') {
-      return this.complete(runId, scenario.iterations ?? 'auto', scenario.coach);
+      return this.complete(runId, scenario.iterations ?? 'auto', { coach: scenario.coach });
     }
   }
 
@@ -394,6 +413,12 @@ export class FakeLoop {
     // Nothing finished yet is no trace at all, as the loop publishes it.
     if (traced.length === 0) return null;
     return runTrace(run.pipeline, this.version, run.request.goal, criteria, traced);
+  }
+
+  /** The fakes' one reading of a settled run (`fakeReadout`), whatever a spec scripted read over it. */
+  private readoutOf(run: QualityRunDto): RunReadoutDto | null {
+    const read = fakeReadout(run);
+    return read === null ? null : { ...read, ...this.readouts.get(run.runId) };
   }
 
   /** The loop recalls before anything else moves: a run still recalling settles to the fixed lessons first. */

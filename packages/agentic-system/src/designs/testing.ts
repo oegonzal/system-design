@@ -6,7 +6,7 @@ import {
   type OrchestrationRunStartedDto,
   type OrchestrationStepDto,
   type QualityLoopHealthDto,
-  type QualityRunDto,
+  type QualityRunReadDto,
   type QualityRunStartedDto,
   type QualityRunStatus,
   type StartOrchestrationFromRunRequest,
@@ -80,7 +80,7 @@ export class FakeLoopClient extends LoopClient {
     this.runs.push(request);
     return Promise.resolve({ runId: this.runId, status: 'running' });
   }
-  getRun(runId: string): Promise<QualityRunDto | null> {
+  getRun(runId: string): Promise<QualityRunReadDto | null> {
     return Promise.resolve(
       fakeRun('memory-architecture', this.artifacts.get(runId) ?? null, {
         runId,

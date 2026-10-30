@@ -3,9 +3,10 @@ import {
   ANSWER_SUGGESTIONS_PIPELINE_ID,
   type AnswerSuggestions,
   BROWSER_STEP_PIPELINE_ID,
-  type DocumentChunk,
   FIELD_ANSWER_PIPELINE_ID,
+  type FieldAnswer,
   type FieldAnswers,
+  type OperatorGuidanceDto,
   type StepPlan,
   type SuccessCriterion,
   type WithheldRef,
@@ -22,7 +23,9 @@ import {
   type DerivedRubric,
   type FieldsInput,
   type FormReport,
+  type SessionStepRef,
   type StepInput,
+  type TeachReceipt,
 } from './ports';
 
 const FULL = { rung: 'full', bytes: 0, snapshotRung: 'full' as const };
@@ -41,6 +44,18 @@ export const withheldBy = (
   source: WithholdingSource = 'finding',
 ): WithheldRef => ({ ref, source, by, note });
 
+/** One field answered as the answerer writes it — about the subject, stated from the evidence — unless a spec says otherwise. */
+export const fieldAnswer = (ref: string, overrides: Partial<FieldAnswer> = {}): FieldAnswer => ({
+  ref,
+  about: 'subject',
+  decision: 'answer',
+  value: null,
+  rests: 'stated',
+  basis: [],
+  reason: `settled for ${ref}`,
+  ...overrides,
+});
+
 /** Field answers as the form-memory orchestration would have decided them, with the admission and the withholding it reports. */
 export function decidedAnswers(
   answers: FieldAnswers,
@@ -58,6 +73,7 @@ export function decidedAnswers(
     composition: FULL,
     admission: options.admission ?? 'admitted',
     withheld: options.withheld ?? [],
+    recall: null,
   };
 }
 
@@ -74,7 +90,15 @@ export function decidedSuggestions(
     composition: FULL,
     admission: options.admission ?? 'admitted',
     withheld: options.withheld ?? [],
+    recall: null,
   };
+}
+
+/** One teach as the fake brain took it: the answers handed over, whom they were taught as, and the step they came from. */
+export interface TaughtAnswers {
+  answers: OperatorGuidanceDto[];
+  subject: string;
+  session: SessionStepRef;
 }
 
 export type Scripted<T> = T | BrainFaulted;
@@ -89,6 +113,8 @@ export interface BrainScript {
   suggestions?: Scripted<Decided<AnswerSuggestions> & FormReport>[];
   /** Holds every suggestions run until it settles, so a question can be asked before they arrive. */
   suggestionsGate?: Promise<void>;
+  /** Receipts for `teach`, one per answer in turn; past the script every answer is queued under a reference of its own. */
+  teachReceipts?: TeachReceipt[];
   /** Thrown by `teach`, when set. */
   teachFault?: BrainFaulted;
 }
@@ -103,15 +129,21 @@ export class ScriptedBrain implements BrainPort {
   readonly planInputs: StepInput[] = [];
   readonly fieldInputs: FieldsInput[] = [];
   readonly suggestionInputs: FieldsInput[] = [];
-  readonly taught: DocumentChunk[] = [];
+  readonly taught: TaughtAnswers[] = [];
   private readonly plans: Scripted<Decided<StepPlan>>[];
   private readonly answers: Scripted<Decided<FieldAnswers> & FormReport>[];
   private readonly suggestions: Scripted<Decided<AnswerSuggestions> & FormReport>[];
+  private readonly receipts: TeachReceipt[];
 
   constructor(private readonly script: BrainScript) {
     this.plans = [...script.plans];
     this.answers = [...(script.answers ?? [])];
     this.suggestions = [...(script.suggestions ?? [])];
+    this.receipts = [...(script.teachReceipts ?? [])];
+  }
+
+  async bind(): Promise<void> {
+    // The script is the whole of what this brain keeps: nothing to bind.
   }
 
   async deriveRubric(pipeline: string, goal: string): Promise<DerivedRubric> {
@@ -149,9 +181,21 @@ export class ScriptedBrain implements BrainPort {
     return next;
   }
 
-  async teach(document: DocumentChunk): Promise<{ orchestrationRunId: string }> {
+  /** Every teach is recorded and each answer answered with the next scripted receipt, else queued under a reference of its own. */
+  async teach(
+    answers: readonly OperatorGuidanceDto[],
+    session: SessionStepRef,
+    subject: string,
+  ): Promise<readonly TeachReceipt[]> {
     if (this.script.teachFault) throw this.script.teachFault;
-    this.taught.push(document);
-    return { orchestrationRunId: `fake-teach-${this.taught.length}` };
+    this.taught.push({ answers: [...answers], subject, session });
+    return answers.map(
+      () =>
+        this.receipts.shift() ?? {
+          ref: `fake-teach-${this.taught.length}`,
+          outcome: 'queued',
+          fault: null,
+        },
+    );
   }
 }

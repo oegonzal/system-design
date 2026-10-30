@@ -1,37 +1,22 @@
 import {
   ANSWER_SUGGESTIONS_PIPELINE_ID,
-  BROWSER_STEP_PIPELINE_ID,
   DOCUMENT_MEMORY_ORCHESTRATOR_ID,
   FIELD_ANSWER_PIPELINE_ID,
   FORM_MEMORY_ORCHESTRATOR_ID,
   FORM_MEMORY_TARGET_STEP,
   formTargetReportSchema,
-  GoalBudgetExceeded,
+  guidanceDocuments,
   renderDocumentGoal,
   type AnswerSuggestions,
-  type DocumentChunk,
   type FieldAnswers,
   type FormPipeline,
-  type QualityRunDto,
-  type RunOpenerDto,
+  type OperatorGuidanceDto,
   type StepPlan,
 } from '@sysdesign/contracts';
-import {
-  awaitOrchestration,
-  awaitRun,
-  DerivationFailed,
-  LoopRefused,
-  LoopRunLost,
-  LoopRunStale,
-  LoopTimeout,
-  LoopUnreachable,
-  type AwaitOptions,
-  type LoopClient,
-} from '@sysdesign/loop-client';
+import { awaitOrchestration, type LoopClient } from '@sysdesign/loop-client';
 
 import {
   BrainFaulted,
-  type BrainFaultReason,
   type BrainPort,
   type Decided,
   type DerivedRubric,
@@ -39,79 +24,34 @@ import {
   type FormReport,
   type SessionStepRef,
   type StepInput,
+  type TeachReceipt,
 } from '../../core/ports';
-import { composeFieldGoalWithinBudget, composeStepGoalWithinBudget } from './render-goal';
+import {
+  DECISION_ITERATIONS,
+  deriveRubricWith,
+  guarded,
+  openedBy,
+  planStepWith,
+  settled,
+  type LoopBrainOptions,
+} from './loop-runs';
+import { composeFieldGoalWithinBudget } from './render-goal';
 
 /**
- * The brain is the quality loop. A plan is a `browser-step` run started on
- * the composed goal and awaited; field answers are a `form-memory`
- * orchestration whose target run is read back with the admission the
- * server reports; teaching is a `document-memory` orchestration, opened and
- * left to run. The rubric comes from the caller on every request, so the
- * criteria ids mean the same thing across the session. Every error the
- * client raises becomes a `BrainFaulted` with its reason; anything else is a
- * bug and is rethrown.
+ * The brain is the quality loop alone. A plan is a `browser-step` run started
+ * on the composed goal and awaited; field answers are a `form-memory`
+ * orchestration whose target run is read back with the admission the server
+ * reports, its recall the loop's own; teaching is a `document-memory`
+ * orchestration, opened and left to run, so a receipt says `queued`. The
+ * rubric comes from the caller on every request, so the criteria ids mean the
+ * same thing across the session. Every error the client raises becomes a
+ * `BrainFaulted` with its reason; anything else is a bug and is rethrown.
+ * The loop is the brain's one store, reached on every request: there is
+ * nothing to bind before the first row.
  */
 
-/** One judged plan or answer set: a fresh observation beats a blind revise. */
-export const DECISION_ITERATIONS = 1;
-/**
- * On a page that has not changed since the last plan, after a plan that ran
- * nothing, there is no fresh observation to have and nothing the page can add:
- * the loop revises once from its own briefing — the prior plan with the
- * remediations at their positions — before the session is handed the verdict.
- * After a plan that ran something, a fresh plan is briefed by what ran:
- * measured 2026-10-07, 23 such revises cost 8.3 minutes and the four that
- * changed what ran chose worse.
- */
-export const DECISION_ITERATIONS_WHEN_NOTHING_RAN = 2;
 /** A digest may revise once. */
-export const TEACH_ITERATIONS = 2;
-
-type ErrorClass = abstract new (...args: never[]) => Error;
-
-/** The client's errors, each to the fault it is. */
-const FAULT_BY_ERROR: readonly (readonly [ErrorClass, BrainFaultReason])[] = [
-  [LoopUnreachable, 'unreachable'],
-  [LoopTimeout, 'unreachable'],
-  [LoopRunLost, 'lost'],
-  [LoopRunStale, 'stale'],
-  [LoopRefused, 'failed'],
-  [DerivationFailed, 'failed'],
-  [GoalBudgetExceeded, 'goal-budget'],
-];
-
-/** The fault an error is, or null for an error that is not the loop's. */
-export function toBrainFault(error: unknown): BrainFaulted | null {
-  if (error instanceof BrainFaulted) return error;
-  const match = FAULT_BY_ERROR.find(([type]) => error instanceof type);
-  return match === undefined ? null : new BrainFaulted(match[1], (error as Error).message);
-}
-
-async function guarded<T>(work: () => Promise<T>): Promise<T> {
-  try {
-    return await work();
-  } catch (error) {
-    throw toBrainFault(error) ?? error;
-  }
-}
-
-/** A run that failed decided nothing. */
-const settled = (run: QualityRunDto): QualityRunDto => {
-  if (run.status === 'failed') {
-    throw new BrainFaulted('failed', run.error?.message ?? `run ${run.runId} failed`);
-  }
-  return run;
-};
-
-export type LoopBrainOptions = Pick<AwaitOptions, 'pollEveryMs' | 'staleAfterMs' | 'now' | 'sleep'>;
-
-/** Who opens a run for the session: the session by its id, and what the run was to it — "step 6 · form page". */
-const openedBy = (session: SessionStepRef, what: string | null): RunOpenerDto => ({
-  kind: 'browser-session',
-  id: session.sessionId,
-  label: what === null ? `step ${session.step}` : `step ${session.step} · ${what}`,
-});
+const TEACH_ITERATIONS = 2;
 
 export class LoopBrain implements BrainPort {
   constructor(
@@ -119,46 +59,16 @@ export class LoopBrain implements BrainPort {
     private readonly options: LoopBrainOptions = {},
   ) {}
 
+  async bind(): Promise<void> {
+    // Nothing is bound ahead: the loop is asked on every request, and refuses there.
+  }
+
   deriveRubric(pipeline: string, goal: string): Promise<DerivedRubric> {
-    return guarded(async () => {
-      const { criteria, dumpRunId } = await this.client.deriveCriteria({ pipeline, goal });
-      return { criteria, dumpRunId };
-    });
+    return deriveRubricWith(this.client, pipeline, goal);
   }
 
   planStep(input: StepInput): Promise<Decided<StepPlan>> {
-    return guarded(async () => {
-      const composed = composeStepGoalWithinBudget({
-        ...input,
-        progress: { criteria: input.criteria, ...input.progress },
-      });
-      // A criterion the session settled is not graded again: the rubric this
-      // run reads omits it, and the goal's Progress section carries it instead.
-      const criteria = input.criteria.filter(
-        (criterion) => !input.progress.settled.includes(criterion.id),
-      );
-      const { runId } = await this.client.startRun({
-        pipeline: BROWSER_STEP_PIPELINE_ID,
-        goal: composed.goal,
-        criteria,
-        openedBy: openedBy(input.session, null),
-        maxIterations:
-          input.pageUnchanged && input.lastStep?.ran === 0
-            ? DECISION_ITERATIONS_WHEN_NOTHING_RAN
-            : DECISION_ITERATIONS,
-      });
-      const run = settled(await awaitRun(this.client, runId, this.options));
-      return {
-        runId,
-        orchestrationRunId: null,
-        run,
-        composition: {
-          rung: composed.rung,
-          bytes: composed.bytes,
-          snapshotRung: composed.snapshotRung,
-        },
-      };
-    });
+    return planStepWith(this.client, this.options, input);
   }
 
   answerFields(input: FieldsInput): Promise<Decided<FieldAnswers> & FormReport> {
@@ -174,7 +84,8 @@ export class LoopBrain implements BrainPort {
    * the goal composed for the pipeline named — its index naming the open unit
    * of work, whose memories alone of those bound to a unit the recall reads —
    * the run it opened read back, and what the orchestration reported of it:
-   * its admission, and the locations a reader withholds.
+   * its admission, and the locations a reader withholds. The recall is the
+   * orchestration's own step, read from its record, so the brain reports none.
    */
   private formRun<T>(
     input: FieldsInput,
@@ -223,21 +134,44 @@ export class LoopBrain implements BrainPort {
         composition: { rung: composed.rung, bytes: composed.bytes, snapshotRung: null },
         admission: report.success ? report.data.admission : 'fell-short',
         withheld: report.success ? report.data.withheld : [],
+        recall: null,
       };
     });
   }
 
-  teach(document: DocumentChunk, session: SessionStepRef): Promise<{ orchestrationRunId: string }> {
+  /**
+   * The answers handed to the memory as the guidance documents they make —
+   * one per unit of work they were given in, as the contracts batch them, so
+   * one answer taught the moment it is given is one document — each a
+   * `document-memory` orchestration opened and left to run. Each answer's
+   * receipt names the orchestration its document went to, queued: what it
+   * stores is the loop's to say, later.
+   */
+  teach(
+    answers: readonly OperatorGuidanceDto[],
+    session: SessionStepRef,
+    subject: string,
+  ): Promise<readonly TeachReceipt[]> {
     return guarded(async () => {
-      const { orchestrationRunId } = await this.client.startOrchestration(
-        DOCUMENT_MEMORY_ORCHESTRATOR_ID,
-        {
-          goal: renderDocumentGoal(document),
-          maxIterations: TEACH_ITERATIONS,
-          openedBy: openedBy(session, 'teaching'),
-        },
-      );
-      return { orchestrationRunId };
+      const documents = guidanceDocuments(session.sessionId, subject, answers, (one) => one);
+      if (documents.length === 0) throw new Error('a teach carries at least one answer');
+      const queuedOn = new Map<OperatorGuidanceDto, string>();
+      for (const { document, answers: batch } of documents) {
+        const { orchestrationRunId } = await this.client.startOrchestration(
+          DOCUMENT_MEMORY_ORCHESTRATOR_ID,
+          {
+            goal: renderDocumentGoal(document),
+            maxIterations: TEACH_ITERATIONS,
+            openedBy: openedBy(session, 'teaching'),
+          },
+        );
+        for (const answer of batch) queuedOn.set(answer, orchestrationRunId);
+      }
+      return answers.map((answer) => ({
+        ref: queuedOn.get(answer) ?? null,
+        outcome: 'queued',
+        fault: null,
+      }));
     });
   }
 }

@@ -15,6 +15,7 @@ import {
   decidedAnswers,
   decidedPlan,
   decidedSuggestions,
+  fieldAnswer,
   withheldBy,
   FakeBrowser,
   ScriptedOperator,
@@ -68,14 +69,11 @@ const ANSWERS: FieldAnswers = {
   ...JOURNEY_ANSWERS,
   fields: [
     ...JOURNEY_ANSWERS.fields,
-    {
-      ref: 'e7',
+    fieldAnswer('e7', {
       decision: 'ask-operator',
-      value: null,
       rests: 'none',
-      basis: [],
       reason: 'nothing recalled on the question',
-    },
+    }),
   ],
 };
 
@@ -122,6 +120,14 @@ const suggestionsFile = (dumps: { text(path: string): string }) =>
   (JSON.parse(dumps.text('01-steps/03/fields.json')) as { suggestions: Record<string, unknown> })
     .suggestions;
 
+/** The item the step's fields file records as taught for a field: the operator's answer, `about` the scope the answerer declared. */
+const guidanceOf = (dumps: { text(path: string): string }, ref: string) =>
+  (
+    JSON.parse(dumps.text('01-steps/03/fields.json')) as {
+      fields: { field: { ref: string }; result: { guidance: unknown } | null }[];
+    }
+  ).fields.find((field) => field.field.ref === ref)?.result?.guidance ?? null;
+
 describe('suggested answers in the session', () => {
   it('[BRW-12] asks for them once per form, for the open fields going to the operator, under the session’s rubric, and letters them record first, drafts labelled apart, withheld ones left out', async () => {
     const { brain, operator, detail, dumps, warnings } = await run({
@@ -153,7 +159,9 @@ describe('suggested answers in the session', () => {
     const row = rowOf(detail.decisions);
     expect(row).toMatchObject({ source: 'operator', answer: TRANSFER });
     expect(row?.payload).toMatchObject({ via: 'scripted', chosen: 'transfer' });
-    expect(brain.taught.some((taught) => taught.parts[0]?.includes(`"${TRANSFER}"`))).toBe(true);
+    expect(
+      brain.taught.some((call) => call.answers.some((taught) => taught.answer === TRANSFER)),
+    ).toBe(true);
     expect(suggestionsFile(dumps)).toMatchObject({
       requested: ['e7'],
       state: 'settled',
@@ -207,6 +215,12 @@ describe('suggested answers in the session', () => {
     });
     expect(rowOf(detail.decisions)?.payload).toMatchObject({ chosen: 'typed' });
     expect(suggestionsFile(dumps)).toMatchObject({ state: 'pending', runId: null });
+    // Taught under the scope the answerer declared the question holds in, which the row records too.
+    expect(rowOf(detail.decisions)?.payload).toMatchObject({ about: 'subject' });
+    expect(guidanceOf(dumps, 'e7')).toMatchObject({
+      answer: 'Five years of event-driven services.',
+      about: 'subject',
+    });
   });
 
   it('[BRW-12] asks without suggestions when their run faults, warned once, or when no judge saw them', async () => {
@@ -254,7 +268,9 @@ describe('suggested answers in the session', () => {
     expect(row).toMatchObject({ source: 'memory', answer: RECORD });
     expect(row?.payload).toMatchObject({ chosen: 'record', route: 'fill' });
     expect(row?.loopRunId).toBe(suggestionsFile(dumps)['runId']);
-    expect(brain.taught.some((taught) => taught.parts[0]?.includes(RECORD))).toBe(false);
+    expect(
+      brain.taught.some((call) => call.answers.some((taught) => taught.answer === RECORD)),
+    ).toBe(false);
     expect(warnings).toEqual([]);
   });
 
@@ -342,6 +358,8 @@ describe('suggested answers in the session', () => {
     // The operator's pick is typed and taught as a chosen draft; the refused record was typed once.
     expect(rowOf(detail.decisions)).toMatchObject({ source: 'operator', answer: TRANSFER });
     expect(rowOf(detail.decisions)?.payload).toMatchObject({ chosen: 'transfer', outcome: 'ok' });
-    expect(brain.taught.some((taught) => taught.parts[0]?.includes(TRANSFER))).toBe(true);
+    expect(
+      brain.taught.some((call) => call.answers.some((taught) => taught.answer === TRANSFER)),
+    ).toBe(true);
   });
 });

@@ -3,7 +3,7 @@ import { LoopRefused } from '@sysdesign/loop-client';
 
 import { INGEST_MAX_ITERATIONS } from '../adapters/loop-http/loop-ingest-sink';
 import type { SettleScript } from '../test/fake-ingest-loop';
-import { FIXED_NOW } from '../test/fakes';
+import { FIXED_NOW, LOOP_STORE } from '../test/fakes';
 import {
   harness,
   LOOP_URL,
@@ -86,7 +86,11 @@ describe('ingest', () => {
         },
         error: null,
         ingestedAt: FIXED_NOW,
-        loopUrl: LOOP_URL,
+        sink: 'loop',
+        host: LOOP_URL,
+        scope: null,
+        spaceId: null,
+        recordIds: [],
         retractedAt: null,
         retractedPoints: null,
       });
@@ -187,10 +191,10 @@ describe('ingest', () => {
     const second = await ingest(['notes.md'], options(), deps);
     expect(second).toMatchObject({ posted: 3, unstored: 0, skipped: 0, failed: 0 });
     expect(posted).toHaveLength(6);
-    expect(latestByChunk(ledger.entries).size).toBe(3);
-    expect([...latestByChunk(ledger.entries).values()].every((e) => e.status === 'complete')).toBe(
-      true,
-    );
+    expect(latestByChunk(ledger.entries, LOOP_STORE).size).toBe(3);
+    expect(
+      [...latestByChunk(ledger.entries, LOOP_STORE).values()].every((e) => e.status === 'complete'),
+    ).toBe(true);
   });
 
   it('[ING-1] a chunk the loop settles with no fact to store is recorded unstored with its reason, reported no-facts, and covers its chunk: a re-run skips it', async () => {

@@ -173,7 +173,7 @@ describe('the form-memory HTTP surface', () => {
     expect(child.request.criteriaProvided).toBe(true);
     expect(child.request.goal).toContain(FIELD_EVIDENCE_HEADING);
     expect(child.request.goal).toContain(
-      '- [m1] profile_fact · subject — Alex Example has six years of professional Python, 2020–2026, at Acme — applies when a form asks how many years of Python experience the applicant has · stored 2026-10-02 · document-digest memory.1 (run digest-run-1)',
+      '- [m1] profile_fact · subject — Alex Example has six years of professional Python, 2020–2026, at Acme — applies when a form asks how many years of Python experience the applicant has · stored 2026-10-02 · document-digest digest-run-1#memory.1',
     );
     expect(child.trace?.contract.criteria.map((criterion) => criterion.id)).toEqual([
       'c1',

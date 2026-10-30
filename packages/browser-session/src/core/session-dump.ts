@@ -17,14 +17,14 @@ import { causeOf, type BrowserActionKind, type DerivedRubric, type Termination }
  *
  * NOTE FOR READERS: these files contain the goal, page text and screenshots.
  */
-const RUBRICS_FILE = '00-rubrics.json';
+export const RUBRICS_FILE = '00-rubrics.json';
 export const STEPS_DIR = '01-steps';
 export const TASKS_FILE = '02-tasks.json';
 export const MANIFEST_FILE = 'manifest.json';
-const GOAL_FILE = 'goal.md';
+export const GOAL_FILE = 'goal.md';
 
 /** The files one step may leave: what was seen, what was decided, what went wrong. */
-const STEP_FILES = {
+export const STEP_FILES = {
   observation: 'observation.json',
   snapshot: 'snapshot.txt',
   screenshot: 'screenshot.png',

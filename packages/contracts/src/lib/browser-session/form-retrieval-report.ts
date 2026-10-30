@@ -1,9 +1,9 @@
 import { z } from 'zod';
 
 import type { ApiResponse } from '../envelope';
-import type { MemoryScope } from '../quality-loop/document-digest';
 import type { MemoryStoreAvailabilityDto, RetrievalHitDto } from '../quality-loop/memory';
 import { unitKeySchema } from '../units/identity';
+import type { MemoryScope } from '../units/scope';
 import { FIELDS_BOUND } from './field-answers.schema';
 import { fieldSpecSchema, type EvidenceItem, type FieldSpec } from './field-goal';
 import type { FieldType } from './vocab';

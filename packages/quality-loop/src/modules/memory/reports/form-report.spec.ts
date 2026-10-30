@@ -90,14 +90,14 @@ describe('the form retrieval report', () => {
     };
     expect(await heldBy('company=acme')).toEqual({
       held: ['memory.1 profile_fact null null', 'memory.2 profile_fact unit company=acme'],
-      evidence: ['memory.1', 'memory.2'],
+      evidence: ['run-a#memory.1', 'run-a#memory.2'],
     });
     // A page naming no unit reads no unit's memories, and one naming another reads only its.
     expect(await heldBy(undefined)).toEqual({
       held: ['memory.1 profile_fact null null'],
-      evidence: ['memory.1'],
+      evidence: ['run-a#memory.1'],
     });
-    expect((await heldBy('company=globex')).evidence).toEqual(['memory.1', 'memory.3']);
+    expect((await heldBy('company=globex')).evidence).toEqual(['run-a#memory.1', 'run-a#memory.3']);
   });
 
   it('[QL-70] a page asking nothing recalls nothing, and unavailable embeddings are null for the service to refuse by name', async () => {

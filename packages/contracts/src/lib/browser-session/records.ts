@@ -88,8 +88,12 @@ export interface BrowserDecisionDto {
   loopRunId: string | null;
   /** The orchestration that ran the deciding run, when one did. */
   loopOrchestrationId: string | null;
-  /** The document-memory orchestration an operator's answer was taught through. */
-  teachOrchestrationId: string | null;
+  /**
+   * The reference the teaching of an operator's answer left: an orchestration
+   * id today, a memory record id under a memory-backed brain; null when the
+   * answer was never taught.
+   */
+  teachingRef: string | null;
   /** The element ref, for a field. */
   ref: string | null;
   /** The field's label — the join key for "was this asked before". */

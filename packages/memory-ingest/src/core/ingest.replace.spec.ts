@@ -1,6 +1,12 @@
 import { LoopRefused } from '@sysdesign/loop-client';
 
-import { FIXED_NOW, manifestEntry, scriptedReader, type InMemoryLedger } from '../test/fakes';
+import {
+  FIXED_NOW,
+  LOOP_STORE,
+  manifestEntry,
+  scriptedReader,
+  type InMemoryLedger,
+} from '../test/fakes';
 import {
   bullet,
   FACTS_LEFT_OUT,
@@ -26,23 +32,28 @@ const standing = (ledger: InMemoryLedger, document?: string): (string | null)[] 
     .filter((entry) => covers(entry) && (document === undefined || entry.document === document))
     .map((entry) => entry.digestRunId);
 
-/** A digest run retracted through the configured loop, with the points it removed. */
+/** A digest run retracted through the configured loop, with the points it removed; the loop keeps no record for another posting. */
 const retracted = (digestRunId: string, removed = 3) => ({
   digestRunId,
   removed,
+  kept: 0,
   recordedUnder: null,
 });
 
 /** The sink, with every call it is asked to make written down in the order it is asked. */
 const recording = (sink: IngestSink, calls: string[]): IngestSink => ({
+  kind: sink.kind,
+  host: sink.host,
+  spaceId: sink.spaceId,
+  scope: sink.scope,
   post: (planned) => {
     calls.push('post');
     return sink.post(planned);
   },
-  status: (orchestrationRunId) => sink.status(orchestrationRunId),
-  retract: (digestRunId) => {
-    calls.push(`retract ${digestRunId}`);
-    return sink.retract(digestRunId);
+  status: (entry) => sink.status(entry),
+  retract: (entry, keep) => {
+    calls.push(`retract ${entry.digestRunId}`);
+    return sink.retract(entry, keep);
   },
 });
 
@@ -100,7 +111,7 @@ describe('ingest, replacing a document', () => {
     ]);
     expect(standing(ledger)).toEqual(['digest-run-4', 'digest-run-5', 'digest-run-6']);
     expect([...client.points.keys()]).toEqual(['digest-run-4', 'digest-run-5', 'digest-run-6']);
-    expect(latestByChunk(ledger.entries).size).toBe(3);
+    expect(latestByChunk(ledger.entries, LOOP_STORE).size).toBe(3);
   });
 
   it('[ING-3] an edited document posts the chunks the edit changed and, once every chunk is covered, retracts only the digests they replaced', async () => {

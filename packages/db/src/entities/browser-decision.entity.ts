@@ -105,9 +105,12 @@ export class BrowserDecision {
   @Property({ type: 'varchar', length: 80, nullable: true })
   loopOrchestrationId: string | null = null;
 
-  /** The document-memory orchestration an operator's answer was taught through. */
+  /**
+   * The reference the teaching of an operator's answer left: an orchestration
+   * id today, a memory record id under a memory-backed brain.
+   */
   @Property({ type: 'varchar', length: 80, nullable: true })
-  teachOrchestrationId: string | null = null;
+  teachingRef: string | null = null;
 
   /** The element ref the decision targeted, for a field. */
   @Property({ type: 'text', nullable: true })

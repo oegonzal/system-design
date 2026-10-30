@@ -8,6 +8,7 @@
  */
 import {
   composeFieldGoal,
+  DOCUMENT_MEMORY_LEGEND,
   FIELD_ANSWER_PIPELINE_ID,
   type EvidenceItem,
   type FieldAnswer,
@@ -71,12 +72,14 @@ export const sampleFields = (): FieldSpec[] => [
   field('e5', 'textbox', 'Why do you want this role?', { inputType: 'text', maxLength: 200 }),
 ];
 
+/** One recalled fact as the recall lists it: what the store holds it as, where it holds, and the run and item it came from. */
 const fact = (alias: string, text: string, ref: string): EvidenceItem => ({
   alias,
   text,
   when: '2026-10-02',
   scope: 'subject',
-  source: { runId: 'digest-run-1', pipeline: 'document-digest', ref, kind: 'profile_fact' },
+  kind: 'profile_fact',
+  source: { origin: 'document-digest', ref: `digest-run-1#${ref}` },
 });
 
 export const sampleEvidence = (): EvidenceItem[] => [
@@ -102,10 +105,12 @@ export const fieldGoal = (
     prose: ANSWERING_PROSE,
     fields,
     evidence,
+    kinds: DOCUMENT_MEMORY_LEGEND,
   });
 
 export const answer = (ref: string, overrides: Partial<FieldAnswer> = {}): FieldAnswer => ({
   ref,
+  about: 'subject',
   decision: 'answer',
   value: null,
   rests: 'stated',

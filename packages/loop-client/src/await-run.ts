@@ -3,6 +3,7 @@ import {
   parseLenient,
   type OrchestrationRunDto,
   type QualityRunDto,
+  type QualityRunReadDto,
 } from '@sysdesign/contracts';
 import type { ZodType } from 'zod';
 
@@ -48,16 +49,17 @@ const stale = (run: Pick<QualityRunDto, 'heartbeatAt'>, pace: Pacing): boolean =
   pace.now() - Date.parse(run.heartbeatAt) > pace.staleAfterMs;
 
 /**
- * The run once it has settled. Liveness is judged by the heartbeat against
- * the loop's own stale window, never by the exchange count or the status —
- * both lie for the whole window after a process dies. A run the loop no longer
- * has is `LoopRunLost`; one whose beat has stopped is `LoopRunStale`.
+ * The run once it has settled, read whole — its readout with it. Liveness is
+ * judged by the heartbeat against the loop's own stale window, never by the
+ * exchange count or the status — both lie for the whole window after a
+ * process dies. A run the loop no longer has is `LoopRunLost`; one whose beat
+ * has stopped is `LoopRunStale`.
  */
 export async function awaitRun(
   client: LoopClient,
   runId: string,
   options: AwaitOptions = {},
-): Promise<QualityRunDto> {
+): Promise<QualityRunReadDto> {
   const pace = await pacing(client, options);
   for (;;) {
     pace.signal?.throwIfAborted();

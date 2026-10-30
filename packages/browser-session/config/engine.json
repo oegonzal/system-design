@@ -3,5 +3,6 @@
   "session": "standard",
   "operator": "terminal-and-notifications",
   "answering": "standard",
-  "observe": "standard"
+  "observe": "standard",
+  "brain": "loop"
 }

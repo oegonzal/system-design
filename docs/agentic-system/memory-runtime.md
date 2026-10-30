@@ -208,6 +208,12 @@ to the request's" or, when the request does not name the key, "unset" — a loop
 over the policy's keys, never the request's, which would let a user's memory leak
 tenant-wide.
 
+The standard policy (`config/memory/standard.json`) declares four keys — `tenant`,
+`project`, `user` and `unit` — the fourth binding a memory to the one unit of work it
+was recorded for, so a request naming no unit never reads another unit's memory.
+A space keeps the policy snapshot it was compiled with and reports its keys as
+`scopeKeys`; the spaces made before the fourth key keep their three.
+
 ## 8. The sweep
 
 A periodic job across every space:
@@ -222,29 +228,35 @@ finishes, recall by meaning has a gap; exact and temporal recall do not.
 
 ## 9. HTTP — `packages/agentic-system`, `/spaces`
 
-| route                                      | does                                                                                                                                                                                                |
-| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST /spaces { runId }`                   | compile a settled `memory-architecture` run's best strategy into a space — finished or failed, never still running; 201 with its report, or 422 with the problems                                   |
-| `GET /spaces/:id`                          | the space and its compile report                                                                                                                                                                    |
-| `POST /spaces/:id/remember`                | `{ register, scope, candidate, provenance, metadata }`                                                                                                                                              |
-| `POST /spaces/:id/update`                  | `{ recordId, scope, candidate, provenance, metadata }`                                                                                                                                              |
-| `POST /spaces/:id/invalidate`              | `{ recordId, scope, reason }`                                                                                                                                                                       |
-| `POST /spaces/:id/history`                 | `{ recordId, scope }` — every version                                                                                                                                                               |
-| `POST /spaces/:id/recall`                  | `{ scope, key?, text?, since?, until?, registers?, where? }`                                                                                                                                        |
-| `POST /spaces/:id/consolidate`             | `{ scope }`                                                                                                                                                                                         |
-| `POST /spaces/:id/digests`                 | `{ title, parts: [{ label, at, text }], rules?, registers?, scope, provenance }` — digest a text into typed memories on the quality loop; 202 with the orchestration, which runs for minutes        |
-| `GET /spaces/:id/digests/:runId`           | the digest as the loop recorded it: the orchestration's status; the digest step's status, reason, note and counts; the run it opened; its report as read, or null; and the apply, once there is one |
-| `POST /spaces/:id/digests/:runId/remember` | no body — remember what the digest endorsed, once; 200 with each memory's outcome or refusal                                                                                                        |
+| route                                      | does                                                                                                                                                                                                                                                                              |
+| ------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /spaces { runId }`                   | compile a settled `memory-architecture` run's best strategy into a space — finished or failed, never still running; 201 with its report, or 422 with the problems                                                                                                                 |
+| `GET /spaces/:id`                          | the space and its compile report                                                                                                                                                                                                                                                  |
+| `PUT /spaces/by-name/:name { runId }`      | ensure the space under a name (lower-case letters, digits and hyphens, else 400): made from the run when none holds the name, the same space when that run made it; 200 with `{ space, created }`; a name another run holds, or a concurrent claim won, is 409 `space.name_taken` |
+| `GET /spaces/by-name/:name`                | the space under the name; an unknown name is 404 `space.not_found`                                                                                                                                                                                                                |
+| `POST /spaces/:id/remember`                | `{ register, scope, candidate, provenance, metadata }`                                                                                                                                                                                                                            |
+| `POST /spaces/:id/update`                  | `{ recordId, scope, candidate, provenance, metadata }`                                                                                                                                                                                                                            |
+| `POST /spaces/:id/invalidate`              | `{ recordId, scope, reason }`                                                                                                                                                                                                                                                     |
+| `POST /spaces/:id/history`                 | `{ recordId, scope }` — every version                                                                                                                                                                                                                                             |
+| `POST /spaces/:id/recall`                  | `{ scope, key?, text?, since?, until?, registers?, where? }`                                                                                                                                                                                                                      |
+| `POST /spaces/:id/consolidate`             | `{ scope }`                                                                                                                                                                                                                                                                       |
+| `POST /spaces/:id/digests`                 | `{ title, parts: [{ label, at, text }], rules?, registers?, scope, provenance }` — digest a text into typed memories on the quality loop; 202 with the orchestration, which runs for minutes                                                                                      |
+| `GET /spaces/:id/digests/:runId`           | the digest as the loop recorded it: the orchestration's status; the digest step's status, reason, note and counts; the run it opened; its report as read, or null; and the apply, once there is one                                                                               |
+| `POST /spaces/:id/digests/:runId/remember` | no body — remember what the digest endorsed, once; 200 with each memory's outcome or refusal                                                                                                                                                                                      |
 
-Every refusal has one declared status, its body carrying the refusal's `code`:
+Every refusal has one declared status, its body carrying the refusal's `code` —
+the runtime's codes and the host's (`run.*`, `digest.*`) with their statuses in one
+contracts table (`packages/contracts/src/lib/agentic-system/space-host.ts`), read by
+`src/memory/refusals.ts`:
 
 - **404** — `space.not_found`, `record.not_found`, `run.not_found`, each naming
   what is `missing` (`space`, `record`, `run`); a digest the loop does not have,
   one another orchestrator ran, or one whose goal names another space is
   `run.not_found` too, so a digest's existence does not leak across spaces;
 - **409** — `record.not_current`, `conflict`, `run.in_flight` (a run or a digest
-  still running has settled nothing yet), and `digest.applied` (the digest was
-  remembered already);
+  still running has settled nothing yet), `digest.applied` (the digest was
+  remembered already), and `space.name_taken` (another run holds the name, or a
+  concurrent claim won it);
 - **422** — the rest: an undeclared verb, an invalid scope, candidate or metadata,
   an unavailable consolidation, a space that no longer compiles,
   `run.no_strategy`, and a digest with no register left to write
@@ -344,13 +356,14 @@ What the caller owns:
   `kinds/`, `write/` (and the write brief, `brief.ts`), `recall/`, `lifecycle/`
   (consolidate, sweep), `service/`
 - Adapters: `src/adapters/mikro-orm/` (Postgres), `src/adapters/qdrant/`
-- Fakes holding the same contract: `src/testing/` (and `record-store-contract.ts`,
-  run against both stores)
-- Wire shapes and the record vocabulary: `packages/contracts/src/lib/agentic-system/memory.ts`;
-  beside it, a digest's goal codec (`register-digest.ts`) and its step report and
+- Fakes holding the same contract: `src/testing/` (and `record-store-contract.ts`
+  and `space-store-contract.ts`, each run against both stores)
+- Wire shapes and the record vocabulary: `packages/contracts/src/lib/agentic-system/memory.ts`
+  (with the space name grammar); beside it, the space routes' refusal table (`space-host.ts`), a digest's goal codec (`register-digest.ts`) and its step report and
   host DTOs (`register-memory.ts`)
 - Tables: `memory_space`, `memory_record` (`packages/db`, migration
-  `Migration20261017100002_memory_space_and_record`), and the digest apply ledger
+  `Migration20261017100002_memory_space_and_record`; the space name and its partial
+  unique index, `Migration20261024010002_memory_space_name`), and the digest apply ledger
   `memory_space_digest` (`Migration20261018100001_memory_space_digest`)
 - Mount and policy: `packages/agentic-system/src/memory/`, `config/memory/standard.json`
 - Digests: `packages/agentic-system/src/memory/digests/` — the service, the
@@ -359,5 +372,5 @@ What the caller owns:
   `packages/quality-loop/src/pipelines/register-digest/` and
   `src/orchestrators/register-memory/`
 - Criteria: `AGM-1`…`AGM-11` (`packages/criteria/src/agentic-memory.ts`); the
-  mount's `AGS-8`…`AGS-11` (`agentic-system.ts`); the digest's goal, pipeline and
+  mount's `AGS-8`…`AGS-12` (`agentic-system.ts`); the digest's goal, pipeline and
   orchestrator, `QL-75`…`QL-78` (`quality-loop.ts`)

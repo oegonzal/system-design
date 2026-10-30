@@ -1,4 +1,4 @@
-import { EXPERIENCE_ORIGINS } from '@sysdesign/contracts';
+import { EXPERIENCE_ORIGINS, excerpt, type MemoryRecordDto } from '@sysdesign/contracts';
 
 import type { ExportReport } from './core/export-studio';
 import type { ChunkReport, FileReport, IngestReport } from './core/ingest-report';
@@ -6,6 +6,7 @@ import type { ManifestEntry, ManifestStep } from './core/ports';
 import { whyNotStored } from './core/record';
 import type { DocumentRetraction, RetractReport, Retraction } from './core/retract';
 import type { StatusRefresh } from './core/status';
+import type { ForgetReport, HistoryReport, RecallReport } from './space-commands';
 
 /**
  * stdout for humans. Fixed-width tables built with padEnd — no dependency —
@@ -27,9 +28,19 @@ function table(header: readonly string[], rows: readonly (readonly string[])[]):
 
 const SHORT_HASH = 12;
 const NONE = '—';
+/** How much of a memory's text a table cell shows. */
+const TEXT_CELL = 100;
 
 const count = (n: number, noun: string, plural = `${noun}s`): string =>
   `${n} ${n === 1 ? noun : plural}`;
+
+/** Memories, as both stores' units are counted: the loop's points and a space's records are one memory each. */
+const memories = (n: number): string => count(n, 'memory', 'memories');
+
+const day = (at: string | null): string => (at === null ? NONE : at.slice(0, 10));
+
+/** A memory's text on one line, within the cell. */
+const textCell = (text: string): string => excerpt(text.replace(/\s+/g, ' ').trim(), TEXT_CELL);
 
 const chunkRow = (chunk: ChunkReport): string[] => [
   `${chunk.index}/${chunk.of}`,
@@ -42,30 +53,32 @@ const chunkRow = (chunk: ChunkReport): string[] => [
   whyNotStored(chunk) ?? chunk.context ?? NONE,
 ];
 
-/** Digest runs retracted and the points they removed, across batches; a batch that did not run counts nothing. */
+/** Digest runs retracted and the memories they removed, across batches; a batch that did not run counts nothing. */
 function retractedTotal(retractions: readonly (Retraction | null)[]): string {
   const runs = retractions.flatMap((retraction) => retraction?.retracted ?? []);
-  const points = runs.reduce((sum, run) => sum + run.removed, 0);
-  return `${count(runs.length, 'digest run')} (${count(points, 'point')})`;
+  const removed = runs.reduce((sum, run) => sum + run.removed, 0);
+  return `${count(runs.length, 'digest run')} (${memories(removed)})`;
 }
 
 /**
- * A batch of retractions: the runs that removed points, with how many; the
+ * A batch of retractions: the runs that removed memories, with how many; the
  * runs that removed none, apart — what they stored was gone already, or they
- * stored nothing; the runs whose postings were recorded under another loop,
- * apart again, with what each removed — the loop asked counts only what its
- * own store held; and the runs left standing, with why.
+ * stored nothing; the records kept current because another standing posting
+ * lists them too; the runs whose postings were recorded under another
+ * service, apart again, with what each removed — the service asked counts
+ * only what its own store held; and the runs left standing, with why.
  */
 function retractionLines(retraction: Retraction): string[] {
   const here = retraction.retracted.filter((run) => run.recordedUnder === null);
   const removed = here.filter((run) => run.removed > 0);
   const empty = here.filter((run) => run.removed === 0);
+  const shared = retraction.retracted.filter((run) => run.kept > 0);
   const elsewhere = [
     ...new Set(retraction.retracted.flatMap((run) => run.recordedUnder ?? [])),
-  ].map((loopUrl) => {
-    const under = retraction.retracted.filter((run) => run.recordedUnder === loopUrl);
-    const each = under.map((run) => `${run.digestRunId} (${count(run.removed, 'point')})`);
-    return `recorded under ${loopUrl}, retracted through ${retraction.through} (${under.length}): ${each.join(', ')}`;
+  ].map((host) => {
+    const under = retraction.retracted.filter((run) => run.recordedUnder === host);
+    const each = under.map((run) => `${run.digestRunId} (${memories(run.removed)})`);
+    return `recorded under ${host}, retracted through ${retraction.through} (${under.length}): ${each.join(', ')}`;
   });
   const runs = (ids: readonly string[]): string => `(${ids.length}): ${ids.join(', ')}`;
   return [
@@ -73,11 +86,18 @@ function retractionLines(retraction: Retraction): string[] {
       ? []
       : [
           table(
-            ['digest run', 'points'],
+            ['digest run', 'memories'],
             removed.map((run) => [run.digestRunId, String(run.removed)]),
           ),
         ]),
     ...(empty.length === 0 ? [] : [`held nothing ${runs(empty.map((run) => run.digestRunId))}`]),
+    ...(shared.length === 0
+      ? []
+      : [
+          `kept current, listed by a standing posting too (${shared.length}): ${shared
+            .map((run) => `${run.digestRunId} (${count(run.kept, 'record')})`)
+            .join(', ')}`,
+        ]),
     ...elsewhere,
     ...(retraction.left === null
       ? []
@@ -90,7 +110,7 @@ const unresolvedLines = (unresolved: number, command: string): string[] =>
   unresolved === 0
     ? []
     : [
-        `unresolved: ${count(unresolved, 'entry', 'entries')} with an orchestration whose report was never read — status --refresh reads it back from the loop; then ${command} again`,
+        `unresolved: ${count(unresolved, 'entry', 'entries')} with a run whose report was never read — status --refresh reads it back from its service; then ${command} again`,
       ];
 
 /** Why a document's replacement was held back, when earlier digest runs outside its current plan still stand. */
@@ -110,7 +130,7 @@ function renderFile(file: FileReport): string {
   return [
     head,
     table(
-      ['chunk', 'hash', 'bytes', 'parts', 'outcome', 'orchestration', 'under / error'],
+      ['chunk', 'hash', 'bytes', 'parts', 'outcome', 'run', 'under / error'],
       file.chunks.map(chunkRow),
     ),
     ...(touched(file.replaced)
@@ -179,16 +199,17 @@ const stepCell = (step: ManifestStep | null): string => {
   return `${step.status}${reason}${note}${counts === '' ? '' : ` (${counts})`}`;
 };
 
-/** When what the posting stored was retracted, and how many points went; empty while it stands. */
+/** When what the posting stored was retracted, and how many memories went; empty while it stands. */
 const retractedCell = (entry: ManifestEntry): string =>
   entry.retractedAt === null
     ? ''
-    : `${entry.retractedAt} (${count(entry.retractedPoints ?? 0, 'point')})`;
+    : `${entry.retractedAt} (${memories(entry.retractedPoints ?? 0)})`;
 
 const entryRow = (entry: ManifestEntry): string[] => [
   entry.document,
   `${entry.chunk.index}/${entry.chunk.of}`,
   entry.kind,
+  entry.sink,
   entry.status,
   retractedCell(entry),
   stepCell(entry.steps.digest),
@@ -210,12 +231,13 @@ export function renderStatus(
             'document',
             'chunk',
             'kind',
+            'sink',
             'status',
             'retracted',
             'digest',
             'store',
             'ingested',
-            'orchestration',
+            'run',
             'error',
           ],
           entries.map(entryRow),
@@ -223,7 +245,7 @@ export function renderStatus(
   const foot =
     refresh === null
       ? null
-      : `refreshed ${refresh.refreshed} · still running ${refresh.running} · no longer at the loop ${refresh.missing}`;
+      : `refreshed ${refresh.refreshed} · still running ${refresh.running} · no longer at the service ${refresh.missing} · through another sink ${refresh.elsewhere}`;
   return [body, foot].filter((line): line is string => line !== null).join('\n');
 }
 
@@ -247,4 +269,78 @@ export function renderExport(report: ExportReport): string {
       return `${file.path}: ${parts.join(' · ')}`;
     })
     .join('\n');
+}
+
+/** The space and the scope a space command addressed, as every such report opens. */
+const addressLine = (report: {
+  space: { id: string; name: string };
+  scope: Record<string, string>;
+}) =>
+  `${report.space.name} (${report.space.id}) · ${Object.entries(report.scope)
+    .map(([key, value]) => `${key} ${value}`)
+    .join(', ')}`;
+
+/** A record as the recall and history tables name one: its id at its version. */
+const recordRef = (record: MemoryRecordDto): string => `${record.id}@v${record.version}`;
+
+/** What the space holds for the key or the question: each memory ranked, the routes that reached them, and what the budget left out. */
+export function renderRecall(report: RecallReport): string {
+  const asked = [
+    ...(report.key === null ? [] : [`key ${JSON.stringify(report.key)}`]),
+    ...(report.text === null ? [] : [`text ${JSON.stringify(report.text)}`]),
+    ...(report.register === null ? [] : [`register ${report.register}`]),
+  ].join(' · ');
+  const body =
+    report.items.length === 0
+      ? '(nothing recalled)'
+      : table(
+          ['record', 'register', 'since', 'score', 'text'],
+          report.items.map(({ record, score }) => [
+            recordRef(record),
+            record.register,
+            day(record.validFrom),
+            score.toFixed(3),
+            textCell(record.text),
+          ]),
+        );
+  const routes = report.routes
+    .map(
+      (route) =>
+        `${route.route} ${count(route.hits, 'hit')}${route.dropped > 0 ? `, ${route.dropped} dropped` : ''}${route.skipped === null ? '' : ` (skipped: ${route.skipped})`}`,
+    )
+    .join(' · ');
+  return [
+    `${addressLine(report)} · ${asked}`,
+    body,
+    `routes: ${routes}${report.omitted > 0 ? ` · omitted ${report.omitted}` : ''}`,
+  ].join('\n');
+}
+
+/** Every version of one record, oldest first: when each held, how it ended and what it said. */
+export function renderHistory(report: HistoryReport): string {
+  const body =
+    report.versions.length === 0
+      ? '(no versions)'
+      : table(
+          ['record', 'status', 'since', 'until', 'closed', 'text'],
+          report.versions.map((record) => [
+            recordRef(record),
+            record.status,
+            day(record.validFrom),
+            day(record.validTo),
+            record.closeReason ?? '',
+            textCell(record.text),
+          ]),
+        );
+  return [`${addressLine(report)} · record ${report.recordId}`, body].join('\n');
+}
+
+/** The record as it stands once forgotten: closed, when, and with the reason it keeps. */
+export function renderForget(report: ForgetReport): string {
+  const { record } = report;
+  return [
+    addressLine(report),
+    `${recordRef(record)} ${record.status} at ${record.closedAt ?? NONE}: ${record.closeReason ?? report.reason}`,
+    textCell(record.text),
+  ].join('\n');
 }

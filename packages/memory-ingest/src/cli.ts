@@ -3,52 +3,60 @@
  * `main.js retract <path…> [--dry-run] [--json]`
  * `main.js status [--refresh] [--json]`
  * `main.js export-studio --out <dir> [--json]`
+ * `main.js recall --space <name> --tenant <t> (--key <k> | --text <t>) [--under k=v,…] [--register <r>] [--json]`
+ * `main.js history <recordId> --space <name> --tenant <t> [--under k=v,…] [--json]`
+ * `main.js forget <recordId> --space <name> --tenant <t> --reason "<why>" [--under k=v,…] [--json]`
  *
  * `parseOptions` reads argv; `execute` runs the options over the ports and
  * writes through `io`; `cli` wires the real adapters around them — no
  * framework, no database — and exits by the result: 2 for a usage problem, an
- * input the program cannot use, a path the manifest has no entry for, or a
- * manifest home another command is writing; 1 when a chunk failed, was
- * refused or was settled with its facts left out of the store, or a
- * retraction left a digest run standing; 0 otherwise.
+ * input the program cannot use, a path the manifest has no entry for, a store
+ * that cannot serve the run, or a manifest home another command is writing; 1
+ * when a chunk failed, was refused or was settled with its facts left out of
+ * the store, or a retraction left a digest run standing; 0 otherwise.
  */
 import { resolve } from 'node:path';
 import { parseArgs } from 'node:util';
 
-import type { MemoryScope } from '@sysdesign/contracts';
+import { HttpMemoryClient, type MemoryClient } from '@sysdesign/agentic-memory-client';
+import { errorMessage } from '@sysdesign/contracts';
 import { HttpLoopClient } from '@sysdesign/loop-client';
 
 import { JsonFileLedger } from './adapters/fs-ledger/json-file-ledger';
 import { fsDocumentWriter } from './adapters/fs-writer/fs-document-writer';
 import { LoopIngestSink } from './adapters/loop-http/loop-ingest-sink';
 import { READERS, tableReader } from './adapters/readers/reader-table';
+import { resolveIngestSpace } from './adapters/space-http/ingest-space';
+import { SpaceIngestSink } from './adapters/space-http/space-ingest-sink';
 import { HttpStudioSource } from './adapters/studio-http/http-studio-source';
+import type { CliDeps, Io } from './commands';
+import {
+  DIGEST_POLL_EVERY_MS,
+  INGEST_ENV,
+  INGEST_FLAGS,
+  INGEST_KINDS,
+  INGEST_RECOVERY,
+  loadIngestConfig,
+  registerName,
+  spaceName,
+  subjectName,
+  tenantName,
+  type IngestConfig,
+  type IngestFlag,
+} from './config';
+import type { IngestSink } from './core/ports';
 import {
   chunkBytes,
   documentDate,
   documentScope,
+  forgetReason,
+  ingestKind,
   partsPerChunk,
   postLimit,
-  DEFAULT_HOME,
-  DEFAULT_LOOP_URL,
-  DEFAULT_STUDIO_URL,
-  INGEST_ENV,
-  INGEST_FLAGS,
-  INGEST_KINDS,
-  INGEST_LOOP_RECOVERY,
-  ingestKind,
-  loadIngestConfig,
-  subjectName,
-  type IngestConfig,
-  type IngestFlag,
-  type IngestKind,
-} from './config';
-import { exportStudio } from './core/export-studio';
-import { planIngest, runIngest, type IngestDeps } from './core/ingest';
-import type { DocumentWriter, StudioSource } from './core/ports';
-import { leftStanding, NotInManifest, retractDocuments } from './core/retract';
-import { refreshStatus } from './core/status';
-import { renderExport, renderIngest, renderRetract, renderStatus } from './render';
+  scopeUnder,
+} from './flag-values';
+import { runManifestCommand, savesManifest, type ManifestOptions } from './manifest-commands';
+import { runSpaceCommand, type SpaceCommandOptions } from './space-commands';
 
 /** One line per flag, with what it means as `INGEST_FLAGS` declares it. */
 function flagLines(): string {
@@ -59,27 +67,42 @@ function flagLines(): string {
   return flags.map(([name, meaning]) => `  ${name.padEnd(width)}  ${meaning}`).join('\n');
 }
 
+/** One line per variable, with its default where it has one. */
+const envLine = (): string =>
+  Object.values(INGEST_ENV)
+    .map(({ name, fallback }) => (fallback === null ? name : `${name} (default ${fallback})`))
+    .join(', ');
+
 export const USAGE = `usage: memory-ingest <command> [options]
   ingest  <path…> [--kind ${INGEST_KINDS.join('|')}] [--subject <name>] [--chunk-bytes <n>] [--parts-per-chunk <n>] [--date <day>] [--limit <n>] [--dry-run] [--force] [--json]
-          reads each document (${Object.keys(READERS).join(', ')}), chunks it and posts one chunk at a time to the loop;
-          a chunk the document's own postings cover — its facts stored, or none to store — is skipped unless --force;
-          once every chunk of a document is covered, every other digest run its entries name is retracted
+          reads each document (${Object.keys(READERS).join(', ')}), chunks it and posts one chunk at a time to the configured store (${INGEST_ENV.sink.name});
+          a chunk the document's own postings through that store cover — its facts stored, or none to store — is skipped unless --force;
+          once every chunk of a document is covered, every other digest run its entries through that store name is retracted
   retract <path…> [--dry-run] [--json]
-          retracts every digest run the manifest's entries for each document name, whatever their status,
+          retracts every digest run the manifest's entries through the configured store name for each document, whatever their status,
           and marks the entries; the documents are never read
   status  [--refresh] [--json]
-          the manifest
+          the manifest; --refresh re-reads every posting made through the configured store
   export-studio --out <dir> [--json]
           writes the subject's own experience profiles and STAR stories as markdown documents under <dir>,
           one titled section per record, for ingest to read like any notes file; a practice example, a story
           drawn from one and every practice line are withheld, and a source left with none of the subject's
           records removes the document an earlier export wrote
+  recall  --space <name> --tenant <t> (--key <k> | --text <t>) [--under k=v,…] [--register <r>] [--json]
+          what a memory space holds for one tenant, by a key or by meaning — narrowed by the keys an agent wrote under
+  history <recordId> --space <name> --tenant <t> [--under k=v,…] [--json]
+          every version of one record, oldest first
+  forget  <recordId> --space <name> --tenant <t> --reason "<why>" [--under k=v,…] [--json]
+          closes one record with the reason, kept on it
 flags:
 ${flagLines()}
-exit: 0 ok · 1 a chunk failed, was refused or was settled with its facts unstored, or a retraction left a digest run standing · 2 usage, an input the program cannot use, a path the manifest has no entry for, or a manifest home another command is writing
-environment: ${INGEST_ENV.loopUrl} (default ${DEFAULT_LOOP_URL}), ${INGEST_ENV.studioUrl} (default ${DEFAULT_STUDIO_URL}), ${INGEST_ENV.home} (default ${DEFAULT_HOME}), ${INGEST_ENV.subject}`;
+exit: 0 ok · 1 a chunk failed, was refused or was settled with its facts unstored, or a retraction left a digest run standing · 2 usage, an input the program cannot use, a path the manifest has no entry for, a store that cannot serve the run, or a manifest home another command is writing
+environment: ${envLine()}`;
 
-/** Commands, the flags each takes and whether it takes paths — as data. */
+/** What a command takes after its name: nothing, document paths (at least one), or one record id. */
+type Positionals = 'none' | 'documents' | 'record';
+
+/** Commands, the flags each takes and what it takes after its name — as data. */
 export const COMMANDS = {
   ingest: {
     flags: [
@@ -94,53 +117,37 @@ export const COMMANDS = {
       'force',
       'json',
     ],
-    paths: true,
+    positionals: 'documents',
   },
-  retract: { flags: ['dry-run', 'json'], paths: true },
-  status: { flags: ['refresh', 'json'], paths: false },
-  'export-studio': { flags: ['out', 'json'], paths: false },
-} as const satisfies Record<string, { flags: readonly IngestFlag[]; paths: boolean }>;
+  retract: { flags: ['dry-run', 'json'], positionals: 'documents' },
+  status: { flags: ['refresh', 'json'], positionals: 'none' },
+  'export-studio': { flags: ['out', 'json'], positionals: 'none' },
+  recall: {
+    flags: ['space', 'tenant', 'under', 'key', 'text', 'register', 'json'],
+    positionals: 'none',
+  },
+  history: { flags: ['space', 'tenant', 'under', 'json'], positionals: 'record' },
+  forget: { flags: ['space', 'tenant', 'under', 'reason', 'json'], positionals: 'record' },
+} as const satisfies Record<string, { flags: readonly IngestFlag[]; positionals: Positionals }>;
 export type Command = keyof typeof COMMANDS;
 
-export type Options =
-  | {
-      command: 'ingest';
-      paths: string[];
-      kind: IngestKind;
-      /** Unset falls back to the environment; neither is a usage error at execute time. */
-      subject: string | undefined;
-      chunkBytes: number;
-      partsPerChunk: number;
-      date: string | null;
-      /** The scope the documents declare for every memory; null when they declare none. */
-      scope: MemoryScope | null;
-      limit: number | null;
-      dryRun: boolean;
-      force: boolean;
-      json: boolean;
-    }
-  | { command: 'retract'; paths: string[]; dryRun: boolean; json: boolean }
-  | { command: 'status'; refresh: boolean; json: boolean }
-  | { command: 'export-studio'; out: string; json: boolean };
+/** The commands over a memory space, which reach no manifest and no store of the ingest's. */
+const SPACE_COMMANDS = ['recall', 'history', 'forget'] as const satisfies readonly Command[];
 
-/** What `execute` writes to and how it is answered. */
-export interface Io {
-  out(text: string): void;
-  error(text: string): void;
-}
-
-export interface CliDeps extends IngestDeps {
-  config: IngestConfig;
-  cwd: string;
-  studio: StudioSource;
-  writer: DocumentWriter;
-}
+export type Options = ManifestOptions | SpaceCommandOptions;
 
 const isCommand = (value: string | undefined): value is Command =>
   value !== undefined && Object.hasOwn(COMMANDS, value);
 
-const messageOf = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error);
+const isSpaceCommand = (options: Options): options is SpaceCommandOptions =>
+  (SPACE_COMMANDS as readonly string[]).includes(options.command);
+
+/** A flag's value, required: the trimmed value, or a usage error naming the flag. */
+const required = (values: Record<string, unknown>, flag: IngestFlag): string => {
+  const value = values[flag] as string | undefined;
+  if (value === undefined || value.trim() === '') throw new Error(`--${flag} is required`);
+  return value;
+};
 
 /** argv → options, or an Error whose message is the usage problem. */
 export function parseOptions(argv: readonly string[]): Options | Error {
@@ -150,26 +157,30 @@ export function parseOptions(argv: readonly string[]): Options | Error {
   try {
     const { values, positionals } = parseArgs({
       args: [...rest],
-      allowPositionals: spec.paths,
+      allowPositionals: spec.positionals !== 'none',
       options: Object.fromEntries(
         spec.flags.map((flag) => [flag, { type: INGEST_FLAGS[flag].type }]),
       ),
     });
-    if (spec.paths && positionals.length === 0) {
+    if (spec.positionals === 'documents' && positionals.length === 0) {
       return new Error(`${command} takes at least one document path`);
     }
+    if (spec.positionals === 'record' && positionals.length !== 1) {
+      return new Error(`${command} takes one record id`);
+    }
     const flag = (name: IngestFlag): boolean => (values[name] as boolean | undefined) ?? false;
+    const text = (name: IngestFlag): string | undefined => values[name] as string | undefined;
     if (command === 'ingest') {
       return {
         command,
         paths: positionals,
-        kind: ingestKind(values['kind'] as string | undefined),
-        subject: subjectName(values['subject'] as string | undefined, '--subject'),
-        chunkBytes: chunkBytes(values['chunk-bytes'] as string | undefined),
-        partsPerChunk: partsPerChunk(values['parts-per-chunk'] as string | undefined),
-        date: documentDate(values['date'] as string | undefined),
-        scope: documentScope(values['scope'] as string | undefined),
-        limit: postLimit(values['limit'] as string | undefined),
+        kind: ingestKind(text('kind')),
+        subject: subjectName(text('subject'), '--subject'),
+        chunkBytes: chunkBytes(text('chunk-bytes')),
+        partsPerChunk: partsPerChunk(text('parts-per-chunk')),
+        date: documentDate(text('date')),
+        scope: documentScope(text('scope')),
+        limit: postLimit(text('limit')),
         dryRun: flag('dry-run'),
         force: flag('force'),
         json: flag('json'),
@@ -179,103 +190,80 @@ export function parseOptions(argv: readonly string[]): Options | Error {
       return { command, paths: positionals, dryRun: flag('dry-run'), json: flag('json') };
     }
     if (command === 'export-studio') {
-      const out = values['out'] as string | undefined;
-      if (out === undefined || out.trim() === '') return new Error('--out is required');
-      return { command, out, json: flag('json') };
+      return { command, out: required(values, 'out'), json: flag('json') };
     }
-    return { command, refresh: flag('refresh'), json: flag('json') };
+    if (command === 'status') return { command, refresh: flag('refresh'), json: flag('json') };
+    const space = spaceName(required(values, 'space'), '--space');
+    const tenant = tenantName(required(values, 'tenant'), '--tenant');
+    const under = scopeUnder(text('under'));
+    if (command === 'recall') {
+      const key = text('key') ?? null;
+      const question = text('text') ?? null;
+      if (key === null && question === null) return new Error('--key or --text is required');
+      const register = text('register');
+      return {
+        command,
+        space,
+        tenant,
+        under,
+        key,
+        text: question,
+        register: register === undefined ? null : registerName(register, '--register'),
+        json: flag('json'),
+      };
+    }
+    const recordId = positionals[0] as string;
+    if (command === 'history') {
+      return { command, recordId, space, tenant, under, json: flag('json') };
+    }
+    return {
+      command,
+      recordId,
+      space,
+      tenant,
+      under,
+      reason: forgetReason(required(values, 'reason')),
+      json: flag('json'),
+    };
   } catch (error) {
-    return error instanceof Error ? error : new Error(messageOf(error));
+    return error instanceof Error ? error : new Error(errorMessage(error));
   }
 }
 
-const print = (io: Io, json: boolean, raw: unknown, text: string): void =>
-  io.out(json ? JSON.stringify(raw, null, 2) : text);
-
-/** Whether the command saves the manifest: what it does then runs holding the home's lock. */
-const savesManifest = (options: Options): boolean => {
-  if (options.command === 'ingest' || options.command === 'retract') return !options.dryRun;
-  return options.command === 'status' && options.refresh;
-};
-
 /** The options over the ports; the exit code. A command that saves the manifest runs as its one writer. */
 export async function execute(options: Options, deps: CliDeps, io: Io): Promise<number> {
-  if (!savesManifest(options)) return dispatch(options, deps, io);
+  if (isSpaceCommand(options)) {
+    return runSpaceCommand(options, deps.memory, deps.config.memoryUrl, io);
+  }
+  if (!savesManifest(options)) return runManifestCommand(options, deps, io);
   let release: () => Promise<void>;
   try {
     release = await deps.ledger.lock();
   } catch (error) {
     // Another command is writing the home: anything saved now would overwrite what it records.
-    io.error(messageOf(error));
+    io.error(errorMessage(error));
     return 2;
   }
   try {
-    return await dispatch(options, deps, io);
+    return await runManifestCommand(options, deps, io);
   } finally {
     await release();
   }
 }
 
-async function dispatch(options: Options, deps: CliDeps, io: Io): Promise<number> {
-  if (options.command === 'export-studio') {
-    try {
-      const report = await exportStudio(deps, resolve(deps.cwd, options.out));
-      print(io, options.json, report, renderExport(report));
-      return 0;
-    } catch (error) {
-      // The studio could not be read — unreachable, or it refused a list — or it served a record whose
-      // origin is not known: nothing was written. A document that could not be written or removed is
-      // reported the same way, and a source exported before it may already be on disk.
-      io.error(messageOf(error));
-      return 2;
-    }
+/**
+ * The store the manifest commands post to and act on, by the configured
+ * sink: the loop through its client, or a memory space checked against its
+ * host — the space under its name compiles, declares a partition, and every
+ * register the digests may file into exists and takes a remember.
+ */
+async function ingestSink(config: IngestConfig, memory: MemoryClient): Promise<IngestSink> {
+  if (config.sink.kind === 'space') {
+    const space = await resolveIngestSpace(memory, config.sink, config.memoryUrl);
+    return new SpaceIngestSink(memory, space, { pollEveryMs: DIGEST_POLL_EVERY_MS });
   }
-  if (options.command === 'status') {
-    const refresh = options.refresh ? await refreshStatus(deps) : null;
-    const entries = refresh?.entries ?? (await deps.ledger.load());
-    print(io, options.json, { entries, refresh }, renderStatus(entries, refresh));
-    return 0;
-  }
-  if (options.command === 'retract') {
-    let report;
-    try {
-      report = await retractDocuments(
-        options.paths,
-        { dryRun: options.dryRun, cwd: deps.cwd },
-        deps,
-      );
-    } catch (error) {
-      if (!(error instanceof NotInManifest)) throw error;
-      // Nothing was retracted: a path given from another directory, or under another home, reads as no document.
-      io.error(error.message);
-      return 2;
-    }
-    print(io, options.json, report, renderRetract(report));
-    return report.documents.some((document) => leftStanding(document.retraction) > 0) ? 1 : 0;
-  }
-
-  const subject = options.subject ?? deps.config.subject;
-  if (subject === undefined) {
-    io.error(
-      `a subject is required: --subject <name>, or ${INGEST_ENV.subject} in the environment`,
-    );
-    return 2;
-  }
-  const planning = { ...options, subject, cwd: deps.cwd };
-  let documents;
-  try {
-    documents = await planIngest(options.paths, planning, deps);
-  } catch (error) {
-    // Nothing was posted: an unreadable file, an extension no reader takes, a part the budget cannot hold.
-    io.error(messageOf(error));
-    return 2;
-  }
-  const report = await runIngest(documents, options, deps);
-  print(io, options.json, report, renderIngest(report));
-  // Anything short of every chunk covered is not ok: a failure, a refusal, a loop that settled with
-  // the facts unstored, or an earlier digest left standing beside its replacement.
-  const standing = report.files.some((file) => leftStanding(file.replaced) > 0);
-  return report.failed > 0 || report.unstored > 0 || report.stopped !== null || standing ? 1 : 0;
+  const client = new HttpLoopClient(config.loopUrl, fetch, INGEST_RECOVERY);
+  return new LoopIngestSink(client, config.loopUrl);
 }
 
 /** The real adapters around `execute`. The environment and working directory are handed in by `main.ts`, read nowhere here. */
@@ -295,21 +283,21 @@ export async function cli(
   try {
     config = loadIngestConfig(env);
   } catch (error) {
-    console.error(messageOf(error));
+    console.error(errorMessage(error));
     return 2;
   }
-  const client = new HttpLoopClient(config.loopUrl, fetch, INGEST_LOOP_RECOVERY);
+  const memory = new HttpMemoryClient(config.memoryUrl, { recovery: INGEST_RECOVERY });
   const deps: CliDeps = {
     config,
     cwd,
     reader: tableReader(),
-    sink: new LoopIngestSink(client),
+    sink: () => ingestSink(config, memory),
     ledger: new JsonFileLedger(resolve(cwd, config.home)),
     clock: { now: () => new Date().toISOString() },
     interrupted,
-    loopUrl: config.loopUrl,
     studio: new HttpStudioSource(config.studioUrl),
     writer: fsDocumentWriter,
+    memory,
   };
   return execute(options, deps, {
     out: (text) => console.log(text),

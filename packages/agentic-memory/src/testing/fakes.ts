@@ -81,13 +81,25 @@ export const failingEmbedder = (model: string, dimensions: number): Embedder => 
 export class InMemorySpaceStore implements SpaceStore {
   private readonly rows = new Map<string, StoredSpace>();
 
-  insert(space: StoredSpace): Promise<void> {
+  insert(space: StoredSpace): Promise<'inserted' | 'name_taken'> {
+    if (space.name !== null && this.named(space.name) !== undefined) {
+      return Promise.resolve('name_taken');
+    }
     this.rows.set(space.id, structuredClone(space));
-    return Promise.resolve();
+    return Promise.resolve('inserted');
   }
 
   get(id: string): Promise<StoredSpace | null> {
     const row = this.rows.get(id);
     return Promise.resolve(row === undefined ? null : structuredClone(row));
+  }
+
+  findByName(name: string): Promise<StoredSpace | null> {
+    const row = this.named(name);
+    return Promise.resolve(row === undefined ? null : structuredClone(row));
+  }
+
+  private named(name: string): StoredSpace | undefined {
+    return [...this.rows.values()].find((row) => row.name === name);
   }
 }

@@ -4,7 +4,8 @@ import type {
   SuccessCriterion,
   ValidationReport,
 } from './evidence';
-import type { QualityRunDto } from './runs';
+import type { RunReadoutDto } from './admission';
+import type { QualityRunDto, QualityRunReadDto } from './runs';
 import { REFUSING_GATES, type Decision } from './vocab';
 
 /**
@@ -55,13 +56,28 @@ export function finding(
   };
 }
 
-/** One finished run with one judged iteration holding the artifact. */
+/**
+ * What a fake loop reads off a run, as the loop answers a settled run's read:
+ * admitted when its final decision is an accept, fallen short otherwise — a
+ * fake's trace already decided at the bar its request asked for — and nothing
+ * withheld, there being no pipeline definition to read withholdings by. Null
+ * while the run is running or recorded no iteration, as the loop's own is.
+ */
+export function fakeReadout(run: QualityRunDto): RunReadoutDto | null {
+  if (run.status === 'running' || run.trace === null) return null;
+  return {
+    admission: run.trace.finalDecision === 'accept' ? 'admitted' : 'fell-short',
+    withheld: [],
+  };
+}
+
+/** One finished run with one judged iteration holding the artifact, read whole with its readout. */
 export function fakeRun(
   pipeline: string,
   artifact: unknown,
   options: FakeRunOptions = {},
   criteria: readonly SuccessCriterion[] = [],
-): QualityRunDto {
+): QualityRunReadDto {
   const runId = options.runId ?? `fake-${pipeline}-${++sequence}`;
   const decision = options.decision ?? 'accept';
   const validation = options.validation ?? [];
@@ -79,7 +95,7 @@ export function fakeRun(
     criteria: [],
   };
   const at = '2026-10-03T10:00:00.000Z';
-  return {
+  const run: QualityRunDto = {
     runId,
     pipeline,
     status: options.status ?? 'complete',
@@ -158,6 +174,7 @@ export function fakeRun(
     exchanges: [],
     error: null,
   };
+  return { ...run, readout: fakeReadout(run) };
 }
 
 /** How a spec describes the one judged iteration of a run; every other field is the quiet default. */
@@ -173,7 +190,7 @@ export interface RunShape {
 }
 
 /** A finished run of the named pipeline with one iteration, judged as described. */
-export function judgedRun(pipeline: string, shape: RunShape): QualityRunDto {
+export function judgedRun(pipeline: string, shape: RunShape): QualityRunReadDto {
   const finalDecision = shape.finalDecision ?? 'accept';
   return fakeRun(
     pipeline,

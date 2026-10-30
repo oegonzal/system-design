@@ -1,0 +1,264 @@
+{
+  "summary": "Four long-term semantic registers over one relational source of truth with a derived vector projection: the person's facts, the stories they can tell whole, the bounds on what they may claim, and the standing answers an operator gave to questions forms asked. Facts, stories and bounds enter through judged digests of the person's documents at tenant scope, so every agent acting for the person reads them. Standing answers enter deterministically from the session that heard them, keyed by subject and question, scoped to the tenant and the project and, when the answer was given for one unit of work, to that unit, so a request naming no unit never sees it. Recall is by meaning over the field's question with an exact route by subject; the newest answer to the same question supersedes the old with history kept; invalidation tombstones a wrong memory and removes its vector; nothing is deleted.",
+  "assumptions": [
+    "One person per tenant; a project names the agent that wrote an answer; a unit of work is an opaque key the session supplies.",
+    "Documents are digested by a judged pipeline that files each memory under a readable predicate; the digest writes no metadata.",
+    "The session knows, when an answer is given, whether it holds for the person or only for the open unit of work, and says so.",
+    "Embeddings come from one declared model; the vector index is a projection that can be rebuilt from the relational rows.",
+    "Short-term working state stays in the session process; the memory keeps only what outlives a session."
+  ],
+  "registers": [
+    {
+      "kind": "semantic",
+      "name": "profile_fact",
+      "term": "long_term",
+      "holds": "One thing true of the person that a field could take or compute from: a duration, a skill, a location, a status, a figure. One current row per (subject, predicate) with superseded history.",
+      "scope": "tenant; readable by every project of the tenant",
+      "store": "Relational rows as the source of truth; the vector projection carries subject, predicate and value text.",
+      "metadata": ["source_document"],
+      "lifecycle": "Written by judged digests of the person's documents; superseded when a digest files a new value under the same predicate; invalidated by the person on review; never expires."
+    },
+    {
+      "kind": "semantic",
+      "name": "profile_story",
+      "term": "long_term",
+      "holds": "A course of events the person was part of, kept whole, for a field asking them to describe or recount one; one current row per (subject, predicate).",
+      "scope": "tenant; readable by every project of the tenant",
+      "store": "Relational rows as the source of truth; the vector projection carries the whole story text.",
+      "metadata": ["source_document"],
+      "lifecycle": "Written by judged digests; superseded when the same story is digested anew; invalidated on review; never expires."
+    },
+    {
+      "kind": "semantic",
+      "name": "claim_boundary",
+      "term": "long_term",
+      "holds": "A bound on what the person may claim, for a field a careless answer would overstate: what they did not do, do not hold, or may not say; one current row per (subject, predicate).",
+      "scope": "tenant; readable by every project of the tenant",
+      "store": "Relational rows as the source of truth; the vector projection carries the bound's text.",
+      "metadata": ["source_document"],
+      "lifecycle": "Written by judged digests; superseded when a digest tightens or lifts the bound; invalidated on review; never expires."
+    },
+    {
+      "kind": "semantic",
+      "name": "standing_answer",
+      "term": "long_term",
+      "holds": "The person's own answer to a question a form asked, with the options it was chosen among, keyed by subject and the question as the form worded it; one current row per (subject, predicate) within a scope.",
+      "scope": "tenant and project; narrowed to one unit of work when the answer holds there alone",
+      "store": "Relational rows as the source of truth; the vector projection carries the question's words and the answer.",
+      "metadata": ["question", "channel"],
+      "lifecycle": "Written deterministically by the session that heard the answer; the same question re-answered supersedes with history; a wrong answer is invalidated; never expires."
+    }
+  ],
+  "interfaces": [
+    {
+      "operation": "remember",
+      "register": "profile_fact",
+      "input": "tenant scope, subject, predicate, value, valid-from, provenance naming the digest and its document",
+      "output": "record id, version and the write outcome: inserted, unchanged or superseded",
+      "guarantee": "One current row per (subject, predicate) in the exact scope; the same value says nothing new; a new value supersedes and the old row keeps its validity window."
+    },
+    {
+      "operation": "recall",
+      "register": "profile_fact",
+      "input": "request scope (tenant, optionally project and unit), the field's question as text, a budget",
+      "output": "ranked facts with their provenance, version and the day they hold from",
+      "guarantee": "Only rows whose scope the request contains; every index hit re-checked against the relational row before it is returned."
+    },
+    {
+      "operation": "invalidate",
+      "register": "profile_fact",
+      "input": "record id, request scope, a reason",
+      "output": "the tombstoned record with its close reason",
+      "guarantee": "The row stops being current at once and its vector is removed; history keeps it."
+    },
+    {
+      "operation": "remember",
+      "register": "profile_story",
+      "input": "tenant scope, subject, predicate, the story text, valid-from, provenance naming the digest",
+      "output": "record id, version and the write outcome",
+      "guarantee": "Stories are kept whole; the same story says nothing new; a re-digested story supersedes with history."
+    },
+    {
+      "operation": "recall",
+      "register": "profile_story",
+      "input": "request scope, the field's question as text, a budget",
+      "output": "ranked stories with provenance and version",
+      "guarantee": "Scope containment and relational re-check as for every register."
+    },
+    {
+      "operation": "invalidate",
+      "register": "profile_story",
+      "input": "record id, request scope, a reason",
+      "output": "the tombstoned record",
+      "guarantee": "Current no more, vector removed, history kept."
+    },
+    {
+      "operation": "remember",
+      "register": "claim_boundary",
+      "input": "tenant scope, subject, predicate, the bound's text, valid-from, provenance naming the digest",
+      "output": "record id, version and the write outcome",
+      "guarantee": "One current bound per (subject, predicate); a tightened or lifted bound supersedes with history."
+    },
+    {
+      "operation": "recall",
+      "register": "claim_boundary",
+      "input": "request scope, the field's question as text, a budget",
+      "output": "ranked bounds with provenance and version",
+      "guarantee": "Scope containment and relational re-check as for every register."
+    },
+    {
+      "operation": "invalidate",
+      "register": "claim_boundary",
+      "input": "record id, request scope, a reason",
+      "output": "the tombstoned record",
+      "guarantee": "Current no more, vector removed, history kept."
+    },
+    {
+      "operation": "remember",
+      "register": "standing_answer",
+      "input": "scope (tenant, project, optional unit), subject, predicate derived from the question, value quoting question, options and answer, valid-from, provenance naming the channel and session, metadata question and channel",
+      "output": "record id, version and the write outcome",
+      "guarantee": "The same question re-answered identically is unchanged; a different answer supersedes with history; an answer for one unit of work is written in that unit's scope and nowhere else."
+    },
+    {
+      "operation": "recall",
+      "register": "standing_answer",
+      "input": "request scope naming the open unit of work when there is one, the field's question as text, a budget",
+      "output": "ranked answers with provenance, version and the day they hold from",
+      "guarantee": "A unit-scoped answer is visible only to a request naming that unit; a tenant- or project-wide answer to every request within it."
+    },
+    {
+      "operation": "update",
+      "register": "standing_answer",
+      "input": "record id, request scope, the corrected value and valid-from, provenance naming the channel and session",
+      "output": "the new version, the superseded one kept in history",
+      "guarantee": "A correction to an answer is a new version of the same record, never a second record; what it replaced stays readable in the history."
+    },
+    {
+      "operation": "invalidate",
+      "register": "standing_answer",
+      "input": "record id, request scope, a reason",
+      "output": "the tombstoned record",
+      "guarantee": "A wrong answer stops being recalled at once; its history shows what it replaced and when it was withdrawn."
+    }
+  ],
+  "workflows": [
+    {
+      "kind": "recall_routing",
+      "name": "evidence for a form's fields",
+      "steps": [
+        {
+          "operation": "recall",
+          "register": "standing_answer",
+          "does": "Search by meaning over the field's question within the request scope (tenant, project, the open unit when one is open); a prior answer to the same question ranks first by recency."
+        },
+        {
+          "operation": "recall",
+          "register": "profile_fact",
+          "does": "Search by meaning over the field's question at tenant scope so the person's facts reach every project; drop any hit whose relational row is no longer current."
+        },
+        {
+          "operation": "recall",
+          "register": "profile_story",
+          "does": "Search by meaning for fields that ask the person to describe or recount; stories are returned whole."
+        },
+        {
+          "operation": "recall",
+          "register": "claim_boundary",
+          "does": "Search by meaning so a bound reaches the judge beside the value it bounds; merge every route by record id and rank by similarity, exactness, recency and support within the budget."
+        }
+      ]
+    },
+    {
+      "kind": "write_pipeline",
+      "name": "answers and documents into memory",
+      "steps": [
+        {
+          "operation": "remember",
+          "register": "standing_answer",
+          "does": "Write the operator's answer as a fact keyed by subject and a predicate derived from the question, in the scope the answerer declared (tenant and project, plus the unit when it holds there alone), with channel and session as provenance."
+        },
+        {
+          "operation": "remember",
+          "register": "profile_fact",
+          "does": "Apply a judged digest's facts at tenant scope with the digest and document as provenance; identical facts are unchanged, changed ones supersede."
+        },
+        {
+          "operation": "remember",
+          "register": "profile_story",
+          "does": "Apply a judged digest's stories whole at tenant scope."
+        },
+        {
+          "operation": "remember",
+          "register": "claim_boundary",
+          "does": "Apply a judged digest's bounds at tenant scope."
+        },
+        {
+          "operation": "invalidate",
+          "register": "standing_answer",
+          "does": "On the person's review, tombstone a wrong answer by record id with a reason; recall stops returning it at once."
+        }
+      ]
+    },
+    {
+      "kind": "expiry",
+      "name": "nothing expires, projections are repaired",
+      "steps": [
+        {
+          "operation": "recall",
+          "register": "profile_fact",
+          "does": "Every register is long-term, so the periodic sweep expires nothing here; it drops the vectors of superseded and invalidated rows and re-projects rows whose embedding failed or whose model changed."
+        }
+      ]
+    }
+  ],
+  "safeguards": [
+    {
+      "rule": "A memory is visible only to a request whose scope contains the memory's own scope.",
+      "mechanism": "The relational query and the vector filter both apply scope containment from the declared scope keys; every vector hit is re-checked against its relational row before it is returned."
+    },
+    {
+      "rule": "Nothing is deleted: a changed value supersedes, a wrong value is invalidated, history stays.",
+      "mechanism": "Writes insert a new version and close the old row in one transaction; invalidation sets the close reason and removes the vector; the lineage is readable by record id."
+    },
+    {
+      "rule": "No model decides what is stored for an operator's answer.",
+      "mechanism": "The session writes the answer as typed data through the remember interface; only documents pass through a judged digest, and the digest is applied once by a ledger."
+    },
+    {
+      "rule": "Every memory carries its provenance and the judge is shown it.",
+      "mechanism": "Provenance is a required field of every write; the recall returns it and the goal that reaches the judge renders it beside the value."
+    }
+  ],
+  "tradeoffs": [
+    {
+      "decision": "Four semantic registers instead of one register with a kind field.",
+      "rationale": "The judge reads the evidence legend by kind; a fact, a story and a bound on a claim are weighed differently, and a register name is declared data the engine routes on without reading prose.",
+      "alternative": "One semantic register with the kind in metadata, filtered at recall."
+    },
+    {
+      "decision": "A standing answer's identity is the subject and a predicate derived from the question text.",
+      "rationale": "Re-answering the same question supersedes deterministically with no model in the write path; paraphrased questions on another site stay separate facts that recall by meaning still finds.",
+      "alternative": "A judged digest per answer that files paraphrases under one readable predicate at the cost of a loop run per answer."
+    },
+    {
+      "decision": "Documents are written at tenant scope, answers at tenant and project scope.",
+      "rationale": "The person's record belongs to the person and must reach every agent acting for them; an answer given through one agent's forms belongs to that agent's project and, when it holds for one unit of work, to that unit alone.",
+      "alternative": null
+    }
+  ],
+  "risks": [
+    {
+      "risk": "A single embedded text per memory ranks a field's question less sharply than today's two named vectors.",
+      "mitigation": "Measure retrieval parity on recorded form pages before any live use; the standing answer's value quotes the question so its words are in the vector."
+    },
+    {
+      "risk": "An answer declared as holding for the person when it held for one unit of work would leak to another unit.",
+      "mitigation": "The scope is declared by the judged answerer per field and applied deterministically; the critic faults a declared scope that contradicts the question."
+    },
+    {
+      "risk": "A digest may paraphrase a document's wording.",
+      "mitigation": "Digests are judged for fidelity before they are applied; the person reviews and can invalidate any memory by record id with history kept."
+    }
+  ]
+}

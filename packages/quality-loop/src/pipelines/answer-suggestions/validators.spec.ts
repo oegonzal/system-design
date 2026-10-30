@@ -1,5 +1,6 @@
 import {
   composeFieldGoal,
+  DOCUMENT_MEMORY_LEGEND,
   FIELD_ANSWER_PIPELINE_ID,
   type AnswerSuggestions,
 } from '@sysdesign/contracts';
@@ -69,6 +70,7 @@ describe('the answer-suggestions validators', () => {
       prose: SUGGESTING_PROSE,
       fields: sampleFields(),
       evidence: sampleEvidence(),
+      kinds: DOCUMENT_MEMORY_LEGEND,
     });
     expect(problems(referencesValidator, sampleSuggestions(), answerGoal)).toEqual([
       [[], 'the goal carries no answer-suggestions index'],

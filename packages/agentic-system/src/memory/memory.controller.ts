@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, Param, ParseUUIDPipe, Post, Put } from '@nestjs/common';
 import { MemoryService } from '@sysdesign/agentic-memory';
 import {
   consolidateRequestSchema,
@@ -7,9 +7,11 @@ import {
   recallRecordsRequestSchema,
   recordHistoryRequestSchema,
   rememberRequestSchema,
+  spaceNameSchema,
   updateRecordRequestSchema,
   type ApiResponse,
   type ConsolidationResultDto,
+  type EnsuredSpaceDto,
   type MemoryRecordDto,
   type MemorySpaceDto,
   type RecallResultDto,
@@ -25,10 +27,12 @@ import { SpacesService } from './spaces.service';
 type BodyOf<S extends z.ZodType> = z.output<S>;
 
 /**
- * Memory spaces over HTTP: one made from a design run, read back, and each
- * memory verb the runtime serves on it. A verb answers 200 with what it did;
- * a refusal answers its one declared status (`refusals.ts`), and a body the
- * contract does not accept is the pipe's 400.
+ * Memory spaces over HTTP: one made from a design run or ensured under a name,
+ * read back by id or by name, and each memory verb the runtime serves on it. A
+ * verb answers 200 with what it did; a refusal answers its one declared status
+ * (`refusals.ts`), and a body or a name the contract does not accept is the
+ * pipe's 400. The by-name routes are declared before the `:id` ones, so a
+ * name is never read as an id.
  */
 @Controller('spaces')
 export class MemoryController {
@@ -46,6 +50,30 @@ export class MemoryController {
     const created = await answered(() => this.spaces.createFromRun(body.runId));
     if ('report' in created) throw notCompiled(created.report);
     return { data: created.space };
+  }
+
+  /**
+   * 200 with the space under this name and whether this call made it: made
+   * from the run when none holds the name, the same space when that run made
+   * it. A name another run holds is 409; a strategy that does not compile is
+   * 422 with the report.
+   */
+  @Put('by-name/:name')
+  async ensure(
+    @Param('name', new ZodValidationPipe(spaceNameSchema)) name: string,
+    @Body(new ZodValidationPipe(createSpaceRequestSchema))
+    body: BodyOf<typeof createSpaceRequestSchema>,
+  ): Promise<ApiResponse<EnsuredSpaceDto>> {
+    const ensured = await answered(() => this.spaces.ensureNamed(name, body.runId));
+    if ('report' in ensured) throw notCompiled(ensured.report);
+    return { data: ensured };
+  }
+
+  @Get('by-name/:name')
+  async getByName(
+    @Param('name', new ZodValidationPipe(spaceNameSchema)) name: string,
+  ): Promise<ApiResponse<MemorySpaceDto>> {
+    return { data: await answered(() => this.memory.getSpaceByName(name)) };
   }
 
   @Get(':id')

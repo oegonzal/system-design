@@ -25,6 +25,12 @@ import type { BrowserDecisionSource, FieldRoute } from './vocab';
 export interface FieldReadout {
   position: number;
   field: FieldSpec;
+  /**
+   * The model's answer for the field as the contract shapes it — the scope
+   * it declared the question holds in (`about`) carried through for whoever
+   * teaches an operator's answer to it; null when nothing it wrote named the
+   * field, or what it wrote was not the contract's shape.
+   */
   answer: FieldAnswer | null;
   route: FieldRoute;
   /** What to type or pick when the route is fill; what the field holds when it is keep; the model's suggestion when the operator is asked. */

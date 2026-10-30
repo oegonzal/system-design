@@ -12,7 +12,7 @@ import {
   REGISTER_MEMORY_DIGEST_STEP,
   type OrchestrationRunDto,
   type OrchestrationStepDto,
-  type QualityRunDto,
+  type QualityRunReadDto,
   type QualityRunStatus,
   type StartOrchestrationRequest,
 } from '@sysdesign/contracts';
@@ -50,7 +50,7 @@ export interface SpecLoop extends Pick<
   readonly orchestrations: Map<string, OrchestrationRunDto>;
 }
 
-export function loopWith(runs: Readonly<Record<string, QualityRunDto>> = {}): SpecLoop {
+export function loopWith(runs: Readonly<Record<string, QualityRunReadDto>> = {}): SpecLoop {
   const started: StartedOrchestration[] = [];
   const orchestrations = new Map<string, OrchestrationRunDto>();
   return {

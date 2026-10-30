@@ -1,11 +1,13 @@
 // Units of work beyond one session: the vocabulary, the identity key every
-// process compares declared facts by, what an advisor answers about units on
-// record, the three mission sections that declare a unit's facts, the
-// advisors to ask, when a unit on record may still be taken, and the landmark
-// whose words state what a unit is, the advisor
-// protocol, and the events a session publishes for whoever keeps the record.
+// process compares declared facts by, where a memory holds — of the subject
+// or of one unit — what an advisor answers about units on record, the three
+// mission sections that declare a unit's facts, the advisors to ask, when a
+// unit on record may still be taken, and the landmark whose words state what a
+// unit is, the advisor protocol, and the events a session publishes for
+// whoever keeps the record.
 export * from './vocab';
 export * from './identity';
+export * from './scope';
 export * from './record';
 export * from './mission-identity';
 export * from './mission-taken';

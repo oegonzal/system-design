@@ -43,6 +43,7 @@ const answers = (
   fields: [
     {
       ref: 'e1',
+      about: 'subject',
       decision: 'answer',
       value: '6',
       rests: 'stated',
@@ -51,6 +52,7 @@ const answers = (
     },
     {
       ref: 'e2',
+      about: 'subject',
       decision: 'answer',
       value: 'Yes',
       rests: 'inferred',
@@ -59,6 +61,7 @@ const answers = (
     },
     {
       ref: 'e3',
+      about: 'subject',
       decision: 'answer',
       value: 'https://x',
       rests: 'stated',
@@ -67,6 +70,7 @@ const answers = (
     },
     {
       ref: 'e4',
+      about: 'subject',
       decision: 'leave-blank',
       value: null,
       rests: 'none',
@@ -98,6 +102,36 @@ describe('routeFields', () => {
       [],
     );
     expect(nothing[0]).toMatchObject({ route: 'ask-operator', reason: 'rests none: from m1' });
+  });
+
+  it('[QL-37] carries the scope the model declared each question holds in on every route that read an answer — the one an operator’s answer to an asked field is taught under — and reads an artifact declaring none as no answer at all', () => {
+    const routes = route(
+      decided(judgedRun({ artifact: answers({ e2: { about: 'unit' } }) })),
+      fields(),
+    );
+    expect(routes.map((r) => [r.route, r.answer?.about ?? null])).toEqual([
+      ['fill', 'subject'],
+      ['ask-operator', 'unit'],
+      ['leave-blank', 'subject'],
+      ['leave-blank', 'subject'],
+    ]);
+    // The read-back takes the contract's shape and nothing less: an artifact from before answers
+    // declared their scope names no field, and every field is the engine's unanswered.
+    const undeclared = {
+      ...answers(),
+      fields: answers().fields.map(({ about, ...rest }) => {
+        void about;
+        return rest;
+      }),
+    };
+    const unread = route(decided(judgedRun({ artifact: undeclared })), fields());
+    expect(unread.map((r) => [r.route, r.source, r.answer])).toEqual([
+      ['ask-operator', 'engine', null],
+      ['ask-operator', 'engine', null],
+      ['leave-blank', 'blank', null],
+      ['leave-blank', 'engine', null],
+    ]);
+    expect(unread[0].reason).toBe('unanswered');
   });
 
   it('[QL-37] never fills a field the report withholds, carries what withheld it for the operator, and reads nothing off the findings itself', () => {

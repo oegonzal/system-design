@@ -3,6 +3,8 @@ import type { IngestReport } from '../core/ingest-report';
 import { fakeIngestLoop, type SettleScript } from './fake-ingest-loop';
 import { fixedClock, InMemoryLedger, scriptedReader } from './fakes';
 
+export { LOOP_URL } from './fakes';
+
 /**
  * What the ingest specs share: a document that packs into three chunks, the
  * options a run takes, and one loop — one store — with one ledger for every
@@ -20,7 +22,6 @@ export const bullet = (seed: string): string =>
  * — three chunks, one part each.
  */
 export const NOTES = ['alpha', 'bravo', 'delta'].map(bullet).join('\n');
-export const LOOP_URL = 'http://loop.test';
 
 /** Judged below the bar, and nothing drawn on: the chunk's facts are not in the store. */
 export const NOT_ACCEPTED: SettleScript = {
@@ -93,7 +94,6 @@ export function harness(script: readonly SettleScript[] = []) {
     sink: fake.sink,
     ledger,
     clock: fixedClock(),
-    loopUrl: LOOP_URL,
   };
   return { ...fake, ledger, deps };
 }

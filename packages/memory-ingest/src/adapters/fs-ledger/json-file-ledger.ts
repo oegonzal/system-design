@@ -2,12 +2,17 @@ import { rmSync } from 'node:fs';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
-import { DOCUMENT_KINDS, ORCHESTRATION_STEP_STATUSES } from '@sysdesign/contracts';
+import {
+  DOCUMENT_KINDS,
+  ORCHESTRATION_STEP_STATUSES,
+  recordScopeSchema,
+} from '@sysdesign/contracts';
 import { z } from 'zod';
 
 import {
-  DOCUMENT_MEMORY_STEPS,
+  INGEST_SINKS,
   INGEST_STATUSES,
+  POSTING_STEPS,
   type IngestLedger,
   type ManifestEntry,
 } from '../../core/ports';
@@ -16,11 +21,14 @@ export const MANIFEST_FILE = 'manifest.json';
 /** Beside the manifest while a command writes the home. */
 export const LOCK_FILE = 'manifest.lock';
 /**
- * The version this build writes. 2 added the retraction marks; a build that
- * reads only 1 refuses the file by this literal, rather than load it, drop
- * the marks it does not know and save the postings as standing again.
+ * The version this build writes. 2 added the retraction marks; 3 the store a
+ * posting went through — the sink, the service, the space and the records it
+ * left; 4 the scope a space posting wrote under, which tells one tenant's
+ * postings from another's in one space. A build that reads only an earlier
+ * version refuses the file by this literal, rather than load it, drop what it
+ * does not know and save the postings as it misread them.
  */
-const MANIFEST_VERSION = 2;
+const MANIFEST_VERSION = 4;
 
 const stepSchema = z
   .object({
@@ -31,7 +39,7 @@ const stepSchema = z
   })
   .nullable();
 
-/** What every version records of a posting. */
+/** What every version records of a posting's chunk and outcome. */
 const postingShape = {
   chunkHash: z.string().min(1),
   document: z.string().min(1),
@@ -41,39 +49,85 @@ const postingShape = {
   digestRunId: z.string().nullable(),
   status: z.enum(INGEST_STATUSES),
   steps: z.object(
-    Object.fromEntries(DOCUMENT_MEMORY_STEPS.map((id) => [id, stepSchema])) as Record<
-      (typeof DOCUMENT_MEMORY_STEPS)[number],
+    Object.fromEntries(POSTING_STEPS.map((id) => [id, stepSchema])) as Record<
+      (typeof POSTING_STEPS)[number],
       typeof stepSchema
     >,
   ),
   error: z.string().nullable(),
   ingestedAt: z.string().min(1),
-  loopUrl: z.string().min(1),
 };
+
+/** The marks version 2 added. */
+const markShape = {
+  retractedAt: z.string().min(1).nullable(),
+  retractedPoints: z.number().int().min(0).nullable(),
+};
+
+/** Where a posting went, as version 3 records it. */
+const originShape = {
+  sink: z.enum(INGEST_SINKS),
+  host: z.string().min(1),
+  spaceId: z.string().min(1).nullable(),
+  recordIds: z.array(z.string().min(1)),
+};
+
+/** The scope a space posting wrote under, as version 4 records it; null for a loop posting. */
+const scopeShape = { scope: recordScopeSchema.nullable() };
+
+/** Every posting before version 3 went through the loop, under the URL it recorded as `loopUrl`, named no records and wrote under no scope. */
+const fromLoopPosting = <T extends { loopUrl: string }>({ loopUrl, ...posting }: T) => ({
+  ...posting,
+  sink: 'loop' as const,
+  host: loopUrl,
+  spaceId: null,
+  scope: null,
+  recordIds: [],
+});
+
+/**
+ * A version-3 posting recorded no scope: a loop posting had none, and a space
+ * posting's reads as none — which no store matches, so it is listed and acted
+ * on by no command — rather than as the configured tenant's, which it may not
+ * have been.
+ */
+const withoutScope = <T>(posting: T) => ({ ...posting, scope: null });
 
 /**
  * The file's shape, by version, so a manifest another program or a newer
  * build wrote is refused rather than misread. Version 1 was written before
- * retractions were marked, so each of its postings reads as standing.
+ * retractions were marked, so each of its postings reads as standing; versions
+ * 1 and 2 were written before a posting could go anywhere but the loop; 3
+ * before a space posting recorded the scope it wrote under.
  */
 const manifestSchema = z.discriminatedUnion('version', [
   z.object({
     version: z.literal(1),
     entries: z.array(
+      z.object({ ...postingShape, loopUrl: z.string().min(1) }).transform((entry) => ({
+        ...fromLoopPosting(entry),
+        retractedAt: null,
+        retractedPoints: null,
+      })),
+    ),
+  }),
+  z.object({
+    version: z.literal(2),
+    entries: z.array(
       z
-        .object(postingShape)
-        .transform((entry) => ({ ...entry, retractedAt: null, retractedPoints: null })),
+        .object({ ...postingShape, ...markShape, loopUrl: z.string().min(1) })
+        .transform(fromLoopPosting),
+    ),
+  }),
+  z.object({
+    version: z.literal(3),
+    entries: z.array(
+      z.object({ ...postingShape, ...markShape, ...originShape }).transform(withoutScope),
     ),
   }),
   z.object({
     version: z.literal(MANIFEST_VERSION),
-    entries: z.array(
-      z.object({
-        ...postingShape,
-        retractedAt: z.string().min(1).nullable(),
-        retractedPoints: z.number().int().min(0).nullable(),
-      }),
-    ),
+    entries: z.array(z.object({ ...postingShape, ...markShape, ...originShape, ...scopeShape })),
   }),
 ]);
 

@@ -15,10 +15,11 @@ import {
 
 import { numbered, numberedSection, type OutputShape } from '../../core/contracts';
 
-/** `e1 — answer "6" — rests stated — basis m1 — reason`: the ref, the decision, how the value rests on what. */
+/** `e1 — answer "6" — about subject — rests stated — basis m1 — reason`: the ref, the decision, where the answer holds, how the value rests on what. */
 const fieldLine = (answer: FieldAnswer): string =>
   [
     `${answer.ref} — ${answer.decision}${answer.value === null ? '' : ` ${quotedJson(answer.value)}`}`,
+    `about ${answer.about}`,
     `rests ${answer.rests}`,
     `basis ${answer.basis.length > 0 ? answer.basis.join(', ') : 'none'}`,
     answer.reason,

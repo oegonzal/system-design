@@ -52,10 +52,11 @@ export const ROUTE_SKIPS = [
 ] as const;
 export type RouteSkip = (typeof ROUTE_SKIPS)[number];
 
-/** Every refusal a memory verb can answer; the HTTP door gives each one declared status. */
+/** Every refusal a memory verb can answer; the HTTP door gives each one declared status (`space-host.ts`). */
 export const MEMORY_REFUSALS = [
   'space.not_found',
   'space.not_compiled',
+  'space.name_taken',
   'register.unknown',
   'operation.undeclared',
   'scope.invalid',
@@ -168,6 +169,22 @@ export const CANDIDATE_VALID_TIME = {
 } as const satisfies { [K in RegisterKind]: (keyof CandidateOf<K> & string) | null };
 
 export const createSpaceRequestSchema = z.strictObject({ runId: ref(80) });
+
+/** The most characters a space's name may run to: the width of the column that keeps it (`memory_space.name`). */
+export const MEMORY_SPACE_NAME_MAX_LENGTH = 80;
+
+/**
+ * The grammar of a space's name: a lower-case word of letters, digits and
+ * hyphens within the bound, so it reads the same in a path, a config file and
+ * a log line. A space made by `POST /spaces` has none; another space holding
+ * the name is `space.name_taken`.
+ */
+export const spaceNameSchema = z
+  .string()
+  .regex(
+    new RegExp(`^[a-z][a-z0-9-]{0,${MEMORY_SPACE_NAME_MAX_LENGTH - 1}}$`),
+    `a lower-case word of letters, digits and hyphens, ${MEMORY_SPACE_NAME_MAX_LENGTH} at most`,
+  );
 
 export const rememberRequestSchema = z.strictObject({
   register: registerRef,
@@ -338,10 +355,20 @@ export interface CompileReportDto {
 
 export interface MemorySpaceDto {
   id: Uuid;
+  /** The name it was ensured under; null for a space made by `POST /spaces`. */
+  name: string | null;
   designRunId: string;
   policySource: string;
+  /** The scope keys of the policy snapshot it keeps, the first the partition: what a request to it may name. */
+  scopeKeys: string[];
   createdAt: IsoDateString;
   report: CompileReportDto;
+}
+
+/** What an ensure answered: the space under the name, and whether this call made it. */
+export interface EnsuredSpaceDto {
+  space: MemorySpaceDto;
+  created: boolean;
 }
 
 /** A register a writer may remember into, and how it files what it keeps. */

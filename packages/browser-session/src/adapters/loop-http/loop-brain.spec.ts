@@ -10,15 +10,16 @@ import {
   FORM_MEMORY_ORCHESTRATOR_ID,
   formObservation,
   GoalBudgetExceeded,
+  guidanceDocuments,
   listingObservation,
   MISSION_FIXTURE,
   NO_UNITS_ON_RECORD,
   readFieldIndex,
   renderDocumentGoal,
-  resumeChunk,
   routePlan,
   textBytes,
   type FieldAnswers,
+  type OperatorGuidanceDto,
   type PageObservation,
   type StepPlan,
   stopsOf,
@@ -31,7 +32,9 @@ import { LoopRefused } from '@sysdesign/loop-client';
 import { FakeLoop, FakeLoopClient } from '@sysdesign/studio-testing';
 
 import { BrainFaulted, type StepInput } from '../../core/ports';
-import { LoopBrain, toBrainFault } from './loop-brain';
+import { fieldAnswer } from '../../core/testing';
+import { LoopBrain } from './loop-brain';
+import { guarded } from './loop-runs';
 import { composeStepGoalWithinBudget, renderFieldProse } from './render-goal';
 
 const PLAN: StepPlan = {
@@ -43,13 +46,29 @@ const PLAN: StepPlan = {
 
 const ANSWERS: FieldAnswers = {
   summary: 'one field',
-  fields: [{ ref: 'e1', decision: 'answer', value: '6', rests: 'stated', basis: [], reason: 'cv' }],
+  fields: [fieldAnswer('e1', { value: '6', reason: 'cv' })],
 };
 
 const CRITERIA = [{ id: 'c1', kind: 'progress', statement: 'Open the next listing.' }];
 
 /** The session and step every decision below is asked in. */
 const SESSION = { sessionId: 'session-1', step: 6 };
+
+/** One operator answer as the session records it, given in the unit of work `u-1`. */
+const GUIDANCE: OperatorGuidanceDto = {
+  sessionId: SESSION.sessionId,
+  capturedAt: '2026-10-10T12:00:00.000Z',
+  field: {
+    question: 'Are you authorized to work in this country',
+    type: 'radio',
+    options: ['Yes', 'No'],
+  },
+  context: { taskLabel: 'Acme', unitKey: 'u-1', page: null },
+  answer: 'Yes',
+  about: 'subject',
+  chosen: null,
+  via: 'terminal',
+};
 
 const stepInput = (
   observation: PageObservation = listingObservation(),
@@ -69,7 +88,6 @@ const stepInput = (
   onRecord: NO_UNITS_ON_RECORD,
 });
 
-/** A goal input with the stop facts the composer is handed, read from its own page. */
 /** What the adapter reads from the page before fitting: the mission's stop words and the controls its exceptions are tied to. */
 const withPageFacts = <I extends { mission: string; observation: PageObservation }>(input: I) => ({
   ...input,
@@ -169,7 +187,7 @@ describe('the loop brain', () => {
     });
   });
 
-  it('[BRW-3] [QL-71] answers fields through the form-memory orchestration — the goal’s index naming the open unit of work — reading the target run and the admission the server reports', async () => {
+  it('[BRW-3] [QL-71] answers fields through the form-memory orchestration — the goal’s index naming the open unit of work — reading the target run and the admission the server reports, its recall the loop’s own', async () => {
     const fields = formObservation().elements.slice(0, 2).map(fieldSpecOf);
     const input = {
       session: SESSION,
@@ -192,6 +210,8 @@ describe('the loop brain', () => {
     expect(started?.request.goal).toContain('- e1 · textbox "Years of experience with Python"');
     expect(started?.request.goal).toContain(renderFieldProse(input));
     expect(decided.admission).toBe('admitted');
+    // The recall is the orchestration's own step, on its record: the brain reports none.
+    expect(decided.recall).toBeNull();
     expect(decided.orchestrationRunId).toBe('fake-run-orchestration-1');
     expect(decided.runId).toBe('fake-run-1');
     expect(bestIterationOf(decided.run)?.artifact).toEqual(ANSWERS);
@@ -225,19 +245,27 @@ describe('the loop brain', () => {
     await expect(failed.brain.answerFields(input)).rejects.toMatchObject({ reason: 'failed' });
   });
 
-  it('teaches a document as a document-memory orchestration and does not wait for it', async () => {
+  it('teaches answers as the guidance documents they make, each a document-memory orchestration it does not wait for, each answer’s receipt naming its document queued', async () => {
     const { core, brain } = harness(() => undefined);
-    const { orchestrationRunId } = await brain.teach(resumeChunk(), SESSION);
-    expect(orchestrationRunId).toBe('fake-run-orchestration-1');
+    const receipts = await brain.teach([GUIDANCE], SESSION, 'Alex Example');
+    expect(receipts).toEqual([{ ref: 'fake-run-orchestration-1', outcome: 'queued', fault: null }]);
+    const [made] = guidanceDocuments(SESSION.sessionId, 'Alex Example', [GUIDANCE], (one) => one);
+    if (made === undefined) throw new Error('one answer makes one document');
     expect(core.orchestrations.startRequests[0]).toEqual({
       orchestrator: DOCUMENT_MEMORY_ORCHESTRATOR_ID,
       request: {
-        goal: renderDocumentGoal(resumeChunk()),
+        goal: renderDocumentGoal(made.document),
         maxIterations: 2,
         openedBy: { kind: 'browser-session', id: 'session-1', label: 'step 6 · teaching' },
       },
     });
-    expect(core.orchestrations.get(orchestrationRunId)?.status).toBe('running');
+    expect(core.orchestrations.get('fake-run-orchestration-1')?.status).toBe('running');
+    // Answers given in two units of work are two documents, two orchestrations: each answer's receipt names its own, never both.
+    const elsewhere = { ...GUIDANCE, context: { ...GUIDANCE.context, unitKey: 'u-2' } };
+    expect(await brain.teach([GUIDANCE, elsewhere], SESSION, 'Alex Example')).toEqual([
+      { ref: 'fake-run-orchestration-2', outcome: 'queued', fault: null },
+      { ref: 'fake-run-orchestration-3', outcome: 'queued', fault: null },
+    ]);
   });
 
   it('turns every client error into a brain fault with its reason, and leaves other errors alone', async () => {
@@ -270,9 +298,16 @@ describe('the loop brain', () => {
         if (run.status === 'running') core.forget(run.runId);
     });
     await expect(lost.brain.planStep(stepInput())).rejects.toMatchObject({ reason: 'lost' });
-    expect(toBrainFault(new GoalBudgetExceeded(70_000, 64_000))?.reason).toBe('goal-budget');
-    expect(toBrainFault(new TypeError('a bug'))).toBeNull();
-    expect(toBrainFault(new BrainFaulted('no-artifact', 'x'))?.reason).toBe('no-artifact');
+    // The guard reads the table: a goal past the budget is the brain's fault, a bug is left as it is, a fault stays itself.
+    await expect(
+      guarded(() => Promise.reject(new GoalBudgetExceeded(70_000, 64_000))),
+    ).rejects.toMatchObject({ reason: 'goal-budget' });
+    await expect(guarded(() => Promise.reject(new TypeError('a bug')))).rejects.toBeInstanceOf(
+      TypeError,
+    );
+    await expect(
+      guarded(() => Promise.reject(new BrainFaulted('no-artifact', 'x'))),
+    ).rejects.toMatchObject({ reason: 'no-artifact' });
   });
 
   it('[BRW-2] fits an oversized page to the budget by declared rungs — snapshot, context, elements — and refuses rather than clip', async () => {

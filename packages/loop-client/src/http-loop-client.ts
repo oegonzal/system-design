@@ -11,7 +11,7 @@ import {
   type PromptLibraryDocumentDto,
   type PromptLibraryEntryDto,
   type QualityLoopHealthDto,
-  type QualityRunDto,
+  type QualityRunReadDto,
   type QualityRunStartedDto,
   type Recovery,
   type RecoveryClock,
@@ -118,8 +118,8 @@ export class HttpLoopClient extends LoopClient {
     return this.started<QualityRunStartedDto>('/runs', request);
   }
 
-  async getRun(runId: string): Promise<QualityRunDto | null> {
-    return this.read<QualityRunDto>(`/runs/${segment(runId)}`, 'GET /runs/:id');
+  async getRun(runId: string): Promise<QualityRunReadDto | null> {
+    return this.read<QualityRunReadDto>(`/runs/${segment(runId)}`, 'GET /runs/:id');
   }
 
   async iterationEvidence(refs: readonly IterationRef[]): Promise<IterationEvidenceDto[]> {

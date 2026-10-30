@@ -196,6 +196,7 @@ describe('a memory space’s digests', () => {
     const broken = randomUUID();
     await spaces.insert({
       id: broken,
+      name: null,
       designRunId: 'run-1',
       strategy: { registers: 'not a list' },
       policy: TEST_POLICY,

@@ -13,6 +13,7 @@ import {
   type IterationTrace,
   type PipelineSummary,
   type QualityRunDto,
+  type QualityRunReadDto,
   type QualityRunSummaryDto,
   type RunRecallDto,
   type StartQualityRunRequest,
@@ -23,6 +24,7 @@ import { describeError, gitContext, makeRunId } from '@sysdesign/run-dump';
 import { toRunDto, type RunRecord } from '../../core/contracts';
 import { materializeCriteria } from '../../core/loop/materialize';
 import { describePipeline } from '../../core/describe-pipeline';
+import { readoutOf } from '../../core/outputs';
 import { validatePipeline } from '../../core/validate-pipeline';
 import { type PipelineDefinition } from '../../core/pipeline';
 import type { AdvisoryMemory, RunListQuery, RunRepository, TraceStore } from '../../core/ports';
@@ -98,8 +100,12 @@ export class RunsService {
     return definition === undefined ? undefined : describePipeline(definition);
   }
 
-  get(runId: string): Promise<QualityRunDto | null> {
-    return this.repository.find(runId);
+  /** One run as its read answers it: the record, and its readout once settled — read by the definition registered under its pipeline. */
+  async get(runId: string): Promise<QualityRunReadDto | null> {
+    const run = await this.repository.find(runId);
+    return run === null
+      ? null
+      : { ...run, readout: readoutOf(this.registry.get(run.pipeline), run) };
   }
 
   listRuns(query: RunListQuery): Promise<[QualityRunSummaryDto[], number]> {

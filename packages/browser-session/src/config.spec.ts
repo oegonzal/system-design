@@ -5,6 +5,8 @@ import {
   advisorEntries,
   flagKey,
   headedOf,
+  NO_ADVISORS,
+  NO_TENANT,
   parseArgsOptions,
   positiveInteger,
   railsOf,
@@ -12,6 +14,7 @@ import {
   SESSION_FLAGS,
   sessionConfigFromEnv,
   SessionConfigError,
+  type SessionFlag,
 } from './config';
 import { SPEC_RAILS } from './core/testing-session';
 
@@ -31,6 +34,8 @@ describe('the session configuration', () => {
       profilesDir: 'static/browser-profiles',
       subject: 'the subject',
       advisors: [],
+      memoryUrl: 'http://localhost:3007',
+      memoryTenant: 'none',
     });
     expect(
       sessionConfigFromEnv({
@@ -40,6 +45,8 @@ describe('the session configuration', () => {
         [SESSION_ENV.profilesDir.name]: ' /tmp/profiles ',
         [SESSION_ENV.subject.name]: 'Alex Example',
         [SESSION_ENV.advisors.name]: 'record=http://advisor.test:3006, http://other.test',
+        [SESSION_ENV.memoryUrl.name]: 'http://memory.test:7',
+        [SESSION_ENV.memoryTenant.name]: ' verify-2026 ',
       }),
     ).toEqual({
       loopUrl: 'http://loop.test:1234',
@@ -51,7 +58,17 @@ describe('the session configuration', () => {
         { id: 'record', url: 'http://advisor.test:3006', text: 'record=http://advisor.test:3006' },
         { id: null, url: 'http://other.test', text: 'http://other.test' },
       ],
+      memoryUrl: 'http://memory.test:7',
+      memoryTenant: 'verify-2026',
     });
+    // The two values that configure nothing are the declared fallbacks, so a module refuses them by
+    // the one name each; what to refuse is the module's decision at boot, not a parse rule here — a
+    // brain deciding through the loop alone never reads the tenant.
+    expect(SESSION_ENV.advisors.fallback).toBe(NO_ADVISORS);
+    expect(SESSION_ENV.memoryTenant.fallback).toBe(NO_TENANT);
+    expect(() => sessionConfigFromEnv({ [SESSION_ENV.memoryUrl.name]: 'host' })).toThrow(
+      new SessionConfigError('AGENTIC_SYSTEM_URL must be a URL, got "host"'),
+    );
     // An advisor entry is `none`, or `[<id>=]<url>` in the grammar a mission names an advisor by.
     expect(advisorEntries({}, SESSION_ENV.advisors)).toEqual([]);
     const entries = (value: string) => () =>
@@ -91,14 +108,28 @@ describe('the session configuration', () => {
     }
   });
 
-  it('[BRW-7] derives the option table from the flag declaration and validates each flag by name', () => {
-    expect(parseArgsOptions()).toMatchObject({
+  it('[BRW-7] derives the option table from the flag declaration for the flags a command reads, and validates each flag by name', () => {
+    const every = Object.keys(SESSION_FLAGS) as SessionFlag[];
+    expect(parseArgsOptions(every)).toMatchObject({
       goal: { type: 'string' },
       'max-tasks': { type: 'string' },
       headed: { type: 'boolean' },
       json: { type: 'boolean' },
+      // Teaching again and replaying address a tenant of their own; a replay samples, judges, closes a sample and writes somewhere.
+      tenant: { type: 'string' },
+      sample: { type: 'string' },
+      judge: { type: 'boolean' },
+      retract: { type: 'string' },
+      out: { type: 'string' },
     });
-    expect(Object.keys(parseArgsOptions())).toHaveLength(Object.keys(SESSION_FLAGS).length);
+    expect(flagKey('tenant')).toBe('tenant');
+    expect(flagKey('dryRun')).toBe('dry-run');
+    expect(Object.keys(parseArgsOptions(every))).toHaveLength(every.length);
+    // A command's table holds the flags it reads alone, so one it would ignore is refused by name instead.
+    expect(parseArgsOptions(['sessions', 'dryRun'])).toEqual({
+      sessions: { type: 'string' },
+      'dry-run': { type: 'boolean' },
+    });
     expect(flagKey('maxFailures')).toBe('max-failures');
 
     expect(railsOf({}, SPEC_RAILS)).toEqual(SPEC_RAILS);

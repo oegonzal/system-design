@@ -13,7 +13,7 @@ import { captureAfter } from './capture';
 import type { DecisionInput, EngineContext } from './engine-context';
 import { routeFieldsInSession, type RoutedField } from './field-routing';
 import { entryOf, fill, fillActionOf, result, settled, type FieldResult } from './field-fill';
-import { remember, teach } from './field-teach';
+import { recordTeaching, remember, teach, type Taught } from './field-teach';
 import { askOperator, SuggestionsPrefetch, type SuggestionsRecord } from './operator-ask';
 import { BrainFaulted, type Decided, type FormReport } from './ports';
 import { stepJsonFile } from './session-dump';
@@ -28,8 +28,8 @@ import { openUnitAnswers, openUnitFilled } from './session-state';
  * put to the operator with the model's value as a suggestion and the reason
  * it was not trusted. The operator's answers are cached for the unit of work
  * they were given in and, unless given on a channel the operator settings
- * keep untaught, taught back the moment they are given. One decision row per
- * field settled.
+ * keep untaught, taught back the moment they are given, the row carrying what
+ * the memory did with each. One decision row per field settled.
  * A fill the page refuses stops the flow where it is — the page may have
  * moved on — so the fields after it are not attempted, and the plan stops
  * with it; the failure is counted once, by the step. The operator's own
@@ -112,7 +112,15 @@ async function ask(
         if (filled.outcome === 'ok') {
           return {
             ...filled,
-            guidance: remember(ctx, field.field, reply.text, observation, chosen, asking.via),
+            guidance: remember(
+              ctx,
+              field.field,
+              reply.text,
+              observation,
+              chosen,
+              asking.via,
+              field.answer?.about ?? null,
+            ),
           };
         }
         if (asked >= ctx.options.asksAfterRefusal) return filled;
@@ -137,7 +145,15 @@ async function ask(
         return {
           ...result(field, 'fill', 'operator', value, 'read-back'),
           ...asking,
-          guidance: remember(ctx, field.field, value, observation, chosen, asking.via),
+          guidance: remember(
+            ctx,
+            field.field,
+            value,
+            observation,
+            chosen,
+            asking.via,
+            field.answer?.about ?? null,
+          ),
         };
       }
     }
@@ -181,6 +197,7 @@ const decisionOf = (
   outcome: FieldResult,
   decided: FieldsDecided | null,
   durationMs: number,
+  taught: Taught | null,
 ): DecisionInput => ({
   kind: 'field-answer',
   source: outcome.source,
@@ -199,6 +216,7 @@ const decisionOf = (
     reason: field.reason,
     withheld: field.withheld,
     decision: field.answer?.decision ?? null,
+    about: field.answer?.about ?? null,
     basis: field.answer?.basis ?? [],
     suggestion: field.value,
     admission: decided?.admission ?? null,
@@ -210,6 +228,8 @@ const decisionOf = (
     detail: outcome.detail,
     required: field.field.required,
     hiddenTraits: field.field.hiddenTraits,
+    // What the memory did with the operator's answer here, when one was taught; the step's teach file has the rest.
+    teaching: taught === null ? null : { ref: taught.ref, outcome: taught.outcome },
   },
 });
 
@@ -302,8 +322,10 @@ async function settleAll(
   for (const field of routed) {
     const outcome = await settle(ctx, field, observation, prefetch);
     results.push(outcome);
-    const decisionId = ctx.record(decisionOf(field, outcome, decided, durationMs));
-    if (outcome.guidance !== null) await teach(ctx, decisionId, outcome.guidance);
+    // The answer is taught before its row is written, so the row carries what the memory did with it.
+    const taught = outcome.guidance === null ? null : await teach(ctx, outcome.guidance);
+    const decisionId = ctx.record(decisionOf(field, outcome, decided, durationMs, taught));
+    if (taught !== null) recordTeaching(ctx, decisionId, taught);
     if (outcome.reply === 'stop') return { results, stopped: true };
     if (outcome.outcome === 'failed') break;
   }
@@ -325,6 +347,8 @@ function dumpFields(
       orchestrationRunId: decided?.orchestrationRunId ?? null,
       admission: decided?.admission ?? null,
       composition: decided?.composition ?? null,
+      // What the brain's recall did for this form, as it reports it; null from a brain whose recall is the loop's own.
+      recall: decided?.recall ?? null,
       fault: fault === null ? null : { reason: fault.reason, message: fault.message },
       // What became of the suggestions — offered, faulted, or still coming when the form was settled.
       suggestions,

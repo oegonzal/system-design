@@ -1,8 +1,14 @@
-import { parseOptions, type CliDeps, type Io, type Options } from '../cli';
+import { memoryClientUnderTest } from '@sysdesign/agentic-memory-client/testing';
+
+import { parseOptions, type Options } from '../cli';
+import type { CliDeps, Io } from '../commands';
+import type { IngestConfig } from '../config';
 import {
   fixedClock,
   InMemoryLedger,
   InMemoryWriter,
+  LOOP_URL,
+  MEMORY_URL,
   sampleExperience,
   sampleStory,
   ScriptedSink,
@@ -33,27 +39,43 @@ export const io = () => {
   return { out, errors, sink };
 };
 
+/** The configuration the CLI specs run under: the loop sink, every service at a test address. */
+export const ingestConfig = (overrides: Partial<IngestConfig> = {}): IngestConfig => ({
+  loopUrl: LOOP_URL,
+  studioUrl: 'http://studio.test',
+  home: 'static/memory-ingest',
+  subject: undefined,
+  memoryUrl: MEMORY_URL,
+  sink: { kind: 'loop' },
+  ...overrides,
+});
+
+/** What a spec may hand in: any port, the ledger as the in-memory one, and the store the resolved sink stands for. */
+type Overrides = Partial<Omit<CliDeps, 'ledger' | 'sink'>> & {
+  ledger?: InMemoryLedger;
+  /** The store the commands reach; a scripted loop sink unless given. */
+  sinkAdapter?: ScriptedSink;
+  /** What resolving the store does instead — a refusal to throw. */
+  sink?: CliDeps['sink'];
+};
+
 /** Every port a fake, each reachable by the spec that wants to inspect it. */
-export const cliDeps = (overrides: Partial<CliDeps> = {}) => {
-  const scripted = new ScriptedSink();
-  const ledger = new InMemoryLedger();
+export const cliDeps = (overrides: Overrides = {}) => {
+  const { sinkAdapter, ...rest } = overrides;
+  const scripted = sinkAdapter ?? new ScriptedSink();
+  const ledger = overrides.ledger ?? new InMemoryLedger();
   const writer = new InMemoryWriter();
   const built: CliDeps = {
-    config: {
-      loopUrl: 'http://loop.test',
-      studioUrl: 'http://studio.test',
-      home: 'static/memory-ingest',
-      subject: undefined,
-    },
+    config: ingestConfig(),
     cwd: '/work',
     reader: scriptedReader({ 'notes.md': NOTES }),
-    sink: scripted,
+    sink: async () => scripted,
     ledger,
     clock: fixedClock(),
-    loopUrl: 'http://loop.test',
     studio: new ScriptedStudio([sampleExperience()], [sampleStory()]),
     writer,
-    ...overrides,
+    memory: memoryClientUnderTest().client,
+    ...rest,
   };
-  return { ...built, scripted, memory: ledger, writer };
+  return { ...built, scripted, ledger, writer };
 };

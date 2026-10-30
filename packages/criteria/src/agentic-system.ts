@@ -57,4 +57,9 @@ export const AGENTIC_SYSTEM_CRITERIA: readonly Criterion[] = [
     statement:
       'A digest is applied once: each apply is recorded with every item’s outcome, identically in Postgres and in memory, and a second apply — or one that loses the race to record — answers 409.',
   },
+  {
+    id: 'AGS-12',
+    statement:
+      'A space may be made under a name — a lower-case word of letters, digits and hyphens the contract declares, any other 400: PUT /spaces/by-name/:name with a run answers 200 with the space under that name and whether this call made it — made from the run when none holds the name, the same space when that run made it — answered without reading the run again — and 409 space.name_taken when another run holds it or a concurrent claim won it, so no name is kept twice; GET /spaces/by-name/:name reads it back and an unknown name is 404; every space answers its name, or null for one made by POST /spaces, and the scope keys of the policy snapshot it keeps; and every refusal of a space route, the runtime’s and the host’s, has its one status and what a 404 names as missing declared once in the contracts, read by the host that answers them.',
+  },
 ];

@@ -2,6 +2,7 @@ import { keptAtMost } from '../bounds';
 import type { ApiListResponse, ApiResponse } from '../envelope';
 import type { LlmModelDto } from '../llm-model';
 import type { IsoDateString } from '../primitives';
+import type { RunReadoutDto } from './admission';
 import type { RunTrace } from './decision';
 import { LARGEST_STATEMENT_BOUND, type SuccessCriterion } from './evidence';
 import type { RunRecallDto, RunRecallSummaryDto } from './recall';
@@ -197,6 +198,17 @@ export interface QualityRunDto {
   error: RunErrorDto | null;
 }
 
+/**
+ * One run as `GET /runs/:id` answers it: the record, with its readout — what
+ * the run says of itself to a caller that would draw on its best iteration,
+ * computed by the loop once the run has settled (`runReadoutSchema`). Null
+ * while the run is running, when it recorded no iteration, and when the loop
+ * no longer registers its pipeline to read the artifact by.
+ */
+export interface QualityRunReadDto extends QualityRunDto {
+  readout: RunReadoutDto | null;
+}
+
 export interface QualityRunStartedDto {
   runId: string;
   status: QualityRunStatus;
@@ -259,7 +271,7 @@ export const DEFAULT_QUALITY_RUN_ITERATIONS = 1;
 export const MAX_QUALITY_RUN_ITERATIONS = 10;
 
 export type StartQualityRunResponse = ApiResponse<QualityRunStartedDto>;
-export type GetQualityRunResponse = ApiResponse<QualityRunDto>;
+export type GetQualityRunResponse = ApiResponse<QualityRunReadDto>;
 
 /** One row of `GET /runs`: the header the list needs, never the trace. */
 export interface QualityRunSummaryDto {

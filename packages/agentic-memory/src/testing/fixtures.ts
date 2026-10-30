@@ -1,13 +1,13 @@
 /**
  * The data the runtime's specs build on: a policy with its own numbers (chosen
  * so a spec reads clearly, not copied from any deployed policy), a compact
- * strategy that keeps every kind, a record builder, and one strategy a model
- * wrote in a live run (2026-10-17), kept as found — nobody fitted the runtime
- * to it, and no code may branch on it.
+ * strategy that keeps every kind, a record builder and a space builder, and
+ * one strategy a model wrote in a live run (2026-10-17), kept as found —
+ * nobody fitted the runtime to it, and no code may branch on it.
  */
 import { memoryStrategySchema, type MemoryStrategy } from '@sysdesign/contracts';
 
-import type { MemoryRecord } from '../ports';
+import type { MemoryRecord, StoredSpace } from '../ports';
 import type { MemoryPolicy } from '../space/policy';
 import golden from './strategy-2026-10-17.json';
 
@@ -120,6 +120,20 @@ export function strategyFixture(): MemoryStrategy {
 }
 
 const AT = new Date('2026-10-01T00:00:00.000Z');
+
+/** A space as its creation stores one — the strategy and the policy, as snapshots — unnamed unless a spec names it. */
+export function spaceFixture(overrides: Partial<StoredSpace> = {}): StoredSpace {
+  return {
+    id: '00000000-0000-4000-8000-0000000000e1',
+    name: null,
+    designRunId: 'run-under-test',
+    strategy: strategyFixture(),
+    policy: TEST_POLICY,
+    policySource: 'spec',
+    createdAt: AT,
+    ...overrides,
+  };
+}
 
 /** A current semantic record; a spec overrides what it is about. The lineage is the record's own id unless named. */
 export function recordFixture(overrides: Partial<MemoryRecord> = {}): MemoryRecord {

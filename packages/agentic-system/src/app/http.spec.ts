@@ -1,6 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
-import { GOLDEN_STRATEGY } from '@sysdesign/agentic-memory/testing';
+import { GOLDEN_STRATEGY, TEST_POLICY } from '@sysdesign/agentic-memory/testing';
 import {
   MemoryDesignCycle,
   MemoryRecord,
@@ -9,14 +9,17 @@ import {
   truncateTestTables,
 } from '@sysdesign/db';
 import {
+  isSpaceRefusal,
   MEMORY_DESIGN_CYCLE_STATUSES,
   readRegisterDigestIndex,
   REGISTER_DIGEST_MAX_ITERATIONS,
   REGISTER_MEMORY_DIGEST_STEP,
   REGISTER_MEMORY_ORCHESTRATOR_ID,
+  SPACE_REFUSAL_STATUS,
   type AppliedDigestDto,
   type ConsolidationResultDto,
   type DigestDto,
+  type EnsuredSpaceDto,
   type MemoryRecordDto,
   type MemorySpaceDto,
   type OrchestrationRunStartedDto,
@@ -33,6 +36,8 @@ const json = async <T>(response: Response): Promise<T> => (await response.json()
 
 /** The run whose best iteration holds a memory strategy: one a model wrote in a live run, kept as found. */
 const STRATEGY_RUN = 'strategy-run-1';
+/** Another settled run holding the same strategy: a second claimant of a name. */
+const OTHER_STRATEGY_RUN = 'strategy-run-2';
 const TABLES = [MemoryDesignCycle, MemorySpaceDigest, MemoryRecord, MemorySpace];
 
 /** What the loop's digest step reports for a text: a fact it endorses, and a directive to the reader it withheld. */
@@ -74,7 +79,10 @@ describe('the agentic-system HTTP surface', () => {
   let loop: FakeLoopClient;
   beforeAll(async () => {
     ({ app, url, loop } = await bootApp({
-      artifacts: new Map([[STRATEGY_RUN, GOLDEN_STRATEGY]]),
+      artifacts: new Map([
+        [STRATEGY_RUN, GOLDEN_STRATEGY],
+        [OTHER_STRATEGY_RUN, GOLDEN_STRATEGY],
+      ]),
       steps: {
         [REGISTER_MEMORY_DIGEST_STEP]: {
           runIds: ['digest-run-1'],
@@ -96,6 +104,17 @@ describe('the agentic-system HTTP surface', () => {
       headers: { 'content-type': 'application/json' },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
+
+  /** A refusal's body, held to the contract: a declared code, answered at its one declared status. */
+  const refused = async (response: Response): Promise<Record<string, unknown>> => {
+    const body = (await response.json()) as Record<string, unknown>;
+    const code = body['code'];
+    if (typeof code !== 'string' || !isSpaceRefusal(code)) {
+      throw new Error(`not a space refusal: ${JSON.stringify(body)}`);
+    }
+    expect(response.status).toBe(SPACE_REFUSAL_STATUS[code]);
+    return body;
+  };
 
   /** Poll the row off the request path until the detached cycle reaches a terminal status. */
   const settle = async (id: string): Promise<{ status: string }> => {
@@ -134,7 +153,12 @@ describe('the agentic-system HTTP surface', () => {
     const created = await send('POST', '/spaces', { runId: STRATEGY_RUN });
     expect(created.status).toBe(201);
     const space = (await json<Envelope<MemorySpaceDto>>(created)).data;
-    expect(space).toMatchObject({ designRunId: STRATEGY_RUN, policySource: 'memory/spec' });
+    expect(space).toMatchObject({
+      name: null,
+      designRunId: STRATEGY_RUN,
+      policySource: 'memory/spec',
+      scopeKeys: TEST_POLICY.scopeKeys,
+    });
     expect(space.report.problems).toEqual([]);
     expect(
       (await json<Envelope<MemorySpaceDto>>(await send('GET', `/spaces/${space.id}`))).data,
@@ -234,11 +258,11 @@ describe('the agentic-system HTTP surface', () => {
     const scope = { tenant: 'acme' };
 
     const unknown = await send('GET', '/spaces/00000000-0000-4000-8000-000000000000');
-    expect(unknown.status).toBe(404);
-    expect(await unknown.json()).toMatchObject({
+    expect(await refused(unknown)).toMatchObject({
       statusCode: 404,
       error: 'Not Found',
       code: 'space.not_found',
+      missing: 'space',
       issues: [],
     });
     const undeclared = await send('POST', `/spaces/${space.id}/remember`, {
@@ -247,8 +271,10 @@ describe('the agentic-system HTTP surface', () => {
       candidate: { name: 'deploys', description: null, rules: [{ key: 'k', text: 'a rule' }] },
       provenance: { source: 'http-spec', sourceRunId: null },
     });
-    expect(undeclared.status).toBe(422);
-    expect(await undeclared.json()).toMatchObject({ code: 'operation.undeclared' });
+    expect(await refused(undeclared)).toMatchObject({
+      statusCode: 422,
+      code: 'operation.undeclared',
+    });
     // What the contract does not accept never reaches the runtime: it is the pipe's 400, saying why.
     const unrouted = await send('POST', `/spaces/${space.id}/recall`, { scope });
     expect(unrouted.status).toBe(400);
@@ -257,6 +283,50 @@ describe('the agentic-system HTTP surface', () => {
       issues: [expect.anything()],
     });
     expect((await send('POST', '/spaces/not-a-uuid/recall', { scope, key: 'k' })).status).toBe(400);
+  });
+
+  it('[AGS-12] ensures a space under a name: made once, found for the same run, 409 for another run’s claim, read back by name, and a name outside the grammar 400', async () => {
+    const name = 'support-notes';
+    const first = await send('PUT', `/spaces/by-name/${name}`, { runId: STRATEGY_RUN });
+    expect(first.status).toBe(200);
+    const made = (await json<Envelope<EnsuredSpaceDto>>(first)).data;
+    expect(made).toMatchObject({
+      created: true,
+      space: { name, designRunId: STRATEGY_RUN, scopeKeys: TEST_POLICY.scopeKeys },
+    });
+    expect(made.space.report.problems).toEqual([]);
+
+    const again = await send('PUT', `/spaces/by-name/${name}`, { runId: STRATEGY_RUN });
+    expect(again.status).toBe(200);
+    expect((await json<Envelope<EnsuredSpaceDto>>(again)).data).toEqual({
+      space: made.space,
+      created: false,
+    });
+    const other = await send('PUT', `/spaces/by-name/${name}`, { runId: OTHER_STRATEGY_RUN });
+    expect(await refused(other)).toMatchObject({
+      statusCode: 409,
+      code: 'space.name_taken',
+      issues: [],
+    });
+
+    const byName = await send('GET', `/spaces/by-name/${name}`);
+    expect(byName.status).toBe(200);
+    expect((await json<Envelope<MemorySpaceDto>>(byName)).data).toEqual(made.space);
+    expect(
+      (await json<Envelope<MemorySpaceDto>>(await send('GET', `/spaces/${made.space.id}`))).data,
+    ).toEqual(made.space);
+    expect(await refused(await send('GET', '/spaces/by-name/nobody-s-notes'))).toMatchObject({
+      statusCode: 404,
+      code: 'space.not_found',
+      missing: 'space',
+    });
+    // A name outside the contract's grammar never reaches the host: it is the pipe's 400.
+    for (const bad of ['Support-Notes', '9notes', `a${'b'.repeat(80)}`]) {
+      expect((await send('PUT', `/spaces/by-name/${bad}`, { runId: STRATEGY_RUN })).status).toBe(
+        400,
+      );
+      expect((await send('GET', `/spaces/by-name/${bad}`)).status).toBe(400);
+    }
   });
 
   it('[AGS-9] [AGS-10] [AGS-11] digests a text into a space: 202 with the orchestration, read back from the loop’s record, remembered once, and recalled by key', async () => {

@@ -17,6 +17,8 @@ import {
   type RecallOrigin,
   renderIndexSection,
   GOAL_BUDGET_BYTES,
+  SOURCE_ID_MAX_LENGTH,
+  SOURCE_REF_MAX_LENGTH,
   textBytes,
   readFencedIndex,
 } from '@sysdesign/contracts';
@@ -91,8 +93,6 @@ const FOCUS_BOUND = exact(MAX_FOCUS);
 const KNOWN_BOUND = exact(MAX_KNOWN);
 const CANDIDATES_BOUND = exact(MAX_CANDIDATES);
 const MATCHED_BOUND = exact(MAX_FOCUS + MAX_PROBES);
-const SOURCE_ID_MAX_LENGTH = 80;
-const SOURCE_REF_MAX_LENGTH = 200;
 const SOURCE_WHEN_MAX_LENGTH = 40;
 
 /**

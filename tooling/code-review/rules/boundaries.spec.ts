@@ -36,6 +36,7 @@ describe('the dependency matrix', () => {
     ['loop-client', ['contracts']],
     ['notifications-client', ['contracts']],
     ['agentic-memory', ['contracts', 'db', 'qdrant-kit']],
+    ['agentic-memory-client', ['contracts', 'agentic-memory']],
     [
       'agentic-system',
       [
@@ -67,10 +68,11 @@ describe('the dependency matrix', () => {
         'loop-client',
         'notifications-client',
         'config-kit',
+        'agentic-memory-client',
         'studio-testing',
       ],
     ],
-    ['memory-ingest', ['contracts', 'loop-client', 'studio-testing']],
+    ['memory-ingest', ['contracts', 'loop-client', 'agentic-memory-client', 'studio-testing']],
     ['notifications', ['contracts', 'db', 'nest-kit', 'config-kit']],
     ['website', []],
   ] as const)('%s may depend only on %j', (pkg, allowed) => {

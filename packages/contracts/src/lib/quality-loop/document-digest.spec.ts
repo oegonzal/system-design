@@ -3,19 +3,17 @@ import { createHash } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
 
 import { resumeChunk } from '../browser-session/fixtures';
+import { MEMORY_SCOPES } from '../units/scope';
 import {
   DOCUMENT_MAX_PARTS,
   DOCUMENT_PART_MAX_LENGTH,
   declaredScopeLimit,
   documentChunkSchema,
-  isUnitBound,
-  MEMORY_SCOPES,
   readDocumentIndex,
   renderDocumentGoal,
   DOCUMENT_RULES,
   DOCUMENT_MAX_MEMORIES,
   SCOPE_RULE,
-  UNIT_BOUND_SCOPES,
   type DocumentChunk,
 } from './document-digest';
 import { documentDigestReportSchema } from './document-memory';
@@ -214,15 +212,6 @@ describe('renderDocumentGoal', () => {
     // Absent is the only way to name none: a null or an empty key is refused.
     expect(documentChunkSchema.safeParse({ ...UNDECLARED, unitKey: null }).success).toBe(false);
     expect(documentChunkSchema.safeParse({ ...UNDECLARED, unitKey: '' }).success).toBe(false);
-  });
-
-  it('[QL-71] which scopes bind a memory to a unit of work is one total table: unit does, subject does not, and a memory stored with no scope is bound to none', () => {
-    expect(UNIT_BOUND_SCOPES).toEqual(['unit']);
-    expect(MEMORY_SCOPES.map((scope) => [scope, isUnitBound(scope)])).toEqual([
-      ['subject', false],
-      ['unit', true],
-    ]);
-    expect(isUnitBound(undefined)).toBe(false);
   });
 
   it('[QL-69] the scope test is left out by its constant, never by its wording: a rule that shares its words is stated', () => {

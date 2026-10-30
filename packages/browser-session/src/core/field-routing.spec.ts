@@ -12,7 +12,7 @@ import {
 
 import { faultedReadouts, routeFieldsInSession, withOperatorCache } from './field-routing';
 import { BrainFaulted } from './ports';
-import { decidedAnswers, withheldBy } from './testing';
+import { decidedAnswers, fieldAnswer, withheldBy } from './testing';
 
 const fields = formObservation()
   .elements.filter((e) => ['e1', 'e2', 'e3', 'e4'].includes(e.ref))
@@ -31,10 +31,10 @@ const route = (
 const answers: FieldAnswers = {
   summary: 'four fields',
   fields: [
-    { ref: 'e1', decision: 'answer', value: '6', rests: 'stated', basis: ['m1'], reason: 'cv' },
-    { ref: 'e2', decision: 'answer', value: 'Yes', rests: 'inferred', basis: [], reason: 'likely' },
-    { ref: 'e3', decision: 'answer', value: 'x', rests: 'stated', basis: [], reason: 'oops' },
-    { ref: 'e4', decision: 'leave-blank', value: null, rests: 'none', basis: [], reason: 'bait' },
+    fieldAnswer('e1', { value: '6', basis: ['m1'], reason: 'cv' }),
+    fieldAnswer('e2', { value: 'Yes', rests: 'inferred', reason: 'likely' }),
+    fieldAnswer('e3', { value: 'x', reason: 'oops' }),
+    fieldAnswer('e4', { decision: 'leave-blank', rests: 'none', reason: 'bait' }),
   ],
 };
 
@@ -143,14 +143,9 @@ describe('field routing in a session', () => {
     ];
     const asked = decidedAnswers({
       summary: 'three questions no evidence settles',
-      fields: questions.map((field) => ({
-        ref: field.ref,
-        decision: 'ask-operator' as const,
-        value: null,
-        rests: 'none' as const,
-        basis: [],
-        reason: 'no evidence',
-      })),
+      fields: questions.map((field) =>
+        fieldAnswer(field.ref, { decision: 'ask-operator', rests: 'none', reason: 'no evidence' }),
+      ),
     });
     const routed = route(
       asked,

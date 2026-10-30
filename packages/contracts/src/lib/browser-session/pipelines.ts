@@ -3,9 +3,7 @@
  * Declared once so the pipeline definitions, the session's brain adapter and
  * every fake name the same strings.
  */
-import { z } from 'zod';
-
-import { ADMISSIONS, withheldRefSchema } from '../quality-loop/admission';
+import { runReadoutSchema } from '../quality-loop/admission';
 
 /** One bounded plan for the page in front of the session. */
 export const BROWSER_STEP_PIPELINE_ID = 'browser-step';
@@ -31,11 +29,12 @@ export const FORM_MEMORY_ORCHESTRATOR_ID = 'form-memory';
 /** The form-memory step that runs the form pipeline: the run a session reads its answers from. */
 export const FORM_MEMORY_TARGET_STEP = 'target';
 
-/** What the form-memory target step reports: the run's admission, and the locations a reader of it withholds. */
-export const formTargetReportSchema = z.strictObject({
-  admission: z.enum(ADMISSIONS),
-  withheld: z.array(withheldRefSchema),
-});
+/**
+ * What the form-memory target step reports: the run's readout — its admission
+ * and the locations a reader of it withholds — under the one shape the run
+ * itself answers on its read, so a reader of either reads one.
+ */
+export const formTargetReportSchema = runReadoutSchema;
 
 /** Why the form-memory recall step skipped or failed — beyond the runner's own reasons. */
 export const FORM_MEMORY_STEP_REASONS = [

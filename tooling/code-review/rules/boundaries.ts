@@ -33,11 +33,12 @@ import type { ChangedFile } from './index';
  *   govcon         -> contracts, db, nest-kit, notifications-client, loop-client, studio-testing (specs)   SAM.gov opportunities: search, store, rank; introductions through the loop
  *   notifications-client -> contracts   the notifications bus as one port, its HTTP adapter, and asking a person through it
  *   tool-session   -> contracts, nest-kit, loop-client, notifications-client, db (the test-database guard only)   a mission run as tool calls the loop decides, for any program that declares tools
- *   browser-session -> contracts, db, nest-kit, run-dump, loop-client, notifications-client, config-kit, studio-testing (specs only)   a Playwright session the loop decides for
- *   memory-ingest  -> contracts, loop-client, studio-testing (specs only)   documents chunked and handed to the loop
+ *   browser-session -> contracts, db, nest-kit, run-dump, loop-client, notifications-client, config-kit, agentic-memory-client, studio-testing (specs only)   a Playwright session the loop decides for, its memories in a space the host serves
+ *   memory-ingest  -> contracts, loop-client, agentic-memory-client, studio-testing (specs only)   documents chunked and handed to the loop, or digested into a memory space
  *   notifications  -> contracts, db, nest-kit, config-kit   the event bus, and the channels that put prompts to people
  *   job-application -> contracts, db, nest-kit, config-kit, notifications-client   the record of units a session applied to, and the advisor over it
  *   agentic-memory -> contracts, db, qdrant-kit   a memory strategy executed: typed writes, hybrid recall, consolidation and the sweep, over Postgres and a Qdrant projection
+ *   agentic-memory-client -> contracts, agentic-memory (the in-process test adapter in testing.ts alone; the production barrel reaches contracts alone)   the memory host as one port for every agent that keeps memories in a space: its HTTP adapter, the errors both raise, and the binding an agent declares
  *   agentic-system -> contracts, db, nest-kit, config-kit, loop-client, notifications-client, agentic-memory, llm (the embedding client only; completions stay on the loop), qdrant-kit   designs agentic-memory strategies on the loop, keeps the cycle table, learns from the runs, announces each cycle on the bus, and serves memory spaces
  *   gmail          -> contracts, nest-kit, config-kit, google-kit, tool-session, loop-client, notifications-client, db (the test-database guard only)   the mailbox as tools, and missions over them
  *   google-calendar -> contracts, nest-kit, config-kit, google-kit, tool-session, loop-client, notifications-client, db (the test-database guard only)   the calendar as tools, and missions over them
@@ -67,6 +68,7 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
   'google-kit': ['contracts'],
   'notifications-client': ['contracts'],
   'agentic-memory': ['contracts', 'db', 'qdrant-kit'],
+  'agentic-memory-client': ['contracts', 'agentic-memory'],
   'tool-session': ['contracts', 'nest-kit', 'loop-client', 'notifications-client', 'db'],
   'studio-testing': ['contracts', 'loop-client'],
   'studio-api': ['contracts', 'db', 'nest-kit', 'loop-client', 'studio-testing'],
@@ -80,9 +82,10 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
     'loop-client',
     'notifications-client',
     'config-kit',
+    'agentic-memory-client',
     'studio-testing',
   ],
-  'memory-ingest': ['contracts', 'loop-client', 'studio-testing'],
+  'memory-ingest': ['contracts', 'loop-client', 'agentic-memory-client', 'studio-testing'],
   notifications: ['contracts', 'db', 'nest-kit', 'config-kit'],
   'job-application': ['contracts', 'db', 'nest-kit', 'config-kit', 'notifications-client'],
   'agentic-system': [

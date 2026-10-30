@@ -56,7 +56,7 @@ export const FIELD_ANSWER: PipelineDefinition<FieldAnswers> = {
       ungrounded:
         'A value, or a claim within a composed one, that nothing listed bears on — an empty basis, or cited evidence about something else — given as resting on the evidence.',
       overstated:
-        'A declared kind that claims more than the evidence gives: stated for what it only yields, maps to or suggests; restated for an earlier answer to another thing, figure or period, or about the unit of work it names; derived from figures or parts the evidence does not list.',
+        'A declared kind that claims more than the evidence gives: stated for what it only yields, maps to or suggests; restated for an earlier answer to another thing, figure or period, or about the unit of work it names; derived from figures or parts the evidence does not list. Or a declared scope that contradicts what the question asks: subject for a question about the one employer, role or application, unit for one the same whoever asks.',
       misfit_option:
         'A mapped value whose option does not carry the fact it rests on, or where another listed option carries it as well.',
       inconsistent:
@@ -131,7 +131,8 @@ export const FIELD_ANSWER: PipelineDefinition<FieldAnswers> = {
     // contradicts its evidence, a mapped value on the wrong option, and a value
     // given to a trap are wrong VALUES — typed into someone's form they would
     // speak falsely for the subject — so each withholds the field it names. An
-    // overstated kind is a disagreement about how a true value rests, and the
+    // overstated kind, or scope, is a disagreement about how a true value
+    // rests or where it holds, and the
     // answering settings already say which kinds fill: it is priced on the
     // grounding dimension and withholds nothing, since under a table that
     // fills every kind no re-labelling could change the route (a session that

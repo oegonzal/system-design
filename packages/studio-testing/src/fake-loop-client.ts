@@ -8,7 +8,7 @@ import type {
   PromptLibraryDocumentDto,
   PromptLibraryEntryDto,
   QualityLoopHealthDto,
-  QualityRunDto,
+  QualityRunReadDto,
   QualityRunStartedDto,
   RetractedMemoryRunDto,
   StartOrchestrationFromRunRequest,
@@ -42,7 +42,7 @@ export class FakeLoopClient extends LoopClient {
     return this.answer(() => this.core.startRun(request));
   }
 
-  getRun(runId: string): Promise<QualityRunDto | null> {
+  getRun(runId: string): Promise<QualityRunReadDto | null> {
     return this.answer(() => this.core.getRun(runId));
   }
 

@@ -188,7 +188,7 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-37',
     statement:
-      'Field answers list every field the goal listed exactly once and cite evidence only by listed alias; a value the field cannot take is a located warning the lenses read and the orchestration’s report withholds; what each finding type and validator withholds is declared on the pipeline — a wrong value every ref, a needless ask or a required blank none — so a field the report withholds is never filled by the caller and one a finding merely prices is routed on its own merits; and a field the page hides is left blank whatever the model decided.',
+      'Field answers list every field the goal listed exactly once and cite evidence only by listed alias, each declaring where an answer to what its field asks holds — of the subject, the same whoever asks, or of the one unit of work — whatever its decision, so an operator’s answer to a field the model could not settle is taught under a declared scope; a value the field cannot take is a located warning the lenses read and the orchestration’s report withholds; what each finding type and validator withholds is declared on the pipeline — a wrong value every ref, a needless ask or a required blank none — so a field the report withholds is never filled by the caller and one a finding merely prices is routed on its own merits; and a field the page hides is left blank whatever the model decided.',
   },
   {
     id: 'QL-38',
@@ -198,7 +198,7 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-39',
     statement:
-      "The composed-goal codecs round-trip: what a composer writes, the pipeline's validators read back from the last fenced block; a plausible maximal goal renders under the engine's budget and one past it is refused rather than clipped; and the fence the composers write is pinned equal to the one the engine reads; a model is shown the goal without its index section, which the validators read from the goal as stored.",
+      "The composed-goal codecs round-trip: what a composer writes, the pipeline's validators read back from the last fenced block; a plausible maximal goal renders under the engine's budget and one past it is refused rather than clipped; and the fence the composers write is pinned equal to the one the engine reads; a model is shown the goal without its index section, which the validators read from the goal as stored; and a form goal's evidence is read back from the lines its codec wrote, every alias the index lists in its order or refused whole — a line of another shape, or an index listing items over no section, refused by name — the writer admitting only what reads back: items one line each, of a kind the declared legend explains, the legend the composer's own data admitted line by line and never read off the items, every address within the bound its origin's declared parts compose.",
   },
   {
     id: 'QL-40',
@@ -414,5 +414,10 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
     id: 'QL-82',
     statement:
       'The introduction-note pipeline writes a short note from one firm to a named reader at another about one named program, from a composed goal that indexes the program and the sender’s offers: four fixed rules — fidelity, relevance, restraint, clarity — two per dimension, judged by one claims critic and one evaluator at two samples; a note that names another program or makes an offer the goal never listed is refused by the references validator before any lens reads it; two iterations, nothing gating, so the composer shows the decision beside the note and a person sends it or not.',
+  },
+  {
+    id: 'QL-83',
+    statement:
+      'Every settled run answers its readout on its read (`GET /runs/:id`): whether its best iteration is admitted at the bar the run was held to — the one it asked for, else its pipeline’s — and the locations of its best artifact a reader withholds, each with what withheld it, both read by the loop off engine facts and the pipeline’s own declarations; the readout is null while the run is running, when it recorded no iteration and when its pipeline is no longer registered, so a caller routes by the readout and recomputes neither; the loop clients and the fake answer the same contract.',
   },
 ];

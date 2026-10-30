@@ -1,31 +1,38 @@
 import { relative, resolve } from 'node:path';
 
-import type { DocumentMemoryStepReason, OrchestrationRunDto } from '@sysdesign/contracts';
-import { LoopRefused } from '@sysdesign/loop-client';
+import type {
+  DocumentMemoryStepReason,
+  RecordScope,
+  RegisterMemoryStepReason,
+} from '@sysdesign/contracts';
 
 import {
-  DOCUMENT_MEMORY_STEPS,
-  type DocumentMemoryStep,
+  POSTING_STEPS,
+  type IngestSink,
   type IngestStatus,
   type ManifestEntry,
   type ManifestStep,
   type PlannedChunk,
+  type PostingOutcome,
+  type PostingStep,
+  type StoreStepReason,
 } from './ports';
 
 /**
  * One posting as the manifest records it. The status is earned by what the
- * store step did, never read off the orchestration's own: the runner marks an
+ * store step did, never read off the run's own: the loop's runner marks an
  * orchestration complete whenever no step failed, so a digest skipped for
  * want of embeddings, judged and not accepted, or finding nothing, and a
- * store that was unavailable, all settle `complete` with nothing stored. Here
- * each of those is `unstored`, and the steps — reason and note kept — say
- * which one it was; whether the posting still covers its chunk, because the
- * chunk holds no fact to store, is that reason's to say, as `HOLDS_NO_FACTS`
- * declares. A posting that stored what its digest endorsed and gave a reason
- * all the same left facts of its chunk out of the store, which the same table
- * says (`leftFactsOut`). What a posting stored stands until a retraction
- * marks it, and the mark is the ledger's own decision: rewriting a posting
- * from what the loop reports keeps it.
+ * store that was unavailable, all settle `complete` with nothing stored — and
+ * a space digest that endorsed nothing settles the same way. Here each of
+ * those is `unstored`, and the steps — reason and note kept — say which one
+ * it was; whether the posting still covers its chunk, because the chunk holds
+ * no fact to store, is that reason's to say, as `HOLDS_NO_FACTS` declares. A
+ * posting that stored what its digest endorsed and gave a reason all the same
+ * left facts of its chunk out of the store, which the same table says
+ * (`leftFactsOut`). What a posting stored stands until a retraction marks it,
+ * and the mark is the ledger's own decision: rewriting a posting from what the
+ * service reports keeps it.
  */
 
 /**
@@ -45,23 +52,64 @@ export const identityOf = (planned: PlannedChunk, document: string): ChunkIdenti
   kind: planned.chunk.kind,
 });
 
-/** The step whose completion means the chunk's facts are in the store. */
-export const STORE_STEP: DocumentMemoryStep = 'store';
+/** Where a posting went: the sink, the service, the space and the scope, as its entry records them. */
+type PostingOrigin = Pick<ManifestEntry, 'sink' | 'host' | 'spaceId' | 'scope'>;
 
-const summarizeStep = (
-  orchestration: OrchestrationRunDto | null,
-  id: DocumentMemoryStep,
-): ManifestStep | null => {
-  const step = orchestration?.steps[id];
-  return step
-    ? { status: step.status, reason: step.reason, note: step.note, counts: step.counts }
-    : null;
+/** Where a fresh posting goes: the configured sink, as the entry will record it. */
+export const originOf = (
+  sink: Pick<IngestSink, 'kind' | 'host' | 'spaceId' | 'scope'>,
+): PostingOrigin => ({
+  sink: sink.kind,
+  host: sink.host,
+  spaceId: sink.spaceId,
+  scope: sink.scope,
+});
+
+/**
+ * What identifies a store among the postings: the sink's kind and, for a
+ * space, the space and the scope written under — the configured sink is one,
+ * and every entry names the one it went to.
+ */
+export type StoreIdentity = Pick<IngestSink, 'kind' | 'spaceId' | 'scope'>;
+
+/** Two scopes naming the same keys to the same values; none and none agree too. */
+const sameScope = (a: RecordScope | null, b: RecordScope | null): boolean => {
+  if (a === null || b === null) return a === b;
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((key) => a[key] === b[key]);
 };
 
-/** A settled orchestration's status, as the manifest words it: by the store step, not the run. */
-export const statusOf = (orchestration: OrchestrationRunDto): IngestStatus => {
-  if (orchestration.status !== 'complete') return 'failed';
-  return orchestration.steps[STORE_STEP]?.status === 'complete' ? 'complete' : 'unstored';
+/**
+ * Whether a posting went to the store given. Two services of one kind may
+ * share one store, so a loop posting is the loop's whatever host it went
+ * through; a space posting is one space's, under one scope — the same
+ * document seeded under two tenants of one space is two postings in two
+ * stores, and a version-3 space posting, which recorded no scope, is no
+ * store's to act on.
+ */
+export const sameStore = (entry: ManifestEntry, store: StoreIdentity): boolean =>
+  entry.sink === store.kind &&
+  (store.kind === 'loop' ||
+    (entry.spaceId === store.spaceId && sameScope(entry.scope, store.scope)));
+
+/**
+ * The postings made through one store: what every command reads and acts on.
+ * Two stores each hold their own copy of a document's facts, so a chunk is
+ * covered, a document replaced or retired and a status refreshed within one
+ * store alone, and every other store's postings are kept as they are.
+ */
+export const throughStore = (
+  entries: readonly ManifestEntry[],
+  store: StoreIdentity,
+): ManifestEntry[] => entries.filter((entry) => sameStore(entry, store));
+
+/** The step whose completion means the chunk's facts are in the store. */
+export const STORE_STEP: PostingStep = 'store';
+
+/** A settled posting's status, as the manifest words it: by the store step, not the run. */
+export const statusOf = (outcome: PostingOutcome): IngestStatus => {
+  if (outcome.status !== 'complete') return 'failed';
+  return outcome.steps[STORE_STEP]?.status === 'complete' ? 'complete' : 'unstored';
 };
 
 /**
@@ -71,8 +119,8 @@ export const statusOf = (orchestration: OrchestrationRunDto): IngestStatus => {
  */
 function stoppingStep(
   steps: ManifestEntry['steps'],
-): { id: DocumentMemoryStep; step: ManifestStep | null } | null {
-  for (const id of DOCUMENT_MEMORY_STEPS) {
+): { id: PostingStep; step: ManifestStep | null } | null {
+  for (const id of POSTING_STEPS) {
     const step = steps[id];
     if (step === null || step.status !== 'complete' || step.reason !== null) return { id, step };
   }
@@ -90,17 +138,21 @@ export function unstoredBy(steps: ManifestEntry['steps'] | null): string | null 
   return `${id} ${step.status}${reason}${note}`;
 }
 
+/** Every reason a posting's step may give that this table classifies: both digesting orchestrators' and the store step's own. */
+type ClassifiedReason = DocumentMemoryStepReason | RegisterMemoryStepReason | StoreStepReason;
+
 /**
  * What a posting's steps say of its chunk, by the reason of the step that
- * kept it from storing everything: true where the reason is the loop's
+ * kept it from storing everything: true where the reason is the digest's
  * verdict that the chunk holds no fact to store, so an `unstored` posting
  * covers its chunk as a stored one does — a re-run skips it, and it counts
  * toward its document's plan standing whole; false where the chunk's facts
  * are missing from the store — nothing stored, or the rest stored and these
  * left out — so it is posted again, and its document's earlier digests stand.
- * Total over the orchestrator's declared reasons, so a reason the loop adds
- * is classified here before this build compiles; a reason it does not declare
- * — the runner's own, or a newer loop's — reads as facts missing.
+ * Total over the reasons both digesting orchestrators declare and the store
+ * step's own, so a reason either adds is classified here before this build
+ * compiles; a reason none declares — the runner's own, or a newer loop's —
+ * reads as facts missing.
  */
 export const HOLDS_NO_FACTS = {
   // Never digested: the loop had no embedding provider.
@@ -115,15 +167,25 @@ export const HOLDS_NO_FACTS = {
   'no-rubric': false,
   // Never judged: nothing was produced.
   'no-artifact': false,
+  // Admitted, and a lens it declares answered no sample: nothing was confirmed.
+  'judges-lost': false,
+  // Admitted, and a safeguard criterion settled fail.
+  'safeguard-failed': false,
   // Judged, accepted, and it endorsed nothing: the chunk holds no fact to store.
   'no-memories': true,
   // Memories bound to a unit of work, in a document that names none: withheld,
   // whatever else of the chunk was stored. A file names no unit, so a document
   // that declares no scope may meet this; one declaring `subject` never does.
   'unit-unnamed': false,
-} as const satisfies Record<DocumentMemoryStepReason, boolean>;
+  // The store step's own: the digest left nothing to apply — its step says why.
+  'nothing-endorsed': false,
+  // The digest settled with memories to apply, and the apply never happened.
+  'not-applied': false,
+  // Applied, and the runtime refused one or more of the endorsed memories.
+  'items-refused': false,
+} as const satisfies Record<ClassifiedReason, boolean>;
 
-const isDeclaredReason = (reason: string): reason is DocumentMemoryStepReason =>
+const isClassified = (reason: string): reason is ClassifiedReason =>
   Object.hasOwn(HOLDS_NO_FACTS, reason);
 
 /** The reason the step that kept a posting from storing everything gave; null when none did. */
@@ -131,7 +193,7 @@ const stoppingReason = (entry: ManifestEntry): string | null =>
   stoppingStep(entry.steps)?.step?.reason ?? null;
 
 /** Whether a reason says the chunk holds no fact to store, as the table declares; any other reads as facts missing. */
-const holdsNone = (reason: string): boolean => isDeclaredReason(reason) && HOLDS_NO_FACTS[reason];
+const holdsNone = (reason: string): boolean => isClassified(reason) && HOLDS_NO_FACTS[reason];
 
 /** Whether a posting settled with nothing stored for a reason that says its chunk holds no fact to store. */
 export function holdsNoFacts(entry: ManifestEntry): boolean {
@@ -144,19 +206,16 @@ export function holdsNoFacts(entry: ManifestEntry): boolean {
  * Whether a posting stored what its digest endorsed and left facts of its
  * chunk out of the store all the same: a step completed with a reason the
  * table reads as facts missing — memories bound to a unit of work, in a
- * document that names none (`unit-unnamed`). Such a posting does not cover
- * its chunk, so its document's earlier digests stand; it reads as `unstored`
- * in the report, its steps saying why.
+ * document that names none (`unit-unnamed`); an endorsed memory the runtime
+ * refused (`items-refused`). Such a posting does not cover its chunk, so its
+ * document's earlier digests stand; it reads as `unstored` in the report, its
+ * steps saying why.
  */
 export function leftFactsOut(entry: ManifestEntry): boolean {
   if (entry.status !== 'complete') return false;
   const reason = stoppingReason(entry);
   return reason !== null && !holdsNone(reason);
 }
-
-/** A loop error as a record words it: a refusal by its status and the loop's own message, anything else by its message. */
-export const loopError = (error: Error): string =>
-  error instanceof LoopRefused ? `${error.status}: ${error.message}` : error.message;
 
 /**
  * Why a record did not store everything: the failure for `failed` and
@@ -174,35 +233,40 @@ export const whyNotStored = (record: {
   return unstoredBy(record.steps);
 };
 
+/** The steps of a posting the service never reported on. */
+const NO_STEPS: ManifestEntry['steps'] = { digest: null, store: null };
+
 /**
- * The record of one posting, from the settled orchestration or from the
- * failure that stood in for it. The retraction mark is an input, not a
- * reading: a fresh posting stands (null), and a posting rewritten from what the
- * loop reports keeps the mark the ledger gave it.
+ * The record of one posting, from the outcome the sink reported or from the
+ * failure that stood in for it. Where the posting went is an input too — the
+ * sink's own origin for a fresh posting, the entry's for one rewritten — as
+ * is the retraction mark: a fresh posting stands (null), and a posting
+ * rewritten from what the service reports keeps the mark the ledger gave it.
  */
 export function entryOf(input: {
   identity: ChunkIdentity;
+  origin: PostingOrigin;
   orchestrationRunId: string | null;
-  orchestration: OrchestrationRunDto | null;
+  outcome: PostingOutcome | null;
   status: IngestStatus;
   error: string | null;
   ingestedAt: string;
-  loopUrl: string;
   retractedAt: string | null;
   retractedPoints: number | null;
 }): ManifestEntry {
-  const digest = input.orchestration?.steps['digest'];
   return {
     ...input.identity,
+    sink: input.origin.sink,
+    host: input.origin.host,
+    spaceId: input.origin.spaceId,
+    scope: input.origin.scope,
     orchestrationRunId: input.orchestrationRunId,
-    digestRunId: digest?.runIds[digest.runIds.length - 1] ?? null,
+    digestRunId: input.outcome?.digestRunId ?? null,
+    recordIds: input.outcome?.recordIds ?? [],
     status: input.status,
-    steps: Object.fromEntries(
-      DOCUMENT_MEMORY_STEPS.map((id) => [id, summarizeStep(input.orchestration, id)]),
-    ) as ManifestEntry['steps'],
+    steps: input.outcome?.steps ?? NO_STEPS,
     error: input.error,
     ingestedAt: input.ingestedAt,
-    loopUrl: input.loopUrl,
     retractedAt: input.retractedAt,
     retractedPoints: input.retractedPoints,
   };
@@ -221,10 +285,10 @@ export const covers = (entry: ManifestEntry): boolean =>
 
 /**
  * The entries with every posting that names the digest run and still stands
- * marked retracted — when, and how many points went. Each marked posting is a
- * new object and the array a new array, so nothing holding the entries it was
- * handed sees a mark it has not been given; a posting marked before keeps its
- * first mark.
+ * marked retracted — when, and how many memories went. Each marked posting is
+ * a new object and the array a new array, so nothing holding the entries it
+ * was handed sees a mark it has not been given; a posting marked before keeps
+ * its first mark.
  */
 export const markRetracted = (
   entries: readonly ManifestEntry[],

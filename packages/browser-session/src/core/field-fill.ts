@@ -9,12 +9,13 @@ import {
   type PageObservation,
 } from '@sysdesign/contracts';
 
+import { describeAction } from './action-words';
 import { captureAfter } from './capture';
 import type { EngineContext } from './engine-context';
 import type { RoutedField } from './field-routing';
 import type { AnswerSource, OperatorReply } from './operator-interaction';
 import { ActionFailed, type BrowserAction } from './ports';
-import { describeAction, openUnitFilled } from './session-state';
+import { openUnitFilled } from './session-state';
 
 /**
  * Putting one value into one field, and what came of it: the action that

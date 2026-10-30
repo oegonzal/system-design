@@ -77,7 +77,7 @@ export const toDecisionDto = (row: BrowserDecision): BrowserDecisionDto => ({
   source: row.source,
   loopRunId: row.loopRunId,
   loopOrchestrationId: row.loopOrchestrationId,
-  teachOrchestrationId: row.teachOrchestrationId,
+  teachingRef: row.teachingRef,
   ref: row.ref,
   question: row.question,
   answer: row.answer,
@@ -174,15 +174,11 @@ export class MikroOrmLedger implements LedgerPort {
     await em.flush();
   }
 
-  async recordTeaching(decisionIds: readonly string[], orchestrationRunId: string): Promise<void> {
+  async recordTeaching(decisionIds: readonly string[], ref: string): Promise<void> {
     if (decisionIds.length === 0) return;
     await this.em
       .fork()
-      .nativeUpdate(
-        BrowserDecision,
-        { id: { $in: [...decisionIds] } },
-        { teachOrchestrationId: orchestrationRunId },
-      );
+      .nativeUpdate(BrowserDecision, { id: { $in: [...decisionIds] } }, { teachingRef: ref });
   }
 
   async failStale(before: Date): Promise<number> {

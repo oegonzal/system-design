@@ -248,17 +248,19 @@ describe('the session engine', () => {
     const again = detail.decisions.find((d) => d.kind === 'field-answer' && d.step === 4);
     expect(again?.source).toBe('operator');
     expect(again?.payload['cached']).toBe(true);
-    // One guidance document the moment the operator answered, naming the field and the answer.
+    // One teaching the moment the operator answered: the answer as the subject's, from the form's step.
     expect(brain.taught).toHaveLength(1);
-    expect(brain.taught[0]?.subject).toBe(SPEC_SUBJECT);
-    expect(brain.taught[0]?.parts[0]).toContain('Asked "Work authorisation');
-    expect(brain.taught[0]?.parts[0]).toContain('the subject answered "Yes"');
+    expect(brain.taught[0]).toMatchObject({
+      subject: SPEC_SUBJECT,
+      session: { step: 3 },
+      answers: [
+        { field: { question: expect.stringContaining('Work authorisation') }, answer: 'Yes' },
+      ],
+    });
     // The teaching lands on the row the answer came from — not on the cached fill, which taught nothing new.
-    expect(fields[1]?.teachOrchestrationId).toBe('fake-teach-1');
-    expect(again?.teachOrchestrationId).toBeNull();
-    expect(ledger.teachings).toEqual([
-      { decisionIds: [fields[1]?.id], orchestrationRunId: 'fake-teach-1' },
-    ]);
+    expect(fields[1]?.teachingRef).toBe('fake-teach-1');
+    expect(again?.teachingRef).toBeNull();
+    expect(ledger.teachings).toEqual([{ decisionIds: [fields[1]?.id], ref: 'fake-teach-1' }]);
     expect(dumps.text('01-steps/03/teach.json')).toContain('fake-teach-1');
     expect(dumps.files.has('01-steps/03/fields.json')).toBe(true);
   });
@@ -296,8 +298,8 @@ describe('the session engine', () => {
     expect(again).toMatchObject({ source: 'operator', answer: 'No' });
     expect(again?.payload['cached']).toBe(true);
     expect(brain.taught).toHaveLength(1);
-    expect(brain.taught[0]?.parts[0]).toContain('the subject answered "No"');
-    expect(asked?.teachOrchestrationId).toBe('fake-teach-1');
+    expect(brain.taught[0]?.answers[0]?.answer).toBe('No');
+    expect(asked?.teachingRef).toBe('fake-teach-1');
   });
 
   it('[BRW-3] fills, records and teaches the operator’s answer in the page’s spelling of the option it names', async () => {
@@ -325,7 +327,7 @@ describe('the session engine', () => {
     expect(asked).toMatchObject({ source: 'operator', answer: 'Yes' });
     expect(selected).toEqual(['e2=Yes']);
     expect([operator.questions.length, operator.notices]).toEqual([1, []]);
-    expect(brain.taught[0]?.parts[0]).toContain('the subject answered "Yes"');
+    expect(brain.taught[0]?.answers[0]?.answer).toBe('Yes');
   });
 
   it('[BRW-5] writes rows through the queue so a failing write is reported, not thrown, and the session still closes', async () => {

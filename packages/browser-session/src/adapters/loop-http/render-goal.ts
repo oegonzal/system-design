@@ -253,6 +253,7 @@ const fieldGoalAt = (pipeline: FormPipeline, input: FieldsInput, shown: number |
       prose: renderFieldProse(input, shown),
       fields: input.fields,
       evidence: [],
+      kinds: [],
       ...(input.task === null ? {} : { unitKey: input.task.unitKey }),
     },
     Number.MAX_SAFE_INTEGER,

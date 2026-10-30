@@ -1,11 +1,14 @@
 import {
   Inject,
   Injectable,
+  Logger,
   Module,
   type DynamicModule,
   type OnModuleDestroy,
+  type Provider,
 } from '@nestjs/common';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
+import { HttpMemoryClient, MemoryClient } from '@sysdesign/agentic-memory-client';
 import { BrowserDecision, BrowserSession, BrowserTask } from '@sysdesign/db';
 import { HttpLoopClient, LoopClient } from '@sysdesign/loop-client';
 import { HttpBusClient, InteractionClient } from '@sysdesign/notifications-client';
@@ -14,6 +17,7 @@ import { HttpUnitAdvisor } from '../../adapters/advisor-http/http-unit-advisor';
 import { fsDumpStore } from '../../adapters/fs-dump/fs-dump-store';
 import { FsGoalSource } from '../../adapters/fs-goal/fs-goal-source';
 import { LoopBrain } from '../../adapters/loop-http/loop-brain';
+import { MemoryLoopBrain } from '../../adapters/memory-loop/memory-loop-brain';
 import { MikroOrmLedger } from '../../adapters/mikro-orm/mikro-orm-ledger';
 import { BusSessionEvents } from '../../adapters/notifications-http/bus-session-events';
 import {
@@ -22,13 +26,15 @@ import {
 } from '../../adapters/notifications-http/notifications-operator';
 import { CHROME_CHANNEL, PlaywrightBrowser } from '../../adapters/playwright/playwright-browser';
 import { TerminalOperator } from '../../adapters/terminal-operator/terminal-operator';
-import type { SessionConfig } from '../../config';
+import { SESSION_FLAGS, type SessionConfig } from '../../config';
 import { FirstAnswer } from '../../core/first-answer';
-import type { Clock, OperatorChannel, StopSignal } from '../../core/ports';
-import type { ConfiguredAdvisor } from '../../core/unit-advice';
+import type { BrainPort, Clock, OperatorChannel, StopSignal } from '../../core/ports';
+import { SessionRefused, type ConfiguredAdvisor } from '../../core/unit-advice';
+import type { BrainSettings } from '../../settings';
 import { SessionService } from './session.service';
 import {
   BRAIN,
+  BRAIN_FOR_TENANT,
   BROWSER,
   CLOCK,
   DUMP_STORE,
@@ -40,6 +46,7 @@ import {
   STOP_SIGNAL,
   TERMINAL,
   UNIT_ADVISORS,
+  type BrainForTenant,
 } from './tokens';
 
 /** The longest delay a timer takes; a later time is reached by re-arming. */
@@ -106,6 +113,72 @@ function remoteOperators(config: SessionConfig, bus: HttpBusClient): OperatorCha
   return [new NotificationsOperator(interactions, bus)];
 }
 
+/** Where the composition root says what a person should hear once: the memory host silent at boot, and the brain's own notices. */
+const logger = new Logger('BrowserSession');
+const warn = (text: string): void => logger.warn(text);
+
+type BrainAdapter = BrainSettings['adapter'];
+type BrainSettingsOf<Adapter extends BrainAdapter> = Extract<BrainSettings, { adapter: Adapter }>;
+
+/** What a brain is composed from: the configuration, the loop client, and the memory client — provided under `memory` alone. */
+interface BrainParts {
+  config: SessionConfig;
+  loop: LoopClient;
+  memory: MemoryClient | null;
+}
+
+type BrainFactory<Adapter extends BrainAdapter> = (
+  settings: BrainSettingsOf<Adapter>,
+  parts: BrainParts,
+  /** The tenant a command named over the environment's; undefined for the environment's own. */
+  tenant: string | undefined,
+) => BrainPort;
+
+/**
+ * The brain each declared adapter composes, a table over the settings' own
+ * discriminant: the loop alone; or the loop with a memory space, for the
+ * tenant named — a command's, else the environment's. Composing binds
+ * nothing: the brain binds when a run or a teaching asks it to, before any
+ * session row, and refuses by name there — a tenant left unnamed, a space that
+ * does not serve the binding — as a bad flag does; a command that only reads
+ * the ledger never reaches the host. A tenant named to a brain that keeps its
+ * memories in no space is refused by name: nothing would read it.
+ */
+const BRAIN_FACTORIES: { [Adapter in BrainAdapter]: BrainFactory<Adapter> } = {
+  loop: (_settings, { loop }, tenant) => {
+    if (tenant !== undefined) {
+      throw new SessionRefused(
+        `${SESSION_FLAGS.tenant.name} names a tenant, and the chosen brain is loop, which keeps its memories in no space: choose a brain file with "adapter": "memory" in config/engine.json`,
+      );
+    }
+    return new LoopBrain(loop);
+  },
+  memory: (settings, { config, loop, memory }, tenant) => {
+    if (memory === null) throw new Error('the memory brain is composed over the memory client');
+    return new MemoryLoopBrain(loop, memory, settings, tenant ?? config.memoryTenant, { warn });
+  },
+};
+
+/** The brain the settings choose. A union indexed by its own discriminant is not narrowed to its member's row, so the row is called through the union's shape. */
+function brainOf(parts: BrainParts, tenant: string | undefined): BrainPort {
+  const { brain } = parts.config.settings;
+  const factory = BRAIN_FACTORIES[brain.adapter] as BrainFactory<BrainAdapter>;
+  return factory(brain, parts, tenant);
+}
+
+/** The memory client, under the memory brain alone: nothing else in the session reaches the memory host. */
+function memoryClientProviders(config: SessionConfig): Provider[] {
+  const { brain } = config.settings;
+  if (brain.adapter !== 'memory') return [];
+  return [
+    {
+      provide: MemoryClient,
+      useFactory: () =>
+        new HttpMemoryClient(config.memoryUrl, { recovery: brain.binding.recovery }),
+    },
+  ];
+}
+
 /** The terminal's reader released at shutdown, so the process ends as it would without one. */
 @Injectable()
 class TerminalLifecycle implements OnModuleDestroy {
@@ -120,8 +193,8 @@ class TerminalLifecycle implements OnModuleDestroy {
  * The composition root: every port bound to its adapter, the configuration
  * taken as data rather than read here. The scripted end-to-end run keeps
  * this module and overrides the browser, the operator, the loop client, the
- * events and the stop signal by token, so what it exercises is the wiring
- * that ships.
+ * brain, the events and the stop signal by token, so what it exercises is
+ * the wiring that ships.
  */
 @Module({})
 export class SessionModule {
@@ -141,10 +214,20 @@ export class SessionModule {
           useFactory: () =>
             new HttpLoopClient(config.loopUrl, fetch, config.settings.session.loopRecovery),
         },
+        ...memoryClientProviders(config),
         {
           provide: BRAIN,
-          useFactory: (client: LoopClient) => new LoopBrain(client),
-          inject: [LoopClient],
+          useFactory: (loop: LoopClient, memory: MemoryClient | undefined) =>
+            brainOf({ config, loop, memory: memory ?? null }, undefined),
+          inject: [LoopClient, { token: MemoryClient, optional: true }],
+        },
+        {
+          provide: BRAIN_FOR_TENANT,
+          useFactory:
+            (loop: LoopClient, memory: MemoryClient | undefined): BrainForTenant =>
+            (tenant) =>
+              brainOf({ config, loop, memory: memory ?? null }, tenant),
+          inject: [LoopClient, { token: MemoryClient, optional: true }],
         },
         {
           provide: BROWSER,

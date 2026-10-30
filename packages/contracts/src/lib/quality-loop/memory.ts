@@ -8,10 +8,19 @@ import { z } from 'zod';
 
 import type { ApiResponse } from '../envelope';
 import { llmAvailabilitySchema } from '../llm-availability';
-import type { MemoryScope } from './document-digest';
+import type { MemoryScope } from '../units/scope';
 import type { OrchestrationStepDto } from './orchestration';
 
 export const MEMORY_ORCHESTRATOR_ID = 'memory';
+
+/**
+ * The bounds of a stored point's address — the run that stored it and the
+ * pipeline that wrote it, each an id, and the ref within that run — declared
+ * once for the store that writes every chunk's source by them and for the
+ * evidence a form goal lists a point under as `<runId>#<ref>`.
+ */
+export const SOURCE_ID_MAX_LENGTH = 80;
+export const SOURCE_REF_MAX_LENGTH = 200;
 
 /**
  * Why a memory step skipped, failed, or completed without effect — beyond

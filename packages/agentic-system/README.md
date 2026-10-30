@@ -20,22 +20,24 @@ here as declared data.
 
 ## Routes
 
-| Method | Path                                  | What                                                                                                                                                                   |
-| ------ | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `POST` | `/designs`                            | Start a design cycle from a memory brief (`{ goal }`); 202 with the cycle, which runs off the request path.                                                            |
-| `GET`  | `/designs/:id`                        | Read a cycle back: its status, the coach run, the orchestration that learned from it.                                                                                  |
-| `POST` | `/spaces`                             | Make a memory space from a settled run's best strategy (`{ runId }`); 201 with the space and its compile report.                                                       |
-| `GET`  | `/spaces/:id`                         | Read a space back, its report compiled again from the snapshots it keeps.                                                                                              |
-| `POST` | `/spaces/:id/remember`                | Assert a typed memory in a register: inserted, unchanged (it says the same), or superseding the current one.                                                           |
-| `POST` | `/spaces/:id/update`                  | Supersede an addressed, current record with a new version of the same identity.                                                                                        |
-| `POST` | `/spaces/:id/invalidate`              | Close an addressed, current record with its reason.                                                                                                                    |
-| `POST` | `/spaces/:id/recall`                  | Recall by key (exact), by text (meaning), or by a time range alone; ranked, budgeted, each item with its factors and routes.                                           |
-| `POST` | `/spaces/:id/consolidate`             | Turn verified episodes in a scope into lessons, and lessons into playbooks, as the strategy routes them.                                                               |
-| `POST` | `/spaces/:id/history`                 | Every version of an addressed record's identity, oldest first.                                                                                                         |
-| `POST` | `/spaces/:id/digests`                 | Digest a text — split into parts its owner labels and dates — into the space's typed memories on the quality loop; 202 with the orchestration, which runs for minutes. |
-| `GET`  | `/spaces/:id/digests/:runId`          | Read a digest back from the loop's record: its step's status, reason and counts, its report — every memory proposed, endorsed or withheld — and the apply, once made.  |
-| `POST` | `/spaces/:id/digests/:runId/remember` | Remember what the digest endorsed, once, through the runtime's own write path; 200 with each memory's outcome or refusal.                                              |
-| `GET`  | `/health`                             | Liveness.                                                                                                                                                              |
+| Method | Path                                  | What                                                                                                                                                                                           |
+| ------ | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST` | `/designs`                            | Start a design cycle from a memory brief (`{ goal }`); 202 with the cycle, which runs off the request path.                                                                                    |
+| `GET`  | `/designs/:id`                        | Read a cycle back: its status, the coach run, the orchestration that learned from it.                                                                                                          |
+| `POST` | `/spaces`                             | Make a memory space from a settled run's best strategy (`{ runId }`); 201 with the space and its compile report.                                                                               |
+| `GET`  | `/spaces/:id`                         | Read a space back, its report compiled again from the snapshots it keeps.                                                                                                                      |
+| `PUT`  | `/spaces/by-name/:name`               | Ensure the space under a name (`{ runId }`): made from the run when none holds the name, the same space when that run made it; 200 with `{ space, created }`. A name another run holds is 409. |
+| `GET`  | `/spaces/by-name/:name`               | Read the space under a name; an unknown name is 404.                                                                                                                                           |
+| `POST` | `/spaces/:id/remember`                | Assert a typed memory in a register: inserted, unchanged (it says the same), or superseding the current one.                                                                                   |
+| `POST` | `/spaces/:id/update`                  | Supersede an addressed, current record with a new version of the same identity.                                                                                                                |
+| `POST` | `/spaces/:id/invalidate`              | Close an addressed, current record with its reason.                                                                                                                                            |
+| `POST` | `/spaces/:id/recall`                  | Recall by key (exact), by text (meaning), or by a time range alone; ranked, budgeted, each item with its factors and routes.                                                                   |
+| `POST` | `/spaces/:id/consolidate`             | Turn verified episodes in a scope into lessons, and lessons into playbooks, as the strategy routes them.                                                                                       |
+| `POST` | `/spaces/:id/history`                 | Every version of an addressed record's identity, oldest first.                                                                                                                                 |
+| `POST` | `/spaces/:id/digests`                 | Digest a text — split into parts its owner labels and dates — into the space's typed memories on the quality loop; 202 with the orchestration, which runs for minutes.                         |
+| `GET`  | `/spaces/:id/digests/:runId`          | Read a digest back from the loop's record: its step's status, reason and counts, its report — every memory proposed, endorsed or withheld — and the apply, once made.                          |
+| `POST` | `/spaces/:id/digests/:runId/remember` | Remember what the digest endorsed, once, through the runtime's own write path; 200 with each memory's outcome or refusal.                                                                      |
+| `GET`  | `/health`                             | Liveness.                                                                                                                                                                                      |
 
 The coached strategy is the coach run's artifact; read it from the loop
 (`GET /runs/:id`), not from this service. Every request and answer of the
@@ -64,15 +66,25 @@ space compiles the same on every load and does not change when the run or the
 policy file does; the space records which settings its policy came from
 (`policySource`, e.g. `memory/standard`). A request names its scope as the
 policy's scope keys, the first of them the partition every request carries; a
-memory is visible to a request whose scope contains its own.
+memory is visible to a request whose scope contains its own. The space answers
+the scope keys of the snapshot it keeps, so a caller reads what it may name.
+
+A consumer that wants its space back without keeping an id ensures it under a
+name — `PUT /spaces/by-name/:name` with the run — a lower-case word of letters,
+digits and hyphens (`spaceNameSchema` in the contracts). The same name from the
+same run is the same space; a name another run holds is refused
+(`space.name_taken`), as is a claim that lost its race, so no name is kept
+twice. A space made by `POST /spaces` has no name.
 
 Every refusal answers one declared status, its body the framework's error shape
-plus the refusal's `code`, `message` and `issues` (`src/memory/refusals.ts`):
+plus the refusal's `code`, `message` and `issues`. The statuses are declared
+once in `@sysdesign/contracts` (`lib/agentic-system/space-host.ts`, the
+runtime's codes and the host's) and answered by `src/memory/refusals.ts`:
 
 | Status | Refusals                                                                                                                                                                                                                                                          |
 | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 404    | `run.not_found` (an orchestration another orchestrator ran, or a digest composed for another space, is not found too), `space.not_found`, `record.not_found` (a record outside the caller's scope is not found too)                                               |
-| 409    | `run.in_flight` (the run or the digest is still running), `digest.applied` (the digest was remembered already), `record.not_current`, `conflict`                                                                                                                  |
+| 409    | `run.in_flight` (the run or the digest is still running), `digest.applied` (the digest was remembered already), `space.name_taken` (another run holds the name, or a concurrent claim won it), `record.not_current`, `conflict`                                   |
 | 422    | `run.no_strategy`, `digest.no_registers`, `digest.too_large`, `digest.no_report`, `space.not_compiled`, `register.unknown`, `operation.undeclared`, `scope.invalid`, `candidate.invalid`, `metadata.undeclared`, `identity.mismatch`, `consolidation.unavailable` |
 
 A strategy that does not compile is 422 with `{ message, report }`, the report
@@ -115,7 +127,9 @@ name none.
 - `config/design/standard.json`: the pipeline, the orchestrator, the coach
   iterations, whether to recall, the poll pace.
 - `config/memory/standard.json`: the policy every new space snapshots — the
-  scope keys (the first is the partition), each term's time to live
+  scope keys (`tenant`, `project`, `user`, `unit`; the first is the partition
+  every request names, the rest a request names as it needs), each term's time
+  to live
   (short-term memory must expire), the recall weights, budget and recency
   half-life, the support a lesson and a playbook need — and, beside it, the
   sweep's schedule (`sweep.everyMs`), which belongs to the process and is

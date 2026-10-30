@@ -7,6 +7,7 @@
 import { z } from 'zod';
 
 import { bound, bounded } from '../bounds';
+import { MEMORY_SCOPES } from '../units/scope';
 import { ELEMENT_REF } from './observation.schema';
 import { ANSWER_BASES, ANSWER_BASIS_MEANINGS, FIELD_DECISIONS } from './vocab';
 
@@ -24,6 +25,17 @@ export const evidenceAlias = (position: number): string => `m${position + 1}`;
 
 export const fieldAnswerSchema = z.strictObject({
   ref: z.string().regex(ELEMENT_REF).describe('The field, exactly as the Fields list names it.'),
+  /**
+   * Where an answer to what this field asks holds, declared whatever the
+   * decision: an operator's answer to a field the model could not settle is
+   * taught under the scope declared here, so the question's scope is judged
+   * even when its answer is not known.
+   */
+  about: z
+    .enum(MEMORY_SCOPES)
+    .describe(
+      'Where an answer to what this field asks holds, whatever the decision. subject: the same whoever asks — the record, experience, skills, documents, status, or a standing answer to a question any form may ask. unit: it would differ for another employer, role or application — working or knowing someone there, consents, how this opening was heard of, whether it suits.',
+    ),
   decision: z
     .enum(FIELD_DECISIONS)
     .describe(

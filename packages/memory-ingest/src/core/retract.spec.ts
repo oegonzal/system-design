@@ -1,13 +1,11 @@
 import { LoopUnreachable } from '@sysdesign/loop-client';
 
 import { fakeIngestLoop } from '../test/fake-ingest-loop';
-import { FIXED_NOW, fixedClock, InMemoryLedger, manifestEntry } from '../test/fakes';
+import { FIXED_NOW, fixedClock, InMemoryLedger, LOOP_URL, manifestEntry } from '../test/fakes';
 import type { ManifestEntry } from './ports';
 import { NotInManifest, retractDocuments, type RetractDeps } from './retract';
 
 const EARLIER = '2026-10-01T09:00:00.000Z';
-/** The loop the command is configured for — the one `manifestEntry` records postings under. */
-const LOOP_URL = manifestEntry().loopUrl;
 
 /** The fake loop behind the shipping sink, its store holding the points a spec gives each digest run. */
 function harness(entries: Partial<ManifestEntry>[], points: Record<string, number>) {
@@ -15,14 +13,15 @@ function harness(entries: Partial<ManifestEntry>[], points: Record<string, numbe
   for (const [digestRunId, held] of Object.entries(points))
     fake.client.points.set(digestRunId, held);
   const ledger = new InMemoryLedger(entries.map((overrides) => manifestEntry(overrides)));
-  const deps: RetractDeps = { sink: fake.sink, ledger, clock: fixedClock(), loopUrl: LOOP_URL };
+  const deps: RetractDeps = { sink: fake.sink, ledger, clock: fixedClock() };
   return { ...fake, ledger, deps };
 }
 
-/** A digest run retracted through the configured loop, with the points it removed. */
+/** A digest run retracted through the configured loop, with the points it removed; the loop keeps no record for another posting. */
 const retracted = (digestRunId: string, removed: number) => ({
   digestRunId,
   removed,
+  kept: 0,
   recordedUnder: null,
 });
 
@@ -53,9 +52,13 @@ describe('retractDocuments', () => {
     const report = await retractDocuments(['notes.md'], options(), {
       ...deps,
       sink: {
-        retract: (digestRunId) => {
+        kind: sink.kind,
+        host: sink.host,
+        spaceId: sink.spaceId,
+        scope: sink.scope,
+        retract: (posting, keep) => {
           marksAtEach.push(ledger.entries.filter((entry) => entry.retractedAt !== null).length);
-          return sink.retract(digestRunId);
+          return sink.retract(posting, keep);
         },
       },
     });
@@ -111,7 +114,7 @@ describe('retractDocuments', () => {
     // The same file named from another directory is another key, and the manifest has no entry for it.
     await expect(
       retractDocuments(['notes.md'], options({ cwd: '/work/docs' }), deps),
-    ).rejects.toThrow(`${ledger.path} has no entry for notes.md:`);
+    ).rejects.toThrow(`${ledger.path} has no entry for notes.md through the loop sink:`);
     expect(loop.retracted).toEqual(['run-1']);
     expect(ledger.saves).toBe(1);
   });
@@ -191,12 +194,12 @@ describe('retractDocuments', () => {
     expect(loop.retracted).toEqual(['run-2']);
   });
 
-  it('[ING-3] retracts a run recorded under another loop through the configured one and marks it — one store may serve both — but reports it apart, under the loop it was recorded under', async () => {
+  it('[ING-3] retracts a run recorded under another service through the configured one and marks it — one store may serve both — but reports it apart, under the service it was recorded under', async () => {
     const OTHER = 'http://other-loop.test';
     const { deps, ledger, loop } = harness(
       [
         { chunkHash: 'h1', digestRunId: 'run-1' },
-        { chunkHash: 'h2', digestRunId: 'run-2', loopUrl: OTHER },
+        { chunkHash: 'h2', digestRunId: 'run-2', host: OTHER },
       ],
       { 'run-1': 3, 'run-2': 4 },
     );
@@ -205,7 +208,7 @@ describe('retractDocuments', () => {
       through: LOOP_URL,
       retracted: [
         retracted('run-1', 3),
-        { digestRunId: 'run-2', removed: 4, recordedUnder: OTHER },
+        { digestRunId: 'run-2', removed: 4, kept: 0, recordedUnder: OTHER },
       ],
       left: null,
     });

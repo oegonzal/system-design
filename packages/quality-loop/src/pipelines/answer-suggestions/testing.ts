@@ -8,6 +8,7 @@
 import {
   ANSWER_SUGGESTIONS_PIPELINE_ID,
   composeFieldGoal,
+  DOCUMENT_MEMORY_LEGEND,
   type AnswerSuggestions,
   type EvidenceItem,
   type FieldSpec,
@@ -47,17 +48,14 @@ export const sampleFields = (): FieldSpec[] => [
   }),
 ];
 
-const item = (alias: string, text: string, kind: EvidenceItem['source']['kind']): EvidenceItem => ({
+/** One recalled item as the recall lists it: what the store holds it as, where it holds, and the run and item it came from. */
+const item = (alias: string, text: string, kind: EvidenceItem['kind']): EvidenceItem => ({
   alias,
   text,
   when: '2026-10-02',
   scope: 'subject',
-  source: {
-    runId: 'digest-run-1',
-    pipeline: 'document-digest',
-    ref: `memory.${alias.slice(1)}`,
-    kind,
-  },
+  kind,
+  source: { origin: 'document-digest', ref: `digest-run-1#memory.${alias.slice(1)}` },
 });
 
 export const sampleEvidence = (): EvidenceItem[] => [
@@ -84,6 +82,7 @@ export const suggestionsGoal = (
     prose: SUGGESTING_PROSE,
     fields,
     evidence,
+    kinds: DOCUMENT_MEMORY_LEGEND,
   });
 
 /** Suggestions as the policy wants them: a record answer, nothing for the employer, a transfer and an invented draft. */

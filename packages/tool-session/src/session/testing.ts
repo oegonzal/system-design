@@ -17,7 +17,7 @@ import {
   type PromptLibraryDocumentDto,
   type PromptLibraryEntryDto,
   type QualityLoopHealthDto,
-  type QualityRunDto,
+  type QualityRunReadDto,
   type QualityRunStartedDto,
   type RetractedMemoryRunDto,
   type RunShape,
@@ -44,7 +44,7 @@ const notUsed = (what: string): never => {
 
 export class FakeLoopClient extends LoopClient {
   readonly starts: StartQualityRunRequest[] = [];
-  private readonly runs = new Map<string, QualityRunDto>();
+  private readonly runs = new Map<string, QualityRunReadDto>();
   private next = 0;
 
   constructor(
@@ -96,7 +96,7 @@ export class FakeLoopClient extends LoopClient {
     return Promise.resolve({ runId, status: 'complete' });
   }
 
-  getRun(runId: string): Promise<QualityRunDto | null> {
+  getRun(runId: string): Promise<QualityRunReadDto | null> {
     return Promise.resolve(this.runs.get(runId) ?? null);
   }
 

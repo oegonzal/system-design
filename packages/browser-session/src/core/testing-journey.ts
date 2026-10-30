@@ -9,6 +9,7 @@ import {
 } from '@sysdesign/contracts';
 
 import type { ScriptedPage } from './testing';
+import { fieldAnswer } from './testing-runs';
 
 /**
  * One scripted journey the engine's dry runs share: a search page, a results
@@ -130,22 +131,8 @@ export const JOURNEY_SEQUENCE: StepPlan[] = [
 export const JOURNEY_ANSWERS: FieldAnswers = {
   summary: 'Two fields from evidence, one hidden.',
   fields: [
-    {
-      ref: 'e1',
-      decision: 'answer',
-      value: '6',
-      rests: 'stated',
-      basis: ['m1'],
-      reason: 'résumé',
-    },
-    {
-      ref: 'e2',
-      decision: 'answer',
-      value: 'Yes',
-      rests: 'inferred',
-      basis: [],
-      reason: 'a guess',
-    },
-    { ref: 'e3', decision: 'answer', value: 'x', rests: 'stated', basis: [], reason: 'oops' },
+    fieldAnswer('e1', { value: '6', basis: ['m1'], reason: 'résumé' }),
+    fieldAnswer('e2', { value: 'Yes', rests: 'inferred', reason: 'a guess' }),
+    fieldAnswer('e3', { value: 'x', reason: 'oops' }),
   ],
 };

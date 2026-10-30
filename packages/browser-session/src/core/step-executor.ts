@@ -20,6 +20,7 @@ import {
   type UnitsOnRecord,
 } from '@sysdesign/contracts';
 
+import { describeAction, touchedBy } from './action-words';
 import { captureAfter, touchedName } from './capture';
 import type { EngineContext } from './engine-context';
 import { exactCheckOf } from './expectations';
@@ -35,14 +36,7 @@ import {
 import type { StepFailureEvent } from './rails';
 import { labelledScreenshot } from './session-dump';
 import { unitClosedEvent, unitOpenedEvent } from './session-events';
-import {
-  clearObjections,
-  describeAction,
-  pushHistory,
-  pushObjections,
-  touchedBy,
-  type OpenTask,
-} from './session-state';
+import { clearObjections, pushHistory, pushObjections, type OpenTask } from './session-state';
 
 /**
  * Running the unfaulted prefix of a plan, action by action. A browser action

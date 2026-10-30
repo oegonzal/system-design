@@ -230,7 +230,8 @@ describe('the document-memory HTTP surface', () => {
       const { data } = (await answer.json()) as Envelope<FormRetrievalReportDto>;
       return data.evidence.map((item) => item.source.ref).sort();
     };
-    expect(await evidenceFor('company=acme')).toEqual(['memory.1', 'memory.2']);
-    expect(await evidenceFor(undefined)).toEqual(['memory.1']);
+    // Each item's source names the point's address as an evidence item does: the run and the ref, as one token.
+    expect(await evidenceFor('company=acme')).toEqual(['run-u#memory.1', 'run-u#memory.2']);
+    expect(await evidenceFor(undefined)).toEqual(['run-u#memory.1']);
   });
 });

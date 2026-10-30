@@ -1,10 +1,11 @@
-import { Inject, Injectable, Logger } from '@nestjs/common';
-import { LoopClient } from '@sysdesign/loop-client';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { MemoryClient } from '@sysdesign/agentic-memory-client';
 import {
   excerpt,
   type BrowserSessionDetailDto,
   type BrowserSessionDto,
 } from '@sysdesign/contracts';
+import { LoopClient } from '@sysdesign/loop-client';
 
 import { SESSION_ENV, type SessionConfig } from '../../config';
 import type { RunSessionOptions } from '../../core/engine-context';
@@ -24,6 +25,7 @@ import { sessionEventsOf, type SessionEventsPort } from '../../core/session-even
 import { SessionRefused, type ConfiguredAdvisor } from '../../core/unit-advice';
 import {
   BRAIN,
+  BRAIN_FOR_TENANT,
   BROWSER,
   CLOCK,
   DUMP_STORE,
@@ -34,7 +36,9 @@ import {
   SESSION_EVENTS,
   STOP_SIGNAL,
   UNIT_ADVISORS,
+  type BrainForTenant,
 } from './tokens';
+import { replayFields, type ReplayFieldsOptions, type ReplayFieldsReport } from './replay-fields';
 import { subjectFor, teachAgain, type TeachAgainReport } from './teach-again';
 
 /**
@@ -58,12 +62,14 @@ export type RunOptions = Omit<
 };
 
 /**
- * The five things the command line asks for. `run` is the engine over the
- * bound ports; `login` opens the profile headed at a URL and waits for the
- * operator, so the cookies persist for later sessions; `list` and `show`
- * read the ledger; `replayEvents` publishes a recorded session's events
- * again. Progress goes to the operator's terminal, so a session can be
- * watched with the Nest logger quiet; a write that did not land is a warning.
+ * What the command line asks for. `run` is the engine over the bound ports;
+ * `login` opens the profile headed at a URL and waits for the operator, so
+ * the cookies persist for later sessions; `list` and `show` read the ledger;
+ * `replayEvents` publishes a recorded session's events again; `teachAgain`
+ * teaches recorded answers again through the brain; `replayFields` replays
+ * recorded form pages against the memory. Progress goes to the operator's
+ * terminal, so a session can be watched with the Nest logger quiet; a write
+ * that did not land is a warning.
  */
 @Injectable()
 export class SessionService {
@@ -72,6 +78,7 @@ export class SessionService {
   constructor(
     @Inject(BROWSER) private readonly browser: BrowserPort,
     @Inject(BRAIN) private readonly brain: BrainPort,
+    @Inject(BRAIN_FOR_TENANT) private readonly brainFor: BrainForTenant,
     @Inject(LEDGER) private readonly ledger: LedgerPort,
     @Inject(OPERATOR) private readonly operator: OperatorPort,
     @Inject(GOAL_SOURCE) private readonly goals: GoalSource,
@@ -82,6 +89,8 @@ export class SessionService {
     @Inject(STOP_SIGNAL) private readonly stop: StopSignal,
     @Inject(SESSION_CONFIG) private readonly config: SessionConfig,
     private readonly client: LoopClient,
+    /** Bound only under a memory brain; a replay asked without one says so. */
+    @Optional() @Inject(MemoryClient) private readonly memory: MemoryClient | null = null,
   ) {}
 
   run(options: RunOptions): Promise<SessionOutcome> {
@@ -185,14 +194,24 @@ export class SessionService {
 
   /**
    * The operator answers a folder of session dumps recorded, taught again in
-   * the canonical shape and their earlier digests retracted; `dryRun` plans and
-   * posts nothing. The subject is each dump's own, else the one given, else the
-   * configured one — and never the environment's placeholder.
+   * the canonical shape through the brain — the environment's tenant's, or
+   * the one named — and, for a brain that digests them on the loop, their
+   * earlier digests retracted; `dryRun` plans and posts nothing, so binds
+   * nothing either. The subject is each dump's own, else the one given, else
+   * the configured one — and never the environment's placeholder.
    */
-  teachAgain(dumpsDir: string, dryRun: boolean, subject?: string): Promise<TeachAgainReport> {
+  async teachAgain(
+    dumpsDir: string,
+    dryRun: boolean,
+    subject?: string,
+    tenant?: string,
+  ): Promise<TeachAgainReport> {
+    const brain = tenant === undefined ? this.brain : this.brainFor(tenant);
+    if (!dryRun) await brain.bind();
     return teachAgain(
       {
-        client: this.client,
+        brain,
+        loop: this.client,
         ledger: this.ledger,
         subject: subjectFor(subject, this.config.subject),
         untaught: this.config.settings.operator.untaught,
@@ -200,6 +219,28 @@ export class SessionService {
       },
       dumpsDir,
       dryRun,
+    );
+  }
+
+  /**
+   * The form pages a folder of session dumps recorded, replayed against the
+   * memory the brain settings bind: what the recall finds now beside what the
+   * recorded goal cited and, when asked, a judged sample routed by the shipped
+   * answering settings — written where the options say. Progress goes to the
+   * operator's terminal as a run's does.
+   */
+  replayFields(options: ReplayFieldsOptions): Promise<ReplayFieldsReport> {
+    return replayFields(
+      {
+        loop: this.client,
+        memory: this.memory,
+        brainSettings: this.config.settings.brain,
+        answering: this.config.settings.answering,
+        memoryTenant: this.config.memoryTenant,
+        clock: this.clock,
+        log: (text) => this.operator.notify(text),
+      },
+      options,
     );
   }
 }

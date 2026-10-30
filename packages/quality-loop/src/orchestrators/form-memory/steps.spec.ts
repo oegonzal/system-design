@@ -17,11 +17,14 @@ import { DisabledEmbeddingClient } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
 
 import { toRunDto, type RunRecord } from '../../core/contracts';
+import { admission, outputsOf, readoutOf } from '../../core/outputs';
+import type { PipelineDefinition } from '../../core/pipeline';
 import {
   InMemoryEmbeddingCache,
   InMemoryMemoryStore,
   mutedEmbeddings,
 } from '../../modules/memory/testing';
+import { FIELD_ANSWER } from '../../pipelines/field-answer/definition';
 import {
   ANSWERING_PROSE,
   fieldGoal,
@@ -125,7 +128,7 @@ describe('the form-memory steps', () => {
     expect(goal).toContain(FIELD_EVIDENCE_HEADING);
     expect(readFieldIndex(goal)?.evidence).toEqual([{ alias: 'm1' }, { alias: 'm2' }]);
     for (const hit of sampleFacts) expect(goal).toContain(hit.text);
-    expect(goal).toContain('· stored 2026-09-06 · system-design memory.');
+    expect(goal).toContain('· stored 2026-09-06 · system-design run-a#memory.');
     // The prose and the fields are the session's, untouched; only the evidence changed.
     expect(splitFieldGoal(goal)).toEqual({
       pipeline: 'field-answer',
@@ -155,12 +158,13 @@ describe('the form-memory steps', () => {
         prose: ANSWERING_PROSE,
         fields: sampleFields(),
         evidence: [],
+        kinds: [],
         ...(unitKey === undefined ? {} : { unitKey }),
       });
       const composed = (await recall(ctx(null, { goal, ports: { store } }))).output?.goal ?? '';
       return {
         composed,
-        refs: [...composed.matchAll(/system-design (memory\.\d)/g)].map((m) => m[1]),
+        refs: [...composed.matchAll(/system-design run-a#(memory\.\d)/g)].map((m) => m[1]),
       };
     };
     const named = await recalledFor('U');
@@ -304,5 +308,39 @@ describe('the form-memory steps', () => {
     expect(run.report?.withheld).toEqual([
       expect.objectContaining({ ref: 'field.1', by: 'ungrounded' }),
     ]);
+  });
+
+  it('[QL-83] target reports the run’s readout at the bar the run was held to — the one it asked for, else its pipeline’s — exactly as the run’s own read answers it', async () => {
+    const recalled = (await recall(ctx(null))).output;
+    if (recalled === undefined) throw new Error('the recall hands on a goal');
+    // Judged short of the 95 it asked for with an overall of 90, which the pipeline's own 70 would admit.
+    const heldHigher = (goal: string): RunRecord => {
+      const run = childRun(
+        'field-answer',
+        readoutTrace({
+          pipeline: 'field-answer',
+          goal,
+          artifact: sampleAnswers(),
+          locations: ['summary', 'field.1', 'field.2', 'field.3', 'field.4', 'field.5'],
+          criteria: [{ id: 'c1', kind: 'grounding', statement: 'values rest on evidence' }],
+          results: [passed('c1', 'grounding', ['field.1'])],
+          decision: 'revise',
+          overall: 90,
+        }),
+      );
+      return { ...run, request: { ...run.request, acceptAt: 95 } };
+    };
+    const run = await target(ctx(heldHigher, { outputs: { recall: recalled } }));
+    expect(run).toMatchObject({
+      status: 'complete',
+      report: { admission: 'fell-short', withheld: [] },
+    });
+    const child = run.output;
+    if (child === undefined || child.trace === null) throw new Error('the target hands on its run');
+    expect(admission(outputsOf(child.trace), FIELD_ANSWER.policy.thresholds.acceptAt)).toBe(
+      'admitted',
+    );
+    // One path to one answer: the step's report is the run's readout.
+    expect(run.report).toEqual(readoutOf(FIELD_ANSWER as PipelineDefinition<unknown>, child));
   });
 });

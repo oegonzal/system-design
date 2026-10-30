@@ -8,6 +8,7 @@
 import { z } from 'zod';
 
 import { unitKeySchema } from '../units/identity';
+import { MEMORY_SCOPES, type MemoryScope } from '../units/scope';
 import {
   readFencedIndex,
   renderIndexSection,
@@ -59,52 +60,11 @@ export const DOCUMENT_MEMORY_KIND_USES: Readonly<Record<DocumentMemoryKind, stri
 };
 
 /**
- * Where a document memory holds: of the subject wherever a form asks, or only
- * of the one employer, role or application it was recorded for. Declared by
- * the digest for each memory, or by the document for all of them (its head's
- * `scope`), carried on the stored chunk and rendered beside the kind, so the
- * form pipelines read it as data and never argue it from the wording of the
- * fact. Measured 2026-10-12: answers taught as one application's events were
- * recalled for the same question reworded, judged another application's, and
- * the operator was asked again — the same fact five times across four
- * sessions.
+ * The kinds as a form goal's legend lists them — each with its use, in the
+ * order declared — for whoever composes a goal over document memories.
  */
-export const MEMORY_SCOPES = ['subject', 'unit'] as const;
-export type MemoryScope = (typeof MEMORY_SCOPES)[number];
-
-/** What each scope means, rendered into the digest's schema and the form goals' legend. */
-export const MEMORY_SCOPE_USES: Readonly<Record<MemoryScope, string>> = {
-  subject:
-    'true of the subject wherever asked — the answer is the same whoever asks: their record, their experience, skills, documents, links, status or availability, or their standing answer to a question any form may ask, however the form was asked for one role',
-  unit: 'about the one employer, role or application it was recorded for — the answer would differ for another: whether the subject works or worked there, knows anyone there, consents to its messages, how they heard of this opening, whether this posting suits; settles only a question about that same unit of work',
-};
-
-/** Every document memory written before scopes were declared was a document's fact about the subject. */
-export const DEFAULT_MEMORY_SCOPE: MemoryScope = 'subject';
-
-/**
- * Which scopes bind a memory to the one unit of work it was recorded for — a
- * total table, so a new scope is classified or the build refuses. A memory of
- * a bound scope is stored with its unit's key and read only by a search that
- * names that unit; every other memory is read by any search.
- */
-const SCOPE_BOUND_TO_UNIT: Readonly<Record<MemoryScope, boolean>> = {
-  subject: false,
-  unit: true,
-};
-
-/** The scopes bound to a unit of work, as the store's filter names them. */
-export const UNIT_BOUND_SCOPES: readonly MemoryScope[] = MEMORY_SCOPES.filter(
-  (scope) => SCOPE_BOUND_TO_UNIT[scope],
-);
-
-/**
- * Whether a memory of this scope is bound to a unit of work. One stored with
- * no scope is not: the store's filter reads a missing scope as matching no
- * bound one, and every reader of a memory reads it the same way.
- */
-export const isUnitBound = (scope: MemoryScope | undefined): boolean =>
-  scope !== undefined && UNIT_BOUND_SCOPES.includes(scope);
+export const DOCUMENT_MEMORY_LEGEND: readonly { kind: DocumentMemoryKind; use: string }[] =
+  DOCUMENT_MEMORY_KINDS.map((kind) => ({ kind, use: DOCUMENT_MEMORY_KIND_USES[kind] }));
 
 const DAY = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -116,7 +76,8 @@ const documentHeadShape = {
   /** The day the document speaks for; null when nothing says. */
   date: z.string().regex(DAY).nullable(),
   /**
-   * Where every memory of the document holds, when the document declares it:
+   * Where every memory of the document holds (`MemoryScope`, the units
+   * domain's vocabulary), when the document declares it:
    * the goal tells every lens so in place of the scope test, and the store
    * keeps each memory under it whatever its digest wrote. Absent when the
    * document declares none, and each memory is then scoped by the scope test
@@ -261,7 +222,7 @@ export function renderDocumentGoal(chunk: DocumentChunk): string {
     '## Limits',
     '',
     `- Propose at most ${chunk.maxMemories} memories, each resting on one to four of the listed sections.`,
-    `- Give each memory a kind: ${DOCUMENT_MEMORY_KINDS.map((kind) => `${kind} — ${DOCUMENT_MEMORY_KIND_USES[kind]}`).join('; ')}.`,
+    `- Give each memory a kind: ${DOCUMENT_MEMORY_LEGEND.map(({ kind, use }) => `${kind} — ${use}`).join('; ')}.`,
     ...(chunk.scope === undefined ? [] : [declaredScopeLimit(chunk.scope)]),
     '- A section may support several memories; list every section no memory rests on under unused.',
     limitsClosing(chunk),

@@ -1,12 +1,11 @@
-import { LoopRefused } from '@sysdesign/loop-client';
-
 import { execute } from './cli';
+import { SinkFault } from './core/ports';
 import { cliDeps as deps, io, parsed } from './test/cli-harness';
-import { FIXED_NOW, InMemoryLedger, manifestEntry } from './test/fakes';
+import { FIXED_NOW, InMemoryLedger, manifestEntry, ScriptedSink } from './test/fakes';
 
 /** `retract` over the ports, and the one writer every command that saves the manifest runs as. */
 describe('execute, as a writer of the manifest', () => {
-  it('[ING-3] retract retires each document, prints the points each digest run removed with the runs that held nothing apart, and exits 0 — also when everything was retracted already', async () => {
+  it('[ING-3] retract retires each document, prints the memories each digest run removed with the runs that held nothing apart, and exits 0 — also when everything was retracted already', async () => {
     const ledger = new InMemoryLedger([
       manifestEntry({ chunkHash: 'h1', digestRunId: 'run-1' }),
       manifestEntry({ chunkHash: 'h2', digestRunId: 'run-2', status: 'unstored' }),
@@ -18,7 +17,7 @@ describe('execute, as a writer of the manifest', () => {
     expect(out[0]).toContain('notes.md · 2 entries');
     expect(out[0]).toMatch(/run-1\s+3/);
     expect(out[0]).toContain('held nothing (1): run-2');
-    expect(out[0]).toContain('retracted 2 digest runs (3 points)');
+    expect(out[0]).toContain('retracted 2 digest runs (3 memories)');
     expect(d.scripted.retracted).toEqual(['run-1', 'run-2']);
     expect(ledger.entries.map((entry) => [entry.retractedAt, entry.retractedPoints])).toEqual([
       [FIXED_NOW, 3],
@@ -39,13 +38,13 @@ describe('execute, as a writer of the manifest', () => {
     const missing = deps({ ledger });
     const { errors, sink } = io();
     expect(await execute(parsed(['retract', 'notes.md', 'resume.pdf']), missing, sink)).toBe(2);
-    expect(errors[0]).toContain(`${ledger.path} has no entry for resume.pdf`);
+    expect(errors[0]).toContain(`${ledger.path} has no entry for resume.pdf through the loop sink`);
     expect(missing.scripted.retracted).toEqual([]);
 
     const failing = deps({ ledger });
     failing.scripted.failingRetractions.set(
       'run-1',
-      new LoopRefused(503, 'the store is unavailable'),
+      new SinkFault('refused', '503: the store is unavailable'),
     );
     const second = io();
     expect(await execute(parsed(['retract', 'notes.md']), failing, second.sink)).toBe(1);
@@ -80,13 +79,15 @@ describe('execute, as a writer of the manifest', () => {
     ledger.held = false;
     expect(await execute(parsed(['ingest', 'notes.md', '--subject', 'Ada']), d, io().sink)).toBe(0);
     expect(ledger.held).toBe(false);
+    const unreachable = new SinkFault(
+      'unreachable',
+      'the quality loop is unreachable: ECONNREFUSED',
+    );
     const down = deps({
       ledger,
-      sink: {
-        post: () => Promise.reject(new Error('not posted')),
-        status: () => Promise.reject(new Error('the quality loop is unreachable: ECONNREFUSED')),
-        retract: () => Promise.resolve(0),
-      },
+      sinkAdapter: Object.assign(new ScriptedSink(), {
+        status: () => Promise.reject(unreachable),
+      }),
     });
     await expect(execute(parsed(['status', '--refresh']), down, io().sink)).rejects.toThrow(
       'unreachable',

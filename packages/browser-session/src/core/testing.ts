@@ -181,7 +181,7 @@ export class InMemoryLedger implements LedgerPort {
   readonly tasks = new Map<string, BrowserTaskDto>();
   readonly decisions: BrowserDecisionDto[] = [];
   readonly heartbeats: { at: string; steps: number }[] = [];
-  readonly teachings: { decisionIds: string[]; orchestrationRunId: string }[] = [];
+  readonly teachings: { decisionIds: string[]; ref: string }[] = [];
   failing: Error | null = null;
 
   private async write<T>(work: () => T): Promise<T> {
@@ -256,17 +256,17 @@ export class InMemoryLedger implements LedgerPort {
       const { createdAt, ...rest } = decision;
       this.decisions.push({
         ...rest,
-        teachOrchestrationId: null,
+        teachingRef: null,
         createdAt: createdAt.toISOString(),
       });
     });
   }
 
-  recordTeaching(decisionIds: readonly string[], orchestrationRunId: string): Promise<void> {
+  recordTeaching(decisionIds: readonly string[], ref: string): Promise<void> {
     return this.write(() => {
-      this.teachings.push({ decisionIds: [...decisionIds], orchestrationRunId });
+      this.teachings.push({ decisionIds: [...decisionIds], ref });
       for (const decision of this.decisions) {
-        if (decisionIds.includes(decision.id)) decision.teachOrchestrationId = orchestrationRunId;
+        if (decisionIds.includes(decision.id)) decision.teachingRef = ref;
       }
     });
   }

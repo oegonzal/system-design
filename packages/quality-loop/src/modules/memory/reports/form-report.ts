@@ -11,7 +11,9 @@
  * unavailable, for the service to refuse by name.
  */
 import {
+  fieldProbes,
   fieldTypeOf,
+  hitsFor,
   reportFieldSpec,
   type FormRetrievalField,
   type FormRetrievalFieldDto,
@@ -22,9 +24,9 @@ import {
 
 import {
   evidenceItems,
+  evidenceRef,
   fieldEvidence,
-  fieldProbes,
-  hitsFor,
+  HITS_PER_FIELD_TYPE,
   probeLists,
   searchProbes,
 } from '../../../orchestrators/form-memory/probes';
@@ -51,8 +53,6 @@ const asFormHit = (hit: MemoryHit): FormRetrievalHitDto => ({
   unitKey: hit.unitKey ?? null,
 });
 
-const pointKey = (point: { runId: string; ref: string }): string => `${point.runId}|${point.ref}`;
-
 export async function formRetrievalReport(
   ports: Pick<MemoryPorts, 'embeddings' | 'store'>,
   given: readonly FormRetrievalField[],
@@ -61,12 +61,12 @@ export async function formRetrievalReport(
 ): Promise<FormRetrievalReportDto | null> {
   const store = await ports.store.verify();
   const fields = given.map(reportFieldSpec);
-  const probes = fieldProbes(fields);
+  const probes = fieldProbes(fields, HITS_PER_FIELD_TYPE);
   const unasked = (field: (typeof fields)[number]): FormRetrievalFieldDto => ({
     ref: field.ref,
     type: fieldTypeOf(field),
     probe: null,
-    limit: hitsFor(field),
+    limit: hitsFor(field, HITS_PER_FIELD_TYPE),
     ranked: [],
     fused: [],
   });
@@ -78,7 +78,7 @@ export async function formRetrievalReport(
     searchProbes(embedded.vectors, probes.limits, unitKey),
   );
   const evidence = evidenceItems(fieldEvidence(probes, ranked));
-  const aliases = new Map(evidence.map((item) => [pointKey(item.source), item.alias]));
+  const aliases = new Map(evidence.map((item) => [item.source.ref, item.alias]));
   return {
     store,
     evidence,
@@ -86,7 +86,7 @@ export async function formRetrievalReport(
       const probe = probes.byField[position];
       if (probe === null || probe === undefined) return unasked(field);
       const lists = probeLists(ranked, probe);
-      const limit = probes.limits[probe] ?? hitsFor(field);
+      const limit = probes.limits[probe] ?? hitsFor(field, HITS_PER_FIELD_TYPE);
       return {
         ref: field.ref,
         type: fieldTypeOf(field),
@@ -98,7 +98,7 @@ export async function formRetrievalReport(
         })),
         fused: fuse(lists, limit).map((hit) => ({
           ...asFormHit(hit),
-          alias: aliases.get(pointKey(hit.source)) ?? null,
+          alias: aliases.get(evidenceRef(hit.source)) ?? null,
         })),
       };
     }),

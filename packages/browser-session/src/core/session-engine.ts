@@ -6,6 +6,7 @@ import {
 } from '@sysdesign/contracts';
 import { describeError } from '@sysdesign/run-dump';
 
+import { touchedBy } from './action-words';
 import {
   createEngineContext,
   type RunSessionOptions,
@@ -23,7 +24,7 @@ import { timeLimitOf } from './rails';
 import { closeInterrupted, closeSession, warnOf } from './session-close';
 import { rubricsFile } from './session-dump';
 import { createSessionEvents, startedEvent } from './session-events';
-import { createState, pushHistory, touchedBy } from './session-state';
+import { createState, pushHistory } from './session-state';
 import { step } from './step-flow';
 import { resolveAdvisors } from './unit-advice';
 import { SESSION_HEARTBEAT_EVERY_MS } from './write-queue';
@@ -82,9 +83,12 @@ export async function runSession(
 ): Promise<SessionOutcome> {
   const goal = await deps.goals.read(options.goalPath);
   const sessionId = crypto.randomUUID();
-  // Every declared section parsed and every advisor the mission names resolved
-  // and asked once, before a row, a beat or a dump folder exists: a malformed
-  // mission or an advisor nobody runs refuses the session like a bad flag.
+  // The brain bound to whatever it keeps its memories in, every declared
+  // section parsed and every advisor the mission names resolved and asked
+  // once, before a row, a beat or a dump folder exists: a space that does not
+  // serve the brain, a malformed mission or an advisor nobody runs refuses the
+  // session like a bad flag.
+  await deps.brain.bind();
   const advisors = await resolveAdvisors(deps, goal.markdown, options, sessionId);
   const startedAt = deps.clock.now();
   await closeInterrupted(deps, startedAt);

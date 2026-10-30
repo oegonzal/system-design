@@ -1,5 +1,6 @@
 import {
   composeFieldGoal,
+  DOCUMENT_MEMORY_LEGEND,
   FIELD_ANSWER_PIPELINE_ID,
   FIELD_EVIDENCE_HEADING,
   GoalBudgetExceeded,
@@ -40,7 +41,11 @@ describe('the field-answer input codec', () => {
       fields: sampleFields(),
     });
     if (split === null) throw new Error('the composed goal must split');
-    const recomposed = composeFieldGoal({ ...split, evidence: sampleEvidence() });
+    const recomposed = composeFieldGoal({
+      ...split,
+      evidence: sampleEvidence(),
+      kinds: DOCUMENT_MEMORY_LEGEND,
+    });
     expect(recomposed).toBe(fieldGoal());
     // Splitting the recomposed goal gives the same prose and fields: the operation is idempotent.
     expect(splitFieldGoal(recomposed)).toEqual(split);
@@ -61,6 +66,7 @@ describe('the field-answer input codec', () => {
           prose: ANSWERING_PROSE,
           fields: sampleFields(),
           evidence: sampleEvidence(),
+          kinds: DOCUMENT_MEMORY_LEGEND,
         },
         500,
       ),

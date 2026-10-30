@@ -137,7 +137,10 @@ describe('what a session keeps of one unit of work', () => {
     const { brain, detail } = await twoUnits([], [], ['Yes', 'No']);
     const [first, second] = detail.tasks;
     expect(brain.fieldInputs.map((input) => input.task?.unitKey)).toEqual([first?.id, second?.id]);
-    expect(brain.taught.map((document) => document.unitKey)).toEqual([first?.id, second?.id]);
+    expect(brain.taught.map((call) => call.answers[0]?.context.unitKey)).toEqual([
+      first?.id,
+      second?.id,
+    ]);
   });
 
   it('[BRW-3] puts an answer back for an ask only in the unit of work it was given in, and a unit of the same declared identity is that unit', async () => {

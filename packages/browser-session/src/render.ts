@@ -9,6 +9,7 @@ import type {
 import { causeOf } from './core/ports';
 import type { SessionOutcome } from './core/session-engine';
 import { isLive, SESSION_STALE_AFTER_MS } from './core/write-queue';
+import type { ReplayFieldsReport } from './modules/session/replay-fields';
 import type { TeachAgainReport } from './modules/session/teach-again';
 
 /**
@@ -95,7 +96,7 @@ const decisionRows = (decisions: readonly BrowserDecisionDto[]): string =>
           excerpt(decision.question ?? '', 40),
           excerpt(decision.answer ?? '', 32),
           decision.rests ?? '',
-          decision.teachOrchestrationId ?? '',
+          decision.teachingRef ?? '',
         ]),
       );
 
@@ -130,14 +131,36 @@ function endedBy(reason: string, cause: string | null): string {
   return cause === null ? reason : `the mission's stop ${cause}`;
 }
 
-/** One line for what `teach-again` did, or would do: the dumps that held no answer and the answers left untaught are counted, the dumps it could not link are named. */
+/** The receipts by outcome, in the memory's words: "inserted 3 · unchanged 2"; none when no document was taught. */
+const outcomesCell = (outcomes: Record<string, number>): string =>
+  Object.entries(outcomes)
+    .map(([outcome, count]) => `${outcome} ${count}`)
+    .join(' · ');
+
+/** Where the answers' scopes came from, counted: "scopes: 120 declared · 40 from the earlier digests · 9 undeclared"; nothing when no answer was read. */
+const scopesLine = (scopes: TeachAgainReport['scopes']): string | null =>
+  scopes.declared + scopes.fromDigest + scopes.undeclared === 0
+    ? null
+    : `scopes: ${scopes.declared} declared · ${scopes.fromDigest} from the earlier digests · ${scopes.undeclared} undeclared, left to the brain's rule`;
+
+/**
+ * One line for what `teach-again` did, or would do: the receipts by outcome,
+ * one per answer, where the answers' scopes came from, what the loop's
+ * digests kept and retracted only when a document was queued there, the dumps
+ * that held no answer, the answers left untaught and the items this build
+ * could not read counted, and what was skipped named.
+ */
 export function renderTeachAgain(report: TeachAgainReport): string {
   const head = `${report.answers} answer(s) in ${report.sessions} session(s)`;
   const tail = [
+    scopesLine(report.scopes),
     report.unanswered === 0 ? null : `${report.unanswered} dump(s) held no answer`,
     report.untaught === 0
       ? null
       : `${report.untaught} answer(s) on a channel the operator settings do not teach, left as they were`,
+    report.unreadable.length === 0
+      ? null
+      : `${report.unreadable.length} recorded item(s) this build could not read: ${report.unreadable.join(', ')}`,
     ...report.skipped,
   ]
     .filter((note): note is string => note !== null)
@@ -146,5 +169,53 @@ export function renderTeachAgain(report: TeachAgainReport): string {
   if (report.dryRun) {
     return `${head} would be taught again as ${report.documents} document(s); nothing was posted${tail}`;
   }
-  return `${head} taught again as ${report.documents} document(s): ${report.stored} fact(s) stored, ${report.retracted} earlier digest(s) retracted${tail}`;
+  const outcomes =
+    Object.keys(report.outcomes).length === 0 ? 'none taught' : outcomesCell(report.outcomes);
+  const digested =
+    (report.outcomes['queued'] ?? 0) === 0
+      ? ''
+      : ` — ${report.stored} fact(s) kept by the loop's digests, ${report.retracted} earlier digest(s) retracted`;
+  return `${head} taught again as ${report.documents} document(s): ${outcomes}${digested}${tail}`;
+}
+
+/** A part of a whole as the replay lines say it: "248 of 261 (95.0%)", or that nothing was there to count. */
+const shareOf = (part: number, whole: number, none: string): string =>
+  whole === 0 ? none : `${part} of ${whole} (${((100 * part) / whole).toFixed(1)}%)`;
+
+const millis = (value: number | null): string =>
+  value === null ? 'n/a' : `${Math.round(value)} ms`;
+
+/** The retraction measure in one line: what was closed, what came back, what the lineage showed, what the host refused. */
+const retractionLine = (retraction: ReplayFieldsReport['retraction']): string =>
+  retraction === null
+    ? 'retraction: not measured'
+    : `retraction: ${retraction.sampled} closed · ${retraction.recalledAfter} recalled after · ${retraction.lineageShown} shown closed by history${retraction.faults.length === 0 ? '' : ` · ${retraction.faults.length} refused`}`;
+
+/** The acceptance table's numbers for one replay, a line each, and where the rows and the report landed. */
+export function renderReplayFields(report: ReplayFieldsReport): string {
+  const judged =
+    report.judged === null
+      ? 'judged: nothing'
+      : `judged: ${report.judged.filled} filled · ${report.judged.asked} asked · ${report.judged.wrong} wrong`;
+  const { citedBy } = report;
+  return [
+    `${report.fields} field(s) over ${report.pages} page(s) replayed`,
+    `cited evidence found again: ${shareOf(report.citedFound, report.cited, 'nothing was cited')}`,
+    `found by: ${citedBy.equal} the same words · ${citedBy.identity} the same identity · ${citedBy.contained} the fact's words contained`,
+    `leaks: ${report.unitLeak} unit · ${report.tenantLeak} tenant`,
+    `recall latency per page: p50 ${millis(report.latency.p50)} · p90 ${millis(report.latency.p90)} — recorded p50 ${millis(report.recordedLatency.p50)} · p90 ${millis(report.recordedLatency.p90)}`,
+    judged,
+    retractionLine(report.retraction),
+    ...(report.unresolvedRuns === 0
+      ? []
+      : [
+          `${report.unresolvedRuns} recorded run(s) the loop no longer holds: their cited evidence was not compared`,
+        ]),
+    ...(report.unresolvedOrchestrations === 0
+      ? []
+      : [
+          `${report.unresolvedOrchestrations} recorded orchestration(s) the loop no longer holds: their recall latency was not read`,
+        ]),
+    `rows and report under ${report.outDir}`,
+  ].join('\n');
 }

@@ -67,6 +67,32 @@ describe('FakeLoop', () => {
     expect(() => loop.recall(grade)).toThrow(/did not ask to recall/);
   });
 
+  it('[QL-83] reads a run’s readout as the loop answers it: null while it runs, then admitted on an accept and fallen short otherwise — at the bar the run asked for — unless a spec scripts one', () => {
+    const loop = new FakeLoop();
+    const { runId } = loop.startRun(request({ maxIterations: 2 }));
+    expect(loop.getRun(runId)?.readout).toBeNull();
+    loop.progress(runId, [{ overall: 40 }]);
+    expect(loop.getRun(runId)?.readout).toBeNull();
+    loop.complete(runId, [{ overall: 40 }, { overall: 85 }]);
+    expect(loop.getRun(runId)?.readout).toEqual({ admission: 'admitted', withheld: [] });
+
+    // The same score under a raised bar is a revise, and reads as fallen short.
+    const raised = loop.startRun(request({ acceptAt: 90 })).runId;
+    loop.complete(raised, [{ overall: 85 }]);
+    expect(loop.getRun(raised)?.readout).toEqual({ admission: 'fell-short', withheld: [] });
+
+    // A run that failed before any iteration has nothing to read; a spec may script what is withheld.
+    const failed = loop.startRun(request()).runId;
+    loop.fail(failed, 'the model went away');
+    expect(loop.getRun(failed)?.readout).toBeNull();
+    const scripted = loop.startRun(request()).runId;
+    const withheld = [
+      { ref: 'node.2', source: 'finding' as const, by: 'unhandled_failure', note: null },
+    ];
+    loop.complete(scripted, [{ overall: 90 }], { readout: { withheld } });
+    expect(loop.getRun(scripted)?.readout).toEqual({ admission: 'admitted', withheld });
+  });
+
   it('[QL-79] answers the verdicts of the iterations it recorded, by run and number, and nothing for one it never did', () => {
     const loop = new FakeLoop();
     const { runId } = loop.startRun(request());

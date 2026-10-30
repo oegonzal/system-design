@@ -97,6 +97,7 @@ describe('the goals', () => {
             prose: renderFieldProse({ mission: text, task }),
             fields: heaviestRecordedFields(),
             evidence: [],
+            kinds: [],
             unitKey: task.unitKey,
           }),
         ).not.toThrow();

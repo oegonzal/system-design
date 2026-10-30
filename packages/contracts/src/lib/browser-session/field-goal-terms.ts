@@ -6,13 +6,11 @@
  * not.
  */
 import {
-  DOCUMENT_MEMORY_KIND_USES,
-  DOCUMENT_MEMORY_KINDS,
   MEMORY_SCOPE_USES,
   MEMORY_SCOPES,
   UNIT_BOUND_SCOPES,
   type MemoryScope,
-} from '../quality-loop/document-digest';
+} from '../units/scope';
 import { SUGGESTIONS_BOUND } from './answer-suggestions.schema';
 import {
   ANSWER_SUGGESTIONS_PIPELINE_ID,
@@ -26,8 +24,14 @@ import {
   UNCITED_ANSWER_BASES,
 } from './vocab';
 
-/** What each kind of evidence is, said once above the evidence so every stage reads the kind as declared. */
-export const KIND_LEGEND = `Kinds: ${DOCUMENT_MEMORY_KINDS.map((kind) => `${kind} — ${DOCUMENT_MEMORY_KIND_USES[kind]}`).join('; ')}.`;
+/**
+ * What each kind of evidence listed is, said once above the evidence from the
+ * kinds the composer declares — a store's own, never read off the items — so
+ * every stage reads a kind as declared.
+ */
+export const kindsLegend = (kinds: readonly { kind: string; use: string }[]): string =>
+  `Kinds: ${kinds.map(({ kind, use }) => `${kind} — ${use}`).join('; ')}.`;
+
 /** Where each item holds, said once beside the kinds: a unit item is no evidence for another unit of work. */
 const SCOPE_LEGEND = `Scopes: ${MEMORY_SCOPES.map((scope) => `${scope} — ${MEMORY_SCOPE_USES[scope]}`).join('; ')}. A unit item settles only a field about the unit of work this goal names.`;
 

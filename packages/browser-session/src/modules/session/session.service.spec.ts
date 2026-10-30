@@ -1,11 +1,8 @@
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs';
 import { join } from 'node:path';
 
-import { Test, type TestingModule } from '@nestjs/testing';
-import { EntityManager } from '@mikro-orm/postgresql';
+import type { TestingModule } from '@nestjs/testing';
 import {
-  answeringFixture,
   BROWSER_SESSION_PIPELINES,
   BROWSER_STEP_PIPELINE_ID,
   DOCUMENT_MEMORY_ORCHESTRATOR_ID,
@@ -13,62 +10,38 @@ import {
   FORM_MEMORY_ORCHESTRATOR_ID,
   MISSION_FIXTURE,
   SESSION_TOPICS,
-  type StepPlan,
   FORM_MEMORY_TARGET_STEP,
 } from '@sysdesign/contracts';
-import {
-  BrowserDecision,
-  BrowserSession,
-  BrowserTask,
-  ensureDatabase,
-  truncateTestTables,
-} from '@sysdesign/db';
-import { LoopClient } from '@sysdesign/loop-client';
-import { FakeLoop, FakeLoopClient } from '@sysdesign/studio-testing';
 
 import { LoopBrain } from '../../adapters/loop-http/loop-brain';
-import { PACKAGE_ROOT, type SessionConfig } from '../../config';
+import { JOURNEY_ANSWERS } from '../../core/testing';
 import {
-  FakeBrowser,
-  JOURNEY_ANSWERS,
-  JOURNEY_SEQUENCE,
-  journeyPages,
-  RecordingEvents,
-  ScriptedOperator,
-} from '../../core/testing';
-import { FakeStopSignal } from '../../core/testing-session';
-import { readSessionSettings } from '../../settings';
-import { AppModule } from '../app/app.module';
+  bootJourney,
+  emptyJourneyTables,
+  JOURNEY_RAILS,
+  journeyConfig,
+  journeyFakes,
+  journeyHome,
+  journeySettings,
+  settlePlans,
+  type JourneyFakes,
+} from './session-journey.testing';
 import { SessionService } from './session.service';
-import { BRAIN, BROWSER, OPERATOR, SESSION_EVENTS, STOP_SIGNAL } from './tokens';
 
 /**
- * The scripted end-to-end dry run: the module as it ships, with the browser
- * and the operator faked, the bus a recorder and the quality loop the shared
- * fake — so what runs is the real brain adapter over a loop that settles each
- * run with a scripted artifact, the real ledger in Postgres, the real dump on
- * disk and the real goal source. The fake loop's settle hook plays the
- * orchestrator: a form-memory orchestration gets a target run and a reported
- * admission.
+ * The scripted end-to-end dry run under the brain the package ships — the
+ * loop alone (`session-journey.testing.ts` has the journey). The fake loop's
+ * settle hook plays the orchestrator: a form-memory orchestration gets a
+ * target run and a reported admission.
  */
 describe('the session service, end to end', () => {
   let home: string;
   let moduleRef: TestingModule;
-  let core: FakeLoop;
-  let browser: FakeBrowser;
-  let operator: ScriptedOperator;
-  let events: RecordingEvents;
-  const plans: StepPlan[] = [...JOURNEY_SEQUENCE];
+  let fakes: JourneyFakes;
 
   const settle = (): void => {
-    for (const run of core.runs.values()) {
-      if (run.status !== 'running') continue;
-      if (run.pipeline === BROWSER_STEP_PIPELINE_ID) {
-        const plan = plans.shift();
-        if (plan === undefined) throw new Error('the journey ran out of plans');
-        core.complete(run.runId, [{ overall: 90, decision: 'accept', artifact: plan }]);
-      }
-    }
+    settlePlans(fakes);
+    const { core } = fakes;
     for (const [id, orchestration] of core.orchestrations.records) {
       if (
         orchestration.status !== 'running' ||
@@ -92,72 +65,30 @@ describe('the session service, end to end', () => {
   };
 
   beforeAll(async () => {
-    await ensureDatabase();
-    home = mkdtempSync(join(tmpdir(), 'browser-session-e2e-'));
-    writeFileSync(join(home, 'goal.md'), MISSION_FIXTURE);
-    const config: SessionConfig = {
-      loopUrl: 'http://unused.test',
-      notificationsUrl: 'http://unused.test',
-      dumpDir: join(home, 'sessions'),
-      profilesDir: join(home, 'profiles'),
-      subject: 'Alex Example',
-      advisors: [],
-      // The settings this package ships — but asking on an inferred value, so the journey's one
-      // guess reaches the operator and the teach path runs end to end; the shipped table fills it.
-      settings: { ...readSessionSettings(PACKAGE_ROOT), answering: answeringFixture(['inferred']) },
-    };
-    core = new FakeLoop({ now: () => new Date().toISOString() });
-    const client = new FakeLoopClient(core);
-    browser = new FakeBrowser(journeyPages());
-    operator = new ScriptedOperator(['Yes']);
-    events = new RecordingEvents();
-    moduleRef = await Test.createTestingModule({ imports: [AppModule.register(config)] })
-      .overrideProvider(LoopClient)
-      .useValue(client)
-      .overrideProvider(BRAIN)
-      .useValue(new LoopBrain(client, { pollEveryMs: 0, sleep: async () => settle() }))
-      .overrideProvider(BROWSER)
-      .useValue(browser)
-      .overrideProvider(OPERATOR)
-      .useValue(operator)
-      .overrideProvider(SESSION_EVENTS)
-      .useValue(events)
-      .overrideProvider(STOP_SIGNAL)
-      .useValue(new FakeStopSignal())
-      .compile();
-    await moduleRef.init();
-    await truncateTestTables(moduleRef.get(EntityManager), [
-      BrowserSession,
-      BrowserTask,
-      BrowserDecision,
-    ]);
+    home = journeyHome();
+    fakes = journeyFakes();
+    // The shipped brain is the loop's: no memory host is asked, and no tenant is chosen.
+    moduleRef = await bootJourney(
+      journeyConfig(home, journeySettings('loop')),
+      fakes,
+      new LoopBrain(fakes.client, { pollEveryMs: 0, sleep: async () => settle() }),
+    );
   });
 
   afterAll(async () => {
-    await truncateTestTables(moduleRef.get(EntityManager), [
-      BrowserSession,
-      BrowserTask,
-      BrowserDecision,
-    ]);
+    await emptyJourneyTables(moduleRef);
     await moduleRef.close();
     rmSync(home, { recursive: true, force: true });
   });
 
   it('[BRW-1] [BRW-9] drives the journey through the loop: the same rubric on every run, form-memory for the fields, one teach the moment the operator answers, each entry imaged, rows and dump to match', async () => {
+    const { core, browser, operator, events } = fakes;
     const service = moduleRef.get(SessionService);
     const outcome = await service.run({
       goalPath: join(home, 'goal.md'),
       profile: 'spec',
       headed: false,
-      rails: {
-        targetDone: null,
-        maxTasks: 3,
-        maxMinutes: 30,
-        maxConsecutiveFailures: 3,
-        maxBrainFaults: 3,
-        maxUnreadablePages: 3,
-        maxStalledSteps: 3,
-      },
+      rails: JOURNEY_RAILS,
     });
     expect(outcome.status).toBe('complete');
     expect(outcome.termination).toMatchObject({
@@ -221,7 +152,9 @@ describe('the session service, end to end', () => {
     const formMemoryId = core.orchestrations.records.keys().next().value;
     expect(fields.every((d) => d.loopOrchestrationId === formMemoryId)).toBe(true);
     const teachId = [...core.orchestrations.records.keys()][1];
-    expect(fields[1]?.teachOrchestrationId).toBe(teachId);
+    expect(fields[1]?.teachingRef).toBe(teachId);
+    // The row carries the receipt: a loop-backed brain queues the answer on the orchestration it opened.
+    expect(fields[1]?.payload['teaching']).toEqual({ ref: teachId, outcome: 'queued' });
     expect(detail?.decisions.find((d) => d.kind === 'termination')).toMatchObject({
       source: 'loop',
       loopRunId: expect.stringMatching(/^fake-run-/),
@@ -266,6 +199,7 @@ describe('the session service, end to end', () => {
       settings: {
         capture: expect.stringMatching(/config\/capture\/field-entries\.json$/),
         session: expect.stringMatching(/config\/session\/standard\.json$/),
+        brain: expect.stringMatching(/config\/brain\/loop\.json$/),
       },
     });
     // The operator was told which files were in force before the session began.

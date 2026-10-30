@@ -4,19 +4,23 @@
  * `main.js sessions [--limit n] [--json]`
  * `main.js show <id> [--json]`
  * `main.js replay-events <id>`
- * `main.js teach-again --sessions <dir> [--subject <name>] [--dry-run]`
+ * `main.js teach-again --sessions <dir> [--subject <name>] [--tenant <name>] [--dry-run]`
+ * `main.js replay-fields --sessions <dir> [--tenant <name>] [--sample n] [--judge] [--retract n] [--out <dir>]`
  *
- * `parseOptions` reads argv against the declared flags; `execute` runs the
- * options over the service and writes through `io`; `cli` loads the
+ * `parseOptions` reads argv against the flags the command declares — a flag
+ * the command does not read is refused by name, never ignored; `execute` runs
+ * the options over the service and writes through `io`; `cli` loads the
  * configuration, boots the Nest context around them and exits by the result:
  * 2 for a usage or configuration problem — a database that has not applied
  * every migration this checkout carries, a session refused before it had a
- * row — 1 for a failed session or an unknown id, 0 otherwise; a session the
- * rails or the operator stopped is 0.
+ * row, by the brain the command binds or by the command — 1 for a failed
+ * session or an unknown id, 0 otherwise; a session the rails or the operator
+ * stopped is 0.
  */
 import { parseArgs } from 'node:util';
 
 import { EntityManager } from '@mikro-orm/postgresql';
+import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { errorMessage, type SessionRailsDto } from '@sysdesign/contracts';
 import { assertMigrated } from '@sysdesign/db';
@@ -33,14 +37,22 @@ import {
   sessionConfigFromEnv,
   SessionConfigError,
   type SessionConfig,
+  type SessionFlag,
 } from './config';
 import { SessionRefused } from './core/unit-advice';
 import { AppModule } from './modules/app/app.module';
+import { DEFAULT_REPLAYS_DIR } from './modules/session/replay-fields';
 import { SessionService } from './modules/session/session.service';
-import { renderOutcome, renderSession, renderSessions, renderTeachAgain } from './render';
+import {
+  renderOutcome,
+  renderReplayFields,
+  renderSession,
+  renderSessions,
+  renderTeachAgain,
+} from './render';
 import { readSessionSettings, type SessionDefaults } from './settings';
 
-const flag = (key: keyof typeof SESSION_FLAGS): string => SESSION_FLAGS[key].name;
+const flag = (key: SessionFlag): string => SESSION_FLAGS[key].name;
 
 export const USAGE = `usage: browser-session <command> [options]
   run       ${flag('goal')} <md> ${flag('profile')} <name> [${flag('url')} <url>] [${flag('headed')}|${flag('headless')}] [${flag('targetDone')} n] [${flag('maxTasks')} n] [${flag('maxMinutes')} n] [${flag('maxFailures')} n] [${flag('maxStalledSteps')} n] [${flag('subject')} <name>]
@@ -51,20 +63,56 @@ export const USAGE = `usage: browser-session <command> [options]
   show      <id> [${flag('json')}]
   replay-events <id>
             publishes a recorded session's events again, for a record that missed them
-  teach-again ${flag('sessions')} <dir> [${flag('subject')} <name>] [${flag('dryRun')}]
+  teach-again ${flag('sessions')} <dir> [${flag('subject')} <name>] [${flag('tenant')} <name>] [${flag('dryRun')}]
             teaches the operator answers recorded in a folder of session dumps again, in the canonical
-            shape, and retracts what their earlier digests stored; the subject names whom a dump's own
-            teachings do not; an answer on a channel the operator settings do not teach is left as it was`;
+            shape, through the brain the settings choose — under the tenant named, else the environment's —
+            each answer its own receipt; a brain that digests them on the loop has their earlier digests
+            retracted once the new facts stand; the subject names whom a dump's own teachings do not; an
+            answer on a channel the operator settings do not teach is left as it was
+  replay-fields ${flag('sessions')} <dir> [${flag('tenant')} <name>] [${flag('sample')} n] [${flag('judge')}] [${flag('retract')} n] [${flag('out')} <dir>]
+            recalls again, through the memory brain the settings choose, for every form page a folder of
+            session dumps recorded — under the tenant named, else the environment's — and compares the
+            evidence with what each recorded run was given; with ${flag('judge')} the pages are judged again and
+            routed by the shipped answering settings, a sample drawn across the fields the operator answered;
+            with ${flag('retract')} n that many recalled records are closed in the tenant replayed against and
+            recalled for again; rows and a report land under <out>/<stamp> (${DEFAULT_REPLAYS_DIR} unless ${flag('out')} says)`;
 
-/** The commands, as data: what each takes as a positional, and whether it reads or writes the session's tables. */
+/** What a command reads of the shared flags, so `parseArgs` refuses by name any flag a command would ignore. */
+const RUN_FLAGS: readonly SessionFlag[] = [
+  'goal',
+  'profile',
+  'url',
+  'headed',
+  'headless',
+  'targetDone',
+  'maxTasks',
+  'maxMinutes',
+  'maxFailures',
+  'maxStalledSteps',
+  'subject',
+];
+
+/** The commands, as data: the flags each reads, what each takes as a positional, and whether it reads or writes the session's tables. */
 export const COMMANDS = {
-  run: { positionals: 0, ledger: true },
-  login: { positionals: 0, ledger: false },
-  sessions: { positionals: 0, ledger: true },
-  show: { positionals: 1, ledger: true },
-  'replay-events': { positionals: 1, ledger: true },
-  'teach-again': { positionals: 0, ledger: true },
-} as const;
+  run: { flags: RUN_FLAGS, positionals: 0, ledger: true },
+  login: { flags: ['profile', 'url'], positionals: 0, ledger: false },
+  sessions: { flags: ['limit', 'json'], positionals: 0, ledger: true },
+  show: { flags: ['json'], positionals: 1, ledger: true },
+  'replay-events': { flags: [], positionals: 1, ledger: true },
+  'teach-again': {
+    flags: ['sessions', 'subject', 'tenant', 'dryRun'],
+    positionals: 0,
+    ledger: true,
+  },
+  'replay-fields': {
+    flags: ['sessions', 'tenant', 'sample', 'judge', 'retract', 'out'],
+    positionals: 0,
+    ledger: true,
+  },
+} as const satisfies Record<
+  string,
+  { flags: readonly SessionFlag[]; positionals: number; ledger: boolean }
+>;
 export type Command = keyof typeof COMMANDS;
 
 export type Options =
@@ -83,7 +131,25 @@ export type Options =
   | { command: 'sessions'; limit: number; json: boolean }
   | { command: 'show'; id: string; json: boolean }
   | { command: 'replay-events'; id: string }
-  | { command: 'teach-again'; sessions: string; subject: string | undefined; dryRun: boolean };
+  | {
+      command: 'teach-again';
+      sessions: string;
+      subject: string | undefined;
+      /** Unset means the environment's tenant; the brain refuses the placeholder by name when it binds. */
+      tenant: string | undefined;
+      dryRun: boolean;
+    }
+  | {
+      command: 'replay-fields';
+      sessions: string;
+      /** Unset means the environment's tenant; the service applies that default and refuses the placeholder. */
+      tenant: string | undefined;
+      sample: number | null;
+      judge: boolean;
+      /** How many recalled records the retraction measure closes; null measures none. */
+      retract: number | null;
+      out: string;
+    };
 
 /** What `execute` writes to and how it is answered. */
 export interface Io {
@@ -95,13 +161,13 @@ export interface Io {
 /** The slice of the service the CLI drives — the fake in the spec implements exactly this. */
 export type CliService = Pick<
   SessionService,
-  'run' | 'login' | 'list' | 'show' | 'replayEvents' | 'teachAgain'
+  'run' | 'login' | 'list' | 'show' | 'replayEvents' | 'teachAgain' | 'replayFields'
 >;
 
 const isCommand = (value: string | undefined): value is Command =>
   value !== undefined && Object.hasOwn(COMMANDS, value);
 
-const required = (value: string | undefined, key: keyof typeof SESSION_FLAGS): string => {
+const required = (value: string | undefined, key: SessionFlag): string => {
   if (value === undefined || value.trim() === '') {
     throw new SessionConfigError(`${SESSION_FLAGS[key].name} is required`);
   }
@@ -116,18 +182,18 @@ export function parseOptions(argv: readonly string[], defaults: SessionDefaults)
     const { values, positionals } = parseArgs({
       args: [...rest],
       allowPositionals: true,
-      options: parseArgsOptions(),
+      options: parseArgsOptions(COMMANDS[command].flags),
     });
     if (positionals.length !== COMMANDS[command].positionals) {
       return new Error(
         `${command} takes ${COMMANDS[command].positionals === 0 ? 'no positional' : 'one id'}`,
       );
     }
-    const text = (key: keyof typeof SESSION_FLAGS): string | undefined => {
+    const text = (key: SessionFlag): string | undefined => {
       const value = values[flagKey(key)];
       return typeof value === 'string' ? value : undefined;
     };
-    const on = (key: keyof typeof SESSION_FLAGS): boolean | undefined => {
+    const on = (key: SessionFlag): boolean | undefined => {
       const value = values[flagKey(key)];
       return typeof value === 'boolean' ? value : undefined;
     };
@@ -172,7 +238,18 @@ export function parseOptions(argv: readonly string[], defaults: SessionDefaults)
           command,
           sessions: required(text('sessions'), 'sessions'),
           subject: text('subject'),
+          tenant: text('tenant'),
           dryRun: on('dryRun') ?? false,
+        };
+      case 'replay-fields':
+        return {
+          command,
+          sessions: required(text('sessions'), 'sessions'),
+          tenant: text('tenant'),
+          sample: positiveInteger(text('sample'), 'sample') ?? null,
+          judge: on('judge') ?? false,
+          retract: positiveInteger(text('retract'), 'retract') ?? null,
+          out: text('out') ?? DEFAULT_REPLAYS_DIR,
         };
     }
   } catch (error) {
@@ -219,8 +296,25 @@ export async function execute(options: Options, service: CliService, io: Io): Pr
         return 0;
       }
       case 'teach-again': {
-        const report = await service.teachAgain(options.sessions, options.dryRun, options.subject);
+        const report = await service.teachAgain(
+          options.sessions,
+          options.dryRun,
+          options.subject,
+          options.tenant,
+        );
         io.out(renderTeachAgain(report));
+        return 0;
+      }
+      case 'replay-fields': {
+        const report = await service.replayFields({
+          sessionsDir: options.sessions,
+          tenant: options.tenant,
+          sample: options.sample,
+          judge: options.judge,
+          retract: options.retract,
+          out: options.out,
+        });
+        io.out(renderReplayFields(report));
         return 0;
       }
     }
@@ -244,9 +338,20 @@ export async function cli(argv: readonly string[]): Promise<number> {
     console.error(options.message);
     return 2;
   }
-  const app = await NestFactory.createApplicationContext(AppModule.register(config), {
-    logger: ['error', 'warn'],
-  });
+  // The ports are composed at boot and reach nothing: a brain binds to its
+  // space when a run or a teaching asks it to, so a composition that fails
+  // here is a fault in the program, said and exited as a failure — Nest's own
+  // abort would exit the same way, saying nothing.
+  let app: INestApplicationContext;
+  try {
+    app = await NestFactory.createApplicationContext(AppModule.register(config), {
+      logger: ['error', 'warn'],
+      abortOnError: false,
+    });
+  } catch (error) {
+    console.error(errorMessage(error));
+    return 1;
+  }
   try {
     // The tables this checkout reads and writes must be the tables the
     // database has: one behind it stops here, naming the migrations to apply,
