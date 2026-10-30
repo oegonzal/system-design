@@ -123,6 +123,16 @@ To read why a step did what it did, walk its debate from the dump: the step's
 [`docs/quality-loop/lens-debate.md`](../quality-loop/lens-debate.md) §4 lists
 that run's files in the order to read them.
 
+### When the time runs out
+
+No unit starts once `--max-minutes` have elapsed, and a unit open then may
+finish within the session file's `unitGraceMinutes`. Read the end from the
+row: `termination_detail` says `…minutes elapsed, no unit of work open` when the
+session ended at the limit after its last unit closed, and `…past the N-minute
+grace of the unit of work still open` when the grace ran out. A plan that
+closed its unit and went on to open the next shows that taskStart as
+`not-executed` — "the session's time is up" — in the next goal's history.
+
 ## 4. Pin the caps
 
 From the runs above, `pnpm measure:bounds` reads `static/runs` read-only and

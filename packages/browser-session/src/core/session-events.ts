@@ -8,6 +8,7 @@ import {
 
 import type { EngineContext } from './engine-context';
 import type { Clock } from './ports';
+import { lifetimeMinutesOf } from './rails';
 import type { OpenTask } from './session-state';
 
 /**
@@ -86,7 +87,7 @@ export const unitOpenedEvent = (session: Session, task: OpenTask): SessionEvent 
   topic: SESSION_TOPICS.unitOpened,
   payload: {
     ...sessionOf(session),
-    maxMinutes: session.options.rails.maxMinutes,
+    maxMinutes: lifetimeMinutesOf(session.options.rails),
     unit: unitOf(task),
   },
 });
@@ -99,7 +100,7 @@ export const unitClosedEvent = (
   topic: SESSION_TOPICS.unitClosed,
   payload: {
     ...sessionOf(session),
-    maxMinutes: session.options.rails.maxMinutes,
+    maxMinutes: lifetimeMinutesOf(session.options.rails),
     unit: unitOf(task),
     outcome,
   },
@@ -132,7 +133,7 @@ export function sessionEventsOf(
       url: task.externalRef,
       facets: [...task.facets],
     };
-    const payload = { ...session, maxMinutes: detail.limits.maxMinutes, unit };
+    const payload = { ...session, maxMinutes: lifetimeMinutesOf(detail.limits), unit };
     events.push({ topic: SESSION_TOPICS.unitOpened, payload });
     if (task.outcome !== null) {
       events.push({

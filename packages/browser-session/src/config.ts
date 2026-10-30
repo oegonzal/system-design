@@ -58,7 +58,11 @@ export const SESSION_FLAGS = {
     valued: true,
     help: 'units of work the session may close done or failed; one found already done or set aside spends none',
   },
-  maxMinutes: { name: '--max-minutes', valued: true, help: 'wall-clock minutes before it stops' },
+  maxMinutes: {
+    name: '--max-minutes',
+    valued: true,
+    help: 'wall-clock minutes after which no unit of work starts; a unit open then may finish within the settings’ unit grace',
+  },
   maxFailures: {
     name: '--max-failures',
     valued: true,
@@ -296,6 +300,7 @@ export function railsOf(
     targetDone,
     maxTasks,
     maxMinutes: positiveInteger(values.maxMinutes, 'maxMinutes') ?? base.maxMinutes,
+    unitGraceMinutes: base.unitGraceMinutes,
     maxConsecutiveFailures:
       positiveInteger(values.maxFailures, 'maxFailures') ?? base.maxConsecutiveFailures,
     maxBrainFaults: base.maxBrainFaults,

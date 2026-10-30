@@ -53,6 +53,17 @@ describe('what a session says happened', () => {
     expect(sessionEventsOf({ ...detail, subject: SPEC_SUBJECT })).toEqual(events.published);
   });
 
+  it('[BRW-28] declares the session’s lifetime as its limit and its unit grace together, live and from its rows', async () => {
+    const { events, detail } = await run({
+      script: { plans: JOURNEY, answers: [decidedAnswers(ANSWERS)] },
+      lines: ['Yes'],
+      rails: { unitGraceMinutes: 15 },
+    });
+    const opened = events.published[1]?.payload as SessionUnitOpened;
+    expect(opened.maxMinutes).toBe(SPEC_RAILS.maxMinutes + 15);
+    expect(sessionEventsOf({ ...detail, subject: SPEC_SUBJECT })).toEqual(events.published);
+  });
+
   it('[BRW-15] a bus that refuses is a warning per event, never a failure of the session', async () => {
     const events = new RecordingEvents();
     events.failing = new Error('bus down');

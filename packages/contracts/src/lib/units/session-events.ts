@@ -50,7 +50,11 @@ const unitSchema = z.strictObject({
 
 const sessionUnit = {
   ...session,
-  /** The session's declared lifetime: a unit still open past it was abandoned with its session. */
+  /**
+   * The session's declared lifetime — its time limit and the grace a unit of
+   * work open at that limit may finish within: a unit still open past it was
+   * abandoned with its session.
+   */
   maxMinutes: z.number().int().positive(),
   unit: unitSchema,
 };

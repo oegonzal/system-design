@@ -14,6 +14,7 @@ const RAILS = {
   targetDone: null,
   maxTasks: 2,
   maxMinutes: 30,
+  unitGraceMinutes: 0,
   maxConsecutiveFailures: 3,
   maxBrainFaults: 3,
   maxUnreadablePages: 3,
@@ -257,9 +258,12 @@ describe('the ledger in Postgres', () => {
       limits: RAILS,
       startedAt: T0,
     });
-    const { targetDone: _dropped, ...stored } = RAILS;
+    const { targetDone: _dropped, unitGraceMinutes: _alsoDropped, ...stored } = RAILS;
     await orm.em.fork().nativeUpdate(BrowserSession, { id: older }, { limits: stored as never });
-    expect((await ledger.getSession(older))?.limits.targetDone).toBeNull();
+    // Recorded before the target and the unit grace existed: no target, no grace.
+    const limits = (await ledger.getSession(older))?.limits;
+    expect(limits?.targetDone).toBeNull();
+    expect(limits?.unitGraceMinutes).toBe(0);
   });
 
   it('[BRW-19] closes as interrupted every running session whose beat is older than the line drawn, finished at its last beat, leaves one beating and one already closed as they were, and a close that later arrives from the stopped process is the record', async () => {

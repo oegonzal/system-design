@@ -4,6 +4,7 @@
     "targetDone": null,
     "maxTasks": 10,
     "maxMinutes": 720,
+    "unitGraceMinutes": 70,
     "maxConsecutiveFailures": 3,
     "maxBrainFaults": 3,
     "maxUnreadablePages": 3,

@@ -597,8 +597,8 @@ to avoid under `## Units of work`; `manifest.json` lists `unsentEvents` when
 the bus was down at the close, and `pnpm browser-session replay-events <id>`
 sends a session's events again — the intake takes a replay as nothing new.
 A unit a crashed session left in progress is abandoned by the next session on
-the same profile, or stands as abandoned once the session's `maxMinutes` have
-passed; `PATCH /applications/:id {"status":"submitted"}` confirms one that did
+the same profile, or stands as abandoned once the session's lifetime — its
+`maxMinutes` and its `unitGraceMinutes` — has passed; `PATCH /applications/:id {"status":"submitted"}` confirms one that did
 go through.
 
 ## Before changing a bound or a cap, measure

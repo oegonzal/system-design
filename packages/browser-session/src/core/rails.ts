@@ -51,9 +51,33 @@ const MS_PER_MINUTE = 60_000;
 const minutesSince = (startedAt: Date, now: Date): number =>
   (now.getTime() - startedAt.getTime()) / MS_PER_MINUTE;
 
-/** The moment the `max-minutes` rail first holds for a session started at `startedAt`. */
-export const timeLimitOf = (startedAt: Date, rails: Pick<SessionRailsDto, 'maxMinutes'>): Date =>
-  new Date(startedAt.getTime() + rails.maxMinutes * MS_PER_MINUTE);
+type TimeRails = Pick<SessionRailsDto, 'maxMinutes' | 'unitGraceMinutes'>;
+
+/** Minutes the session may run: its limit, and while a unit of work is open, the grace that unit may finish within. */
+const minutesAllowed = (openTask: boolean, rails: TimeRails): number =>
+  rails.maxMinutes + (openTask ? rails.unitGraceMinutes : 0);
+
+/** The moment the session's time is up: its limit with no unit of work open, the end of the grace with one. */
+export const timeLimitOf = (startedAt: Date, openTask: boolean, rails: TimeRails): Date =>
+  new Date(startedAt.getTime() + minutesAllowed(openTask, rails) * MS_PER_MINUTE);
+
+/** Whether the session's time is up as it stands: no unit of work starts then, and the `max-minutes` rail holds. */
+export const timeIsUp = (
+  state: Pick<RailState, 'startedAt' | 'openTask'>,
+  rails: TimeRails,
+  now: Date,
+): boolean => now.getTime() >= timeLimitOf(state.startedAt, state.openTask, rails).getTime();
+
+/** The longest a session may run — its limit and the grace of a unit open at it: the lifetime its events declare. */
+export const lifetimeMinutesOf = (rails: TimeRails): number => minutesAllowed(true, rails);
+
+/** What the grace had to do with a stop on time: nothing at 0, else whether a unit was open. */
+const graceNote = (state: Pick<RailState, 'openTask'>, rails: TimeRails): string =>
+  rails.unitGraceMinutes === 0
+    ? ''
+    : state.openTask
+      ? `, past the ${rails.unitGraceMinutes}-minute grace of the unit of work still open`
+      : ', no unit of work open';
 
 /** In the order they are checked: the operator's word first, then the session's own limits. */
 export const RAILS: readonly Rail[] = [
@@ -83,10 +107,13 @@ export const RAILS: readonly Rail[] = [
       `${state.tasksSpent} of ${rails.maxTasks} units of work closed ${SPENDING_TASK_OUTCOMES.join(' or ')}, ${state.tasksStarted} started`,
   },
   {
+    // A backstop, never a budget: no unit starts once the limit has passed,
+    // and a unit open then may finish within the declared grace — abandoned,
+    // the record would avoid it as if it had been sent.
     reason: 'max-minutes',
-    holds: (state, rails, now) => minutesSince(state.startedAt, now) >= rails.maxMinutes,
+    holds: timeIsUp,
     detail: (state, rails, now) =>
-      `${minutesSince(state.startedAt, now).toFixed(1)} of ${rails.maxMinutes} minutes elapsed`,
+      `${minutesSince(state.startedAt, now).toFixed(1)} of ${rails.maxMinutes} minutes elapsed${graceNote(state, rails)}`,
   },
   {
     reason: 'max-failures',

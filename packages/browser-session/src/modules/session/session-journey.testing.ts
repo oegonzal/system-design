@@ -51,6 +51,7 @@ export const JOURNEY_RAILS: SessionRailsDto = {
   targetDone: null,
   maxTasks: 3,
   maxMinutes: 30,
+  unitGraceMinutes: 0,
   maxConsecutiveFailures: 3,
   maxBrainFaults: 3,
   maxUnreadablePages: 3,

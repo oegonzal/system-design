@@ -79,8 +79,18 @@ const railsSchema = z
      * Wall-clock minutes: a backstop against a session nobody is watching,
      * not a budget to plan against — one page is one brain call of one to
      * three minutes, and what ends a working session is closing its units.
+     * No unit of work starts once they have elapsed.
      */
     maxMinutes: positive,
+    /**
+     * Minutes a unit of work open when `maxMinutes` elapse may still take to
+     * close, so an application in hand is finished rather than abandoned —
+     * and, abandoned, avoided by the record as if it had been sent. Measured
+     * 2026-10-30: units took 4 to 68 minutes to close (47 of the 68 waiting
+     * on the operator), and two of seven were abandoned at the limit, one
+     * opened two minutes before it. 0 ends the session at the limit.
+     */
+    unitGraceMinutes: z.number().int().nonnegative(),
     /** Failed steps in a row before the session stops. */
     maxConsecutiveFailures: positive,
     /** Brain calls in a row that answered nothing before the session stops; an answered one clears the count. */

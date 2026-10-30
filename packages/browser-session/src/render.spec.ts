@@ -124,6 +124,13 @@ describe('the CLI renderer', () => {
       STALE_AFTER_MS,
     );
     expect(targeted).toContain('3 brain faults · target 5 done');
+    // A session with a unit grace says so beside its limit.
+    const graced = renderSession(
+      { ...detail, limits: { ...SPEC_RAILS, unitGraceMinutes: 30 } },
+      NOW,
+      STALE_AFTER_MS,
+    );
+    expect(graced).toContain(`${SPEC_RAILS.maxMinutes} min + 30 for an open unit ·`);
     expect(targeted).toContain('ended by target-reached: 5 of 5 units of work closed done');
     expect(text).toMatch(/1\s+Senior Engineer at Acme\s+company=Acme\s+complete\s+done\s+2–4/);
     expect(text).toContain('subject Alex Example');

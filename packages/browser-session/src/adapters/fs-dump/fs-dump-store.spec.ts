@@ -33,6 +33,7 @@ const manifest = () =>
       targetDone: null,
       maxTasks: 1,
       maxMinutes: 1,
+      unitGraceMinutes: 0,
       maxConsecutiveFailures: 1,
       maxBrainFaults: 1,
       maxUnreadablePages: 1,

@@ -118,7 +118,11 @@ export function renderSession(
     `goal ${detail.goalPath} (${detail.goalHash.slice(0, 12)}) · profile ${detail.profile}${
       detail.subject === null ? '' : ` · subject ${detail.subject}`
     } · ${detail.headed ? 'headed' : 'headless'} · ${detail.steps} step(s) · dump ${detail.dumpRunId}`,
-    `rails: ${detail.limits.maxTasks} tasks · ${detail.limits.maxMinutes} min · ${detail.limits.maxConsecutiveFailures} failures · ${detail.limits.maxBrainFaults} brain faults${
+    `rails: ${detail.limits.maxTasks} tasks · ${detail.limits.maxMinutes} min${
+      detail.limits.unitGraceMinutes > 0
+        ? ` + ${detail.limits.unitGraceMinutes} for an open unit`
+        : ''
+    } · ${detail.limits.maxConsecutiveFailures} failures · ${detail.limits.maxBrainFaults} brain faults${
       detail.limits.targetDone === null ? '' : ` · target ${detail.limits.targetDone} done`
     }`,
     ...(detail.error === null ? [] : [`error: ${detail.error.name}: ${detail.error.message}`]),

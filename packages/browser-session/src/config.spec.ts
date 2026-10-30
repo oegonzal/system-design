@@ -144,6 +144,7 @@ describe('the session configuration', () => {
       maxTasks: 2,
       maxMinutes: 5,
       maxConsecutiveFailures: 1,
+      unitGraceMinutes: SPEC_RAILS.unitGraceMinutes,
       // Rails with no flag of their own come from the settings, so adding one
       // cannot silently leave a session running without it.
       maxBrainFaults: SPEC_RAILS.maxBrainFaults,

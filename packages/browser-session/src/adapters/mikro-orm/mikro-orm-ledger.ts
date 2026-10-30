@@ -8,6 +8,7 @@ import {
   type BrowserSessionDetailDto,
   type BrowserSessionDto,
   type BrowserTaskDto,
+  type SessionRailsDto,
   type SuccessCriterion,
 } from '@sysdesign/contracts';
 import { BrowserDecision, BrowserSession, BrowserTask } from '@sysdesign/db';
@@ -31,6 +32,20 @@ import { causeOf } from '../../core/ports';
 const iso = (at: Date): string => at.toISOString();
 const isoOrNull = (at: Date | null): string | null => (at === null ? null : iso(at));
 
+/**
+ * A session's rails as stored: one recorded before the target or the unit
+ * grace existed has neither, and reads as a session without them — no target,
+ * no grace.
+ */
+const storedRails = (stored: SessionRailsDto): SessionRailsDto => {
+  const recorded: Partial<SessionRailsDto> = stored;
+  return {
+    ...stored,
+    targetDone: recorded.targetDone ?? null,
+    unitGraceMinutes: recorded.unitGraceMinutes ?? 0,
+  };
+};
+
 export const toSessionDto = (row: BrowserSession): BrowserSessionDto => ({
   id: row.id,
   dumpRunId: row.dumpRunId,
@@ -43,8 +58,7 @@ export const toSessionDto = (row: BrowserSession): BrowserSessionDto => ({
   terminationReason: row.terminationReason,
   terminationCause: row.terminationCause,
   terminationDetail: row.terminationDetail,
-  // A session recorded before the target existed has none in its stored rails.
-  limits: { ...row.limits, targetDone: row.limits.targetDone ?? null },
+  limits: storedRails(row.limits),
   steps: row.steps,
   startedAt: iso(row.startedAt),
   heartbeatAt: iso(row.heartbeatAt),

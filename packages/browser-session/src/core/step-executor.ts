@@ -33,10 +33,16 @@ import {
   type Decided,
   type Termination,
 } from './ports';
-import type { StepFailureEvent } from './rails';
+import { timeIsUp, type StepFailureEvent } from './rails';
 import { labelledScreenshot } from './session-dump';
 import { unitClosedEvent, unitOpenedEvent } from './session-events';
-import { clearObjections, pushHistory, pushObjections, type OpenTask } from './session-state';
+import {
+  clearObjections,
+  pushHistory,
+  pushObjections,
+  railStateOf,
+  type OpenTask,
+} from './session-state';
 
 /**
  * Running the unfaulted prefix of a plan, action by action. A browser action
@@ -50,15 +56,17 @@ import { clearObjections, pushHistory, pushObjections, type OpenTask } from './s
  * was held for.
  */
 
+/** What a taskStart did: opened a unit or met one open (the plan goes on), was refused by the record, or came once the session's time was up. */
+type UnitOpening = 'go-on' | 'refused' | 'out-of-time';
+
 /**
- * A unit opens for the item the plan names — unless the record the step was
- * composed with refuses it. Every unit the advisors answered is checked, never
- * only the ones the goal had room to list: measured 2026-10-14, a goal
- * rendered 40 of 43 units on record, and the planner opened one of the three
- * cut as "not on the list". A refusal is the plan's to answer on the next
- * page, so it is carried once as an objection, the history keeping the fact.
- * True when the record refused the unit and the plan stops; false when it
- * opened, or when one was open already and the plan goes on.
+ * A unit opens for the item the plan names — unless the session's time is up
+ * or the record the step was composed with refuses it. Every unit the
+ * advisors answered is checked, never only the ones the goal had room to
+ * list: measured 2026-10-14, a goal rendered 40 of 43 units on record, and
+ * the planner opened one of the three cut as "not on the list". A refusal is
+ * the plan's to answer on the next page, so it is carried once as an
+ * objection, the history keeping the fact.
  */
 function openTaskUnlessRefused(
   ctx: EngineContext,
@@ -66,11 +74,20 @@ function openTaskUnlessRefused(
   label: string,
   position: number,
   onRecord: UnitsOnRecord,
-): boolean {
+): UnitOpening {
   const { state, deps, queue } = ctx;
   if (state.tasks.open !== null) {
     pushHistory(state, label, 'not-executed', 'a unit of work is already open');
-    return false;
+    return 'go-on';
+  }
+  // No unit starts once the session's time is up: a plan composed before the
+  // limit can run after it, and one that closes a unit within its grace may go
+  // on to open the next. Measured 2026-10-30: a unit opened two minutes before
+  // the limit was abandoned there, and the record avoids it as if it were sent.
+  if (timeIsUp(railStateOf(state), ctx.options.rails, deps.clock.now())) {
+    pushHistory(state, label, 'not-executed', "the session's time is up: no unit of work starts");
+    deps.log(`step ${state.step}: no unit of work starts — the session's time is up`);
+    return 'out-of-time';
   }
   // The stances the mission's exception names are the only ones a declaration lifts a refusal for.
   const declared = takenStancesOf(ctx.mission);
@@ -85,7 +102,7 @@ function openTaskUnlessRefused(
         detail: describeOnRecordRefusal(refused, declared),
       },
     ]);
-    return true;
+    return 'refused';
   }
   const task: OpenTask = {
     id: deps.ids(),
@@ -132,7 +149,7 @@ function openTaskUnlessRefused(
       ? noteOnRecordTaken(unitOnRecordFor(action.facets, onRecord))
       : null,
   );
-  return false;
+  return 'go-on';
 }
 
 async function closeTask(
@@ -170,7 +187,7 @@ async function closeTask(
   pushHistory(state, label, 'ok', null);
 }
 
-/** What one engine event did to the step: the failure it counts, if any, and whether the operator stopped the session. */
+/** What one engine event did to the step: the failure it counts, if any, and whether the session is ending — the operator's stop, or its time being up. */
 interface Performed {
   failure: StepFailureEvent | null;
   stopped: boolean;
@@ -206,8 +223,11 @@ async function perform(
     case 'taskStart': {
       // The actions after a refused taskStart were planned for a unit that
       // never opened: they do not run, as nothing runs past a refused click.
-      const refused = openTaskUnlessRefused(ctx, action, label, position, onRecord);
-      return { failure: refused ? 'unit-refused' : null, stopped: false };
+      // One after the session's time is up ends the plan as a stop does: no
+      // failure, and the rails end the session after it.
+      const opening = openTaskUnlessRefused(ctx, action, label, position, onRecord);
+      if (opening === 'out-of-time') return { failure: null, stopped: true };
+      return { failure: opening === 'refused' ? 'unit-refused' : null, stopped: false };
     }
     case 'taskDone':
       await closeTask(ctx, action, label);

@@ -34,6 +34,7 @@ export const SPEC_RAILS: SessionRailsDto = {
   targetDone: null,
   maxTasks: 10,
   maxMinutes: 60,
+  unitGraceMinutes: 0,
   maxConsecutiveFailures: 3,
   maxBrainFaults: 3,
   maxUnreadablePages: 3,

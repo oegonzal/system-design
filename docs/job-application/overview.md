@@ -43,7 +43,8 @@ true` — a declaration the validator cuts while the page lists the control
 - **The session's events** (`session.started`, `session.unit.opened`,
   `session.unit.closed`, `session.ended`), declared on the notifications bus
   and carrying the task row's own id, the unit's declared facets and the
-  session's `maxMinutes`. The intake here is one subscriber of the bus, so a
+  session's lifetime as `maxMinutes` — its time limit plus the grace a unit
+  open at that limit may finish within. The intake here is one subscriber of the bus, so a
   second listener costs nothing and the session never carries a domain's write
   address.
 
@@ -57,7 +58,7 @@ A row is keyed by the session's unit id (a hand-entered one is minted), holds
 the company as the page named it beside its `identity_key` — the contracts'
 key, so "ACME" and "Acme" meet — and a status from a vocabulary the table is
 `CHECK`ed against. A session's events move it along a monotone lattice: an
-opened unit is inserted `in-progress` with `expires_at = opened + maxMinutes`
+opened unit is inserted `in-progress` with `expires_at = opened + maxMinutes` (the lifetime)
 and never changes a row that exists; a closed unit is terminal
 (`done → submitted`, `already-done → submitted-before`, `skipped`, `failed`)
 and overrides anything, `abandoned` included; a session's end, and a new

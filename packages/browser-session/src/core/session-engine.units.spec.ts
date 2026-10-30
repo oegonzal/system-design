@@ -2,8 +2,6 @@ import {
   formObservation,
   MISSION_FIXTURE,
   MISSION_WITH_CONTEXT,
-  type StepAction,
-  type StepPlan,
   type UnitFacet,
 } from '@sysdesign/contracts';
 
@@ -12,7 +10,7 @@ import {
   JOURNEY_ANSWERS as ANSWERS,
   JOURNEY_PLANS as PLANS,
   journeyPages,
-  JOURNEY_URLS,
+  nextUnitPlan,
 } from './testing-journey';
 import { runScripted as run } from './testing-session';
 
@@ -24,8 +22,6 @@ import { runScripted as run } from './testing-session';
  * stated about the unit as it opened travels with it to the answerer and into
  * the dump, and nowhere else.
  */
-
-const common = { reason: 'the procedure says so', expect: null, serves: [] };
 
 /** The journey, its confirmation page leading back to a form, so a second unit asks the same fields. */
 const twoUnitPages = (next = 'form'): ScriptedPage[] =>
@@ -45,22 +41,6 @@ const rememberingPages = (): ScriptedPage[] => {
   ];
 };
 
-/** On the confirmation page: the first unit closes and the next one opens on the form again. */
-const nextUnit = (facets: UnitFacet[]): StepPlan => ({
-  assessment: 'the application was sent; the next listing is on the same form',
-  actions: [
-    { kind: 'taskDone', outcome: 'done', detail: 'sent', ...common },
-    {
-      kind: 'taskStart',
-      label: 'Staff Engineer at Globex',
-      url: JOURNEY_URLS.listing,
-      facets,
-      ...common,
-    } satisfies StepAction,
-    { kind: 'click', ref: 'e1', ...common },
-  ],
-});
-
 /** Two units whose forms ask the same question, the first unit opened with these facets. */
 const twoUnits = (
   first: UnitFacet[],
@@ -77,7 +57,7 @@ const twoUnits = (
         PLANS.search,
         { ...PLANS.results, actions: opening },
         PLANS.form,
-        nextUnit(second),
+        nextUnitPlan(second),
         PLANS.formAgain,
         PLANS.end,
       ].map((plan) => decidedPlan(plan)),

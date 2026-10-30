@@ -1,11 +1,20 @@
 import { BROWSER_SESSION_TERMINATIONS, TERMINATION_STATUS } from '@sysdesign/contracts';
 
-import { checkRails, RAILS, remainingTasks, type RailState } from './rails';
+import {
+  checkRails,
+  lifetimeMinutesOf,
+  RAILS,
+  remainingTasks,
+  timeIsUp,
+  timeLimitOf,
+  type RailState,
+} from './rails';
 
 const RAIL_LIMITS = {
   targetDone: null,
   maxTasks: 2,
   maxMinutes: 30,
+  unitGraceMinutes: 0,
   maxConsecutiveFailures: 3,
   maxBrainFaults: 2,
   maxUnreadablePages: 2,
@@ -83,6 +92,31 @@ describe('the rails', () => {
       checkRails(state({ tasksDone: 2, tasksSpent: 2, operatorStopped: true }), target, at(1))
         ?.reason,
     ).toBe('operator-stop');
+  });
+
+  it('[BRW-28] lets a unit open when the time runs out finish within the declared grace, and holds the limit for a session with none open', () => {
+    const grace = { ...RAIL_LIMITS, unitGraceMinutes: 15 };
+    // No unit open: the limit is the limit, and the stop says so.
+    expect(timeIsUp(state(), grace, at(29))).toBe(false);
+    expect(timeIsUp(state(), grace, at(30))).toBe(true);
+    expect(checkRails(state(), grace, at(30))?.detail).toBe(
+      '30.0 of 30 minutes elapsed, no unit of work open',
+    );
+    // A unit open: the session runs on to the grace's end, and the stop names the grace.
+    expect(checkRails(state({ openTask: true }), grace, at(44))).toBeNull();
+    const out = checkRails(state({ openTask: true }), grace, at(45));
+    expect(out?.reason).toBe('max-minutes');
+    expect(out?.detail).toBe(
+      '45.0 of 30 minutes elapsed, past the 15-minute grace of the unit of work still open',
+    );
+    expect(timeLimitOf(START, false, grace)).toEqual(at(30));
+    expect(timeLimitOf(START, true, grace)).toEqual(at(45));
+    expect(lifetimeMinutesOf(grace)).toBe(45);
+    // A grace of 0 is the limit as before, whatever is open, and the stop says nothing of a grace.
+    expect(checkRails(state({ openTask: true }), RAIL_LIMITS, at(30))?.detail).toBe(
+      '30.0 of 30 minutes elapsed',
+    );
+    expect(lifetimeMinutesOf(RAIL_LIMITS)).toBe(30);
   });
 
   it('tells the next plan how many units of work may still be spent: the open unit is not subtracted', () => {

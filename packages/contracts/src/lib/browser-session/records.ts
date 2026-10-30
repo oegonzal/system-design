@@ -26,6 +26,12 @@ export interface SessionRailsDto {
   targetDone: number | null;
   maxTasks: number;
   maxMinutes: number;
+  /**
+   * Minutes a unit of work open when `maxMinutes` elapse may still take to
+   * close. No unit starts once they have elapsed; 0 ends the session at the
+   * limit whatever is open.
+   */
+  unitGraceMinutes: number;
   maxConsecutiveFailures: number;
   /** Brain calls in a row that answered nothing before the session stops; an answered one clears the count. */
   maxBrainFaults: number;

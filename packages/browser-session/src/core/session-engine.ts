@@ -4,6 +4,7 @@ import {
   startPeriodic,
   type BrowserSessionRole,
   type BrowserSessionStatus,
+  type SessionRailsDto,
 } from '@sysdesign/contracts';
 import { describeError } from '@sysdesign/run-dump';
 
@@ -26,7 +27,7 @@ import { timeLimitOf } from './rails';
 import { closeInterrupted, closeSession, warnOf } from './session-close';
 import { rubricsFile } from './session-dump';
 import { createSessionEvents, startedEvent } from './session-events';
-import { createState, pushHistory } from './session-state';
+import { createState, pushHistory, type SessionState } from './session-state';
 import { step } from './step-flow';
 import { resolveAdvisors } from './unit-advice';
 
@@ -73,6 +74,29 @@ export const STOPPING: Withdrawal = { reason: 'abandoned', note: 'the session is
 
 /** What a question waiting on the operator is withdrawn with when the session's time limit comes. */
 export const OUT_OF_TIME: Withdrawal = { reason: 'abandoned', note: "the session's time is up" };
+
+/**
+ * The time limit's two moments: at the limit a question waiting on the
+ * operator is withdrawn unless a unit of work is open — that unit may finish
+ * within the declared grace — and at the grace's end it is withdrawn whatever
+ * is open. With no grace both fall at the limit.
+ */
+function armTimeLimit(
+  deps: Pick<SessionDeps, 'clock'>,
+  startedAt: Date,
+  rails: SessionRailsDto,
+  state: SessionState,
+  timeUp: () => void,
+): () => void {
+  const atLimit = deps.clock.at(timeLimitOf(startedAt, false, rails), () => {
+    if (state.tasks.open === null) timeUp();
+  });
+  const atGraceEnd = deps.clock.at(timeLimitOf(startedAt, true, rails), timeUp);
+  return () => {
+    atLimit();
+    atGraceEnd();
+  };
+}
 
 export async function runSession(
   deps: SessionDeps,
@@ -127,13 +151,13 @@ export async function runSession(
     stopping.abort(STOPPING);
   });
   // The rails read the time limit between steps, and a step waiting on the
-  // operator has no between: when the limit comes, a question still open is
+  // operator has no between: when the time is up, a question still open is
   // withdrawn as a stop withdraws one, and the rails then read the limit. The
   // operator pressed nothing, so the session ends max-minutes, never
   // operator-stop. Measured 2026-10-13: a session waited 40 minutes on an
   // unanswered question, and only an interrupt could have ended one past its
   // limit.
-  const deadline = deps.clock.at(timeLimitOf(startedAt, options.rails), () =>
+  const deadline = armTimeLimit(deps, startedAt, options.rails, state, () =>
     stopping.abort(OUT_OF_TIME),
   );
   const ticker = startPeriodic(

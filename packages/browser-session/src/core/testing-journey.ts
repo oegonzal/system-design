@@ -5,6 +5,7 @@ import {
   type PageObservation,
   type StepAction,
   type StepPlan,
+  type UnitFacet,
   observedElement,
 } from '@sysdesign/contracts';
 
@@ -117,6 +118,22 @@ export const JOURNEY_PLANS = {
     act({ kind: 'terminate', cause: 'mission-complete', detail: 'nothing left', ...common }),
   ]),
 };
+
+/** On the confirmation page: the unit closes and the next one opens on the form again, in one plan. */
+export const nextUnitPlan = (facets: UnitFacet[]): StepPlan => ({
+  assessment: 'the application was sent; the next listing is on the same form',
+  actions: [
+    act({ kind: 'taskDone', outcome: 'done', detail: 'sent', ...common }),
+    act({
+      kind: 'taskStart',
+      label: 'Staff Engineer at Globex',
+      url: JOURNEY_URLS.listing,
+      facets,
+      ...common,
+    }),
+    act({ kind: 'click', ref: 'e1', ...common }),
+  ],
+});
 
 /** The whole journey, in order, ending by the mission's own stop condition. */
 export const JOURNEY_SEQUENCE: StepPlan[] = [

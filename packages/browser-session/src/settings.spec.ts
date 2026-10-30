@@ -319,6 +319,37 @@ describe('the session settings', () => {
     ).toThrow(EngineConfigError);
   });
 
+  it('[BRW-28] ships the unit grace the measurements sized, and takes only a whole number of minutes from 0', () => {
+    // Measured 2026-10-30: units took 4 to 68 minutes to close, 47 of the 68 waiting on the operator.
+    expect(readSessionSettings(PACKAGE_ROOT).session.rails.unitGraceMinutes).toBe(70);
+    const standard = JSON.parse(real(join(CONFIG, 'session', 'standard.json'))) as {
+      rails: Record<string, unknown>;
+    };
+    const withGrace = (unitGraceMinutes: number) =>
+      readSessionSettings(
+        PACKAGE_ROOT,
+        choosing(
+          {
+            capture: 'field-entries',
+            session: 'standard',
+            operator: 'terminal',
+            answering: 'standard',
+            observe: 'standard',
+            brain: 'loop',
+          },
+          {
+            'session/standard.json': JSON.stringify({
+              ...standard,
+              rails: { ...standard.rails, unitGraceMinutes },
+            }),
+          },
+        ),
+      );
+    expect(withGrace(0).session.rails.unitGraceMinutes).toBe(0);
+    expect(() => withGrace(-1)).toThrow(/rails\.unitGraceMinutes: /);
+    expect(() => withGrace(1.5)).toThrow(/rails\.unitGraceMinutes: /);
+  });
+
   it('[BRW-7] refuses by name a kind left unchosen, a field no schema declares, and a target above its budget', () => {
     expect(() => readSessionSettings(PACKAGE_ROOT, choosing({ capture: 'field-entries' }))).toThrow(
       SessionConfigError,
