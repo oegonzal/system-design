@@ -20,6 +20,7 @@ import { criterionLengthBound, providedStatementLimit } from '../../core/contrac
 import { fakeLlm, tinyPipeline } from '../../core/testing';
 import { bootApp, type Envelope, getJson, type Page, postJson } from '../http/testing';
 import { boot, DUMP_DIR, TABLES, tinyOnly } from './runs.testing';
+import { RunsService } from './runs.service';
 import { QUALITY_LOOP_LLM } from './tokens';
 
 describe('the HTTP surface', () => {
@@ -236,6 +237,10 @@ describe('the HTTP surface', () => {
     });
     expect(lowered.status).toBe(400);
     expect(((await lowered.json()) as { message: string }).message).toContain('below the pipeline');
+    // A run opened in process — the CLI's path, and a run's recall — is held to the same floor.
+    await expect(
+      app.get(RunsService).execute({ pipeline: 'tiny', goal: '# Goal', acceptAt: 50 }),
+    ).rejects.toThrow('below the pipeline');
     const raised = await postJson(url, '/runs', { pipeline: 'tiny', goal: '# Goal', acceptAt: 95 });
     expect(raised.status).toBe(202);
     const { data } = (await raised.json()) as Envelope<{ runId: string }>;

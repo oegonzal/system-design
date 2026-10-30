@@ -155,11 +155,7 @@ export class RunsService {
 
   /** Start in the background; the row is readable at once. */
   async start(request: StartQualityRunRequest): Promise<RunRecord> {
-    const definition = this.resolve(request.pipeline);
-    this.assertRubric(request, definition);
-    this.assertRecall(request, definition);
-    this.assertBar(request, definition);
-    const adopted = await this.resolveAdoption(request, definition);
+    const { definition, adopted } = await this.admit(request);
     const record = await this.open(request, definition, null);
     void this.perform(record, request, definition, adopted);
     return record;
@@ -188,14 +184,27 @@ export class RunsService {
     request: StartQualityRunRequest,
     onOpened?: (record: RunRecord) => void,
   ): Promise<RunRecord> {
-    const definition = this.resolve(request.pipeline);
-    this.assertRubric(request, definition);
-    this.assertRecall(request, definition);
-    const adopted = await this.resolveAdoption(request, definition);
+    const { definition, adopted } = await this.admit(request);
     const record = await this.open(request, definition, parentRunId);
     onOpened?.(record);
     await this.perform(record, request, definition, adopted);
     return record;
+  }
+
+  /**
+   * What every run passes before its row exists, however it was opened — over
+   * HTTP, from the CLI, or by another run: a known pipeline, a rubric that fits
+   * it, recall only for a producer that consumes memories, a bar no lower than
+   * the pipeline's, and an adoption that lines up.
+   */
+  private async admit(
+    request: StartQualityRunRequest,
+  ): Promise<{ definition: PipelineDefinition<unknown>; adopted: Adoption | undefined }> {
+    const definition = this.resolve(request.pipeline);
+    this.assertRubric(request, definition);
+    this.assertRecall(request, definition);
+    this.assertBar(request, definition);
+    return { definition, adopted: await this.resolveAdoption(request, definition) };
   }
 
   /**
@@ -264,11 +273,6 @@ export class RunsService {
     }
   }
 
-  /**
-   * Lessons a producer could never be handed are refused before any row
-   * exists — the pipe's own 400 shape. Recall is for a producer that declares
-   * it consumes memories; nothing else in a run can receive them.
-   */
   /** A run may raise its pipeline's accept threshold, never lower it: the pipeline's bar is a floor. */
   private assertBar(
     request: StartQualityRunRequest,
@@ -283,6 +287,11 @@ export class RunsService {
     }
   }
 
+  /**
+   * Lessons a producer could never be handed are refused before any row
+   * exists — the pipe's own 400 shape. Recall is for a producer that declares
+   * it consumes memories; nothing else in a run can receive them.
+   */
   private assertRecall(
     request: StartQualityRunRequest,
     definition: PipelineDefinition<unknown>,
