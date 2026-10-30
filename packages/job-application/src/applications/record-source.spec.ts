@@ -86,6 +86,26 @@ describe('the record as the advisor answers it', () => {
     ).toBe(true);
   });
 
+  it('[JA-2] a company known only by failed applications is avoided under a policy that says so, its note naming the latest failure and the count', () => {
+    const avoidingFailed: ScatterPolicy = {
+      ...POLICY,
+      stances: { ...POLICY.stances, failed: 'avoid' },
+    };
+    const failed = (day: string) =>
+      application({ company: 'Initech', status: 'failed', openedAt: at(day), closedAt: at(day) });
+    expect(
+      onRecord([failed('2026-10-07')], avoidingFailed, NOW).map((unit) => [unit.stance, unit.note]),
+    ).toEqual([['avoid', 'failed on 2026-10-07']]);
+    expect(
+      onRecord([failed('2026-10-03'), failed('2026-10-07')], avoidingFailed, NOW).map((unit) => [
+        unit.stance,
+        unit.note,
+      ]),
+    ).toEqual([['avoid', 'failed on 2026-10-07, 2 times']]);
+    // Under the policy that says nothing of a failure, the company is not on record.
+    expect(onRecord([failed('2026-10-07')], POLICY, NOW)).toEqual([]);
+  });
+
   it('[JA-2] describes itself by id and facet, reads one subject’s window from the store, and bounds the answer with the rest counted', async () => {
     const store = new InMemoryApplicationStore();
     for (let i = 0; i < ADVICE_UNITS_BOUND.target + 3; i += 1) {

@@ -13,14 +13,14 @@ The browser session asks it when its mission names `job-application` under `## A
 
 ## Routes
 
-| Route                                                                        | What it does                                                                                                                       |
-| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /advisor`                                                               | `{data: AdvisorDescriptor}` — `job-application`, keeping its record by `company`                                                   |
-| `POST /advice` `{subject, asker, facets}`                                    | `{data: UnitAdvice}` — one unit per company on record for the subject, by stance (`forbid` in progress elsewhere, `avoid` applied) |
-| `GET /applications?subject&company&status&since&limit&offset`                | `{data: ApplicationDto[]}`, a company matched by the shared key whatever its spelling                                              |
-| `GET /companies?subject`                                                     | `{data: CompanyDto[]}` — each company, how many applications, the latest and what it stands as                                     |
-| `POST /applications` `{subject, company, label?, url?, status?, appliedAt?}` | an application made by hand, or before the record existed; `201`                                                                   |
-| `PATCH /applications/:id` `{status}`                                         | the operator's correction — an abandoned unit confirmed submitted, or one released that never was; `404` for an unknown id         |
+| Route                                                                        | What it does                                                                                                                                            |
+| ---------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `GET /advisor`                                                               | `{data: AdvisorDescriptor}` — `job-application`, keeping its record by `company`                                                                        |
+| `POST /advice` `{subject, asker, facets}`                                    | `{data: UnitAdvice}` — one unit per company on record for the subject, by stance (`forbid` in progress elsewhere, `avoid` applied, failed or set aside) |
+| `GET /applications?subject&company&status&since&limit&offset`                | `{data: ApplicationDto[]}`, a company matched by the shared key whatever its spelling                                                                   |
+| `GET /companies?subject`                                                     | `{data: CompanyDto[]}` — each company, how many applications, the latest and what it stands as                                                          |
+| `POST /applications` `{subject, company, label?, url?, status?, appliedAt?}` | an application made by hand, or before the record existed; `201`                                                                                        |
+| `PATCH /applications/:id` `{status}`                                         | the operator's correction — an abandoned unit confirmed submitted, or one released that never was; `404` for an unknown id                              |
 
 ## Settings
 

@@ -324,8 +324,8 @@ mission (## Unit identity, ## Advisors)      environment (UNIT_ADVISOR_URLS)
    counted (`:138-139`; `ADVICE_UNITS_BOUND`, `contracts/src/lib/units/vocab.ts:92`).
 4. **The stance is policy, not code.**
    `packages/job-application/config/policy/scatter.json`: 90-day window;
-   `in-progress → forbid`; `submitted`, `submitted-before`, `abandoned → avoid`;
-   `failed`, `skipped → null` (no stance). `standingOf` reads an in-progress
+   `in-progress → forbid`; `submitted`, `submitted-before`, `abandoned`,
+   `failed`, `skipped → avoid` (the last two since 2026-10-29). `standingOf` reads an in-progress
    row past its `expiresAt` as `abandoned` (`applications/policy.ts:46-50`),
    `stanceOf` applies the table (`:58-65`); `neverOnRecord` and
    `skippedBecomesAvoidAfter` are declared knobs, currently empty and `null`.
@@ -397,8 +397,9 @@ advised"):
   `onRecordTaken: true` (`packages/browser-session/goals/linkedin-easy-apply.md`,
   `## Taking a unit on record`). "Applied, never again" is a preference with a
   declared exception, not an absolute.
-- A **failed** or **skipped** application earns no stance, so it is retried,
-  within a session and across sessions. Observed on the 2026-10-16 run: two
+- A **failed** or **skipped** application earned no stance until 2026-10-29,
+  so it was retried, within a session and across sessions; since then both are
+  avoided for the window. Observed on the 2026-10-16 run, before the change: two
   units that had failed in an earlier run were taken up again and failed the
   same way; one failed unit was re-opened within the same session. Whether a
   failure should become `avoid`, be retried only once the record changes, or

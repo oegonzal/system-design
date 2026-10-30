@@ -5,8 +5,8 @@
     "submitted": "avoid",
     "submitted-before": "avoid",
     "abandoned": "avoid",
-    "failed": null,
-    "skipped": null
+    "failed": "avoid",
+    "skipped": "avoid"
   },
   "neverOnRecord": [],
   "skippedBecomesAvoidAfter": null

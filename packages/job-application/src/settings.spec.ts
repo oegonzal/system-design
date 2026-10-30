@@ -29,8 +29,14 @@ describe('the service settings', () => {
     const shipped = readSettings(PACKAGE_ROOT);
     expect(shipped.policy.windowDays).toBe(90);
     expect(Object.keys(shipped.policy.stances).sort()).toEqual([...APPLICATION_STATUSES].sort());
-    // The owner's decision of 2026-10-11: a unit in progress elsewhere is forbidden; an application made is avoided.
-    expect(shipped.policy.stances).toMatchObject({ 'in-progress': 'forbid', submitted: 'avoid' });
+    // The owner's decisions: 2026-10-11, a unit in progress elsewhere is forbidden and an application made is avoided;
+    // 2026-10-29, one that failed or was set aside is avoided for the window too, so no later session retries it.
+    expect(shipped.policy.stances).toMatchObject({
+      'in-progress': 'forbid',
+      submitted: 'avoid',
+      failed: 'avoid',
+      skipped: 'avoid',
+    });
     expect(shipped.intake.subscription).toBe('job-application.sessions');
     expect(shipped.sources.policy).toMatch(/config\/policy\/scatter\.json$/);
     for (const policy of profiles('policy')) {

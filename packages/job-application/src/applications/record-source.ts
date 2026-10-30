@@ -62,6 +62,11 @@ function noteOf(latestFirst: readonly Application[], stance: UnitStance, now: Da
   if (interrupted !== undefined) {
     return `interrupted on ${day(movedAt(interrupted))} — may have gone through`;
   }
+  const failed = at('failed');
+  if (failed !== undefined) {
+    const count = standing.filter((status) => status === 'failed').length;
+    return `failed on ${day(movedAt(failed))}${count > 1 ? `, ${count} times` : ''}`;
+  }
   const skipped = standing.filter((status) => status === 'skipped').length;
   return `set aside ${skipped} times`;
 }

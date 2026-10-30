@@ -14,7 +14,7 @@ const stance = z.enum(UNIT_STANCES).nullable();
 export const scatterPolicySchema = z.strictObject({
   /** How far back an application counts; one older says nothing. */
   windowDays: z.number().int().positive(),
-  /** The stance each status takes, or null for one the record says nothing about — a retry stays open. */
+  /** The stance each status takes, or null for one the record says nothing about — a retry stays open; the shipped file gives every status a stance since the owner's decision of 2026-10-29. */
   stances: z.strictObject({
     'in-progress': stance,
     submitted: stance,

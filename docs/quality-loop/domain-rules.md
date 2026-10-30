@@ -85,7 +85,8 @@ the next session, same profile  ──▶ session.started      ──▶ a dead 
   and subject                                                abandoned
 the next POST /advice           ◀── stance by policy, config/policy/scatter.json:
                                     in-progress → forbid; submitted, submitted-before,
-                                    abandoned → avoid for 90 days; failed, skipped → none
+                                    abandoned, failed, skipped → avoid for 90 days (failed
+                                    and skipped since 2026-10-29)
 ```
 
 Running the service, the bus and the backfill, and what to read after a

@@ -70,11 +70,27 @@ abandoned without a sweep.
 The stance is policy, not code (`config/policy/scatter.json`): a window in
 days, a total map from every status to a stance or none — `in-progress →
 forbid`, `submitted`, `submitted-before` and `abandoned → avoid` (a unit
-interrupted after Submit may have gone through), `failed` and `skipped → none`
-so a retry stays open — a list of values that identify no single employer (a
-staffing agency), and the set-asides after which a company is avoided. The
-owner's decision of 2026-10-11: scatter across companies with a 90-day window;
-only a unit in progress in another live session is forbidden.
+interrupted after Submit may have gone through), and since 2026-10-29 `failed`
+and `skipped → avoid` too, so no later session retries a listing the session
+could not apply to (an account wall on the employer's site, a document it
+cannot provide, a form refused twice) — a list of values that identify no
+single employer (a staffing agency), and the set-asides after which a company
+is avoided (moot while set-asides are avoided outright). The owner's decisions:
+2026-10-11, scatter across companies with a 90-day window, only a unit in
+progress in another live session forbidden; 2026-10-29, a failed or set-aside
+unit avoided for the window as well. The stance is read at advice time over the
+window, so a policy change reaches every row already in it.
+
+One record, every site. The advisor compares on the company alone — the exact
+name as each page writes it, trimmed, normalised and lower-cased
+(`identityKey`) — and never on the site, the profile or the listing. Two
+missions of one subject on two job sites therefore avoid and forbid each
+other's companies within the window, as long as the two sites spell the
+company the same ("Acme, Inc." and "Acme" are two records); a mission that
+closes every opened listing as a unit, as the Built In one does, puts its
+set-asides on the record as well, and a company skipped on one site is avoided
+on the other for the window. The mission's `## Taking a unit on record`
+exception is the one way past an avoided company on either.
 
 ## The HTTP surface (`pnpm job-application:serve`, `:3006`)
 
