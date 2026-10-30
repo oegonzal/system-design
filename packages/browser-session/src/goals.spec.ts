@@ -3,6 +3,7 @@ import { join } from 'node:path';
 
 import {
   advisorsOf,
+  documentNamesOf,
   composeFieldGoal,
   composeStepGoal,
   FIELD_ANSWER_PIPELINE_ID,
@@ -67,6 +68,8 @@ describe('the goals', () => {
       expect(() => unitFacetsOf(text)).not.toThrow();
       expect(() => unitContextLandmarkOf(text)).not.toThrow();
       expect(() => advisorsOf(text)).not.toThrow();
+      // And a Documents section: a document nobody can name is a file nobody can supply.
+      expect(() => documentNamesOf(text)).not.toThrow();
       // A goal that asks an advisor declares what a unit is known by, or the advisor would have nothing to answer about.
       if (advisorsOf(text).length > 0) expect(unitFacetsOf(text).length).toBeGreaterThan(0);
       const events = text.slice(text.indexOf('## Task events'));

@@ -13,8 +13,8 @@ import { captureFileName, captureFiles, type CaptureRecord } from './session-dum
  * action or the session: an image that could not be taken is a warning.
  */
 
-/** The actions that put a value into a field: their element stays where it was, so its image can mark it. */
-const ENTRY_KINDS: readonly BrowserActionKind[] = ['fill', 'select'];
+/** The actions that put a value into a field — a file into a file control among them: their element stays where it was, so its image can mark it. */
+const ENTRY_KINDS: readonly BrowserActionKind[] = ['fill', 'select', 'upload'];
 
 /** What an action touched, by the name the page gives it — never a value it entered. */
 export function touchedName(action: BrowserAction, observation: PageObservation): string | null {

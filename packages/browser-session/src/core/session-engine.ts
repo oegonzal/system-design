@@ -13,6 +13,7 @@ import {
   type SessionCriteria,
   type SessionDeps,
 } from './engine-context';
+import { resolveDocuments } from './documents';
 import {
   BrainFaulted,
   type BrowserAction,
@@ -90,6 +91,7 @@ export async function runSession(
   // session like a bad flag.
   await deps.brain.bind();
   const advisors = await resolveAdvisors(deps, goal.markdown, options, sessionId);
+  resolveDocuments(goal.markdown, options.documents);
   const startedAt = deps.clock.now();
   await closeInterrupted(deps, startedAt);
   const dump = deps.dumps.open(startedAt);
@@ -168,7 +170,10 @@ export async function runSession(
         byPipeline((role) => ctx.criteria[role]),
       ),
     );
-    await deps.browser.open(options.profile, { headed: options.headed });
+    await deps.browser.open(options.profile, {
+      headed: options.headed,
+      documents: options.documents,
+    });
     // Open where the work begins, so the loop never plans on about:blank — the
     // one reliably contentless page, where the judges read "no listings" as a
     // limit and gate the navigate that would leave it. Engine setup, not a

@@ -156,6 +156,9 @@ function elementFactsInPage(
       value = chosen !== undefined && answerable(chosen) ? text(chosen) || chosen.value : null;
     } else if (tag === 'input' && (inputType === 'checkbox' || inputType === 'radio')) {
       value = input.checked ? 'checked' : 'unchecked';
+    } else if (tag === 'input' && inputType === 'file') {
+      // A file control holds the file chosen, by name — never the placeholder path the browser reports as its value.
+      value = input.files?.[0]?.name ?? null;
     } else if (tag === 'input' || tag === 'textarea') {
       value = input.value === '' ? null : input.value;
     } else if ((el as HTMLElement).isContentEditable) {
@@ -326,11 +329,17 @@ function elementFactsInPage(
   > => {
     const maxLength =
       (tag === 'input' || tag === 'textarea') && input.maxLength > 0 ? input.maxLength : null;
+    // What a file control accepts is what the page tells a person beside it.
+    const accept =
+      tag === 'input' && (attr('type') ?? 'text').toLowerCase() === 'file'
+        ? (attr('accept') ?? '')
+        : '';
     const context = [
       byIds(attr('aria-describedby')),
       attr('placeholder') ?? '',
       text(el.closest('fieldset')?.querySelector('legend')),
       sharedQuestion(),
+      accept === '' ? '' : `accepts ${accept}`,
     ]
       .filter((part) => part.length > 0)
       .join(' · ');

@@ -45,6 +45,7 @@ const SCHEMA_FILES = [
   'packages/contracts/src/lib/browser-session/step-plan.schema.ts',
   'packages/contracts/src/lib/browser-session/mission-sections.ts',
   'packages/contracts/src/lib/browser-session/mission-marks.ts',
+  'packages/contracts/src/lib/browser-session/mission-documents.ts',
   'packages/contracts/src/lib/browser-session/mission-stops.ts',
   'packages/contracts/src/lib/units/identity.ts',
   'packages/contracts/src/lib/units/record.ts',

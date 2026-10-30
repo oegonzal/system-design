@@ -227,6 +227,31 @@ export const MISSION_WITH_TAKEN = `${MISSION_WITH_IDENTITY}
 - avoid unless "Next page": a listing at a company on record to avoid is taken only when no next page is listed.
 `;
 
+/** The fixture mission declaring one document a plan may upload: the subject's résumé. */
+export const MISSION_WITH_DOCUMENTS = `${MISSION_FIXTURE}
+## Documents
+
+- resume: the subject's résumé, a PDF.
+`;
+
+/** The form with a file control the page hides behind an attach button, as employer forms do: listed by the adapter all the same, with no ref of the tree's. */
+export function uploadFormObservation(): PageObservation {
+  const form = formObservation();
+  return {
+    ...form,
+    elements: [
+      ...form.elements,
+      observedElement('f1', 'button', 'Attach résumé', {
+        kind: 'uploadable',
+        inputType: 'file',
+        required: true,
+        visible: false,
+        context: 'accepts .pdf, .docx',
+      }),
+    ],
+  };
+}
+
 /** The fixture mission declaring, besides a unit's identity, the landmark whose words state what a unit is: the page's main. */
 export const MISSION_WITH_CONTEXT = `${MISSION_WITH_IDENTITY}
 ## Unit context

@@ -12,6 +12,21 @@ import type { z } from 'zod';
 
 import { bounded, type Bound } from '../bounds';
 
+/** A lower-case word, hyphens allowed: a fact's name, an advisor's id, a document's name, as every grammar here reads it. */
+export const WORD = '[a-z][a-z0-9-]*';
+
+/** The second bullet to declare a name already declared, or null: the rule across rows a section of named things shares. */
+export const declaredOnce =
+  <Row>(key: (row: Row) => string) =>
+  (rows: readonly Row[], lines: readonly string[]): string | null => {
+    const seen = new Set<string>();
+    for (const [index, row] of rows.entries()) {
+      if (seen.has(key(row))) return lines[index] ?? null;
+      seen.add(key(row));
+    }
+    return null;
+  };
+
 /** The bullets under a heading, trimmed, blank lines skipped, up to the next heading; none when the heading is absent. */
 export function bulletsUnder(mission: string, heading: string): string[] {
   const lines = mission.split('\n');

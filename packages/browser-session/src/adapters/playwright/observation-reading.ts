@@ -21,6 +21,7 @@ import {
 
 import { fitSnapshot, type FittedSnapshot, type SnapshotNode } from './aria-snapshot';
 import { hiddenTraitsOf, type ElementFacts } from './element-facts';
+import type { FileControlRef } from './file-controls';
 
 /**
  * One read of the page turned into the observation the contracts describe:
@@ -42,6 +43,8 @@ export interface PageReading {
   /** The tree the snapshot decodes to, in document order: what the browser answers `wordsUnder` from until the next read. */
   nodes: readonly SnapshotNode[];
   elements: ObservedElement[];
+  /** The file controls the page hides, listed among the elements under refs of the adapter's own: how each resolves. */
+  fileControls: readonly FileControlRef[];
   unreadElements: number;
   unreadSnapshotLines: number;
   /** The scope of the node the page marks active, when it marks one inside a scope. */
@@ -190,7 +193,9 @@ function ordered(
   elements: readonly ObservedElement[],
   activeScope: ActiveScope | null,
 ): ObservedElement[] {
-  const reachable = (element: ObservedElement): boolean => element.visible && !element.disabled;
+  // A file control the page hides is reached by its upload, so it orders with what is shown.
+  const reachable = (element: ObservedElement): boolean =>
+    (element.visible || element.kind === 'uploadable') && !element.disabled;
   // With no dialog open nothing is "inside the open scope": the page's own order holds.
   const inOpenScope = (element: ObservedElement): boolean =>
     activeScope !== null && inScope(element, activeScope);

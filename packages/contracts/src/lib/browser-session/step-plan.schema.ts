@@ -13,6 +13,7 @@ import { CRITERION_ID_MAX_LENGTH } from '../quality-loop/evidence';
 import { unitFacetsSchema } from '../units/identity';
 import { ELEMENT_REF, TASK_LABEL_BOUND, URL_MAX_LENGTH } from './observation.schema';
 import { PRESS_KEYS, SCROLL_DIRECTIONS, WAIT_UNTIL } from './action-effects';
+import { DOCUMENT_NAME_MAX_LENGTH } from './mission-documents';
 import { STOP_CAUSE_MAX_LENGTH } from './mission-stops';
 import { TASK_OUTCOMES } from './vocab';
 
@@ -84,6 +85,15 @@ export const stepActionSchema = z.discriminatedUnion('kind', [
     option: bounded.id(OPTION_VALUE_MAX_LENGTH, {
       min: 1,
       description: 'One of the options the Elements list gives for this ref, verbatim.',
+    }),
+    ...common,
+  }),
+  z.strictObject({
+    kind: z.literal('upload'),
+    ref,
+    document: bounded.id(DOCUMENT_NAME_MAX_LENGTH, {
+      min: 1,
+      description: 'One of the documents the mission declares, by name as the Limits list them.',
     }),
     ...common,
   }),
@@ -189,6 +199,7 @@ export function actionRefs(action: StepAction): string[] {
     case 'click':
     case 'fill':
     case 'select':
+    case 'upload':
       return [action.ref];
     case 'scroll':
       return action.ref === null ? [] : [action.ref];

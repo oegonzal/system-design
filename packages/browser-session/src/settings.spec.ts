@@ -47,7 +47,7 @@ const SHIPPED = JSON.parse(real(join(CONFIG, 'engine.json'))) as Record<string, 
 describe('the session settings', () => {
   it('[BRW-7] reads the choices the package ships, and every profile it ships validates', () => {
     const shipped = readSessionSettings(PACKAGE_ROOT);
-    expect(shipped.capture).toEqual({ after: ['fill', 'select'], failures: true });
+    expect(shipped.capture).toEqual({ after: ['fill', 'select', 'upload'], failures: true });
     expect(shipped.session.headed).toBe(true);
     expect(shipped.sources.capture).toMatch(/config\/capture\/field-entries\.json$/);
     expect(shipped.sources.session).toMatch(/config\/session\/standard\.json$/);

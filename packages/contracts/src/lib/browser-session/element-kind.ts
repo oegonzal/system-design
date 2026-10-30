@@ -10,8 +10,14 @@
  */
 export const VALUE_ROLES = ['textbox', 'searchbox', 'combobox', 'spinbutton'] as const;
 
-/** What an element affords: typed into, chosen from, pressed, or only read. */
-export const ELEMENT_KINDS = ['fillable', 'selectable', 'clickable', 'static'] as const;
+/** What an element affords: typed into, chosen from, a file put into it, pressed, or only read. */
+export const ELEMENT_KINDS = [
+  'fillable',
+  'selectable',
+  'uploadable',
+  'clickable',
+  'static',
+] as const;
 export type ElementKind = (typeof ELEMENT_KINDS)[number];
 
 /** Role → kind, as a table; a role not listed is `static`. */
@@ -73,14 +79,26 @@ export const ELEMENT_KIND_WHEN_TYPED: Readonly<Record<string, ElementKind>> = {
 };
 
 /**
- * What an element affords, from its role and the control beneath it. Every
- * unambiguous role is the table's to decide; a role listed as ambiguous is
+ * Input types whose control settles the kind whatever the role: a file input
+ * reads as a button in the tree — a person presses it — and takes a file,
+ * never a click or typed text. Consulted before the role.
+ */
+export const ELEMENT_KIND_BY_INPUT_TYPE: Readonly<Record<string, ElementKind>> = {
+  file: 'uploadable',
+};
+
+/**
+ * What an element affords, from its role and the control beneath it. A
+ * control whose type settles it is the input-type table's to decide; every
+ * other unambiguous role is the role table's; a role listed as ambiguous is
  * settled by the DOM facts the page already gave, never by the name alone.
  */
 export const elementKind = (
   role: string,
   facts: { readonly inputType: string | null },
 ): ElementKind => {
+  const byType = facts.inputType === null ? undefined : ELEMENT_KIND_BY_INPUT_TYPE[facts.inputType];
+  if (byType !== undefined) return byType;
   const typed = ELEMENT_KIND_WHEN_TYPED[role];
   return typed !== undefined && acceptsTypedText(facts.inputType) ? typed : elementKindOf(role);
 };

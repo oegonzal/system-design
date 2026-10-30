@@ -20,7 +20,7 @@
 import { z } from 'zod';
 
 import { bounded } from '../bounds';
-import { declaredSection } from '../browser-session/mission-sections';
+import { declaredOnce, declaredSection, WORD } from '../browser-session/mission-sections';
 import {
   ADVISOR_ID_MAX_LENGTH,
   ADVISORS_BOUND,
@@ -30,9 +30,6 @@ import {
 
 export const IDENTITY_HEADING = '## Unit identity';
 export const ADVISORS_HEADING = '## Advisors';
-
-/** A lower-case word, hyphens allowed: a facet's name or an advisor's id, as the grammar reads it. */
-const WORD = '[a-z][a-z0-9-]*';
 
 /** One bullet: the fact's name, a colon, what it means on the page. */
 const IDENTITY_LINE = new RegExp(`^- (?<name>${WORD}): .+$`);
@@ -58,18 +55,6 @@ export class MissionAdvisorsMalformed extends Error {
     );
   }
 }
-
-/** The second bullet to declare a name already declared, or null. */
-const declaredOnce =
-  <Row>(key: (row: Row) => string) =>
-  (rows: readonly Row[], lines: readonly string[]): string | null => {
-    const seen = new Set<string>();
-    for (const [index, row] of rows.entries()) {
-      if (seen.has(key(row))) return lines[index] ?? null;
-      seen.add(key(row));
-    }
-    return null;
-  };
 
 const facetDeclarationSchema = z.strictObject({
   name: bounded.id(UNIT_FACET_NAME_MAX_LENGTH, { min: 1 }),

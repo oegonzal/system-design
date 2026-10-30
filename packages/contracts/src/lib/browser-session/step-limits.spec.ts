@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 
 import { takenOf, takenOnPage } from '../units/mission-taken';
 import { NO_UNITS_ON_RECORD } from '../units/record';
-import { emptyLedger, listingObservation, MISSION_FIXTURE, stepGoalInput } from './fixtures';
+import {
+  emptyLedger,
+  listingObservation,
+  MISSION_FIXTURE,
+  stepGoalInput,
+  MISSION_WITH_DOCUMENTS,
+  uploadFormObservation,
+} from './fixtures';
 import { MissionMarkMalformed } from './mission-marks';
 import { stopsOf, stopsOnPage } from './mission-stops';
 import { type Objection } from '../quality-loop/read-back';
@@ -124,5 +131,18 @@ describe('the Limits a step goal states', () => {
 
     // Still said once, where the validators' own rules are said.
     expect(goal.split('belongs to this observation alone')).toHaveLength(2);
+  });
+
+  it('[BRW-26] says which documents a plan may upload and lists them in the index, and says nothing of uploads under a mission declaring none', () => {
+    const goal = composeStepGoal(
+      stepGoalInput({ mission: MISSION_WITH_DOCUMENTS, observation: uploadFormObservation() }),
+    );
+    expect(goal).toContain(
+      '- An upload puts one document the mission declares — resume — into a file control (type file), listed whether or not the page shows it; a file control is never filled or asked for.',
+    );
+    expect(readStepIndex(goal)?.documents).toEqual(['resume']);
+    const plain = goalOf(uploadFormObservation());
+    expect(plain).not.toContain('An upload puts');
+    expect(readStepIndex(plain)?.documents).toEqual([]);
   });
 });

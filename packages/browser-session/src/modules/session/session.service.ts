@@ -19,6 +19,7 @@ import type {
   LedgerPort,
   OperatorPort,
   StopSignal,
+  SuppliedDocument,
 } from '../../core/ports';
 import { runSession, type SessionOutcome } from '../../core/session-engine';
 import { sessionEventsOf, type SessionEventsPort } from '../../core/session-events';
@@ -57,8 +58,11 @@ export type RunOptions = Omit<
   | 'asksAfterRefusal'
   | 'untaught'
   | 'answering'
+  | 'documents'
 > & {
   subject?: string | undefined;
+  /** The files for the documents the mission declares, by name; none unless the command line names them. */
+  documents?: readonly SuppliedDocument[] | undefined;
 };
 
 /**
@@ -123,6 +127,7 @@ export class SessionService {
       },
       {
         ...options,
+        documents: options.documents ?? [],
         subject: options.subject ?? this.config.subject,
         // Given by the flag, or set in the environment: anything but the declared fallback.
         subjectDeclared:
@@ -140,7 +145,7 @@ export class SessionService {
 
   /** Open the profile headed at the URL; the operator signs in and presses Enter; the profile keeps the cookies. */
   async login(profile: string, url: string): Promise<void> {
-    await this.browser.open(profile, { headed: true });
+    await this.browser.open(profile, { headed: true, documents: [] });
     try {
       await this.browser.act({
         kind: 'navigate',

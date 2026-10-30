@@ -47,6 +47,7 @@ const reading = (overrides: Partial<PageReading> = {}): PageReading => ({
   snapshot: '- generic [ref=e1]:\n  - button "Easy Apply" [ref=e2]',
   nodes: [],
   elements: [],
+  fileControls: [],
   unreadElements: 0,
   unreadSnapshotLines: 0,
   focusedScope: null,

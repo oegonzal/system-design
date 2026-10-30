@@ -8,6 +8,7 @@ export const STEP_ACTION_KINDS = [
   'click',
   'fill',
   'select',
+  'upload',
   'press',
   'scroll',
   'waitFor',
@@ -44,6 +45,15 @@ export type StepActionKind = (typeof STEP_ACTION_KINDS)[number];
  */
 export interface ActionEffects {
   readonly touches: boolean;
+  /**
+   * It needs the element in sight: a click, a fill or a select waits for the
+   * element to be visible, so one the page does not show fails in the
+   * browser. A file setter does not wait for sight — a file control is
+   * routinely hidden behind the page's own styled button — so an upload into
+   * a hidden file control is not refused for its sight, while the disabled,
+   * dialog and mark rules still hold for it.
+   */
+  readonly sight: boolean;
   readonly page: 'none' | 'may-change' | 'replaces';
   /** It asserts something the page shows. */
   readonly claims: boolean;
@@ -60,9 +70,10 @@ export interface ActionEffects {
 const effects = (
   touches: boolean,
   page: ActionEffects['page'],
-  otherEffects: Partial<Pick<ActionEffects, 'claims' | 'terminal' | 'endsSession'>> = {},
+  otherEffects: Partial<Pick<ActionEffects, 'claims' | 'terminal' | 'endsSession' | 'sight'>> = {},
 ): ActionEffects => ({
   touches,
+  sight: otherEffects.sight ?? true,
   page,
   claims: otherEffects.claims ?? false,
   terminal: otherEffects.terminal ?? false,
@@ -74,6 +85,7 @@ export const ACTION_EFFECTS = {
   click: effects(true, 'may-change'),
   fill: effects(true, 'may-change'),
   select: effects(true, 'may-change'),
+  upload: effects(true, 'may-change', { sight: false }),
   press: effects(false, 'may-change'),
   scroll: effects(false, 'none'),
   waitFor: effects(false, 'none'),

@@ -21,6 +21,8 @@ export interface LimitFacts {
   causes: readonly string[];
   /** The facts the mission's Unit identity declares, by name. */
   unitFacets: readonly string[];
+  /** The documents the mission declares a plan may upload, by name. */
+  documents: readonly string[];
   /** The units on record the goal was composed with — every one the advisors answered, whatever the goal lists. */
   onRecord: UnitsOnRecord;
   /** The exceptions the mission declares for taking a unit on record, as this page bears on them. */
@@ -89,6 +91,15 @@ const STEP_LIMITS: readonly Limit[] = [
     when: ({ unitFacets }) => unitFacets.length > 0,
     line: ({ unitFacets }) =>
       `- A taskStart carries each fact the mission's Unit identity declares — ${unitFacets.join(', ')} — once, with its value exactly as this page names it, and no other fact.`,
+  },
+  // A file control is routinely hidden behind the page's own button, so the
+  // goal lists it whether or not the page shows it, and the one action on it
+  // is an upload of a document the mission declares: the validator cuts any
+  // other document, and any fill or question put to the control.
+  {
+    when: ({ documents }) => documents.length > 0,
+    line: ({ documents }) =>
+      `- An upload puts one document the mission declares — ${documents.join(', ')} — into a file control (type file), listed whether or not the page shows it; a file control is never filled or asked for.`,
   },
   // The record is enforced whole, whatever the goal had room to list. Measured
   // 2026-10-14: 43 units on record, 40 rendered, and the planner opened one of

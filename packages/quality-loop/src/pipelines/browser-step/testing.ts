@@ -53,6 +53,19 @@ export const select = (ref: string, option: string, reason = `choose on ${ref}`)
   serves: [],
 });
 
+export const upload = (
+  ref: string,
+  document: string,
+  reason = `put ${document} into ${ref}`,
+): StepAction => ({
+  kind: 'upload',
+  ref,
+  document,
+  reason,
+  expect: null,
+  serves: [],
+});
+
 export const askFields = (refs: string[], reason = 'questions about the subject'): StepAction => ({
   kind: 'askFields',
   refs,

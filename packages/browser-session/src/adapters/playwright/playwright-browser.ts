@@ -14,10 +14,12 @@ import {
   type BrowserAction,
   type BrowserPort,
   type PagesClosed,
+  type SuppliedDocument,
 } from '../../core/ports';
 import { performAction } from './action-performer';
 import { landmarkWords, type SnapshotNode } from './aria-snapshot';
 import { readElementFacts } from './element-facts';
+import { FILE_CONTROLS } from './file-controls';
 import type { ObservePolicy } from './observe-policy';
 import { PageReader } from './page-reader';
 import { markedScreenshot } from './page-marker';
@@ -70,13 +72,21 @@ export class PlaywrightBrowser implements BrowserPort {
   private tree: readonly SnapshotNode[] = [];
   /** The pages kept open: those present at `open`, then those present after each `closeOpenedPages`. */
   private kept = new Set<Page>();
+  /** The file each declared document is read from, by name, as the run supplied them. */
+  private documents = new Map<string, string>();
+  /** The hidden file controls of the last observation, by the adapter's own ref: which control each is, in document order. */
+  private fileControls = new Map<string, number>();
   private readonly reader: PageReader;
 
   constructor(private readonly options: PlaywrightBrowserOptions) {
     this.reader = new PageReader(() => this.page, options.observe);
   }
 
-  async open(profile: string, { headed }: { headed: boolean }): Promise<void> {
+  async open(
+    profile: string,
+    { headed, documents }: { headed: boolean; documents: readonly SuppliedDocument[] },
+  ): Promise<void> {
+    this.documents = new Map(documents.map((document) => [document.name, document.path]));
     this.context = await chromium.launchPersistentContext(
       join(this.options.profilesDir, profile),
       launchOptions(this.options, headed),
@@ -99,6 +109,7 @@ export class PlaywrightBrowser implements BrowserPort {
     const read = await this.reader.read();
     const observation = pageObservationSchema.parse(read.observation);
     this.known = new Map(observation.elements.map((element) => [element.ref, element]));
+    this.fileControls = new Map(read.reading.fileControls.map((file) => [file.ref, file.nth]));
     this.tree = read.reading.nodes;
     return observation;
   }
@@ -115,6 +126,7 @@ export class PlaywrightBrowser implements BrowserPort {
         {
           page: this.page,
           locate: (ref) => this.locate(ref),
+          documentPath: (name) => this.documentPath(name),
           scrollPx: this.options.observe.scrollPx,
         },
         action,
@@ -175,6 +187,7 @@ export class PlaywrightBrowser implements BrowserPort {
     this.kept = new Set(this.context.pages());
     if (closing.length > 0) {
       this.known.clear();
+      this.fileControls.clear();
       this.tree = [];
     }
     const front = this.page;
@@ -186,13 +199,27 @@ export class PlaywrightBrowser implements BrowserPort {
     const context = this.context;
     this.context = null;
     this.known.clear();
+    this.fileControls.clear();
     this.tree = [];
     this.kept.clear();
     if (context !== null) await context.close();
   }
 
+  /** The element under a ref: a hidden file control by its place among the page's file controls, anything else by the tree's ref. */
   private locate(ref: string): Locator {
-    return this.page.locator(`aria-ref=${ref}`);
+    const nth = this.fileControls.get(ref);
+    return nth === undefined
+      ? this.page.locator(`aria-ref=${ref}`)
+      : this.page.locator(FILE_CONTROLS).nth(nth);
+  }
+
+  /** The file supplied for a declared document; the session refuses a run that lacks one before any plan, so this never trusts the plan. */
+  private documentPath(name: string): string {
+    const path = this.documents.get(name);
+    if (path === undefined) {
+      throw new ActionFailed('upload', `no file was supplied for document ${name}`);
+    }
+    return path;
   }
 
   /** The element the last observation listed under the ref, or a refusal: refs never outlive their observation. */

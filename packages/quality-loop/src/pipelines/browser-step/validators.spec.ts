@@ -6,9 +6,13 @@ import {
   openTaskLedger,
   type StepAction,
   type StepPlan,
+  MISSION_WITH_DOCUMENTS,
+  uploadFormObservation,
+  composeStepGoal,
+  stepGoalInput,
 } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
-import { askFields, click, done, fill, samplePlan, select, stepGoal } from './testing';
+import { askFields, click, done, fill, samplePlan, select, stepGoal, upload } from './testing';
 import { limitsValidator, referencesValidator } from './validators';
 import { form, listing, problems } from './validators.testing';
 
@@ -218,5 +222,75 @@ describe('the browser-step validators', () => {
     });
     const broken = { assessment: 'a page, and no actions' } as unknown as StepPlan;
     expect(problems(broken)).toEqual({ references: [], limits: [] });
+  });
+
+  it('[BRW-26] an upload puts a declared document into a file control the page may hide, and nothing else', () => {
+    const goal = stepGoal(uploadFormObservation(), undefined, MISSION_WITH_DOCUMENTS);
+    // A hidden file control needs no sight: the one action that reaches it passes.
+    expect(problems(samplePlan([upload('f1', 'resume'), click('e6')]), goal)).toEqual({
+      references: [],
+      limits: [],
+    });
+    expect(problems(samplePlan([upload('f1', 'cover-letter')]), goal).limits).toEqual([
+      {
+        severity: 'high',
+        locationRefs: ['action.1'],
+        message: 'upload cover-letter: the mission declares no such document — it declares resume',
+      },
+    ]);
+    expect(problems(samplePlan([upload('e1', 'resume')]), goal).limits).toEqual([
+      {
+        severity: 'high',
+        locationRefs: ['action.1'],
+        message:
+          'e1 is not a file control (fillable): an upload puts a document into a file control alone',
+      },
+    ]);
+    // A fill or a question put to a file control is a wrong-kind cut, and one needing sight on a hidden control.
+    expect(problems(samplePlan([fill('f1', 'x')]), goal).limits.map((p) => p.message)).toEqual([
+      'f1 is not visible',
+      'f1 cannot be typed into (uploadable)',
+    ]);
+    expect(problems(samplePlan([askFields(['f1'])]), goal).limits.map((p) => p.message)).toEqual([
+      'f1 is not visible',
+      'f1 is not a field to answer (uploadable)',
+    ]);
+    // The disabled rule still holds for an upload.
+    const disabled = uploadFormObservation();
+    disabled.elements = disabled.elements.map((element) =>
+      element.ref === 'f1' ? { ...element, disabled: true } : element,
+    );
+    expect(
+      problems(
+        samplePlan([upload('f1', 'resume')]),
+        stepGoal(disabled, undefined, MISSION_WITH_DOCUMENTS),
+      ).limits,
+    ).toEqual([{ severity: 'high', locationRefs: ['action.1'], message: 'f1 is disabled' }]);
+    // A mission declaring no document lets nothing be uploaded.
+    expect(
+      problems(samplePlan([upload('f1', 'resume')]), stepGoal(uploadFormObservation())).limits,
+    ).toEqual([
+      {
+        severity: 'high',
+        locationRefs: ['action.1'],
+        message: 'upload resume: the mission declares no such document — it declares none',
+      },
+    ]);
+    // On a page unchanged since the last plan, the upload that ran is cut like any repeat.
+    const unchanged = composeStepGoal(
+      stepGoalInput({
+        mission: MISSION_WITH_DOCUMENTS,
+        observation: uploadFormObservation(),
+        pageUnchanged: true,
+        lastStep: {
+          ran: 1,
+          touched: [{ kind: 'upload', role: 'button', name: 'Attach résumé', detail: 'resume' }],
+          held: [],
+        },
+      }),
+    );
+    expect(problems(samplePlan([upload('f1', 'resume')]), unchanged).limits[0]?.message).toMatch(
+      /^upload on f1 ran at the last step and the page did not change: repeating it is cut/,
+    );
   });
 });

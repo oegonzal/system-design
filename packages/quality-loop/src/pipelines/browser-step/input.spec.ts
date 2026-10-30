@@ -106,6 +106,7 @@ describe('the browser-step input codec', () => {
       causes: ['limit-reached', 'login-wall', 'mission-complete'],
       // The fixture mission declares no unit identity, and no advisor was asked.
       unitFacets: [],
+      documents: [],
       unitsForbidden: [],
       onRecordTaken: [],
     });

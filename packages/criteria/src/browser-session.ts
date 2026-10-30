@@ -131,6 +131,11 @@ export const BROWSER_SESSION_CRITERIA: readonly Criterion[] = [
     statement:
       "A unit of work's pages close with it: after the plan in which a unit closes, whatever its outcome and however the plan ended — never inside the close itself, since a mission may go on from a taskDone to a click on the same page — the session closes every page opened since it opened or since the last such close, newest first, a page the site itself closed not counted and the last page open never closed, and brings the newest page kept to the front; the next goal's recent actions say how many pages closed and which page is in front, the promise the last action made about a page now gone is dropped rather than counted unmet, the refs of the closed pages resolve no more, and a session whose units open no page sees no change: nothing closed, no history line.",
   },
+  {
+    id: 'BRW-26',
+    statement:
+      "A mission may declare under Documents the files a plan may upload, by name, through the one declared-section grammar; a run supplies each as a file by name on the command line and the session refuses before any row a declared document with no file, a file that does not exist, a supplied file no section declares, or a name supplied twice; the observation lists the page's file controls whether or not the page shows them — a hidden one under a ref of the adapter's own that resolves to that control — and the goal lists them beside what is shown; the plan's one upload action puts one declared document into a file control, which the browser sets without the sight a click or fill needs while the control's disabled, dialog and mark rules still hold, the effects table declaring the one action that needs no sight; the limits validator cuts an upload naming an undeclared document or an element that is no file control while a fill or a question put to a file control stays a wrong-kind cut, the Limits say so, and the history and the images name the document, never its path.",
+  },
   // Memory ingest (packages/memory-ingest)
   {
     id: 'ING-1',

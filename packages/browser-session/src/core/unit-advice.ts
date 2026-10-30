@@ -1,5 +1,6 @@
 import {
   advisorsOf,
+  documentNamesOf,
   marksOf,
   NO_UNITS_ON_RECORD,
   stopsOf,
@@ -120,6 +121,7 @@ function declaredOf(mission: string): { facets: string[]; advisors: string[] } {
     stopsOf(mission);
     takenOf(mission);
     unitContextLandmarkOf(mission);
+    documentNamesOf(mission);
     return { facets: unitFacetsOf(mission), advisors: advisorsOf(mission) };
   } catch (error) {
     throw new SessionRefused(describeError(error).message);

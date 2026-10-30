@@ -70,4 +70,18 @@ describe('stepPlanSchema', () => {
     expect(read.ok).toBe(true);
     expect(read.value?.actions[0]).not.toHaveProperty(ON_RECORD_TAKEN);
   });
+
+  it('[BRW-26] an upload names an element and one declared document, and carries no path', () => {
+    const upload = {
+      kind: 'upload',
+      ref: 'f1',
+      document: 'resume',
+      reason: 'the form requires a résumé',
+      expect: null,
+      serves: [],
+    };
+    expect(stepActionSchema.parse(upload)).toEqual(upload);
+    expect(() => stepActionSchema.parse({ ...upload, document: '' })).toThrow();
+    expect(() => stepActionSchema.parse({ ...upload, path: '/somewhere/resume.pdf' })).toThrow();
+  });
 });

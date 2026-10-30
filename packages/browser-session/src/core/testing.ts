@@ -34,6 +34,7 @@ import {
   QuestionWithdrawn,
   type SessionClose,
   type PagesClosed,
+  type SuppliedDocument,
   type TaskClose,
   type Withdrawal,
 } from './ports';
@@ -97,7 +98,8 @@ export class FakeBrowser implements BrowserPort {
   /** What each screenshot was asked to mark, in order — apart from `calls`, which the step specs pin. */
   readonly shots: (string | null)[] = [];
   readonly values = new Map<string, string>();
-  opened: { profile: string; headed: boolean } | null = null;
+  opened: { profile: string; headed: boolean; documents: readonly SuppliedDocument[] } | null =
+    null;
   closed = false;
   /** The pages open, oldest first: the one the browser opened with, then each a page opened over it. */
   private stack: ScriptedPage[];
@@ -124,8 +126,11 @@ export class FakeBrowser implements BrowserPort {
     return top;
   }
 
-  async open(profile: string, options: { headed: boolean }): Promise<void> {
-    this.opened = { profile, headed: options.headed };
+  async open(
+    profile: string,
+    options: { headed: boolean; documents: readonly SuppliedDocument[] },
+  ): Promise<void> {
+    this.opened = { profile, headed: options.headed, documents: options.documents };
     this.calls.push(`open ${profile} ${options.headed ? 'headed' : 'headless'}`);
   }
 
@@ -150,6 +155,7 @@ export class FakeBrowser implements BrowserPort {
     }
     if (action.kind === 'fill') this.values.set(action.ref, action.value);
     if (action.kind === 'select') this.values.set(action.ref, action.option);
+    if (action.kind === 'upload') this.values.set(action.ref, action.document);
     const over = this.current.opens?.[key];
     if (over !== undefined) {
       this.stack.push(this.pageOf(over));

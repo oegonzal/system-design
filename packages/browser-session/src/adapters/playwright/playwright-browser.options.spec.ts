@@ -55,7 +55,7 @@ describe('the Playwright browser, on what a person can answer with', () => {
   beforeAll(async () => {
     profiles = mkdtempSync(join(tmpdir(), 'browser-session-profiles-'));
     browser = new PlaywrightBrowser(specBrowserOptions(profiles));
-    await browser.open('spec', { headed: false });
+    await browser.open('spec', { headed: false, documents: [] });
   });
 
   afterAll(async () => {

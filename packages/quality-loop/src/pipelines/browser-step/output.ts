@@ -27,6 +27,8 @@ export function describeAction(action: StepAction): string {
       return `fill ${action.ref} with ${quotedJson(action.value)}`;
     case 'select':
       return `select ${quotedJson(action.option)} on ${action.ref}`;
+    case 'upload':
+      return `upload ${quotedJson(action.document)} into ${action.ref}`;
     case 'press':
       return `press ${action.key}`;
     case 'scroll':

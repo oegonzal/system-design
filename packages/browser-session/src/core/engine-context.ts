@@ -20,6 +20,7 @@ import type {
   OperatorPort,
   StopSignal,
   Termination,
+  SuppliedDocument,
 } from './ports';
 import { causeOf } from './ports';
 import type { StepFailureEvent } from './rails';
@@ -72,6 +73,8 @@ export interface RunSessionOptions {
   eventsDrainMs: number;
   /** Where to open the browser before the first plan; unset leaves it on about:blank. */
   startUrl?: string;
+  /** The files the run supplies for the documents the mission declares, by name; handed to the browser, read by nothing else. */
+  documents: readonly SuppliedDocument[];
   capture: CapturePolicy;
   /** How long a question stays offered on a channel that honours expiry, should the session never withdraw it. */
   questionExpiresAfterMs: number;

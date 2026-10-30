@@ -13,6 +13,7 @@ import { unitFacetsOf } from '../units/mission-identity';
 import type { TakenOnPage } from '../units/mission-taken';
 import { forbiddenOf, type UnitsOnRecord } from '../units/record';
 import type { RanAction } from './action-identity';
+import { documentNamesOf } from './mission-documents';
 import { marksOf, marksOn, type Mark } from './mission-marks';
 import { stopsOf, type StopOnPage } from './mission-stops';
 import {
@@ -164,7 +165,11 @@ function groupedByLandmark(elements: readonly ObservedElement[], marks: readonly
 function elementLines(observation: PageObservation, marks: readonly Mark[]): string[] {
   const { elements, activeScope } = observation;
   if (elements.length === 0) return ['(no interactive elements)'];
-  const reachable = elements.filter((element) => element.visible && inScope(element, activeScope));
+  // A file control is listed whether or not the page shows it: an upload needs no sight.
+  const reachable = elements.filter(
+    (element) =>
+      (element.visible || element.kind === 'uploadable') && inScope(element, activeScope),
+  );
   const unlisted = elements.length - reachable.length;
   return [
     // What is not listed inside the dialog may be behind it. A unit was once
@@ -309,6 +314,7 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
   const { stops } = input;
   const causes = [...new Set(stopsOf(input.mission).map((stop) => stop.cause))];
   const unitFacets = unitFacetsOf(input.mission);
+  const documents = documentNamesOf(input.mission);
   const forbidden = forbiddenOf(input.onRecord);
   const goal = [
     // The mission brings its own heading — the template requires its `# Mission` — so the
@@ -329,12 +335,20 @@ export function composeStepGoal(input: StepGoalInput, budget = GOAL_BUDGET_BYTES
         stops,
         causes,
         unitFacets,
+        documents,
         onRecord: input.onRecord,
         taken: input.taken,
       }),
     ),
     renderIndexSection(
-      indexOf(input, marks, stops, causes, { facets: unitFacets, forbidden, taken: input.taken }),
+      indexOf(
+        input,
+        marks,
+        stops,
+        causes,
+        { facets: unitFacets, forbidden, taken: input.taken },
+        documents,
+      ),
     ),
   ].join('\n');
   return withinBudget(goal, budget);

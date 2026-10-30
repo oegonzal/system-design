@@ -93,6 +93,9 @@ const replacesPage = (action: StepAction): boolean =>
  * control to become enabled is the ordinary shape of a wizard page.
  */
 const touches = (action: StepAction): boolean => ACTION_EFFECTS[action.kind].touches;
+/** Whether a touch needs the element in sight, from the declared effects: a file setter does not, and a file control is routinely hidden behind the page's own button. */
+const needsSight = (action: StepAction): boolean =>
+  touches(action) && ACTION_EFFECTS[action.kind].sight;
 
 /** Whether the element's disabled state at observation still binds this action. */
 interface Standing {
@@ -123,7 +126,7 @@ function elementFaults(
     if (touches(action) && element.behind) {
       fault('high', `${ref} is behind the open dialog: a person could not reach it`);
     }
-    if (touches(action) && !element.visible && element.hiddenTraits.length === 0) {
+    if (needsSight(action) && !element.visible && element.hiddenTraits.length === 0) {
       fault('high', `${ref} is not visible`);
     }
     if (
@@ -168,6 +171,12 @@ function elementFaults(
       element.kind !== 'selectable'
     ) {
       fault('high', `${ref} is not a field to answer (${element.kind})`);
+    }
+    if (action.kind === 'upload' && element.kind !== 'uploadable') {
+      fault(
+        'high',
+        `${ref} is not a file control (${element.kind}): an upload puts a document into a file control alone`,
+      );
     }
   }
   return faults;
@@ -240,6 +249,17 @@ const repeatFault = (action: StepAction, index: StepIndex): string | null => {
 const causeFault = (action: StepAction, index: StepIndex): string | null =>
   action.kind === 'terminate' && !index.causes.includes(action.cause)
     ? `terminate ${action.cause}: the mission declares no such stop condition — it declares ${index.causes.join(', ') || 'none'}`
+    : null;
+
+/**
+ * An upload names one of the documents the mission declares: the run supplied
+ * a file for each of those and for nothing else, so a name the mission never
+ * declared is a file nobody has — and a mission that declares none lets
+ * nothing be uploaded.
+ */
+const documentFault = (action: StepAction, index: StepIndex): string | null =>
+  action.kind === 'upload' && !index.documents.includes(action.document)
+    ? `upload ${action.document}: the mission declares no such document — it declares ${index.documents.join(', ') || 'none'}`
     : null;
 
 const stopFault = (action: StepAction, index: StepIndex): string | null => {
@@ -348,6 +368,8 @@ const limits: Rule = (plan, index) => {
     if (repeat !== null) problems.push(problem('high', repeat, at));
     const cause = causeFault(action, index);
     if (cause !== null) problems.push(problem('high', cause, at));
+    const document = documentFault(action, index);
+    if (document !== null) problems.push(problem('high', document, at));
     const stop = stopFault(action, index);
     if (stop !== null) problems.push(problem('high', stop, at));
     const facets = facetsFault(action, index);

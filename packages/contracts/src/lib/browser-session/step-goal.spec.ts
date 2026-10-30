@@ -15,6 +15,8 @@ import {
   listingObservation,
   openTaskLedger,
   stepGoalInput,
+  MISSION_WITH_DOCUMENTS,
+  uploadFormObservation,
 } from './fixtures';
 import {
   CLOSED_TASKS_BOUND,
@@ -479,5 +481,16 @@ describe('composeStepGoal', () => {
     const capped = goalOf({ ...listingObservation(), omittedElements: 12, unread: null });
     expect(capped).toContain('(12 more interactive elements not listed)');
     expect(capped).not.toContain('could not be read');
+  });
+
+  it('[BRW-26] lists a file control whether or not the page shows it, among the elements a plan may act on rather than the unlisted', () => {
+    const goal = composeStepGoal(
+      stepGoalInput({ mission: MISSION_WITH_DOCUMENTS, observation: uploadFormObservation() }),
+    );
+    expect(goal).toMatch(
+      /^- f1 · button · "Attach résumé" · type file · required · not visible · context "accepts .pdf, .docx"$/m,
+    );
+    // The honeypot stays unlisted and counted; the file control is not among the count.
+    expect(goal).toContain('(1 interactive elements not visible');
   });
 });

@@ -58,6 +58,7 @@ export const BROWSER_ACTION_KINDS = [
   'click',
   'fill',
   'select',
+  'upload',
   'press',
   'scroll',
   'waitFor',
@@ -79,6 +80,12 @@ export class ActionFailed extends Error {
   }
 }
 
+/** A file the run supplies for a document the mission declares: the name the plan uploads it by, and where the browser reads it from. */
+export interface SuppliedDocument {
+  name: string;
+  path: string;
+}
+
 /** What closing a unit's pages did: how many closed, and the URL of the page now in front. */
 export interface PagesClosed {
   closed: number;
@@ -86,7 +93,11 @@ export interface PagesClosed {
 }
 
 export interface BrowserPort {
-  open(profile: string, options: { headed: boolean }): Promise<void>;
+  /** The documents are the files an `upload` puts into a file control, by name; the browser alone reads them. */
+  open(
+    profile: string,
+    options: { headed: boolean; documents: readonly SuppliedDocument[] },
+  ): Promise<void>;
   /** The page as it is now; the refs it lists resolve only until the next `observe`. */
   observe(): Promise<PageObservation>;
   /** What the page the last `observe` read states inside one landmark — each node's words in document order, from that observation's tree, never a new read; none when it lays out no such landmark. */

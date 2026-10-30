@@ -15,6 +15,8 @@ const wholeText = (words: string): RegExp => new RegExp(`^\\s*${escapeRegExp(wor
 export interface ActionSurface {
   page: Page;
   locate(ref: string): Locator;
+  /** The file supplied for a document the mission declares, by name; throws `ActionFailed` for a name nobody supplied. */
+  documentPath(name: string): string;
   /** How far one page-level scroll moves, in CSS pixels. */
   scrollPx: number;
 }
@@ -37,6 +39,10 @@ export async function performAction(
       return;
     case 'select':
       await select(surface, target, action.ref, action.option);
+      return;
+    case 'upload':
+      // Set, never clicked: the chooser a click would open is the browser's, and the setter needs no sight.
+      await locate(action.ref).setInputFiles(surface.documentPath(action.document));
       return;
     case 'press':
       await page.keyboard.press(action.key === 'Space' ? ' ' : action.key);

@@ -173,7 +173,7 @@ describe('the Playwright browser', () => {
   beforeAll(async () => {
     profiles = mkdtempSync(join(tmpdir(), 'browser-session-profiles-'));
     browser = new PlaywrightBrowser(specBrowserOptions(profiles));
-    await browser.open('spec', { headed: false });
+    await browser.open('spec', { headed: false, documents: [] });
   });
 
   afterAll(async () => {
@@ -306,7 +306,7 @@ describe('the Playwright browser', () => {
       serves: [],
     });
     const quick = new PlaywrightBrowser(specBrowserOptions(profiles, { actionTimeoutMs: 300 }));
-    await quick.open('spec-quick', { headed: false });
+    await quick.open('spec-quick', { headed: false, documents: [] });
     try {
       await quick.page.setContent(NEXT_PAGE);
       await quick.observe();
@@ -418,7 +418,7 @@ describe('the Playwright browser', () => {
     // second after its own reload, reported a landing page without the search
     // control the screenshot taken moments later shows.
     const patient = new PlaywrightBrowser(specBrowserOptions(profiles, { settleRetryMs: 150 }));
-    await patient.open('spec-patient', { headed: false });
+    await patient.open('spec-patient', { headed: false, documents: [] });
     try {
       await patient.page.setContent(LATE_PAGE);
       const observation = await patient.observe();
@@ -440,7 +440,7 @@ describe('the Playwright browser', () => {
     // over on 33 elements of banner, navigation and search box, with a main
     // that had nothing beneath it yet; each plan made on them was wasted.
     const patient = new PlaywrightBrowser(specBrowserOptions(profiles, { settleRetryMs: 150 }));
-    await patient.open('spec-late-main', { headed: false });
+    await patient.open('spec-late-main', { headed: false, documents: [] });
     try {
       await patient.page.setContent(LATE_MAIN);
       const observation = await patient.observe();

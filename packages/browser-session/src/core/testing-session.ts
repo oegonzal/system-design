@@ -6,7 +6,7 @@ import {
 } from '@sysdesign/contracts';
 
 import type { CapturePolicy } from './engine-context';
-import type { StopSignal } from './ports';
+import type { StopSignal, SuppliedDocument } from './ports';
 import { runSession, type SessionOutcome } from './session-engine';
 import {
   FakeBrowser,
@@ -93,6 +93,8 @@ export interface Scenario {
   operator?: ScriptedOperator;
   ledger?: InMemoryLedger;
   startUrl?: string;
+  /** The files supplied for the documents the mission declares; none unless a scenario says. */
+  documents?: readonly SuppliedDocument[];
   capture?: CapturePolicy;
   /** How many times a refused answer is put back; the shipped settings' once unless a scenario says. */
   asksAfterRefusal?: number;
@@ -140,6 +142,7 @@ export async function runScripted(scenario: Scenario) {
       subjectDeclared: scenario.subjectDeclared ?? true,
       eventsDrainMs: SPEC_EVENTS_DRAIN_MS,
       startUrl: scenario.startUrl,
+      documents: scenario.documents ?? [],
       capture: scenario.capture ?? NO_CAPTURE,
       questionExpiresAfterMs: SPEC_QUESTION_EXPIRY_MS,
       asksAfterRefusal: scenario.asksAfterRefusal ?? SPEC_ASKS_AFTER_REFUSAL,

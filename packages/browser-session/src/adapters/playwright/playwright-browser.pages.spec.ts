@@ -36,7 +36,7 @@ describe('the Playwright browser and the pages a unit opens', () => {
   beforeAll(async () => {
     profiles = mkdtempSync(join(tmpdir(), 'browser-session-profiles-'));
     browser = new PlaywrightBrowser(specBrowserOptions(profiles));
-    await browser.open('spec', { headed: false });
+    await browser.open('spec', { headed: false, documents: [] });
   });
 
   afterAll(async () => {

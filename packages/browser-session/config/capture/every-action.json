@@ -1,4 +1,4 @@
 {
-  "after": ["click", "fill", "select", "press", "scroll"],
+  "after": ["click", "fill", "select", "upload", "press", "scroll"],
   "failures": true
 }

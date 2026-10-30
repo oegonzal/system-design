@@ -16,6 +16,7 @@ import { UNIT_FACET_NAME_MAX_LENGTH, UNIT_NOTE_BOUND, UNIT_STANCES } from '../un
 import { STEP_ACTION_KINDS } from './action-effects';
 import { refNowOf, type RanAction } from './action-identity';
 import { ELEMENT_KINDS } from './element-kind';
+import { DOCUMENT_NAME_MAX_LENGTH } from './mission-documents';
 import { MARK_TOKEN_MAX_LENGTH, marksOn, type Mark } from './mission-marks';
 import { STOP_CAUSE_MAX_LENGTH, STOP_TOKEN_MAX_LENGTH, type StopOnPage } from './mission-stops';
 import {
@@ -147,6 +148,12 @@ export const stepIndexSchema = z.strictObject({
    */
   unitFacets: z.array(bounded.id(UNIT_FACET_NAME_MAX_LENGTH, { min: 1 })).default([]),
   /**
+   * The documents the mission declares, by name: an upload names one of them,
+   * or the limits validator cuts it. Written only when the mission declares
+   * any.
+   */
+  documents: z.array(bounded.id(DOCUMENT_NAME_MAX_LENGTH, { min: 1 })).default([]),
+  /**
    * The units an advisor put on record as forbidden, by identity: a taskStart
    * whose facets match one is cut, with the record's note said back. Written
    * only when there are any; the units merely to avoid are prose for the
@@ -199,6 +206,7 @@ export const indexOf = (
   stops: readonly StopOnPage[],
   causes: readonly string[],
   units: UnitFacts,
+  documents: readonly string[],
 ): z.input<typeof stepIndexSchema> => ({
   pipeline: BROWSER_STEP_PIPELINE_ID,
   maxActions: ACTIONS_BOUND.target,
@@ -231,6 +239,7 @@ export const indexOf = (
   ...(stops.length > 0 ? { stops: [...stops] } : {}),
   ...(causes.length > 0 ? { causes: [...causes] } : {}),
   ...(units.facets.length > 0 ? { unitFacets: [...units.facets] } : {}),
+  ...(documents.length > 0 ? { documents: [...documents] } : {}),
   ...(units.forbidden.length > 0
     ? {
         unitsForbidden: units.forbidden.map((unit) => ({

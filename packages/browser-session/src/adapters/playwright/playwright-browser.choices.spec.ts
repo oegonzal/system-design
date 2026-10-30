@@ -64,7 +64,7 @@ describe('the Playwright browser, on radio questions', () => {
   beforeAll(async () => {
     profiles = mkdtempSync(join(tmpdir(), 'browser-session-profiles-'));
     browser = new PlaywrightBrowser(specBrowserOptions(profiles));
-    await browser.open('spec', { headed: false });
+    await browser.open('spec', { headed: false, documents: [] });
   });
 
   afterAll(async () => {
@@ -102,7 +102,7 @@ describe('the Playwright browser, on radio questions', () => {
 
   it('[BRW-2] says why an action gave up: the call log’s last reason travels with the failure', async () => {
     const quick = new PlaywrightBrowser(specBrowserOptions(profiles, { actionTimeoutMs: 1_500 }));
-    await quick.open('spec-quick', { headed: false });
+    await quick.open('spec-quick', { headed: false, documents: [] });
     try {
       await quick.page.setContent(`<!doctype html><html><body>
         <button type="button">Covered</button>

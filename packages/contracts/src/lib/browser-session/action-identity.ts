@@ -19,13 +19,15 @@ export interface RanAction {
 
 type Named = Pick<ObservedElement, 'ref' | 'role' | 'name'>;
 
-/** What an action carries besides its element: the text typed, the option chosen, the key pressed, the URL opened. */
+/** What an action carries besides its element: the text typed, the option chosen, the document put in, the key pressed, the URL opened. */
 export function actionDetail(action: StepAction): string | null {
   switch (action.kind) {
     case 'fill':
       return action.value;
     case 'select':
       return action.option;
+    case 'upload':
+      return action.document;
     case 'press':
       return action.key;
     case 'navigate':
@@ -44,7 +46,8 @@ export function ranActionOf(action: StepAction, elements: readonly Named[]): Ran
   switch (action.kind) {
     case 'click':
     case 'fill':
-    case 'select': {
+    case 'select':
+    case 'upload': {
       const element = elements.find((candidate) => candidate.ref === action.ref);
       return {
         kind: action.kind,

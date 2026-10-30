@@ -70,4 +70,15 @@ describe('the identity of an action that ran', () => {
       refNowOf({ kind: 'press', role: null, name: null, detail: 'Enter' }, reminted),
     ).toBeNull();
   });
+
+  it('[BRW-26] an upload is identified by its element and the document it carries', () => {
+    const upload: StepAction = { kind: 'upload', ref: 'f1', document: 'resume', ...common };
+    expect(actionDetail(upload)).toBe('resume');
+    expect(ranActionOf(upload, [{ ref: 'f1', role: 'button', name: 'Attach résumé' }])).toEqual({
+      kind: 'upload',
+      role: 'button',
+      name: 'Attach résumé',
+      detail: 'resume',
+    });
+  });
 });

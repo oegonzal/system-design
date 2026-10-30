@@ -24,6 +24,7 @@ import {
 import { readWithinBudget } from './budgeted-read';
 import { busyCheck } from './busy-check';
 import { readElementFacts } from './element-facts';
+import { readFileControls } from './file-controls';
 import type { ObservePolicy } from './observe-policy';
 import {
   failedWholesale,
@@ -142,13 +143,15 @@ export class PageReader {
             ),
           ];
     });
+    const files = await readFileControls(page, this.policy.factsTimeoutMs);
     const focused = nodes.findIndex((node) => node.attributes['active'] === true);
     return {
       url: page.url(),
       title: await page.title(),
       snapshot,
       nodes,
-      elements,
+      elements: [...elements, ...files.elements],
+      fileControls: files.refs,
       unreadElements: unread,
       unreadSnapshotLines: unreadSnapshotLines(snapshot, nodes),
       focusedScope: focused < 0 ? null : (ancestry[focused]?.scope ?? null),

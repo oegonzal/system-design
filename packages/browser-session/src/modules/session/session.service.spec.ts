@@ -96,7 +96,7 @@ describe('the session service, end to end', () => {
       cause: 'mission-complete',
     });
     expect(outcome.steps).toBe(5);
-    expect(browser.opened).toEqual({ profile: 'spec', headed: false });
+    expect(browser.opened).toEqual({ profile: 'spec', headed: false, documents: [] });
     expect(browser.closed).toBe(true);
 
     // The rubric was derived once for each pipeline the session runs, and every start request carried it.

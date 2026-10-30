@@ -69,6 +69,8 @@ export function describeAction(action: StepAction, observation: PageObservation)
       return `fill ${named(action.ref, observation)} with ${quoted(action.value)}`;
     case 'select':
       return `select ${quoted(action.option)} in ${named(action.ref, observation)}`;
+    case 'upload':
+      return `upload ${quoted(action.document)} into ${named(action.ref, observation)}`;
     case 'press':
       return `press ${action.key}`;
     case 'scroll':
