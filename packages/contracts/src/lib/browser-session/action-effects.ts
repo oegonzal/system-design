@@ -54,6 +54,18 @@ export interface ActionEffects {
    * dialog and mark rules still hold for it.
    */
   readonly sight: boolean;
+  /**
+   * It may open a page of its own: a click or a key press activates whatever
+   * it hits, and a link or a form may answer in a new tab. The browser waits
+   * its declared page-open wait for that page before the next read, so the
+   * step after the action observes the page it opened and not the page it
+   * was taken on; a fill, a select or an upload changes a control and opens
+   * nothing. Measured 2026-10-30: a job list's card opened its job page in a
+   * tab 195 to 735 ms after the click returned, and a live session read the
+   * unchanged list 1.1 s after the click and planned a step on it, twice in
+   * one unit.
+   */
+  readonly opens: boolean;
   readonly page: 'none' | 'may-change' | 'replaces';
   /** It asserts something the page shows. */
   readonly claims: boolean;
@@ -70,10 +82,13 @@ export interface ActionEffects {
 const effects = (
   touches: boolean,
   page: ActionEffects['page'],
-  otherEffects: Partial<Pick<ActionEffects, 'claims' | 'terminal' | 'endsSession' | 'sight'>> = {},
+  otherEffects: Partial<
+    Pick<ActionEffects, 'claims' | 'terminal' | 'endsSession' | 'sight' | 'opens'>
+  > = {},
 ): ActionEffects => ({
   touches,
   sight: otherEffects.sight ?? true,
+  opens: otherEffects.opens ?? false,
   page,
   claims: otherEffects.claims ?? false,
   terminal: otherEffects.terminal ?? false,
@@ -82,11 +97,11 @@ const effects = (
 
 export const ACTION_EFFECTS = {
   navigate: effects(false, 'replaces'),
-  click: effects(true, 'may-change'),
+  click: effects(true, 'may-change', { opens: true }),
   fill: effects(true, 'may-change'),
   select: effects(true, 'may-change'),
   upload: effects(true, 'may-change', { sight: false }),
-  press: effects(false, 'may-change'),
+  press: effects(false, 'may-change', { opens: true }),
   scroll: effects(false, 'none'),
   waitFor: effects(false, 'none'),
   screenshot: effects(false, 'none'),

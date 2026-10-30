@@ -53,6 +53,7 @@ const positive = z.number().int().positive();
 /** How the browser waits on and reads a page; each field's meaning is `ObservePolicy`'s. */
 const observePolicySchema = z.strictObject({
   actionTimeoutMs: positive,
+  pageOpenWaitMs: positive,
   settleTimeoutMs: positive,
   settleRetryMs: positive,
   emptySnapshotReads: positive,

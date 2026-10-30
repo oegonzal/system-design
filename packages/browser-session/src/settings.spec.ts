@@ -55,6 +55,7 @@ describe('the session settings', () => {
     expect(shipped.sources.observe).toMatch(/config\/observe\/standard\.json$/);
     expect(shipped.observe).toEqual({
       actionTimeoutMs: 15000,
+      pageOpenWaitMs: 1500,
       settleTimeoutMs: 10000,
       settleRetryMs: 400,
       emptySnapshotReads: 4,

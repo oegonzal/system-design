@@ -16,6 +16,7 @@ import { specBrowserOptions } from './testing';
 const LISTING = `<!doctype html><html><head><title>Listing</title></head><body>
   <a href="about:blank" target="_blank">Open job</a>
   <a href="about:blank" target="_blank">Open another</a>
+  <button type="button" onclick="setTimeout(() => window.open('about:blank'), 500)">Open later</button>
 </body></html>`;
 
 const page = (title: string) =>
@@ -101,5 +102,18 @@ describe('the Playwright browser and the pages a unit opens', () => {
     expect(await browser.closeOpenedPages()).toEqual({ closed: 1, front: opener.url() });
     expect(browser.page).toBe(opener);
     expect(await browser.closeOpenedPages()).toEqual({ closed: 0, front: opener.url() });
+  });
+
+  it('[BRW-25] waits for the page a click opens late, so the next read is of that page and not of the opener', async () => {
+    const opener = browser.page;
+    await opener.setContent(LISTING);
+    const observation = await browser.observe();
+    const later = observation.elements.find((e) => e.role === 'button' && e.name === 'Open later');
+    if (later === undefined) throw new Error('no button "Open later" observed');
+
+    // No wait of the spec's own: the adapter's declared page-open wait covers a page opened after the click returned.
+    await browser.act(click(later.ref));
+    expect(browser.page).not.toBe(opener);
+    expect(await browser.closeOpenedPages()).toEqual({ closed: 1, front: opener.url() });
   });
 });

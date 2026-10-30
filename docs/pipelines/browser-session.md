@@ -180,7 +180,12 @@ the lenses read what it says of another item as no statement about this one.
 
 A mission whose listing opens each item on a page of its own, and the item's
 apply control a third page on another site, runs on the same engine: the
-session follows the newest tab, and a unit's pages close with it. Then:
+session follows the newest tab, and a unit's pages close with it. A click or
+a key press is followed by the observe settings' `pageOpenWaitMs` wait for a
+page it opened to register (measured 2026-10-30: 195 to 735 ms after the
+click), so the step after a card click or an apply link reads the opened tab;
+a tab that registers later still is read on the step after, at the cost of
+one plan on the unchanged page. Then:
 
 ```bash
 jq -r '.url' static/sessions/<id>/01-steps/NN/observation.json                   # the step after a card click reads the job page — never about:blank, never the listing still

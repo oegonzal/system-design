@@ -1,6 +1,7 @@
 import { join } from 'node:path';
 
 import {
+  ACTION_EFFECTS,
   actionRefs,
   pageObservationSchema,
   type LandmarkRole,
@@ -121,6 +122,7 @@ export class PlaywrightBrowser implements BrowserPort {
   async act(action: BrowserAction): Promise<void> {
     const label = `${action.kind}${'ref' in action && action.ref !== null ? ` ${action.ref}` : ''}`;
     const targets = actionRefs(action).map((ref) => this.resolve(ref, label));
+    const opened = this.pageOpenedBy(action);
     try {
       await performAction(
         {
@@ -136,6 +138,24 @@ export class PlaywrightBrowser implements BrowserPort {
       if (error instanceof ActionFailed) throw error;
       throw new ActionFailed(label, actionFailureOf(error));
     }
+    await opened;
+  }
+
+  /**
+   * The page an action may open, listened for from before the action runs —
+   * a tab registers with Playwright some hundreds of milliseconds after the
+   * click that opened it — waited for up to the declared wait, and read to
+   * its document once it registers, so the next observation is of that page
+   * and never of the page the action was taken on. An action that opens
+   * nothing costs the wait; one that cannot open a page costs nothing.
+   */
+  private pageOpenedBy(action: BrowserAction): Promise<void> {
+    if (this.context === null || !ACTION_EFFECTS[action.kind].opens) return Promise.resolve();
+    const { pageOpenWaitMs, settleTimeoutMs } = this.options.observe;
+    return this.context
+      .waitForEvent('page', { timeout: pageOpenWaitMs })
+      .then((page) => page.waitForLoadState('domcontentloaded', { timeout: settleTimeoutMs }))
+      .catch(() => undefined);
   }
 
   async highlight(ref: string): Promise<void> {

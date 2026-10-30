@@ -1,5 +1,6 @@
 {
   "actionTimeoutMs": 15000,
+  "pageOpenWaitMs": 1500,
   "settleTimeoutMs": 10000,
   "settleRetryMs": 400,
   "emptySnapshotReads": 4,

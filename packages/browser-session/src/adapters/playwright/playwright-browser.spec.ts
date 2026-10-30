@@ -28,6 +28,8 @@ const FORM = `<!doctype html><html><head><title>Apply — step 2</title>
     <small id="years-help">Whole years, professional only.</small>
     <label for="auth">Work authorisation</label>
     <select id="auth" name="auth" required><option value="">Choose…</option><option>Yes</option><option>No</option></select>
+    <div><div>Are you legally authorized to work here?*</div><select name="legal" required><option value="">Please Select</option><option>Yes</option><option>No</option></select></div>
+    <div><div>Do you require sponsorship?*</div><select name="sponsor" aria-label="Please Select" required><option value="">Please Select</option><option>Yes</option><option>No</option></select></div>
     <input class="hp" name="website" type="text" autocomplete="off">
     <label><input type="checkbox" name="remote"> Remote only</label>
     <button type="button" tabindex="-1">Hidden helper</button>
@@ -207,6 +209,17 @@ describe('the Playwright browser', () => {
     // "Choose…" is the required select's placeholder label option: choosing it is choosing nothing.
     expect(auth.options).toEqual(['Yes', 'No']);
     expect(auth.value).toBeNull();
+    // A labelled control reads no words before it; one nothing explains, or one named only by its
+    // placeholder option, carries the words before it in its group — the one place its question sits.
+    expect(auth.context).toBeNull();
+    expect(byName(observation, 'combobox', 'legal')).toMatchObject({
+      options: ['Yes', 'No'],
+      context: 'Are you legally authorized to work here?*',
+    });
+    expect(byName(observation, 'combobox', 'Please Select')).toMatchObject({
+      options: ['Yes', 'No'],
+      context: 'Do you require sponsorship?*',
+    });
     expect(byName(observation, 'checkbox', 'Remote only')).toMatchObject({ value: 'unchecked' });
     expect(byName(observation, 'button', 'Save').disabled).toBe(true);
     expect(byName(observation, 'button', 'Hidden helper').hiddenTraits).toEqual([

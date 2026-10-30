@@ -8,6 +8,16 @@
 export interface ObservePolicy {
   /** The default timeout of every Playwright action the session takes. */
   actionTimeoutMs: number;
+  /**
+   * How long, after an action that may open a page (`ActionEffects.opens`),
+   * the browser waits for the page it opened to register before the page is
+   * read again; a page that registers is read to its document first. Measured
+   * 2026-10-30: a job list's card title opened the job page in a new tab 195
+   * to 735 ms after the click returned, headless, while the live headed
+   * session read the unchanged list 1.1 s after the click, planned a step on
+   * it, and observed the tab only on the step after — twice in one unit.
+   */
+  pageOpenWaitMs: number;
   /** How long the observer waits for the document to settle before each read of the page. */
   settleTimeoutMs: number;
   /** How long it waits between reads that came back without a ref or that differ from the read before. */

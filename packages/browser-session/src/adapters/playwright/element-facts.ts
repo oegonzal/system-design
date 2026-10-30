@@ -63,6 +63,53 @@ function elementFactsInPage(
       .map((id) => text(el.ownerDocument.getElementById(id)))
       .filter((part) => part.length > 0)
       .join(' ');
+  /** Whether anything the page offers a person explains the control: a label, an ARIA name, a placeholder or a title. */
+  const explained =
+    (input.labels !== undefined && input.labels !== null && input.labels.length > 0) ||
+    attr('aria-label') !== null ||
+    attr('aria-labelledby') !== null ||
+    attr('placeholder') !== null ||
+    attr('title') !== null;
+  /** What the page names the control by itself: its ARIA name, its label, else its title. */
+  const ownName =
+    attr('aria-label') ||
+    byIds(attr('aria-labelledby')) ||
+    text(Array.from(input.labels ?? [])[0]) ||
+    attr('title') ||
+    '';
+  /** A select's placeholder option — the first — by its words; a name that is only those words asks nothing. */
+  const selectPlaceholder = tag === 'select' ? text((el as HTMLSelectElement).options[0]) : '';
+  /**
+   * The words just before a control whose name asks nothing, in its group —
+   * what a person reads as its question: the node before it, over any blank
+   * text, unless that node is or holds a control of its own; read only when
+   * no legend and no shared question names it. A name asks nothing when
+   * nothing explains the control, or when a select is named by its own
+   * placeholder option. Measured 2026-10-30: a job site's own form
+   * put each question in the node before its select and named the select
+   * "Please Select", so seven required selects were observed with no words
+   * of their own — two of them yes-or-no questions with opposite answers.
+   */
+  const precedingWords = (): string => {
+    const nameAsksNothing =
+      !explained || (selectPlaceholder !== '' && ownName === selectPlaceholder);
+    if (!nameAsksNothing) return '';
+    let node: ChildNode | null = el.previousSibling;
+    while (
+      node !== null &&
+      node.nodeType === Node.TEXT_NODE &&
+      (node.textContent ?? '').trim() === ''
+    ) {
+      node = node.previousSibling;
+    }
+    if (node === null) return '';
+    if (node.nodeType !== Node.ELEMENT_NODE) {
+      return (node.textContent ?? '').replace(/\s+/g, ' ').trim();
+    }
+    const before = node as Element;
+    const control = 'input, select, textarea, button, [role="combobox"], [role="radiogroup"]';
+    return before.matches(control) || before.querySelector(control) !== null ? '' : text(before);
+  };
   const labelOf = (node: Element): string =>
     node.getAttribute('aria-label') ||
     byIds(node.getAttribute('aria-labelledby')) ||
@@ -301,12 +348,6 @@ function elementFactsInPage(
     if (rect.width === 0 || rect.height === 0 || clipped) traits.push('zero-size');
     const tabindex = attr('tabindex');
     if (tabindex !== null && Number(tabindex) < 0) traits.push('tabindex-negative');
-    const explained =
-      (input.labels !== undefined && input.labels !== null && input.labels.length > 0) ||
-      attr('aria-label') !== null ||
-      attr('aria-labelledby') !== null ||
-      attr('placeholder') !== null ||
-      attr('title') !== null;
     if (tag === 'input' && (attr('autocomplete') ?? '').toLowerCase() === 'off' && !explained) {
       traits.push('autocomplete-off-bait');
     }
@@ -332,11 +373,14 @@ function elementFactsInPage(
       (tag === 'input' || tag === 'textarea') && input.maxLength > 0 ? input.maxLength : null;
     // What a file control accepts is what the page tells a person beside it.
     const accept = fileControl ? (attr('accept') ?? '') : '';
+    // Its question: the legend of its fieldset, the question its radios are
+    // named after, else the words before it — one of them, never two.
+    const question =
+      text(el.closest('fieldset')?.querySelector('legend')) || sharedQuestion() || precedingWords();
     const context = [
       byIds(attr('aria-describedby')),
       attr('placeholder') ?? '',
-      text(el.closest('fieldset')?.querySelector('legend')),
-      sharedQuestion(),
+      question,
       accept === '' ? '' : `accepts ${accept}`,
     ]
       .filter((part) => part.length > 0)
