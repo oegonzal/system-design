@@ -24,6 +24,7 @@ import type { Severity } from '../quality-loop/vocab';
 import { excerpt, quoted, quotedJson } from '../text';
 import { unitKeySchema } from '../units/identity';
 import { MEMORY_SCOPES } from '../units/scope';
+import { acceptsTypedText } from './element-kind';
 import { EVIDENCE_ALIAS, FIELDS_BOUND } from './field-answers.schema';
 import { FORM_GOAL_TERMS, kindsLegend, scopeLegend } from './field-goal-terms';
 import {
@@ -155,13 +156,17 @@ export const fieldLabelOf = (field: Pick<FieldSpec, 'name' | 'context'>): string
 /**
  * The options a value for the field must be one of: its listed ones when the
  * page offers no more, else null — the list is open, and a value the page
- * offers past it may stand. The one statement of a closed list, whoever the
- * value comes from: the answerer's validators and the operator's prompt.
+ * offers past it may stand. A control typed into lists only what it offers
+ * for the words it holds, so its list is never closed. The one statement of a
+ * closed list, whoever the value comes from: the answerer's validators and
+ * the operator's prompt.
  */
 export const closedOptionsOf = (
-  field: Pick<FieldSpec, 'options' | 'optionsOmitted'>,
+  field: Pick<FieldSpec, 'options' | 'optionsOmitted' | 'inputType'>,
 ): readonly string[] | null =>
-  field.options !== null && field.optionsOmitted === 0 ? field.options : null;
+  field.options !== null && field.optionsOmitted === 0 && !acceptsTypedText(field.inputType)
+    ? field.options
+    : null;
 
 /** A number input takes a number: not blank, and one `Number` reads whole. */
 const isNumeric = (value: string): boolean =>

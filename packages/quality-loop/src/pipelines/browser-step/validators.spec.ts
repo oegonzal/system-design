@@ -93,6 +93,37 @@ describe('the browser-step validators', () => {
     ]);
   });
 
+  it('[BRW-27] a control typed into that lists options is chosen from by a select, on any words: the browser types them and chooses', () => {
+    const typed = stepGoal({
+      ...formObservation(),
+      elements: formObservation().elements.map((element) =>
+        element.ref === 'e1'
+          ? {
+              ...element,
+              role: 'combobox',
+              kind: 'fillable' as const,
+              inputType: 'search',
+              options: ['United States Minor Outlying Islands', 'United States of America'],
+              optionsOmitted: 0,
+            }
+          : element,
+      ),
+    });
+    expect(problems(samplePlan([select('e1', 'United States of America')]), typed).limits).toEqual(
+      [],
+    );
+    // What it lists is only what it offers for the words it holds: other words may pass.
+    expect(problems(samplePlan([select('e1', 'United States')]), typed).limits).toEqual([]);
+    // A field typed into that lists nothing still offers nothing to select.
+    expect(problems(samplePlan([select('e1', 'Yes')]), form).limits).toEqual([
+      {
+        severity: 'high',
+        locationRefs: ['action.1'],
+        message: 'e1 offers nothing to select (fillable)',
+      },
+    ]);
+  });
+
   it('[QL-36] a select is held to the listed options only when the list is whole: past a counted cut, the page decides', () => {
     const counted = stepGoal({
       ...formObservation(),

@@ -3,10 +3,11 @@
  * observation listed under its ref. Nothing here decides what to do: the
  * action is the plan's, and the adapter only does it.
  */
-import { escapeRegExp, type ObservedElement } from '@sysdesign/contracts';
+import { choosesByTyping, escapeRegExp, type ObservedElement } from '@sysdesign/contracts';
 import type { Locator, Page } from 'playwright';
 
 import type { BrowserAction } from '../../core/ports';
+import { chooseByTyping } from './typed-choice';
 
 /** Words an element shows whole, around its own whitespace — never a longer text they begin. */
 const wholeText = (words: string): RegExp => new RegExp(`^\\s*${escapeRegExp(words)}\\s*$`);
@@ -19,6 +20,8 @@ export interface ActionSurface {
   documentPath(name: string): string;
   /** How far one page-level scroll moves, in CSS pixels. */
   scrollPx: number;
+  /** How long a select on a control typed into waits for the option whose words it typed. */
+  optionWaitMs: number;
 }
 
 export async function performAction(
@@ -72,11 +75,12 @@ export async function performAction(
 /**
  * A `<select>` takes the option by label; a radio group checks the radio
  * its option names — by its accessible name when that names one radio, else
- * by the words it shows, as the observation read its options; anything else
- * opens and picks.
+ * by the words it shows, as the observation read its options; a control typed
+ * into types the option's words and chooses that option; anything else opens
+ * and picks.
  */
 async function select(
-  { page, locate }: ActionSurface,
+  { page, locate, optionWaitMs }: ActionSurface,
   target: ObservedElement | null,
   ref: string,
   option: string,
@@ -97,6 +101,10 @@ async function select(
   }
   if (target?.role === 'radio') {
     await locator.check();
+    return;
+  }
+  if (target !== null && choosesByTyping(target.role, target)) {
+    await chooseByTyping(locator, option, optionWaitMs);
     return;
   }
   await locator.click();

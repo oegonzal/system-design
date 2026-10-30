@@ -59,4 +59,12 @@ export interface ObservePolicy {
   stableReads: number;
   /** How far one page-level scroll moves, in CSS pixels. */
   scrollPx: number;
+  /**
+   * How long a select on a control both typed into and chosen from waits,
+   * after typing the option's words, for that option to show in the lists the
+   * control names. It ends the moment the option shows, so only a choice that
+   * fails waits it out. Provisional (2026-10-30): a typing debounce plus one
+   * lookup, twice over; measured live and resized as `pageOpenWaitMs` was.
+   */
+  optionWaitMs: number;
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   acceptsTypedText,
+  choosesByTyping,
   ELEMENT_KIND_BY_ROLE,
   ELEMENT_KIND_WHEN_TYPED,
   elementKind,
@@ -10,6 +11,19 @@ import {
 } from './element-kind';
 
 describe('what an element affords', () => {
+  it('[BRW-27] names a control both typed into and chosen from by its role and the control beneath it, never by its name', () => {
+    // An input with the combobox role: typed into, and committed by a choice.
+    expect(choosesByTyping('combobox', { inputType: 'search' })).toBe(true);
+    expect(choosesByTyping('combobox', { inputType: 'text' })).toBe(true);
+    expect(choosesByTyping('combobox', { inputType: 'textarea' })).toBe(true);
+    // A combobox on no typed control, or on a native select, is chosen from alone.
+    expect(choosesByTyping('combobox', { inputType: null })).toBe(false);
+    expect(choosesByTyping('combobox', { inputType: 'select' })).toBe(false);
+    // A role typed into that offers no choice, and a choice no one types into, are neither.
+    expect(choosesByTyping('textbox', { inputType: 'text' })).toBe(false);
+    expect(choosesByTyping('radio', { inputType: 'radio' })).toBe(false);
+  });
+
   it('[BRW-2] settles an ambiguous role by the control beneath it, and leaves every unambiguous role to the table', () => {
     // The live case: a site's search box is a textarea the author gave the
     // combobox role. Read from the role alone it is `selectable`, which makes

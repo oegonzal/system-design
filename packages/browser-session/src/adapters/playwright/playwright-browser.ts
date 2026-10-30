@@ -130,6 +130,7 @@ export class PlaywrightBrowser implements BrowserPort {
           locate: (ref) => this.locate(ref),
           documentPath: (name) => this.documentPath(name),
           scrollPx: this.options.observe.scrollPx,
+          optionWaitMs: this.options.observe.optionWaitMs,
         },
         action,
         targets[0] ?? null,

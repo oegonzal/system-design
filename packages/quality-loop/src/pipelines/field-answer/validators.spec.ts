@@ -57,6 +57,32 @@ describe('the field-answer validators', () => {
     ]);
   });
 
+  it('[BRW-27] keeping words a field holds that are none of its options is a warning on that field: such words are no choice', () => {
+    const holding = (value: string, options: string[]) =>
+      fieldGoal(
+        undefined,
+        sampleFields().map((field) =>
+          field.ref === 'e2' ? { ...field, inputType: 'search', value, options } : field,
+        ),
+      );
+    const kept = withAnswer('e2', answer('e2', { decision: 'keep', value: null, rests: 'none' }));
+    expect(
+      problems(kept, holding('United States', ['United States Minor Outlying Islands', 'Canada']))
+        .limits,
+    ).toEqual([
+      {
+        severity: 'medium',
+        locationRefs: ['field.2'],
+        message:
+          'e2 holds "United States", none of its options: words that are no choice are answered, never kept',
+      },
+    ]);
+    // Words that are one of its options are kept freely.
+    expect(
+      problems(kept, holding('Canada', ['United States of America', 'Canada'])).limits,
+    ).toEqual([]);
+  });
+
   it('[QL-37] a value is present iff the decision is answer', () => {
     expect(problems(withAnswer('e1', answer('e1', { basis: ['m1'] }))).limits).toEqual([
       { severity: 'medium', locationRefs: ['field.1'], message: 'e1 is answered with no value' },

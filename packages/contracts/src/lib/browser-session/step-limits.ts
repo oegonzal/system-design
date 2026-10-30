@@ -74,7 +74,7 @@ const STEP_LIMITS: readonly Limit[] = [
   },
   {
     line: () =>
-      '- Never act on a disabled, not-visible or behind-the-dialog element; fill only what can be typed into; select only a listed option, or where the list counts more the page offers, one of those, verbatim.',
+      "- Never act on a disabled, not-visible or behind-the-dialog element; fill only what can be typed into; select only a listed option, or where the list counts more the page offers, one of those, verbatim. A field you type into that lists options is chosen from by select too: the select types the option's words and chooses that option.",
   },
   { line: () => '- A field the page hides is never filled or selected.' },
   // A claim rests on the page as observed. Measured 2026-10-07: twelve plans

@@ -154,9 +154,13 @@ function elementFaults(
       fault('high', `${ref} cannot be typed into (${element.kind})`);
     }
     if (action.kind === 'select') {
-      if (element.kind !== 'selectable') {
+      // A control typed into that lists options is chosen from too: the
+      // select types the option's words and chooses it, and the list it shows
+      // is only what it offers for the words it holds, so any words may pass.
+      if (element.kind !== 'selectable' && element.options === null) {
         fault('high', `${ref} offers nothing to select (${element.kind})`);
       } else if (
+        element.kind === 'selectable' &&
         element.options !== null &&
         element.optionsOmitted === 0 &&
         !element.options.includes(action.option)

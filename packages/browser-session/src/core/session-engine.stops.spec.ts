@@ -114,8 +114,12 @@ describe('how a plan stops and how a session ends', () => {
     expect(form.browser.pageId).toBe('form');
     expect(form.browser.calls).not.toContain('click e6');
     expect(form.operator.questions).toEqual([]);
+    // The note names the field the page refused, and why: the next plan answers it rather than repeating it.
     expect(form.brain.planInputs[3]?.history.slice(-1).map((h) => [h.outcome, h.note])).toEqual([
-      ['failed', '3 field(s): 0 filled, 0 kept, 0 asked, 0 blank, 1 failed, 2 not attempted'],
+      [
+        'failed',
+        '3 field(s): 0 filled, 0 kept, 0 asked, 0 blank, 1 failed, 2 not attempted — Years of experience with Python: fill e1: the element is detached',
+      ],
     ]);
     expect(form.brain.planInputs[3]?.lastStep?.held).toEqual(['click']);
     const rows = form.detail.decisions.filter((d) => d.kind === 'field-answer');

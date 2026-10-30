@@ -248,12 +248,14 @@ const summarize = (results: readonly FieldResult[], listed: number): string => {
   const count = (route: FieldRoute): number =>
     results.filter((r) => r.reply === null && r.route === route && r.outcome === 'ok').length;
   const failed = results.filter((r) => r.outcome === 'failed').length;
+  // The field the page refused, by name, and why: the next plan answers it, never repeats it.
+  const refusal = results.find((r) => r.outcome === 'failed');
   const unattempted = listed - results.length;
   return `${listed} field(s): ${count('fill')} filled, ${count('keep')} kept, ${asked.length} asked${
     asked.length > 0 ? ` (${answered} answered by the operator)` : ''
   }, ${count('leave-blank')} blank${failed > 0 ? `, ${failed} failed` : ''}${
     unattempted > 0 ? `, ${unattempted} not attempted` : ''
-  }`;
+  }${refusal === undefined ? '' : ` — ${refusal.label}: ${refusal.detail ?? 'refused'}`}`;
 };
 
 /** The listed fields the refs name, in the order asked. */

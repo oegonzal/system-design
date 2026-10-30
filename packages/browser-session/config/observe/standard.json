@@ -8,5 +8,6 @@
   "observeBudgetMs": 20000,
   "wholesaleReads": 3,
   "stableReads": 4,
-  "scrollPx": 600
+  "scrollPx": 600,
+  "optionWaitMs": 3000
 }

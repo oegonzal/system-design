@@ -1,4 +1,5 @@
 import {
+  choosesByTyping,
   elementKind,
   fieldLabelOf,
   fieldQuestionOf,
@@ -44,9 +45,9 @@ export interface FieldResult {
   filledFrom: { runId: string | null; orchestrationRunId: string | null } | null;
 }
 
-/** The browser action that puts a value into a field: an option for a selectable one, text otherwise. */
+/** The browser action that puts a value into a field: an option for one chosen from — typed into or not — text otherwise. */
 export const fillActionOf = (field: FieldSpec, value: string): BrowserAction =>
-  elementKind(field.role, field) === 'selectable'
+  elementKind(field.role, field) === 'selectable' || choosesByTyping(field.role, field)
     ? {
         kind: 'select',
         ref: field.ref,

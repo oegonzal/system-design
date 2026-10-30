@@ -6,6 +6,7 @@ import { GoalBudgetExceeded } from '../quality-loop/goal-index';
 import { SOURCE_ID_MAX_LENGTH, SOURCE_REF_MAX_LENGTH } from '../quality-loop/memory';
 import { evidenceAlias, fieldAnswersSchema, FIELDS_BOUND } from './field-answers.schema';
 import {
+  closedOptionsOf,
   composeFieldGoal,
   EVIDENCE_TEXT_MAX_LENGTH,
   evidenceText,
@@ -266,6 +267,16 @@ describe('composeFieldGoal', () => {
       { severity: 'medium', message: 'e1 takes at most 1 characters; the value runs to 2' },
     ]);
     expect(valueFaults(hidden, 'x')[0]?.severity).toBe('high');
+  });
+
+  it('[BRW-27] holds the options of a control typed into open: it lists only what it offers for the words it holds', () => {
+    const [, auth] = fields();
+    if (auth === undefined) throw new Error('the form fixture lists no chosen field');
+    const typed = { ...auth, inputType: 'search' };
+    expect(closedOptionsOf(auth)).toEqual(auth.options);
+    expect(closedOptionsOf(typed)).toBeNull();
+    // Words past what it offers are the page's to take or refuse: no fault.
+    expect(valueFaults(typed, 'Maybe')).toEqual([]);
   });
 
   it('[QL-39] finds its own fields heading even when the prose uses the same words', () => {

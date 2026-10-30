@@ -64,6 +64,7 @@ describe('the session settings', () => {
       wholesaleReads: 3,
       stableReads: 4,
       scrollPx: 600,
+      optionWaitMs: 3000,
     });
     // The operator is asked at the terminal and through the notifications service.
     expect(shipped.sources.operator).toMatch(/config\/operator\/terminal-and-notifications\.json$/);

@@ -1,0 +1,160 @@
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import type { ObservedElement, PageObservation, StepAction } from '@sysdesign/contracts';
+
+import { ActionFailed } from '../../core/ports';
+import { PlaywrightBrowser } from './playwright-browser';
+import { specBrowserOptions } from './testing';
+
+/**
+ * Against the Chromium Playwright bundles, headless, on a throwaway profile:
+ * a field typed into and chosen from — an input with the combobox role whose
+ * suggestions render a moment after the typing, which commits only when an
+ * option is chosen and clears unchosen words when the field is left, as the
+ * country field measured on 2026-10-30 did. Run with the `browser` vitest
+ * project.
+ */
+const FORM = `<!doctype html><html><head><title>Apply — address</title></head>
+<body>
+  <main>
+    <form>
+      <label for="country">Country *</label>
+      <input id="country" type="search" role="combobox" aria-autocomplete="list" aria-controls="country-list" required>
+      <ul id="country-list" role="listbox"></ul>
+      <label for="region">Region</label>
+      <input id="region" type="search" role="combobox" aria-autocomplete="list" aria-controls="region-list">
+      <ul id="region-list" role="listbox"></ul>
+      <label for="city">City</label>
+      <input id="city" type="text">
+      <span id="size-label">Team size</span>
+      <div id="size" role="combobox" aria-labelledby="size-label" aria-controls="sizes" tabindex="0">Choose</div>
+      <ul id="sizes" role="listbox"><li role="option">Small</li><li role="option">Large</li></ul>
+    </form>
+  </main>
+  <script>
+    // A scope of its own: setContent keeps the window, and a top-level declaration would clash on the next load.
+    (() => {
+    const COUNTRIES = ['United States Minor Outlying Islands', 'United States of America', 'Canada'];
+    const country = document.getElementById('country');
+    const list = document.getElementById('country-list');
+    let chosen = '';
+    country.addEventListener('input', () => {
+      const words = country.value;
+      list.innerHTML = '';
+      setTimeout(() => {
+        if (country.value !== words) return;
+        for (const name of COUNTRIES.filter((c) => words !== '' && c.startsWith(words.split(' ')[0]))) {
+          const option = document.createElement('li');
+          option.setAttribute('role', 'option');
+          option.textContent = name;
+          option.addEventListener('mousedown', (event) => {
+            event.preventDefault();
+            chosen = name;
+            country.value = name;
+            list.innerHTML = '';
+          });
+          list.appendChild(option);
+        }
+      }, 100);
+    });
+    country.addEventListener('blur', () => {
+      if (country.value !== chosen) country.value = '';
+    });
+    document.getElementById('sizes').addEventListener('click', (event) => {
+      document.getElementById('size').textContent = event.target.textContent;
+    });
+    })();
+  </script>
+</body></html>`;
+
+const common = { reason: 'the procedure says so', expect: null, serves: [] };
+const select = (ref: string, option: string): Extract<StepAction, { kind: 'select' }> => ({
+  kind: 'select',
+  ref,
+  option,
+  ...common,
+});
+const fill = (ref: string, value: string): Extract<StepAction, { kind: 'fill' }> => ({
+  kind: 'fill',
+  ref,
+  value,
+  ...common,
+});
+
+const byName = (observation: PageObservation, role: string, name: string): ObservedElement => {
+  const element = observation.elements.find((e) => e.role === role && e.name === name);
+  if (element === undefined) throw new Error(`no ${role} "${name}" observed`);
+  return element;
+};
+
+describe('the Playwright browser and a field typed into and chosen from', () => {
+  let profiles: string;
+  let browser: PlaywrightBrowser;
+
+  beforeAll(async () => {
+    profiles = mkdtempSync(join(tmpdir(), 'browser-session-profiles-'));
+    // A short wait keeps the spec quick; the shipped value is the settings'.
+    browser = new PlaywrightBrowser(specBrowserOptions(profiles, { optionWaitMs: 1000 }));
+    await browser.open('spec', { headed: false, documents: [] });
+  });
+
+  afterAll(async () => {
+    await browser.close();
+    rmSync(profiles, { recursive: true, force: true });
+  });
+
+  /** The page fresh, its country field as observed, and a way to leave the field as Next would. */
+  const fresh = async () => {
+    await browser.page.setContent(FORM);
+    const country = byName(await browser.observe(), 'combobox', 'Country *');
+    const leave = () => browser.page.locator('#city').focus();
+    const read = async () => byName(await browser.observe(), 'combobox', 'Country *');
+    return { country, leave, read };
+  };
+
+  it('[BRW-27] is observed as typed into, and a select on it types the option’s words and chooses that option, which stays when the field is left', async () => {
+    const { country, leave, read } = await fresh();
+    expect(country).toMatchObject({ kind: 'fillable', inputType: 'search', options: null });
+    await browser.act(select(country.ref, 'United States of America'));
+    await leave();
+    expect((await read()).value).toBe('United States of America');
+  });
+
+  it('[BRW-27] chooses nothing for words no option has, naming what the field offered for them, and the words left unchosen go when the field is left', async () => {
+    const { country, leave, read } = await fresh();
+    await expect(browser.act(select(country.ref, 'United States'))).rejects.toThrow(
+      new ActionFailed(
+        'select',
+        'typed "United States": the field offered "United States Minor Outlying Islands", "United States of America" — answer it with one of its options\' exact words',
+      ),
+    );
+    // Until the field is left, the next observation reads the words and what they offered.
+    expect(await read()).toMatchObject({
+      value: 'United States',
+      options: ['United States Minor Outlying Islands', 'United States of America'],
+    });
+    await leave();
+    expect((await read()).value).toBeNull();
+  });
+
+  it('[BRW-27] never chooses on a fill: the words typed whole are still no choice', async () => {
+    const { country, leave, read } = await fresh();
+    await browser.act(fill(country.ref, 'United States of America'));
+    await leave();
+    expect((await read()).value).toBeNull();
+  });
+
+  it('[BRW-27] says the field offered nothing when its list never shows, and leaves a combobox no one types into to open and pick', async () => {
+    await browser.page.setContent(FORM);
+    const region = byName(await browser.observe(), 'combobox', 'Region');
+    await expect(browser.act(select(region.ref, 'West'))).rejects.toThrow(
+      'the field offered nothing for those words',
+    );
+    const size = byName(await browser.observe(), 'combobox', 'Team size');
+    expect(size).toMatchObject({ kind: 'selectable', options: ['Small', 'Large'] });
+    await browser.act(select(size.ref, 'Large'));
+    expect(await browser.page.locator('#size').textContent()).toBe('Large');
+  });
+});

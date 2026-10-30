@@ -62,6 +62,7 @@ const observePolicySchema = z.strictObject({
   wholesaleReads: positive,
   stableReads: positive,
   scrollPx: positive,
+  optionWaitMs: positive,
 }) satisfies z.ZodType<ObservePolicy>;
 
 /** The engine's own stop rules: each a limit that ends the session `stopped`, but `targetDone`, its goal. */

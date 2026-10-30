@@ -11,6 +11,7 @@
 import {
   ANSWER_BASIS_CITES,
   fieldLocation,
+  quotedJson,
   valueFaults,
   type FieldAnswer,
   type FieldAnswers,
@@ -102,6 +103,21 @@ function answerFaults(answer: FieldAnswer, field: FieldSpec): Fault[] {
   }
   if (answer.rests === 'mapped' && field.options === null) {
     fault('medium', `${ref} is mapped yet offers no options`);
+  }
+  // Words a field holds that are none of its whole list of options are no
+  // choice: typed into a field chosen from, they were never committed.
+  if (
+    answer.decision === 'keep' &&
+    field.value !== null &&
+    field.value !== '' &&
+    field.options !== null &&
+    field.optionsOmitted === 0 &&
+    !field.options.includes(field.value)
+  ) {
+    fault(
+      'medium',
+      `${ref} holds ${quotedJson(field.value)}, none of its options: words that are no choice are answered, never kept`,
+    );
   }
   if (answer.decision !== 'answer' && answer.rests !== 'none') {
     fault(

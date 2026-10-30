@@ -102,3 +102,16 @@ export const elementKind = (
   const typed = ELEMENT_KIND_WHEN_TYPED[role];
   return typed !== undefined && acceptsTypedText(facts.inputType) ? typed : elementKindOf(role);
 };
+
+/**
+ * Whether an element is both typed into and chosen from: a role the role
+ * table calls selectable, on a control that takes typed text — an input with
+ * the combobox role, whose suggestions commit only when one is chosen. Its
+ * kind stays what a hand does to it, typing; choosing is what a select on it
+ * does. Measured 2026-10-30: a country field built so took typed words with
+ * no choice, and the form cleared five fields on Next.
+ */
+export const choosesByTyping = (
+  role: string,
+  facts: { readonly inputType: string | null },
+): boolean => elementKindOf(role) === 'selectable' && acceptsTypedText(facts.inputType);

@@ -221,15 +221,17 @@ function elementFactsInPage(
       value = chosen === undefined ? null : optionLabel(chosen) || null;
     }
     if (options === null && (role === 'listbox' || role === 'combobox')) {
-      const controls = attr('aria-controls');
-      const list =
-        controls !== null
-          ? el.ownerDocument.getElementById(controls)
-          : role === 'listbox'
-            ? el
-            : null;
-      if (list !== null) {
-        options = Array.from(list.querySelectorAll('[role="option"]'))
+      // The lists the control names as its own — `aria-controls`, else
+      // `aria-owns` — every id each names; a listbox naming none is its own.
+      const named = (attr('aria-controls') ?? attr('aria-owns') ?? '')
+        .split(/\s+/)
+        .filter((id) => id.length > 0)
+        .map((id) => el.ownerDocument.getElementById(id))
+        .filter((list): list is HTMLElement => list !== null);
+      const lists = named.length > 0 ? named : role === 'listbox' ? [el] : [];
+      if (lists.length > 0) {
+        options = lists
+          .flatMap((list) => Array.from(list.querySelectorAll('[role="option"]')))
           .filter((option) => option.getAttribute('aria-disabled') !== 'true')
           .map((option) => text(option))
           .filter((option) => option.length > 0);
