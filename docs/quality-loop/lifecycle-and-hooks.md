@@ -420,16 +420,15 @@ advised"):
 
 ## 7. Doc drift found while mapping
 
-Each of these names a file, symbol or count the code no longer matches.
-Listed for the owner; nothing here was edited.
+None open. The five passages this map found in `reference.md` and
+`memory-runs.md` were corrected on 2026-10-30.
 
-| Where                                    | Says                                                                                | Code                                                                                                         |
-| ---------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `docs/quality-loop/reference.md:352-353` | `modules/http/` holds `goalRequestSchema` with `MAX_GOAL_LENGTH`                    | no `MAX_GOAL_LENGTH` exists; `goal-request.ts:15` bounds by `GOAL_BUDGET_BYTES` from contracts               |
-| `docs/quality-loop/reference.md:434-435` | runs tokens: `QUALITY_LOOP_LLM`, `PIPELINES_TOKEN`, `TRACE_STORE`, `RUN_REPOSITORY` | `tokens.ts:7-11` also has `RUN_DUMP_DIR`, `RUN_RECALL_SLOT`, `RUN_RECALL_RECORDER`                           |
-| `docs/quality-loop/reference.md:447-450` | live writes are exchanges plus heartbeat; one close transaction                     | progress snapshots per iteration, the ticker, and the `closed / reclaimed / refused` outcomes are missing    |
-| `docs/quality-loop/reference.md:464`     | the orchestration step record is "written whole at the end"                         | `StepLedger` flushes every transition (`ledger.ts:64`); `docs/pipelines/memory-runs.md:437-441` has it right |
-| `docs/pipelines/memory-runs.md:466`      | the `interrupted` reason is raised at boot                                          | also on every sweep interval (`run-janitor.ts:37-44`)                                                        |
+---------------------------------------- | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `docs/quality-loop/reference.md:352-353` | `modules/http/` holds `goalRequestSchema` with `MAX_GOAL_LENGTH` | no `MAX_GOAL_LENGTH` exists; `goal-request.ts:15` bounds by `GOAL_BUDGET_BYTES` from contracts |
+| `docs/quality-loop/reference.md:434-435` | runs tokens: `QUALITY_LOOP_LLM`, `PIPELINES_TOKEN`, `TRACE_STORE`, `RUN_REPOSITORY` | `tokens.ts:7-11` also has `RUN_DUMP_DIR`, `RUN_RECALL_SLOT`, `RUN_RECALL_RECORDER` |
+| `docs/quality-loop/reference.md:447-450` | live writes are exchanges plus heartbeat; one close transaction | progress snapshots per iteration, the ticker, and the `closed / reclaimed / refused` outcomes are missing |
+| `docs/quality-loop/reference.md:464` | the orchestration step record is "written whole at the end" | `StepLedger` flushes every transition (`ledger.ts:64`); `docs/pipelines/memory-runs.md:437-441` has it right |
+| `docs/pipelines/memory-runs.md:466` | the `interrupted` reason is raised at boot | also on every sweep interval (`run-janitor.ts:37-44`) |
 
 ---
 
@@ -437,12 +436,12 @@ Listed for the owner; nothing here was edited.
 
 Findings for TOP RULE 1 still open. The chained write queue, the heartbeat and
 close logging, the settled-trace predicate, the host binding's name and its
-untyped map were resolved on 2026-10-24; `tooling/inert-code.spec.ts` now also
-fails an export only specs reach in the quality loop.
+untyped map were resolved on 2026-10-24, and the admission sequence on
+2026-10-30 (`modules/runs/run-admission.ts`); `tooling/inert-code.spec.ts` now
+also fails an export only specs reach in the quality loop.
 
 | Kind                  | Where                                                                                                                                                                 | Note                                                                                                                                                                                                            |
 | --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| admission sequence ×2 | `modules/runs/runs.service.ts:144-152` and `:172-185`                                                                                                                 | `resolve → assertRubric → assertRecall → resolveAdoption → open` in both `start` and `executeFor`                                                                                                               |
 | threshold read ×2     | `boot.ts:48`; `modules/janitor/stale-after.ts:44`                                                                                                                     | `runStaleAfterMs` in `preflight` only to fail early, then again in the janitor's factory; same function, same answer; kept: the preflight is the fail-early read of the same declared parser, not a second rule |
 | exported, single-file | the types `IterationListener`, `Produced`, `RecorderPorts`, `PipelineChooser`, `OrchestrationRunRow`, `RunHeadline`, `CallOverrun`, `StoreNotReady`, `FixedCriterion` | each names a type a public signature of its file uses; the values in this row were made file-local (2026-10-24)                                                                                                 |
 

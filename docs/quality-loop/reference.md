@@ -354,8 +354,8 @@ the slim context for the replay command: database and pipelines only, no model, 
 
 ### `modules/http/`
 
-Three helpers the controllers share, no Nest module: `orNotFound` for 404s, `goalRequestSchema` with
-`MAX_GOAL_LENGTH`, and `testing.ts`, the integration harness whose defaults force a fake model, a
+Three helpers the controllers share, no Nest module: `orNotFound` for 404s, `goalRequestSchema`,
+which bounds a goal by contracts' `GOAL_BUDGET_BYTES` as the engine counts bytes, and `testing.ts`, the integration harness whose defaults force a fake model, a
 disabled embedding client and an in-memory store so a developer's `.env` can never make a suite call
 a real provider.
 
@@ -438,11 +438,12 @@ pipeline that would be chosen, and why — without running anything.
 ### `modules/runs/`
 
 The core of the service. Tokens: `QUALITY_LOOP_LLM`, `PIPELINES_TOKEN`, `TRACE_STORE`,
-`RUN_REPOSITORY`.
+`RUN_REPOSITORY`, `RUN_DUMP_DIR`, `RUN_RECALL_SLOT` and `RUN_RECALL_RECORDER`.
 
 | File                      | What it does                                                               |
 | ------------------------- | -------------------------------------------------------------------------- |
 | `runs.service.ts`         | Starts and runs a run; `run-recorder.ts` writes what it did and closes it. |
+| `run-admission.ts`        | What every run passes before its row exists, however it was opened.        |
 | `runs.controller.ts`      | `POST /runs` (202), `GET /runs`, `GET /runs/:id`, `POST /runs/evidence`.   |
 | `pipelines.controller.ts` | `GET /pipelines` — the registry as summaries.                              |
 | `criteria.controller.ts`  | `POST /criteria` — one model call, no row, no dump.                        |
@@ -450,9 +451,12 @@ The core of the service. Tokens: `QUALITY_LOOP_LLM`, `PIPELINES_TOKEN`, `TRACE_S
 | `dump-trace-store.ts`     | The one dump writer. Never throws; a failed write is logged.               |
 | `persistence/*`           | Row types, `toRows`, `fromRows`, `toSummary`, the MikroORM repository.     |
 
-A run opens as a `running` header with a heartbeat, records each model exchange as it goes, and
-closes in a single pessimistic-write transaction that inserts every criterion, iteration, finding and
-result. So a run is either fully recorded or still running for the janitor to reclaim. Mapping is
+A run opens as a `running` header and beats on a ticker of its own. As it goes it records each model
+exchange and, after every iteration, a progress snapshot of the standing iterations. It closes in a
+single pessimistic-write transaction that inserts every criterion, iteration, finding and result, and
+says whether it `closed` the row, found it `reclaimed` by the janitor, or was `refused` because the
+row was missing or already terminal. So a run is either fully recorded or still running for the
+janitor to reclaim. Mapping is
 pure and round-trips. Reading a finished run goes through `core/outputs/`.
 
 ## `orchestrators/` — compositions over pipelines
@@ -467,7 +471,7 @@ memory step gives for a child it may not draw on — none of which the runner ap
 
 **`runner/`** is not an orchestrator but the engine that executes one. `definition.ts` is the data
 model (`OrchestratorStep`, `OrchestratorDefinition`, `validateOrchestrator`), `run-orchestration.ts`
-the single loop, `record.ts` and `ledger.ts` the step record that is written whole at the end. A step
+the single loop, `record.ts` and `ledger.ts` the step record, flushed whole behind every step transition. A step
 can only run a pipeline it declared, and an undeclared reason is rejected.
 
 **`panel/`** is the two step factories the two panel orchestrators share: `panelStep` runs a pipeline
