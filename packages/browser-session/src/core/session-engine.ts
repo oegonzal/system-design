@@ -29,7 +29,6 @@ import { createSessionEvents, startedEvent } from './session-events';
 import { createState, pushHistory } from './session-state';
 import { step } from './step-flow';
 import { resolveAdvisors } from './unit-advice';
-import { SESSION_HEARTBEAT_EVERY_MS } from './write-queue';
 
 /**
  * The session loop. It decides nothing of its own: every plan, every field
@@ -90,7 +89,7 @@ export async function runSession(
   const advisors = await resolveAdvisors(deps, goal.markdown, options, sessionId);
   resolveDocuments(goal.markdown, options.documents);
   const startedAt = deps.clock.now();
-  await closeInterrupted(deps, startedAt);
+  await closeInterrupted(deps, startedAt, options.liveness.staleAfterMs);
   const dump = deps.dumps.open(startedAt);
   const state = createState({ sessionId, dumpRunId: dump.runId, startedAt });
   // The one awaited write: a ledger that refuses the row stops the session before the browser opens.
@@ -138,7 +137,7 @@ export async function runSession(
     stopping.abort(OUT_OF_TIME),
   );
   const ticker = startPeriodic(
-    { everyMs: SESSION_HEARTBEAT_EVERY_MS, atStart: false },
+    { everyMs: options.liveness.heartbeatEveryMs, atStart: false },
     () => deps.ledger.heartbeat(state.sessionId, deps.clock.now(), state.step),
     (error) => warn('heartbeat not written', error),
   );

@@ -1,6 +1,6 @@
 import type { BrowserSessionDetailDto, BrowserSessionDto } from '@sysdesign/contracts';
 
-import { SPEC_RAILS } from './core/testing-session';
+import { SPEC_LIVENESS, SPEC_RAILS } from './core/testing-session';
 import type { ReplayFieldsReport } from './modules/session/replay-fields';
 import type { TeachAgainReport } from './modules/session/teach-again';
 import {
@@ -13,6 +13,7 @@ import {
 } from './render';
 
 const NOW = new Date('2026-10-03T10:05:00.000Z');
+const STALE_AFTER_MS = SPEC_LIVENESS.staleAfterMs;
 
 const session = (overrides: Partial<BrowserSessionDto> = {}): BrowserSessionDto => ({
   id: 'session-1',
@@ -47,15 +48,15 @@ describe('the CLI renderer', () => {
       finishedAt: null,
       heartbeatAt: '2026-10-03T10:03:00.000Z',
     });
-    expect(liveness(live, NOW)).toBe('running (live)');
-    expect(liveness(stale, NOW)).toBe('running (stale)');
-    expect(liveness(session(), NOW)).toBe('complete');
-    const text = renderSessions([live, stale, session()], NOW);
+    expect(liveness(live, NOW, STALE_AFTER_MS)).toBe('running (live)');
+    expect(liveness(stale, NOW, STALE_AFTER_MS)).toBe('running (stale)');
+    expect(liveness(session(), NOW, STALE_AFTER_MS)).toBe('complete');
+    const text = renderSessions([live, stale, session()], NOW, STALE_AFTER_MS);
     expect(text).toMatch(/id\s+started\s+status\s+ended by\s+steps\s+profile\s+goal\s+duration/);
     expect(text).toContain('running (live)');
     expect(text).toContain('running (stale)');
     expect(text).toContain('4.0 min');
-    expect(renderSessions([], NOW)).toBe('no sessions yet');
+    expect(renderSessions([], NOW, STALE_AFTER_MS)).toBe('no sessions yet');
   });
 
   it('renders one session with its rails, units of work and decisions', () => {
@@ -99,7 +100,7 @@ describe('the CLI renderer', () => {
         },
       ],
     };
-    const text = renderSession(detail, NOW);
+    const text = renderSession(detail, NOW, STALE_AFTER_MS);
     expect(text).toContain(
       "session session-1 · complete · ended by the mission's stop mission-complete: results shown",
     );
@@ -120,6 +121,7 @@ describe('the CLI renderer', () => {
         terminationDetail: '5 of 5 units of work closed done',
       },
       NOW,
+      STALE_AFTER_MS,
     );
     expect(targeted).toContain('3 brain faults · target 5 done');
     expect(targeted).toContain('ended by target-reached: 5 of 5 units of work closed done');
@@ -128,9 +130,9 @@ describe('the CLI renderer', () => {
     expect(text).toMatch(
       /3\.2\s+field-answer\s+operator\s+run-9\s+e2\s+Work authorisation\s+Yes\s+inferred\s+teach-1/,
     );
-    expect(renderSession({ ...session(), tasks: [], decisions: [] }, NOW)).toContain(
-      'no units of work',
-    );
+    expect(
+      renderSession({ ...session(), tasks: [], decisions: [] }, NOW, STALE_AFTER_MS),
+    ).toContain('no units of work');
   });
 
   it('[BRW-17] says what teach-again did: the receipts by outcome, the loop’s digests only where a document was queued there, and what was skipped', () => {

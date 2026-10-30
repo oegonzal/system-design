@@ -189,9 +189,9 @@ Things a reader should know, measured in the code rather than remembered:
   with `intervalMs: null` (`modules/http/testing.ts:51`) and calls `sweep()`
   by hand (`runs-liveness.spec.ts`); only `startPeriodic` itself is unit-pinned.
 - `browser-session` mirrors the design with its own `LedgerPort`
-  (`heartbeat`, `failStale`), its own constants (15 s beat, 60 s stale —
-  `packages/browser-session/src/core/write-queue.ts:10-11`, served over no
-  route) and a sweep at the start of every session (`session-close.ts:26-28`)
+  (`heartbeat`, `failStale`), its own declared timings (15 s beat, 60 s stale —
+  `liveness` in `packages/browser-session/config/session/standard.json`,
+  served over no route) and a sweep at the start of every session (`session-close.ts:26-28`)
   rather than a periodic janitor. Its ledger heartbeat has no status guard
   (`adapters/mikro-orm/mikro-orm-ledger.ts:121-123`).
 

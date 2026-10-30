@@ -23,6 +23,7 @@ import type {
   Termination,
   SuppliedDocument,
 } from './ports';
+import type { SessionLiveness } from './liveness';
 import { causeOf } from './ports';
 import type { StepFailureEvent } from './rails';
 import type { SessionEvents, SessionEventsPort } from './session-events';
@@ -73,6 +74,8 @@ export interface RunSessionOptions {
   subjectDeclared: boolean;
   /** How long the close waits for the session's events to publish, in all: the bus recovery window, so a bus down for the window costs one window, not one per event. */
   eventsDrainMs: number;
+  /** How often the session beats, and how long a silence the start-of-session sweep takes for death. */
+  liveness: SessionLiveness;
   /** Where to open the browser before the first plan; unset leaves it on about:blank. */
   startUrl?: string;
   /** The files the run supplies for the documents the mission declares, by name; handed to the browser, read by nothing else. */

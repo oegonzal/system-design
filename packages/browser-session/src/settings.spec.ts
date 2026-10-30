@@ -92,15 +92,18 @@ describe('the session settings', () => {
       transfer: 'fill',
       invented: 'fill',
     });
-    // One window per service the session rides out, all three declared on the session.
+    // One window per service the session rides out, all three declared on the session, and its beat.
     expect(Object.keys(shipped.session)).toEqual([
       'headed',
       'rails',
       'loopRecovery',
       'advisorRecovery',
       'busRecovery',
+      'liveness',
     ]);
     expect(shipped.session.busRecovery).toEqual({ windowMs: 60000, pauseMs: 2000 });
+    // The beat and the stale window the session constants held before they were declared.
+    expect(shipped.session.liveness).toEqual({ heartbeatEveryMs: 15000, staleAfterMs: 60000 });
     // The brain the package ships decides through the loop alone; the memory-backed one is a one-word edit away.
     expect(shipped.sources.brain).toMatch(/config\/brain\/loop\.json$/);
     expect(shipped.brain).toEqual({ adapter: 'loop' });

@@ -20,5 +20,9 @@
   "busRecovery": {
     "windowMs": 60000,
     "pauseMs": 2000
+  },
+  "liveness": {
+    "heartbeatEveryMs": 15000,
+    "staleAfterMs": 60000
   }
 }

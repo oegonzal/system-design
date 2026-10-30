@@ -134,8 +134,8 @@ export type Options =
       documents: SuppliedDocument[];
     }
   | { command: 'login'; profile: string; url: string }
-  | { command: 'sessions'; limit: number; json: boolean }
-  | { command: 'show'; id: string; json: boolean }
+  | { command: 'sessions'; limit: number; json: boolean; staleAfterMs: number }
+  | { command: 'show'; id: string; json: boolean; staleAfterMs: number }
   | { command: 'replay-events'; id: string }
   | {
       command: 'teach-again';
@@ -240,9 +240,15 @@ export function parseOptions(argv: readonly string[], defaults: SessionDefaults)
           command,
           limit: positiveInteger(text('limit'), 'limit') ?? DEFAULT_LIST_LIMIT,
           json: on('json') ?? false,
+          staleAfterMs: defaults.liveness.staleAfterMs,
         };
       case 'show':
-        return { command, id: positionals[0] ?? '', json: on('json') ?? false };
+        return {
+          command,
+          id: positionals[0] ?? '',
+          json: on('json') ?? false,
+          staleAfterMs: defaults.liveness.staleAfterMs,
+        };
       case 'replay-events':
         return { command, id: positionals[0] ?? '' };
       case 'teach-again':
@@ -286,7 +292,9 @@ export async function execute(options: Options, service: CliService, io: Io): Pr
         return 0;
       case 'sessions': {
         const sessions = await service.list(options.limit);
-        io.out(options.json ? json(sessions) : renderSessions(sessions, io.now()));
+        io.out(
+          options.json ? json(sessions) : renderSessions(sessions, io.now(), options.staleAfterMs),
+        );
         return 0;
       }
       case 'show': {
@@ -295,7 +303,7 @@ export async function execute(options: Options, service: CliService, io: Io): Pr
           io.error(`no session ${options.id}`);
           return 1;
         }
-        io.out(options.json ? json(detail) : renderSession(detail, io.now()));
+        io.out(options.json ? json(detail) : renderSession(detail, io.now(), options.staleAfterMs));
         return 0;
       }
       case 'replay-events': {

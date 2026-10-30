@@ -17,6 +17,7 @@ import { z } from 'zod';
 import type { ObservePolicy } from './adapters/playwright/observe-policy';
 import { SessionConfigError, targetWithinBudget } from './config';
 import type { CapturePolicy } from './core/engine-context';
+import type { SessionLiveness } from './core/liveness';
 import { BROWSER_ACTION_KINDS } from './core/ports';
 
 /**
@@ -119,6 +120,12 @@ const sessionDefaultsSchema = z.strictObject({
    * restarting; and how long the close waits for the last events, in all.
    */
   busRecovery: recoverySchema,
+  /** How often a running session beats, and how long a silence a reader takes for death. */
+  liveness: z
+    .strictObject({ heartbeatEveryMs: positive, staleAfterMs: positive })
+    .refine((liveness) => liveness.heartbeatEveryMs * 2 <= liveness.staleAfterMs, {
+      message: 'a session beats at least twice inside the window it is taken for dead after',
+    }) satisfies z.ZodType<SessionLiveness>,
 });
 export type SessionDefaults = z.infer<typeof sessionDefaultsSchema>;
 

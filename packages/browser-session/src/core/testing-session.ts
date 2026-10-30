@@ -53,6 +53,8 @@ const SPEC_ASKS_AFTER_REFUSAL = 1;
 
 /** How long a spec's close waits for its events: long past a recording bus, short enough to time out a held one. */
 export const SPEC_EVENTS_DRAIN_MS = 50;
+/** The beat and stale window the shipped session settings declare. */
+export const SPEC_LIVENESS = { heartbeatEveryMs: 15_000, staleAfterMs: 60_000 };
 
 /** The operator's interrupt a spec can press. */
 export class FakeStopSignal implements StopSignal {
@@ -144,6 +146,7 @@ export async function runScripted(scenario: Scenario) {
       subject: SPEC_SUBJECT,
       subjectDeclared: scenario.subjectDeclared ?? true,
       eventsDrainMs: SPEC_EVENTS_DRAIN_MS,
+      liveness: SPEC_LIVENESS,
       startUrl: scenario.startUrl,
       documents: scenario.documents ?? [],
       capture: scenario.capture ?? NO_CAPTURE,

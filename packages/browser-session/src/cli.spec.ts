@@ -1,7 +1,7 @@
 import type { BrowserSessionDetailDto, BrowserSessionDto } from '@sysdesign/contracts';
 
 import { execute, parseOptions, USAGE, type CliService, type Io, type Options } from './cli';
-import { SPEC_RAILS } from './core/testing-session';
+import { SPEC_LIVENESS, SPEC_RAILS } from './core/testing-session';
 import type { SessionOutcome } from './core/session-engine';
 import { SessionRefused } from './core/unit-advice';
 import type { ReplayFieldsReport } from './modules/session/replay-fields';
@@ -17,6 +17,7 @@ const DEFAULTS: SessionDefaults = {
   loopRecovery: AT_ONCE,
   advisorRecovery: AT_ONCE,
   busRecovery: AT_ONCE,
+  liveness: SPEC_LIVENESS,
 };
 
 const parsed = (argv: string[]): Options => {
@@ -134,13 +135,24 @@ describe('parseOptions', () => {
       profile: 'p',
       url: 'https://x.test',
     });
-    expect(parsed(['sessions'])).toEqual({ command: 'sessions', limit: 20, json: false });
+    expect(parsed(['sessions'])).toEqual({
+      command: 'sessions',
+      limit: 20,
+      json: false,
+      staleAfterMs: SPEC_LIVENESS.staleAfterMs,
+    });
     expect(parsed(['sessions', '--limit', '3', '--json'])).toEqual({
       command: 'sessions',
       limit: 3,
       json: true,
+      staleAfterMs: SPEC_LIVENESS.staleAfterMs,
     });
-    expect(parsed(['show', 'abc', '--json'])).toEqual({ command: 'show', id: 'abc', json: true });
+    expect(parsed(['show', 'abc', '--json'])).toEqual({
+      command: 'show',
+      id: 'abc',
+      json: true,
+      staleAfterMs: SPEC_LIVENESS.staleAfterMs,
+    });
     expect(parsed(['replay-events', 'abc'])).toEqual({ command: 'replay-events', id: 'abc' });
     expect(
       parsed(['teach-again', '--sessions', 'static/sessions', '--subject', 'Ada', '--dry-run']),

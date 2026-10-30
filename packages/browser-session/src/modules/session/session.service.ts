@@ -56,6 +56,7 @@ export type RunOptions = Omit<
   | 'subject'
   | 'subjectDeclared'
   | 'eventsDrainMs'
+  | 'liveness'
   | 'capture'
   | 'settingsSources'
   | 'questionExpiresAfterMs'
@@ -140,6 +141,7 @@ export class SessionService {
         subjectDeclared:
           options.subject !== undefined || this.config.subject !== SESSION_ENV.subject.fallback,
         eventsDrainMs: session.busRecovery.windowMs,
+        liveness: session.liveness,
         capture,
         questionExpiresAfterMs: operator.expiresAfterMs,
         asksAfterRefusal: operator.asksAfterRefusal,

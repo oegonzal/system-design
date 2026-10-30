@@ -7,7 +7,6 @@ import { closingFiles, dumpedTasks, indexRowOf, manifestOf } from './session-dum
 import type { SessionOutcome } from './session-engine';
 import { endedEvent } from './session-events';
 import { tasksClosed } from './session-state';
-import { SESSION_STALE_AFTER_MS } from './write-queue';
 
 /** A write that did not land, a beat that was missed: reported under the session, never thrown. */
 export const warnOf =
@@ -19,13 +18,17 @@ export const warnOf =
  * Every session another process left running and then stopped beating for —
  * killed, crashed, the machine put to sleep — closed as interrupted by the
  * session that starts now, as the quality loop's janitor closes a run whose
- * beat stopped. Only a session silent past `SESSION_STALE_AFTER_MS` is
+ * beat stopped. Only a session silent past the declared stale window is
  * closed, so one alive beside this one is never touched. Housekeeping, not
  * the session's own record: a ledger that cannot do it is one warning.
  */
-export async function closeInterrupted(deps: SessionDeps, now: Date): Promise<void> {
+export async function closeInterrupted(
+  deps: SessionDeps,
+  now: Date,
+  staleAfterMs: number,
+): Promise<void> {
   try {
-    const closed = await deps.ledger.failStale(new Date(now.getTime() - SESSION_STALE_AFTER_MS));
+    const closed = await deps.ledger.failStale(new Date(now.getTime() - staleAfterMs));
     if (closed > 0) {
       deps.log(`closed ${closed} session(s) that stopped beating without closing, as interrupted`);
     }

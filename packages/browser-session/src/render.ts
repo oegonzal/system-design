@@ -8,7 +8,7 @@ import type {
 
 import { causeOf } from './core/ports';
 import type { SessionOutcome } from './core/session-engine';
-import { isLive, SESSION_STALE_AFTER_MS } from './core/write-queue';
+import { isLive } from './core/liveness';
 import type { ReplayFieldsReport } from './modules/session/replay-fields';
 import type { TeachAgainReport } from './modules/session/teach-again';
 
@@ -36,7 +36,7 @@ function table(header: readonly string[], rows: readonly (readonly string[])[]):
 export function liveness(
   session: Pick<BrowserSessionDto, 'status' | 'heartbeatAt'>,
   now: Date,
-  staleAfterMs = SESSION_STALE_AFTER_MS,
+  staleAfterMs: number,
 ): string {
   if (session.status !== 'running') return session.status;
   return isLive(session.heartbeatAt, now, staleAfterMs) ? 'running (live)' : 'running (stale)';
@@ -45,14 +45,18 @@ export function liveness(
 const minutes = (from: string, to: string): string =>
   `${((Date.parse(to) - Date.parse(from)) / 60_000).toFixed(1)} min`;
 
-export function renderSessions(sessions: readonly BrowserSessionDto[], now: Date): string {
+export function renderSessions(
+  sessions: readonly BrowserSessionDto[],
+  now: Date,
+  staleAfterMs: number,
+): string {
   if (sessions.length === 0) return 'no sessions yet';
   return table(
     ['id', 'started', 'status', 'ended by', 'steps', 'profile', 'goal', 'duration'],
     sessions.map((session) => [
       session.id,
       session.startedAt,
-      liveness(session, now),
+      liveness(session, now, staleAfterMs),
       session.terminationCause ?? session.terminationReason ?? '',
       String(session.steps),
       session.profile,
@@ -100,13 +104,17 @@ const decisionRows = (decisions: readonly BrowserDecisionDto[]): string =>
         ]),
       );
 
-export function renderSession(detail: BrowserSessionDetailDto, now: Date): string {
+export function renderSession(
+  detail: BrowserSessionDetailDto,
+  now: Date,
+  staleAfterMs: number,
+): string {
   const ended =
     detail.terminationReason === null
       ? ''
       : ` · ended by ${endedBy(detail.terminationReason, detail.terminationCause)}${detail.terminationDetail ? `: ${detail.terminationDetail}` : ''}`;
   return [
-    `session ${detail.id} · ${liveness(detail, now)}${ended}`,
+    `session ${detail.id} · ${liveness(detail, now, staleAfterMs)}${ended}`,
     `goal ${detail.goalPath} (${detail.goalHash.slice(0, 12)}) · profile ${detail.profile}${
       detail.subject === null ? '' : ` · subject ${detail.subject}`
     } · ${detail.headed ? 'headed' : 'headless'} · ${detail.steps} step(s) · dump ${detail.dumpRunId}`,
