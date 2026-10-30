@@ -4,10 +4,11 @@
  * valid time comes from, the text it is embedded and shown as, whether it is
  * projected into the vector index, and the identity values it keeps for the
  * lessons consolidation writes into it. (The role a kind plays in consolidation
- * is design vocabulary, the contract's `CONSOLIDATION_ROLES`.) The engine reads
- * these and nothing else about a kind, so a new kind or a changed
- * one is an entry in a registry, never an engine edit. The members are written
- * as methods so a behavior typed for its own candidate fits the registry.
+ * is design vocabulary, declared with the kind in the contract's
+ * `REGISTER_KIND_DECLARATIONS`.) The engine reads these and nothing else about a
+ * kind, so a new kind or a changed one is an entry in a registry, never an
+ * engine edit. The members are written as methods so a behavior typed for its
+ * own candidate fits the registry.
  */
 import { createHash } from 'node:crypto';
 

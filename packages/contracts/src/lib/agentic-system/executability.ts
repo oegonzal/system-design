@@ -21,21 +21,12 @@
  * Everything it answers is sorted, so the same declarations analyze the same in
  * any order.
  */
-import type { MemoryStrategy, MemoryTerm, OperationVerb, RegisterKind } from './strategy';
-
-/**
- * What a register's records do in consolidation, by kind: episodes are the
- * evidence, semantic registers keep the lessons, procedural registers keep the
- * playbooks — the promotion the consolidation workflow kind describes.
- */
-export const CONSOLIDATION_ROLES = {
-  working: null,
-  episodic: 'source',
-  semantic: 'lesson',
-  procedural: 'playbook',
-  relational: null,
-} as const satisfies Record<RegisterKind, 'source' | 'lesson' | 'playbook' | null>;
-export type ConsolidationRole = NonNullable<(typeof CONSOLIDATION_ROLES)[RegisterKind]>;
+import {
+  REGISTER_KIND_DECLARATIONS,
+  type ConsolidationRole,
+  type RegisterKind,
+} from './register-kinds';
+import type { MemoryStrategy, MemoryTerm, OperationVerb } from './strategy';
 
 /** The one grammar for a field name: a scope key, a metadata field, a register's declared metadata entry. */
 export const MEMORY_FIELD_NAME = /^[A-Za-z][A-Za-z0-9_]{0,63}$/;
@@ -160,7 +151,7 @@ function routeConsolidation(
           return (
             step.operation === operation &&
             register !== undefined &&
-            CONSOLIDATION_ROLES[register.kind] === role
+            REGISTER_KIND_DECLARATIONS[register.kind].role === role
           );
         })
         .map((step) => step.register),

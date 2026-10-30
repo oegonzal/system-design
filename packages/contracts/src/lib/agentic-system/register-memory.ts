@@ -13,7 +13,7 @@ import { ADMISSIONS, withheldRefSchema } from '../quality-loop/admission';
 import type { OrchestrationStepDto } from '../quality-loop/orchestration';
 import type { QualityRunStatus } from '../quality-loop/runs';
 import type { MemoryRefusalDto, WriteOutcome } from './memory';
-import { REGISTER_KINDS } from './strategy';
+import { REGISTER_KINDS } from './register-kinds';
 
 export const REGISTER_MEMORY_ORCHESTRATOR_ID = 'register-memory';
 

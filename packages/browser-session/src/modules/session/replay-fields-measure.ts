@@ -1,6 +1,6 @@
 import type { BoundSpace } from '@sysdesign/agentic-memory-client';
 import {
-  CANDIDATE_SCHEMAS,
+  REGISTER_KIND_DECLARATIONS,
   LESSON_SEPARATOR,
   type FieldRoute,
   type MemoryRecordDto,
@@ -36,7 +36,7 @@ function recordedHalves(text: string): { insight: string; appliesWhen: string | 
 
 /** The declared fact a semantic record keeps, read by the kind's own candidate shape; null for a record of another kind. */
 const factOf = (record: MemoryRecordDto): { predicate: string; value: string } | null => {
-  const parsed = CANDIDATE_SCHEMAS.semantic.safeParse(record.body);
+  const parsed = REGISTER_KIND_DECLARATIONS.semantic.candidate.safeParse(record.body);
   return parsed.success ? { predicate: parsed.data.predicate, value: parsed.data.value } : null;
 };
 

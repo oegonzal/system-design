@@ -24,16 +24,11 @@ import {
 } from '../quality-loop/goal-index';
 import { quoted, quotedJson } from '../text';
 import { MEMORY_FIELD_NAME } from './executability';
-import {
-  instantSchema,
-  provenanceSchema,
-  recordScopeSchema,
-  type WritableRegisterDto,
-} from './memory';
+import { provenanceSchema, recordScopeSchema, type WritableRegisterDto } from './memory';
+import { instantSchema, REGISTER_KINDS } from './register-kinds';
 import {
   MEMORY_TERMS,
   REGISTER_HOLDS_BOUND,
-  REGISTER_KINDS,
   REGISTER_NAME_BOUND,
   STRATEGY_REGISTERS_BOUND,
 } from './strategy';

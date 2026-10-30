@@ -52,9 +52,9 @@ not change when the run or the policy file does.
   `invalidate`, so nothing it keeps can be forgotten), `operation.no_effect`, and the
   consolidation-route warnings.
 - The warnings and the consolidation route come from one pure analysis in the
-  contracts, `analyzeStrategy`, over the typed declarations and the kind→role table
-  (`CONSOLIDATION_ROLES`: episodes are the evidence, semantic registers keep the
-  lessons, procedural registers keep the playbooks). The `memory-architecture`
+  contracts, `analyzeStrategy`, over the typed declarations and the role each kind
+  declares (`REGISTER_KIND_DECLARATIONS`: episodes are the evidence, semantic
+  registers keep the lessons, procedural registers keep the playbooks). The `memory-architecture`
   pipeline runs the same analysis over every draft as its `executability`
   validator, so the coach is told what would not run before a space is ever made.
 - The **consolidation route** is resolved by the role each kind declares — the
@@ -84,9 +84,13 @@ the fields its identity is made of, the values an exact recall finds it by, its
 valid-time field, its text template, whether it is projected, and the identity
 values it keeps for the lessons consolidation writes into it. The engine reads
 these and nothing else, so a new or changed kind is a registry entry, not an
-engine edit. The role a kind plays in consolidation is the contracts'
-(`CONSOLIDATION_ROLES`), and so is the field its valid time comes from
-(`CANDIDATE_VALID_TIME`), which the digest reads too (§9).
+engine edit. What the design, the digest (§9) and the runtime share about a kind
+is declared once, in the contracts' `REGISTER_KIND_DECLARATIONS`: the words the
+design pipeline is shown, the role it plays in consolidation, its candidate
+schema and the candidate field its valid time comes from. The database holds no
+list of kinds: a space refuses at compile a kind its runtime has no behavior for
+(`register.kind_unsupported`), so a new kind is one declaration and one behavior,
+never a migration.
 
 | kind       | identity                    | exact keys      | valid from              | projected | role      |
 | ---------- | --------------------------- | --------------- | ----------------------- | --------- | --------- |

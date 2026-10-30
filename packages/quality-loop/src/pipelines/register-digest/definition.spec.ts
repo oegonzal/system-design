@@ -1,7 +1,6 @@
 import {
   boundsAgainstMeasured,
-  CANDIDATE_SCHEMAS,
-  CANDIDATE_VALID_TIME,
+  REGISTER_KIND_DECLARATIONS,
   CRITERION_STATEMENT_BOUND,
   declaredSizes,
   REGISTER_DIGEST_MAX_ITERATIONS,
@@ -43,7 +42,9 @@ const exemptAll = (paths: readonly BoundPath[], reason: string): Record<BoundPat
  */
 const RUNTIME_OWNED = exemptAll(
   REGISTER_KINDS.flatMap((kind) =>
-    Object.keys(declaredSizes(CANDIDATE_SCHEMAS[kind])).map((path) => `memories[].${kind}.${path}`),
+    Object.keys(declaredSizes(REGISTER_KIND_DECLARATIONS[kind].candidate)).map(
+      (path) => `memories[].${kind}.${path}`,
+    ),
   ),
   'the runtime’s write contract',
 );
@@ -57,7 +58,7 @@ const RUNTIME_OWNED = exemptAll(
 const UNFILLED = exemptAll(
   REGISTER_KINDS.filter(
     (kind) =>
-      !Object.keys(declaredSizes(CANDIDATE_SCHEMAS[kind])).some((field) =>
+      !Object.keys(declaredSizes(REGISTER_KIND_DECLARATIONS[kind].candidate)).some((field) =>
         Object.hasOwn(measured.fields, `memories[].${kind}.${field}`),
       ),
   ).flatMap((kind) =>
@@ -69,7 +70,8 @@ const UNFILLED = exemptAll(
 );
 
 /** A kind's candidate fields as the runtime declares them, by name. */
-const runtimeShape = (kind: RegisterKind): Record<string, ZodType> => CANDIDATE_SCHEMAS[kind].shape;
+const runtimeShape = (kind: RegisterKind): Record<string, ZodType> =>
+  REGISTER_KIND_DECLARATIONS[kind].candidate.shape;
 
 /** Every kind slot of a memory, left empty. */
 const NO_SLOT_FILLED = Object.fromEntries(REGISTER_KINDS.map((kind) => [kind, null]));
@@ -206,14 +208,14 @@ describe('the register-digest pipeline', () => {
       expect([kind, Object.keys(model)]).toEqual([kind, Object.keys(runtime)]);
       // Every field but the valid time is the runtime's own node, bounds and all.
       for (const field of Object.keys(runtime).filter(
-        (key) => key !== CANDIDATE_VALID_TIME[kind],
+        (key) => key !== REGISTER_KIND_DECLARATIONS[kind].validTime,
       )) {
         expect(model[field], `${kind}.${field}`).toBe(runtime[field]);
       }
     }
     // A valid time takes null or any text, and the runtime alone says which text is a time.
     const dated = REGISTER_KINDS.flatMap((kind) => {
-      const field = CANDIDATE_VALID_TIME[kind];
+      const field = REGISTER_KIND_DECLARATIONS[kind].validTime;
       return field === null ? [] : [[kind, field] as const];
     });
     expect(dated).toEqual([

@@ -18,12 +18,8 @@ import { z } from 'zod';
 import { bound, bounded, keptAtMost } from '../bounds';
 import type { ApiValidationIssue } from '../envelope';
 import type { IsoDateString, Uuid } from '../primitives';
-import {
-  REGISTER_NAME_BOUND,
-  type MemoryTerm,
-  type OperationVerb,
-  type RegisterKind,
-} from './strategy';
+import { instantSchema, type RegisterKind } from './register-kinds';
+import { REGISTER_NAME_BOUND, type MemoryTerm, type OperationVerb } from './strategy';
 import { MEMORY_FIELD_NAME, type CompileWarning } from './executability';
 import { STRATEGY_FAULTS } from './strategy-validator';
 
@@ -81,8 +77,6 @@ export type CompileProblem = (typeof COMPILE_PROBLEMS)[number];
 
 const fieldName = z.string().regex(MEMORY_FIELD_NAME);
 const ref = (max: number) => bounded.id(max, { min: 1 });
-/** An instant with its offset, as every time a memory carries is written. */
-export const instantSchema = z.iso.datetime({ offset: true });
 /** Any register name a lenient read of a strategy can hold. */
 const registerRef = ref(keptAtMost(REGISTER_NAME_BOUND));
 
@@ -97,76 +91,6 @@ export const provenanceSchema = z.strictObject({
   source: ref(120),
   sourceRunId: ref(80).nullable(),
 });
-
-const workingCandidateSchema = z.strictObject({
-  key: ref(160),
-  value: bounded.text(bound(2000), { min: 1 }),
-});
-
-const semanticCandidateSchema = z.strictObject({
-  subject: ref(160),
-  predicate: ref(80),
-  value: bounded.text(bound(800), { min: 1 }),
-  validFrom: instantSchema.nullable(),
-});
-
-const lessonSchema = z.strictObject({
-  key: ref(160),
-  text: bounded.text(bound(400), { min: 1 }),
-  playbook: ref(160).nullable(),
-});
-export type MemoryLesson = z.infer<typeof lessonSchema>;
-
-const episodicCandidateSchema = z.strictObject({
-  subject: ref(160),
-  situation: bounded.text(bound(400), { min: 1 }),
-  action: bounded.text(bound(400), { min: 1 }),
-  outcome: bounded.text(bound(400), { min: 1 }),
-  outcomeVerified: z.boolean(),
-  occurredAt: instantSchema,
-  lesson: lessonSchema.nullable(),
-});
-
-const proceduralCandidateSchema = z.strictObject({
-  name: ref(160),
-  description: bounded.text(bound(600)).nullable(),
-  rules: bounded.list(
-    bound(24, 'list'),
-    z.strictObject({ key: ref(160), text: bounded.text(bound(400), { min: 1 }) }),
-    { min: 1 },
-  ),
-});
-
-const relationalCandidateSchema = z.strictObject({
-  subject: ref(160),
-  relation: ref(80),
-  object: ref(160),
-  validFrom: instantSchema.nullable(),
-});
-
-/** The candidate a register of each kind accepts — the typed memory a caller remembers. */
-export const CANDIDATE_SCHEMAS = {
-  working: workingCandidateSchema,
-  episodic: episodicCandidateSchema,
-  semantic: semanticCandidateSchema,
-  procedural: proceduralCandidateSchema,
-  relational: relationalCandidateSchema,
-} as const satisfies Record<RegisterKind, z.ZodType>;
-export type CandidateOf<K extends RegisterKind> = z.infer<(typeof CANDIDATE_SCHEMAS)[K]>;
-
-/**
- * The candidate field each kind's valid time is declared in — when an event
- * happened, or since when a fact holds — or null where it is the moment of
- * recording. Declared once, beside the candidates it names, so the runtime and
- * anything that asks a writer for a candidate date it by the same field.
- */
-export const CANDIDATE_VALID_TIME = {
-  working: null,
-  episodic: 'occurredAt',
-  semantic: 'validFrom',
-  procedural: null,
-  relational: 'validFrom',
-} as const satisfies { [K in RegisterKind]: (keyof CandidateOf<K> & string) | null };
 
 export const createSpaceRequestSchema = z.strictObject({ runId: ref(80) });
 

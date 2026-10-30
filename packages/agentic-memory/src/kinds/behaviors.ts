@@ -13,8 +13,7 @@
  * candidate.
  */
 import {
-  CANDIDATE_SCHEMAS,
-  CANDIDATE_VALID_TIME,
+  REGISTER_KIND_DECLARATIONS,
   type CandidateOf,
   type RegisterKind,
 } from '@sysdesign/contracts';
@@ -27,10 +26,10 @@ export const LESSON_PREDICATE = 'lesson';
 
 const working = defineBehavior<CandidateOf<'working'>>({
   kind: 'working',
-  candidate: CANDIDATE_SCHEMAS.working,
+  candidate: REGISTER_KIND_DECLARATIONS.working.candidate,
   identity: ['key'],
   keys: ['key'],
-  validFrom: CANDIDATE_VALID_TIME.working,
+  validFrom: REGISTER_KIND_DECLARATIONS.working.validTime,
   projected: false,
   reserved: [],
   text(candidate) {
@@ -40,10 +39,10 @@ const working = defineBehavior<CandidateOf<'working'>>({
 
 const semantic = defineBehavior<CandidateOf<'semantic'>>({
   kind: 'semantic',
-  candidate: CANDIDATE_SCHEMAS.semantic,
+  candidate: REGISTER_KIND_DECLARATIONS.semantic.candidate,
   identity: ['subject', 'predicate'],
   keys: ['subject'],
-  validFrom: CANDIDATE_VALID_TIME.semantic,
+  validFrom: REGISTER_KIND_DECLARATIONS.semantic.validTime,
   projected: true,
   reserved: [{ field: 'predicate', value: LESSON_PREDICATE }],
   text(candidate) {
@@ -61,10 +60,10 @@ const semantic = defineBehavior<CandidateOf<'semantic'>>({
 
 const episodic = defineBehavior<CandidateOf<'episodic'>>({
   kind: 'episodic',
-  candidate: CANDIDATE_SCHEMAS.episodic,
+  candidate: REGISTER_KIND_DECLARATIONS.episodic.candidate,
   identity: [],
   keys: ['subject'],
-  validFrom: CANDIDATE_VALID_TIME.episodic,
+  validFrom: REGISTER_KIND_DECLARATIONS.episodic.validTime,
   projected: true,
   reserved: [],
   text(candidate) {
@@ -78,10 +77,10 @@ const episodic = defineBehavior<CandidateOf<'episodic'>>({
 
 const procedural = defineBehavior<CandidateOf<'procedural'>>({
   kind: 'procedural',
-  candidate: CANDIDATE_SCHEMAS.procedural,
+  candidate: REGISTER_KIND_DECLARATIONS.procedural.candidate,
   identity: ['name'],
   keys: ['name'],
-  validFrom: CANDIDATE_VALID_TIME.procedural,
+  validFrom: REGISTER_KIND_DECLARATIONS.procedural.validTime,
   projected: true,
   reserved: [],
   text(candidate) {
@@ -98,10 +97,10 @@ const procedural = defineBehavior<CandidateOf<'procedural'>>({
 
 const relational = defineBehavior<CandidateOf<'relational'>>({
   kind: 'relational',
-  candidate: CANDIDATE_SCHEMAS.relational,
+  candidate: REGISTER_KIND_DECLARATIONS.relational.candidate,
   identity: ['subject', 'relation', 'object'],
   keys: ['subject', 'object'],
-  validFrom: CANDIDATE_VALID_TIME.relational,
+  validFrom: REGISTER_KIND_DECLARATIONS.relational.validTime,
   projected: false,
   reserved: [],
   text(candidate) {

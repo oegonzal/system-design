@@ -1,4 +1,4 @@
-import { CANDIDATE_VALID_TIME, REGISTER_KINDS } from '@sysdesign/contracts';
+import { REGISTER_KIND_DECLARATIONS, REGISTER_KINDS } from '@sysdesign/contracts';
 
 import { spaceUnderTest } from '../testing/space-under-test';
 import { compileSpace } from '../space/compile';
@@ -47,7 +47,11 @@ describe('the memory kinds as data', () => {
   it('[AGM-11] dates every kind by the valid-time field the contract declares for its candidate', () => {
     expect(
       Object.fromEntries(REGISTER_KINDS.map((kind) => [kind, DEFAULT_BEHAVIORS[kind].validFrom])),
-    ).toEqual(CANDIDATE_VALID_TIME);
+    ).toEqual(
+      Object.fromEntries(
+        REGISTER_KINDS.map((kind) => [kind, REGISTER_KIND_DECLARATIONS[kind].validTime]),
+      ),
+    );
   });
 
   it('[AGM-11] reserves on the lesson kind the identity every consolidated lesson is written under, and nothing on any other', () => {

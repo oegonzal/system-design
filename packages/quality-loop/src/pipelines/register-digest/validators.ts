@@ -21,7 +21,7 @@
  * wrote into the index, or the runtime's own schema.
  */
 import {
-  CANDIDATE_SCHEMAS,
+  REGISTER_KIND_DECLARATIONS,
   quotedJson,
   schemaIssuesOf,
   type ValidationProblem,
@@ -109,7 +109,7 @@ const refusedCandidates: Rule = (digest) =>
   perMemory(digest, (memory, location) => {
     const slot = filledSlot(memory);
     if (slot === null) return [];
-    const parsed = CANDIDATE_SCHEMAS[slot.kind].safeParse(slot.candidate);
+    const parsed = REGISTER_KIND_DECLARATIONS[slot.kind].candidate.safeParse(slot.candidate);
     if (parsed.success) return [];
     const faults = schemaIssuesOf(parsed.error.issues).map(
       (issue) => `${issue.path}: ${issue.message}`,

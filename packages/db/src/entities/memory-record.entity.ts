@@ -10,15 +10,7 @@ import type * as Contracts from '@sysdesign/contracts';
 
 import { MemorySpace } from './memory-space.entity';
 
-type ContractKinds = (typeof Contracts)['REGISTER_KINDS'];
 type ContractStatuses = (typeof Contracts)['RECORD_STATUSES'];
-const KINDS = [
-  'working',
-  'episodic',
-  'semantic',
-  'procedural',
-  'relational',
-] as const satisfies ContractKinds;
 const STATUSES = [
   'active',
   'superseded',
@@ -40,7 +32,6 @@ const quoted = (values: readonly string[]): string =>
  * concurrent writes of one fact, or of one episode, cannot both win.
  */
 @Entity()
-@Check({ name: 'memory_record_kind_check', expression: `kind in (${quoted(KINDS)})` })
 @Check({ name: 'memory_record_status_check', expression: `status in (${quoted(STATUSES)})` })
 @Check({
   name: 'memory_record_lifecycle_check',

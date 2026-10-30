@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { analyzeStrategy, CONSOLIDATION_ROLES } from './executability';
+import { analyzeStrategy } from './executability';
+import { REGISTER_KIND_DECLARATIONS, REGISTER_KINDS } from './register-kinds';
 import type { MemoryStrategy } from './strategy';
 
 type Register = MemoryStrategy['registers'][number];
@@ -67,7 +68,11 @@ const declarations = (): Pick<MemoryStrategy, 'registers' | 'interfaces' | 'work
 
 describe('what the runtime can execute of a strategy', () => {
   it('[AGM-1] names episodes the evidence, semantic memory the lessons and procedures the playbooks', () => {
-    expect(CONSOLIDATION_ROLES).toEqual({
+    expect(
+      Object.fromEntries(
+        REGISTER_KINDS.map((kind) => [kind, REGISTER_KIND_DECLARATIONS[kind].role]),
+      ),
+    ).toEqual({
       working: null,
       episodic: 'source',
       semantic: 'lesson',

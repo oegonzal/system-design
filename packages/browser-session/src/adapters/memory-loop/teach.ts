@@ -7,7 +7,7 @@ import {
   type RememberRequest,
 } from '@sysdesign/agentic-memory-client';
 import {
-  CANDIDATE_SCHEMAS,
+  REGISTER_KIND_DECLARATIONS,
   excerpt,
   quoted,
   rememberRequestSchema,
@@ -121,7 +121,7 @@ function requestOf(
   const register = bound.registers[settings.teach];
   if (register === undefined) throw new Error(`the binding has no role ${settings.teach}`);
   const unitKey = unitKeyOf(bound, answer);
-  const candidate = CANDIDATE_SCHEMAS[TEACH_REGISTER_KIND].safeParse({
+  const candidate = REGISTER_KIND_DECLARATIONS[TEACH_REGISTER_KIND].candidate.safeParse({
     subject,
     predicate: predicateOf(answer.field.question),
     value: factValueOf(answer, subject),

@@ -3,9 +3,9 @@
  * register the goal lists and resting on the sections that state it. A memory
  * carries one slot per kind a register can keep, and fills only the one of
  * its register's kind; every slot is the runtime's own candidate schema
- * (`CANDIDATE_SCHEMAS`), so what the model is asked for, and measured against,
+ * (`REGISTER_KIND_DECLARATIONS`), so what the model is asked for, and measured against,
  * is the write contract every caller of the runtime is held to. The one field
- * it relaxes is each kind's valid time (`CANDIDATE_VALID_TIME`): written as
+ * it relaxes is each kind's valid time (its declared `validTime`): written as
  * nullable text, so a malformed time costs its memory — the candidate
  * validator withholds it — and never the whole reply.
  *
@@ -19,8 +19,7 @@
 import {
   bound,
   bounded,
-  CANDIDATE_SCHEMAS,
-  CANDIDATE_VALID_TIME,
+  REGISTER_KIND_DECLARATIONS,
   keptAtMost,
   quotedJson,
   REGISTER_DIGEST_MAX_EVIDENCE,
@@ -55,8 +54,8 @@ const byKind = <V>(valueOf: (kind: RegisterKind) => V): Record<RegisterKind, V> 
 
 /** The kind's candidate as the runtime declares it, its valid time — where it has one — relaxed to nullable text. */
 const modelCandidate = (kind: RegisterKind): CandidateSchema => {
-  const runtime: CandidateSchema = CANDIDATE_SCHEMAS[kind];
-  const validTime = CANDIDATE_VALID_TIME[kind];
+  const runtime: CandidateSchema = REGISTER_KIND_DECLARATIONS[kind].candidate;
+  const validTime = REGISTER_KIND_DECLARATIONS[kind].validTime;
   if (validTime === null) return runtime;
   return z.strictObject({
     ...runtime.shape,

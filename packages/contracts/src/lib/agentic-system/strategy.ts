@@ -29,25 +29,12 @@
 import { z } from 'zod';
 
 import { bound, bounded } from '../bounds';
+import { REGISTER_KIND_DECLARATIONS, REGISTER_KINDS, type RegisterKind } from './register-kinds';
 
-/** The five memory patterns a design keeps apart; each is written, recalled and retained differently. */
-export const REGISTER_KINDS = [
-  'working',
-  'episodic',
-  'semantic',
-  'procedural',
-  'relational',
-] as const;
-export type RegisterKind = (typeof REGISTER_KINDS)[number];
-const REGISTER_KIND_USES: Record<RegisterKind, string> = {
-  working: 'the task in flight — current objective, recent tool results, scratch reasoning state',
-  episodic:
-    'specific past events — runs, the action taken and the outcome observed, distilled into lessons',
-  semantic: 'durable learned facts — preferences, decisions, verified entity facts',
-  procedural: 'how the agent does things — validated playbooks and tool recipes, versioned',
-  relational:
-    'entities and how they connect — contacts, accounts, contracts, and facts that change over time',
-};
+/** What each declared kind is for, as the design pipeline is shown it. */
+const REGISTER_KIND_USES = Object.fromEntries(
+  REGISTER_KINDS.map((kind) => [kind, REGISTER_KIND_DECLARATIONS[kind].use]),
+) as Record<RegisterKind, string>;
 
 /** Short-term active state versus durable memory held across sessions — different stores, not just collections. */
 export const MEMORY_TERMS = ['short_term', 'long_term'] as const;
