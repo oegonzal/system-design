@@ -10,6 +10,7 @@ import {
   ANSWER_SUGGESTIONS_PIPELINE_ID,
   FIELD_ANSWER_PIPELINE_ID,
   type AnswerSuggestions,
+  type BrowserSessionRole,
   type FieldAnswers,
   type FormPipeline,
   type OperatorGuidanceDto,
@@ -109,8 +110,8 @@ export class MemoryLoopBrain implements BrainPort {
     this.silent = this.bound === null;
   }
 
-  deriveRubric(pipeline: string, goal: string): Promise<DerivedRubric> {
-    return deriveRubricWith(this.loop, pipeline, goal);
+  deriveRubric(role: BrowserSessionRole, goal: string): Promise<DerivedRubric> {
+    return deriveRubricWith(this.loop, role, goal);
   }
 
   planStep(input: StepInput): Promise<Decided<StepPlan>> {

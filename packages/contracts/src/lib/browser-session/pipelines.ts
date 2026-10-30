@@ -65,6 +65,10 @@ export const BROWSER_SESSION_PIPELINES = {
   suggest: ANSWER_SUGGESTIONS_PIPELINE_ID,
 } as const;
 
+/** What a pipeline is to a session: the session asks its brain by role, and the brain knows which pipeline plays it. */
+export type BrowserSessionRole = keyof typeof BROWSER_SESSION_PIPELINES;
+export const BROWSER_SESSION_ROLES = Object.keys(BROWSER_SESSION_PIPELINES) as BrowserSessionRole[];
+
 /** Positional location ids the pipelines assign and the session reads back. */
 export const actionLocation = (position: number): string => `action.${position + 1}`;
 export const fieldLocation = (position: number): string => `field.${position + 1}`;

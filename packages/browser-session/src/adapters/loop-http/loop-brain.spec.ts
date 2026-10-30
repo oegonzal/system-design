@@ -142,10 +142,13 @@ const completeFormMemory =
 describe('the loop brain', () => {
   it('[BRW-1] derives the rubric through the loop and plans a step as one browser-step run with the rubric supplied', async () => {
     const { core, brain } = harness(completeRuns(PLAN));
-    const { criteria: rubric, dumpRunId } = await brain.deriveRubric(
-      BROWSER_STEP_PIPELINE_ID,
-      MISSION_FIXTURE,
-    );
+    const {
+      pipeline,
+      criteria: rubric,
+      dumpRunId,
+    } = await brain.deriveRubric('plan', MISSION_FIXTURE);
+    // A session asks by role; the brain knows which pipeline plays it.
+    expect(pipeline).toBe(BROWSER_STEP_PIPELINE_ID);
     expect(rubric.length).toBeGreaterThan(0);
     // The loop names the dump of its derivation; this fake loop writes none.
     expect(dumpRunId).toBeNull();
@@ -271,7 +274,7 @@ describe('the loop brain', () => {
   it('turns every client error into a brain fault with its reason, and leaves other errors alone', async () => {
     const down = harness(() => undefined);
     down.core.unreachable = true;
-    await expect(down.brain.deriveRubric(BROWSER_STEP_PIPELINE_ID, 'x')).rejects.toMatchObject({
+    await expect(down.brain.deriveRubric('plan', 'x')).rejects.toMatchObject({
       reason: 'unreachable',
     });
     const refusing = harness(() => undefined);
@@ -282,7 +285,7 @@ describe('the loop brain', () => {
     });
     const noModel = harness(() => undefined);
     noModel.core.derivationFails = true;
-    await expect(noModel.brain.deriveRubric(BROWSER_STEP_PIPELINE_ID, 'x')).rejects.toMatchObject({
+    await expect(noModel.brain.deriveRubric('plan', 'x')).rejects.toMatchObject({
       reason: 'failed',
     });
     const failing = harness((core) => {

@@ -1,7 +1,8 @@
 import {
-  BROWSER_SESSION_PIPELINES,
+  BROWSER_SESSION_ROLES,
   createWriteQueue,
   startPeriodic,
+  type BrowserSessionRole,
   type BrowserSessionStatus,
 } from '@sysdesign/contracts';
 import { describeError } from '@sysdesign/run-dump';
@@ -52,24 +53,20 @@ export interface SessionOutcome {
   steps: number;
 }
 
-type Role = keyof SessionCriteria;
-const ROLES = Object.keys(BROWSER_SESSION_PIPELINES) as Role[];
+type Rubrics = Record<BrowserSessionRole, DerivedRubric>;
 
-/** The rubric for every pipeline the session runs, once; a fault here ends the session before the browser opens. */
-async function deriveRubrics(
-  deps: SessionDeps,
-  mission: string,
-): Promise<Record<Role, DerivedRubric>> {
-  const rubrics: Partial<Record<Role, DerivedRubric>> = {};
-  for (const role of ROLES) {
-    rubrics[role] = await deps.brain.deriveRubric(BROWSER_SESSION_PIPELINES[role], mission);
+/** The rubric for every role a pipeline plays in the session, once; a fault here ends the session before the browser opens. */
+async function deriveRubrics(deps: SessionDeps, mission: string): Promise<Rubrics> {
+  const rubrics: Partial<Rubrics> = {};
+  for (const role of BROWSER_SESSION_ROLES) {
+    rubrics[role] = await deps.brain.deriveRubric(role, mission);
   }
-  return rubrics as Record<Role, DerivedRubric>;
+  return rubrics as Rubrics;
 }
 
-/** One record per pipeline the session runs, keyed by the pipeline's id. */
-const byPipeline = <T>(of: (role: Role) => T): Record<string, T> =>
-  Object.fromEntries(ROLES.map((role) => [BROWSER_SESSION_PIPELINES[role], of(role)]));
+/** One record per pipeline the session runs, keyed by the id of the pipeline its rubric was derived for. */
+const byPipeline = <T>(rubrics: Rubrics, of: (role: BrowserSessionRole) => T): Record<string, T> =>
+  Object.fromEntries(BROWSER_SESSION_ROLES.map((role) => [rubrics[role].pipeline, of(role)]));
 
 // BOOKMARK
 /** What a question waiting on the operator is withdrawn with when the session is told to stop. */
@@ -160,14 +157,14 @@ export async function runSession(
   try {
     const rubrics = await deriveRubrics(deps, goal.markdown);
     ctx.criteria = Object.fromEntries(
-      ROLES.map((role) => [role, rubrics[role].criteria]),
+      BROWSER_SESSION_ROLES.map((role) => [role, rubrics[role].criteria]),
     ) as SessionCriteria;
     // Where each rubric was made: the loop dumped each derivation as a folder of its own.
-    ctx.dumpFiles('rubrics', [rubricsFile(byPipeline((role) => rubrics[role]))]);
+    ctx.dumpFiles('rubrics', [rubricsFile(byPipeline(rubrics, (role) => rubrics[role]))]);
     queue.write('criteria', () =>
       deps.ledger.recordCriteria(
         state.sessionId,
-        byPipeline((role) => ctx.criteria[role]),
+        byPipeline(rubrics, (role) => ctx.criteria[role]),
       ),
     );
     await deps.browser.open(options.profile, {

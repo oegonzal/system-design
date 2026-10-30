@@ -1,6 +1,8 @@
 import {
+  BROWSER_SESSION_PIPELINES,
   BROWSER_STEP_PIPELINE_ID,
   GoalBudgetExceeded,
+  type BrowserSessionRole,
   type QualityRunDto,
   type RunOpenerDto,
   type StepPlan,
@@ -106,15 +108,16 @@ export const openedBy = (session: SessionStepRef, what: string | null): RunOpene
   label: what === null ? `step ${session.step}` : `step ${session.step} · ${what}`,
 });
 
-/** The rubric for one pipeline, derived by the loop from the mission alone, with the loop's dump of the derivation. */
+/** The rubric for the pipeline that plays a role in the session, derived by the loop from the mission alone, with the loop's dump of the derivation. */
 export function deriveRubricWith(
   client: LoopClient,
-  pipeline: string,
+  role: BrowserSessionRole,
   goal: string,
 ): Promise<DerivedRubric> {
+  const pipeline = BROWSER_SESSION_PIPELINES[role];
   return guarded(async () => {
     const { criteria, dumpRunId } = await client.deriveCriteria({ pipeline, goal });
-    return { criteria, dumpRunId };
+    return { pipeline, criteria, dumpRunId };
   });
 }
 

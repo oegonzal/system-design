@@ -8,6 +8,7 @@ import {
   guidanceDocuments,
   renderDocumentGoal,
   type AnswerSuggestions,
+  type BrowserSessionRole,
   type FieldAnswers,
   type FormPipeline,
   type OperatorGuidanceDto,
@@ -63,8 +64,8 @@ export class LoopBrain implements BrainPort {
     // Nothing is bound ahead: the loop is asked on every request, and refuses there.
   }
 
-  deriveRubric(pipeline: string, goal: string): Promise<DerivedRubric> {
-    return deriveRubricWith(this.client, pipeline, goal);
+  deriveRubric(role: BrowserSessionRole, goal: string): Promise<DerivedRubric> {
+    return deriveRubricWith(this.client, role, goal);
   }
 
   planStep(input: StepInput): Promise<Decided<StepPlan>> {

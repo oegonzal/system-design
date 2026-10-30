@@ -6,6 +6,7 @@ import type {
   BrowserDecisionSource,
   BrowserSessionDetailDto,
   BrowserSessionDto,
+  BrowserSessionRole,
   BrowserSessionStatus,
   EngineTermination,
   BrowserTaskStatus,
@@ -247,8 +248,9 @@ export interface FieldsInput {
   criteria: readonly SuccessCriterion[];
 }
 
-/** A rubric derived from the mission, and the loop's dump of the derivation — null when none was written. */
+/** A rubric derived from the mission, the pipeline it was derived for, and the loop's dump of the derivation — null when none was written. */
 export interface DerivedRubric {
+  pipeline: string;
   criteria: SuccessCriterion[];
   dumpRunId: string | null;
 }
@@ -276,8 +278,8 @@ export interface BrainPort {
    * or teaches through the brain, never by a command that only reads.
    */
   bind(): Promise<void>;
-  /** The rubric for one pipeline, derived from the mission alone. */
-  deriveRubric(pipeline: string, goal: string): Promise<DerivedRubric>;
+  /** The rubric for the pipeline that plays one role in the session, derived from the mission alone. */
+  deriveRubric(role: BrowserSessionRole, goal: string): Promise<DerivedRubric>;
   planStep(input: StepInput): Promise<Decided<StepPlan>>;
   answerFields(input: FieldsInput): Promise<Decided<FieldAnswers> & FormReport>;
   /** A few suggested answers for fields the operator is about to be asked, judged once. */

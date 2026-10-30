@@ -1,6 +1,6 @@
 import type {
   AnsweringSettings,
-  BROWSER_SESSION_PIPELINES,
+  BrowserSessionRole,
   SessionRailsDto,
   SuccessCriterion,
   WriteQueue,
@@ -89,7 +89,7 @@ export interface RunSessionOptions {
 }
 
 /** The rubric derived once per session, by the role each pipeline plays. */
-export type SessionCriteria = Record<keyof typeof BROWSER_SESSION_PIPELINES, SuccessCriterion[]>;
+export type SessionCriteria = Record<BrowserSessionRole, SuccessCriterion[]>;
 
 /** A decision as the flows record it: the engine fills in the ids, the step and the ordinal. */
 export type DecisionInput = Omit<

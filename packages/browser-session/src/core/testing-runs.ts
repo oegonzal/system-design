@@ -2,7 +2,9 @@ import {
   type Admission,
   ANSWER_SUGGESTIONS_PIPELINE_ID,
   type AnswerSuggestions,
+  BROWSER_SESSION_PIPELINES,
   BROWSER_STEP_PIPELINE_ID,
+  type BrowserSessionRole,
   FIELD_ANSWER_PIPELINE_ID,
   type FieldAnswer,
   type FieldAnswers,
@@ -146,10 +148,12 @@ export class ScriptedBrain implements BrainPort {
     // The script is the whole of what this brain keeps: nothing to bind.
   }
 
-  async deriveRubric(pipeline: string, goal: string): Promise<DerivedRubric> {
+  async deriveRubric(role: BrowserSessionRole, goal: string): Promise<DerivedRubric> {
     if (this.script.deriveFault) throw this.script.deriveFault;
+    const pipeline = BROWSER_SESSION_PIPELINES[role];
     this.derived.push({ pipeline, goal });
     return {
+      pipeline,
       criteria: (this.script.rubric ?? FAKE_RUBRIC).map((criterion) => ({ ...criterion })),
       dumpRunId: `${pipeline}-criteria-dump`,
     };
