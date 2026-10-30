@@ -19,6 +19,8 @@ const DEFAULTS: SessionDefaults = {
   busRecovery: AT_ONCE,
   liveness: SPEC_LIVENESS,
 };
+/** What a listing reads a session's beat against: the declared stale window. */
+const STALE = { staleAfterMs: SPEC_LIVENESS.staleAfterMs };
 
 const parsed = (argv: string[]): Options => {
   const options = parseOptions(argv, DEFAULTS);
@@ -135,23 +137,18 @@ describe('parseOptions', () => {
       profile: 'p',
       url: 'https://x.test',
     });
-    expect(parsed(['sessions'])).toEqual({
-      command: 'sessions',
-      limit: 20,
-      json: false,
-      staleAfterMs: SPEC_LIVENESS.staleAfterMs,
-    });
+    expect(parsed(['sessions'])).toEqual({ command: 'sessions', limit: 20, json: false, ...STALE });
     expect(parsed(['sessions', '--limit', '3', '--json'])).toEqual({
       command: 'sessions',
       limit: 3,
       json: true,
-      staleAfterMs: SPEC_LIVENESS.staleAfterMs,
+      ...STALE,
     });
     expect(parsed(['show', 'abc', '--json'])).toEqual({
       command: 'show',
       id: 'abc',
       json: true,
-      staleAfterMs: SPEC_LIVENESS.staleAfterMs,
+      ...STALE,
     });
     expect(parsed(['replay-events', 'abc'])).toEqual({ command: 'replay-events', id: 'abc' });
     expect(
