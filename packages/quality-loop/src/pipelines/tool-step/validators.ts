@@ -36,6 +36,7 @@ import {
   LIMITS_VALIDATOR_ID,
   problem,
   REFERENCES_VALIDATOR_ID,
+  unlisted,
   type IndexedRule,
 } from '../../core/contracts';
 import type { Validator } from '../../core/ports';
@@ -47,14 +48,12 @@ type Rule = IndexedRule<ToolPlan, ToolIndex>;
 type IndexedTool = ToolIndex['tools'][number];
 
 /** Every tool a call names is one the index lists; located at the call, so the session stops before it. */
-const references: Rule = (plan, index) => {
-  const known = new Set(index.tools.map((tool) => tool.name));
-  return plan.calls.flatMap((call, position) =>
-    known.has(call.tool)
-      ? []
-      : [problem('critical', `${call.tool} is not a listed tool`, [callLocation(position)])],
+const references: Rule = (plan, index) =>
+  unlisted(
+    index.tools.map((tool) => tool.name),
+    plan.calls.map((call, position) => ({ ref: call.tool, at: [callLocation(position)] })),
+    (tool) => `${tool} is not a listed tool`,
   );
-};
 
 /**
  * Whether a call ends the plan: its tool's declared effect is terminal, or a

@@ -14,15 +14,17 @@ import {
   valueFaults,
   type AnswerSuggestions,
   type FieldIndex,
-  type ValidationProblem,
 } from '@sysdesign/contracts';
 
 import {
   asWarning,
   indexedValidator,
   LIMITS_VALIDATOR_ID,
+  misplaced,
   problem,
   REFERENCES_VALIDATOR_ID,
+  unlisted,
+  unplaced,
   type IndexedRule,
 } from '../../core/contracts';
 import type { Validator } from '../../core/ports';
@@ -36,35 +38,32 @@ const CITING_BASES: ReadonlySet<string> = new Set(['record', 'transfer']);
 
 /** Every listed field suggested for exactly once, every cited alias listed. */
 const references: Rule = (suggested, index) => {
-  const fields = new Set(index.fields.map((field) => field.ref));
-  const aliases = new Set(index.evidence.map((item) => item.alias));
-  const seen = new Set<string>();
-  const problems: ValidationProblem[] = [];
-  suggested.fields.forEach((field, at) => {
-    const location = [fieldLocation(at)];
-    if (!fields.has(field.ref)) {
-      problems.push(problem('critical', `${field.ref} is not a listed field`, location));
-    } else if (seen.has(field.ref)) {
-      problems.push(problem('critical', `${field.ref} is suggested for more than once`, location));
-    }
-    seen.add(field.ref);
-    field.suggestions.forEach((suggestion, position) => {
-      for (const alias of suggestion.cites) {
-        if (!aliases.has(alias)) {
-          problems.push(
-            problem('critical', `${alias} is not listed evidence`, [
-              suggestionLocation(at, position),
-            ]),
-          );
-        }
-      }
-    });
-  });
-  for (const field of index.fields) {
-    if (!seen.has(field.ref))
-      problems.push(problem('critical', `${field.ref} is not suggested for`));
-  }
-  return problems;
+  const listed = index.fields.map((field) => field.ref);
+  return [
+    ...misplaced(
+      listed,
+      suggested.fields.map((field, at) => ({ ref: field.ref, at: [fieldLocation(at)] })),
+      {
+        unlisted: (ref) => `${ref} is not a listed field`,
+        repeated: (ref) => `${ref} is suggested for more than once`,
+      },
+    ),
+    ...unlisted(
+      index.evidence.map((item) => item.alias),
+      suggested.fields.flatMap((field, at) =>
+        field.suggestions.flatMap((suggestion, position) =>
+          suggestion.cites.map((alias) => ({ ref: alias, at: [suggestionLocation(at, position)] })),
+        ),
+      ),
+      (alias) => `${alias} is not listed evidence`,
+    ),
+    ...unplaced(
+      listed,
+      suggested.fields.map((field) => field.ref),
+      'critical',
+      (ref) => `${ref} is not suggested for`,
+    ),
+  ];
 };
 
 /** A suggestion labelled as resting on the record cites what it rests on. */

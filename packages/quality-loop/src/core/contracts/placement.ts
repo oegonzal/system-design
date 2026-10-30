@@ -48,6 +48,24 @@ export function misplaced(
   return problems;
 }
 
+/**
+ * Each placement of a ref the goal never listed, at its own location — for a
+ * ref an artifact may cite more than once (evidence a second answer rests on,
+ * an element a second action touches), so only being listed is the rule.
+ */
+export function unlisted(
+  listed: Iterable<string>,
+  placements: Iterable<Placement>,
+  say: (ref: string) => string,
+): ValidationProblem[] {
+  const known = new Set(listed);
+  const problems: ValidationProblem[] = [];
+  for (const { ref, at } of placements) {
+    if (!known.has(ref)) problems.push(problem('critical', say(ref), [...(at ?? [])]));
+  }
+  return problems;
+}
+
 /** The listed refs no placement names, in the goal's order, each worded by `say`. */
 export const unplaced = (
   listed: readonly string[],

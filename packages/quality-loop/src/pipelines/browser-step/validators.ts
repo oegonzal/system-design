@@ -45,6 +45,7 @@ import {
   LIMITS_VALIDATOR_ID,
   problem,
   REFERENCES_VALIDATOR_ID,
+  unlisted,
   type IndexedRule,
 } from '../../core/contracts';
 import type { Validator } from '../../core/ports';
@@ -57,16 +58,14 @@ type Element = StepIndex['elements'][number];
 type Fault = { severity: Severity; message: string };
 
 /** Every ref an action cites is one the page listed; located at the action, so the caller stops before it. */
-const references: Rule = (plan, index) => {
-  const known = new Set(index.elements.map((element) => element.ref));
-  return plan.actions.flatMap((action, position) =>
-    actionRefs(action)
-      .filter((ref) => !known.has(ref))
-      .map((ref) =>
-        problem('critical', `${ref} is not a listed element`, [actionLocation(position)]),
-      ),
+const references: Rule = (plan, index) =>
+  unlisted(
+    index.elements.map((element) => element.ref),
+    plan.actions.flatMap((action, position) =>
+      actionRefs(action).map((ref) => ({ ref, at: [actionLocation(position)] })),
+    ),
+    (ref) => `${ref} is not a listed element`,
   );
-};
 
 const isTerminal = (action: StepAction): boolean =>
   (TERMINAL_ACTION_KINDS as readonly string[]).includes(action.kind);

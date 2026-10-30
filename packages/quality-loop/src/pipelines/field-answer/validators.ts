@@ -17,15 +17,17 @@ import {
   type FieldIndex,
   type FieldSpec,
   type Severity,
-  type ValidationProblem,
 } from '@sysdesign/contracts';
 
 import {
   asWarning,
   indexedValidator,
   LIMITS_VALIDATOR_ID,
+  misplaced,
   problem,
   REFERENCES_VALIDATOR_ID,
+  unlisted,
+  unplaced,
   type IndexedRule,
 } from '../../core/contracts';
 import type { Validator } from '../../core/ports';
@@ -38,27 +40,33 @@ type Fault = { severity: Severity; message: string };
 
 /** Every listed field answered exactly once, every basis alias listed. */
 const references: Rule = (answers, index) => {
-  const fields = new Set(index.fields.map((field) => field.ref));
-  const aliases = new Set(index.evidence.map((item) => item.alias));
-  const seen = new Set<string>();
-  const problems: ValidationProblem[] = [];
-  answers.fields.forEach((answer, position) => {
-    const at = [fieldLocation(position)];
-    if (!fields.has(answer.ref)) {
-      problems.push(problem('critical', `${answer.ref} is not a listed field`, at));
-    } else if (seen.has(answer.ref)) {
-      problems.push(problem('critical', `${answer.ref} is answered more than once`, at));
-    }
-    seen.add(answer.ref);
-    for (const alias of answer.basis) {
-      if (!aliases.has(alias))
-        problems.push(problem('critical', `${alias} is not listed evidence`, at));
-    }
-  });
-  for (const field of index.fields) {
-    if (!seen.has(field.ref)) problems.push(problem('critical', `${field.ref} is not answered`));
-  }
-  return problems;
+  const listed = index.fields.map((field) => field.ref);
+  return [
+    ...misplaced(
+      listed,
+      answers.fields.map((answer, position) => ({
+        ref: answer.ref,
+        at: [fieldLocation(position)],
+      })),
+      {
+        unlisted: (ref) => `${ref} is not a listed field`,
+        repeated: (ref) => `${ref} is answered more than once`,
+      },
+    ),
+    ...unlisted(
+      index.evidence.map((item) => item.alias),
+      answers.fields.flatMap((answer, position) =>
+        answer.basis.map((alias) => ({ ref: alias, at: [fieldLocation(position)] })),
+      ),
+      (alias) => `${alias} is not listed evidence`,
+    ),
+    ...unplaced(
+      listed,
+      answers.fields.map((answer) => answer.ref),
+      'critical',
+      (ref) => `${ref} is not answered`,
+    ),
+  ];
 };
 
 /** What one answer does that its field cannot take, in the order the page would refuse it. */
