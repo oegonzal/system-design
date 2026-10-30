@@ -3,10 +3,9 @@
  * with deterministic vectors, a store that ranks by cosine the way Qdrant
  * does, and a cache. Pure helpers only — no vitest imports.
  */
-import { createHash } from 'node:crypto';
-
 import { isUnitBound, type MemoryStoreAvailabilityDto } from '@sysdesign/contracts';
 import type { EmbeddingClient } from '@sysdesign/llm';
+import { cosine, hashedUnitVector } from '@sysdesign/qdrant-kit/testing';
 
 import { CachedEmbeddings } from '../../orchestrators/memory/embeddings';
 import type {
@@ -42,15 +41,9 @@ export function fakeEmbeddings(
   };
 }
 
-export function vectorOf(text: string, dimensions = 8): number[] {
-  const digest = createHash('sha256').update(text, 'utf8').digest();
-  const raw = Array.from(
-    { length: dimensions },
-    (_, index) => digest[index % digest.length] / 255 - 0.5,
-  );
-  const norm = Math.hypot(...raw) || 1;
-  return raw.map((value) => value / norm);
-}
+/** The fake's vector for a text, at the width its specs embed by default. */
+export const vectorOf = (text: string, dimensions = 8): number[] =>
+  hashedUnitVector(text, dimensions);
 
 /**
  * A memory as a store keeps it: indexed by both halves the way a digest's are
@@ -97,10 +90,6 @@ const passes = (chunk: StoredChunk, filter: ProbeFilter | undefined): boolean =>
       (filter?.unitKey !== undefined && chunk.unitKey === filter.unitKey))
   );
 };
-
-const cosine = (a: readonly number[], b: readonly number[]): number =>
-  a.reduce((sum, value, index) => sum + value * (b[index] ?? 0), 0) /
-  ((Math.hypot(...a) || 1) * (Math.hypot(...b) || 1));
 
 /**
  * A stored chunk as the adapter reads one back: the memory without what it is

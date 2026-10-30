@@ -3,7 +3,7 @@
  * table-driven embedder and a space store in memory — shared by this package's
  * specs and a host's.
  */
-import { createHash } from 'node:crypto';
+import { hashedUnitVector } from '@sysdesign/qdrant-kit/testing';
 
 import type { Clock, Embedder, Ids, SpaceStore, StoredSpace } from '../ports';
 
@@ -31,17 +31,6 @@ export function sequentialIds(): Ids {
   return () => `00000000-0000-4000-8000-${String((next += 1)).padStart(12, '0')}`;
 }
 
-/** A unit vector a text always maps to, for a text a spec did not place by hand. */
-function hashedVector(text: string, dimensions: number): number[] {
-  const digest = createHash('sha256').update(text).digest();
-  const raw = Array.from(
-    { length: dimensions },
-    (_, index) => (digest[index % digest.length] ?? 0) - 127.5,
-  );
-  const norm = Math.hypot(...raw) || 1;
-  return raw.map((value) => value / norm);
-}
-
 /** An embedder whose vectors a spec places by hand; any other text maps to a fixed unit vector of its own. */
 export function tableEmbedder(options: {
   model: string;
@@ -57,7 +46,7 @@ export function tableEmbedder(options: {
       calls.push([...inputs]);
       return Promise.resolve(
         inputs.map((text) => [
-          ...(options.table?.[text] ?? hashedVector(text, options.dimensions)),
+          ...(options.table?.[text] ?? hashedUnitVector(text, options.dimensions)),
         ]),
       );
     },

@@ -4,6 +4,8 @@
  * partition, then every OTHER policy scope key either unset on the point or
  * equal to the request's, and a key the request does not name unset.
  */
+import { cosine } from '@sysdesign/qdrant-kit/testing';
+
 import { byText } from '../order';
 import type { PointPayload, VectorIndex, VisibilityFilter } from '../ports';
 
@@ -11,12 +13,6 @@ interface Point {
   vector: readonly number[];
   payload: PointPayload;
 }
-
-const cosine = (a: readonly number[], b: readonly number[]): number => {
-  const dot = a.reduce((sum, value, index) => sum + value * (b[index] ?? 0), 0);
-  const norms = Math.hypot(...a) * Math.hypot(...b);
-  return norms === 0 ? 0 : dot / norms;
-};
 
 /** The visibility rule a point must meet, stated over the policy's scope keys. */
 export function pointVisible(payload: PointPayload, filter: VisibilityFilter): boolean {
