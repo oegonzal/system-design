@@ -29,6 +29,7 @@ import {
 } from './operator-interaction';
 import { OperatorInterrupted, QuestionWithdrawn, type Withdrawal } from './ports';
 import { formTaskOf } from './open-unit';
+import { SESSION_KIND } from './identity';
 
 /**
  * Putting a field to the operator, with the suggested answers readied for it.
@@ -232,8 +233,9 @@ const STOPPED: AskOutcome = { kind: 'stopped' };
 const askingOf = (ctx: EngineContext): Asking => {
   const task = ctx.state.tasks.open?.label ?? null;
   return {
+    promptId: ctx.deps.ids(),
     origin: {
-      kind: 'browser-session',
+      kind: SESSION_KIND,
       id: ctx.state.sessionId,
       label: `step ${ctx.state.step}${task === null ? '' : ` · ${task}`}`,
     },

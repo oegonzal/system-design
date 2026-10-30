@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { MemoryClient } from '@sysdesign/agentic-memory-client';
 import {
@@ -42,6 +44,7 @@ import {
 import { replayFields, type ReplayFieldsOptions, type ReplayFieldsReport } from './replay-fields';
 import { presentDocuments } from './supplied-documents';
 import { subjectFor, teachAgain, type TeachAgainReport } from './teach-again';
+import { SESSION_KIND } from '../../core/identity';
 
 /**
  * What the command line asks of a run: the engine's options, the subject
@@ -121,6 +124,7 @@ export class SessionService {
         operator: this.operator,
         goals: this.goals,
         clock: this.clock,
+        ids: randomUUID,
         dumps: this.dumps,
         advisors: this.advisors,
         events: this.events,
@@ -161,7 +165,8 @@ export class SessionService {
         pauseQuestion(
           `Sign in at ${url} in the browser window, then continue. The profile "${profile}" keeps the cookies for later sessions.`,
           {
-            origin: { kind: 'browser-session', id: excerpt(profile, 80), label: 'sign-in' },
+            promptId: randomUUID(),
+            origin: { kind: SESSION_KIND, id: excerpt(profile, 80), label: 'sign-in' },
             expiresAt: new Date(
               this.clock.now().getTime() + this.config.settings.operator.expiresAfterMs,
             ),

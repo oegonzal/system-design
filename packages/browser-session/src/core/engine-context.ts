@@ -15,6 +15,7 @@ import type {
   DumpSink,
   DumpStore,
   GoalSource,
+  Ids,
   LedgerPort,
   NewDecision,
   OperatorPort,
@@ -40,6 +41,7 @@ export interface SessionDeps {
   operator: OperatorPort;
   goals: GoalSource;
   clock: Clock;
+  ids: Ids;
   dumps: DumpStore;
   /** Every advisor the environment configures; the mission names which to ask. */
   advisors: readonly ConfiguredAdvisor[];
@@ -149,7 +151,7 @@ export function createEngineContext(parts: EngineParts): EngineContext {
       state.decisions += 1;
       const row = {
         ...decision,
-        id: crypto.randomUUID(),
+        id: deps.ids(),
         sessionId: state.sessionId,
         taskId: state.tasks.open?.id ?? null,
         step: state.step,

@@ -5,6 +5,7 @@ import {
 } from '@sysdesign/contracts';
 import { BusCallAborted, type BusClient } from '@sysdesign/notifications-client';
 
+import { SESSION_KIND } from '../../core/identity';
 import {
   QuestionWithdrawn,
   type OperatorChannel,
@@ -16,9 +17,6 @@ import {
 export interface Asker {
   ask(prompt: InteractionPrompt, signal?: AbortSignal): Promise<InteractionAnswer>;
 }
-
-/** How the session names itself on what it publishes. */
-export const SESSION_SOURCE = 'browser-session';
 
 /**
  * The operator reached through the notifications service: the question goes
@@ -48,7 +46,7 @@ export class NotificationsOperator implements OperatorChannel {
   async unused(question: OperatorQuestion, withdrawal: Withdrawal): Promise<void> {
     await this.bus.publish({
       topic: INTERACTION_TOPICS.withdrawn,
-      source: SESSION_SOURCE,
+      source: SESSION_KIND,
       payload: { promptId: question.prompt.id, ...withdrawal },
     });
   }

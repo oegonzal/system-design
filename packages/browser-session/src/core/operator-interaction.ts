@@ -1,5 +1,3 @@
-import { randomUUID } from 'node:crypto';
-
 import {
   closedOptionsOf,
   excerpt,
@@ -75,6 +73,8 @@ export interface OperatorPrompt {
 
 /** Who asks, as every channel names it, and until when a channel keeps offering the question. */
 export interface Asking {
+  /** The id the question is put under. */
+  promptId: string;
   origin: InteractionPrompt['origin'];
   expiresAt: Date;
 }
@@ -145,7 +145,7 @@ export function fieldQuestion(prompt: OperatorPrompt, asking: Asking): AskedFiel
   return {
     question: {
       prompt: {
-        id: randomUUID(),
+        id: asking.promptId,
         origin: asking.origin,
         title,
         details,
@@ -206,7 +206,7 @@ export function fieldReplyOf(
 export function pauseQuestion(text: string, asking: Asking): OperatorQuestion {
   return {
     prompt: {
-      id: randomUUID(),
+      id: asking.promptId,
       origin: asking.origin,
       title: 'The session is waiting for you',
       details: [detail(text)],

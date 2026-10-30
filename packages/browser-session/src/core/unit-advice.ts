@@ -15,6 +15,7 @@ import {
 import { describeError } from '@sysdesign/run-dump';
 
 import type { EngineContext, RunSessionOptions, SessionDeps } from './engine-context';
+import { SESSION_KIND } from './identity';
 
 /**
  * What the mission's advisors know of units beyond this session, composed into
@@ -135,7 +136,7 @@ const requestOf = (
   step: number,
 ): UnitAdviceRequest => ({
   subject: options.subject,
-  asker: { kind: 'browser-session', id: sessionId, label: stepWord(step) },
+  asker: { kind: SESSION_KIND, id: sessionId, label: stepWord(step) },
   facets: [...facets],
 });
 

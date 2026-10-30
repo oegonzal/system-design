@@ -2,13 +2,13 @@ import type { SessionEvent } from '@sysdesign/contracts';
 import type { BusClient } from '@sysdesign/notifications-client';
 
 import type { SessionEventsPort } from '../../core/session-events';
-import { SESSION_SOURCE } from './notifications-operator';
+import { SESSION_KIND } from '../../core/identity';
 
 /** The session's events on the notifications bus, each under the session's own name as publisher. */
 export class BusSessionEvents implements SessionEventsPort {
   constructor(private readonly bus: Pick<BusClient, 'publish'>) {}
 
   async publish(event: SessionEvent): Promise<void> {
-    await this.bus.publish({ topic: event.topic, source: SESSION_SOURCE, payload: event.payload });
+    await this.bus.publish({ topic: event.topic, source: SESSION_KIND, payload: event.payload });
   }
 }

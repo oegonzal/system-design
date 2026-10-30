@@ -80,7 +80,7 @@ export async function runSession(
   options: RunSessionOptions,
 ): Promise<SessionOutcome> {
   const goal = await deps.goals.read(options.goalPath);
-  const sessionId = crypto.randomUUID();
+  const sessionId = deps.ids();
   // The brain bound to whatever it keeps its memories in, every declared
   // section parsed and every advisor the mission names resolved and asked
   // once, before a row, a beat or a dump folder exists: a space that does not

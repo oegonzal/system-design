@@ -28,6 +28,7 @@ import {
   type StepInput,
 } from '../../core/ports';
 import { composeStepGoalWithinBudget } from './render-goal';
+import { SESSION_KIND } from '../../core/identity';
 
 /**
  * What every brain over the loop shares: how a rubric is derived and a plan
@@ -103,7 +104,7 @@ export type LoopBrainOptions = Pick<AwaitOptions, 'pollEveryMs' | 'staleAfterMs'
 
 /** Who opens a run for the session: the session by its id, and what the run was to it — "step 6 · form page". */
 export const openedBy = (session: SessionStepRef, what: string | null): RunOpenerDto => ({
-  kind: 'browser-session',
+  kind: SESSION_KIND,
   id: session.sessionId,
   label: what === null ? `step ${session.step}` : `step ${session.step} · ${what}`,
 });

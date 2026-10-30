@@ -2,7 +2,8 @@ import type { InteractionPrompt, PublishEventRequest } from '@sysdesign/contract
 import { BusCallAborted, BusUnreachable } from '@sysdesign/notifications-client';
 
 import { QuestionWithdrawn, type OperatorQuestion } from '../../core/ports';
-import { NotificationsOperator, SESSION_SOURCE } from './notifications-operator';
+import { SESSION_KIND } from '../../core/identity';
+import { NotificationsOperator } from './notifications-operator';
 
 const PROMPT = {
   id: '5d1e2f30-8192-4ca3-b4d5-e6f708192a3b',
@@ -62,7 +63,7 @@ describe('the operator through the notifications service', () => {
     expect(published).toEqual([
       {
         topic: 'interaction.withdrawn',
-        source: SESSION_SOURCE,
+        source: SESSION_KIND,
         payload: {
           promptId: PROMPT.id,
           reason: 'answered-elsewhere',

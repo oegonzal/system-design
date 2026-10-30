@@ -1,5 +1,8 @@
 import type { DumpBytes, DumpFile } from '@sysdesign/run-dump';
 
+/** A fresh id for each record the session writes and each question it puts: a session, a task, a decision, a prompt. */
+export type Ids = () => string;
+
 export interface GoalDocument {
   path: string;
   markdown: string;

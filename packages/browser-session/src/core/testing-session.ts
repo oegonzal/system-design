@@ -1,3 +1,5 @@
+import { randomUUID } from 'node:crypto';
+
 import {
   answeringFixture,
   MISSION_FIXTURE,
@@ -126,6 +128,7 @@ export async function runScripted(scenario: Scenario) {
       operator,
       goals: new InMemoryGoalSource({ 'goals/test.md': scenario.mission ?? MISSION_FIXTURE }),
       clock: scenario.clock ?? new FixedClock(),
+      ids: randomUUID,
       dumps,
       advisors: scenario.advisors ?? [],
       events,

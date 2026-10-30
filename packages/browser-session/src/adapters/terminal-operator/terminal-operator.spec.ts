@@ -23,6 +23,7 @@ const asked = (): OperatorQuestion =>
       suggestions: [],
     },
     {
+      promptId: '00000000-0000-4000-8000-000000000001',
       origin: { kind: 'browser-session', id: 's1', label: 'step 3 · Senior Engineer at Acme' },
       expiresAt: new Date('2026-10-12T00:00:00Z'),
     },

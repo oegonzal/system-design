@@ -88,7 +88,7 @@ function openTaskUnlessRefused(
     return true;
   }
   const task: OpenTask = {
-    id: crypto.randomUUID(),
+    id: deps.ids(),
     ordinal: state.tasks.started + 1,
     label: action.label,
     url: action.url,

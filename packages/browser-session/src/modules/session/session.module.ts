@@ -20,14 +20,12 @@ import { LoopBrain } from '../../adapters/loop-http/loop-brain';
 import { MemoryLoopBrain } from '../../adapters/memory-loop/memory-loop-brain';
 import { MikroOrmLedger } from '../../adapters/mikro-orm/mikro-orm-ledger';
 import { BusSessionEvents } from '../../adapters/notifications-http/bus-session-events';
-import {
-  NotificationsOperator,
-  SESSION_SOURCE,
-} from '../../adapters/notifications-http/notifications-operator';
+import { NotificationsOperator } from '../../adapters/notifications-http/notifications-operator';
 import { CHROME_CHANNEL, PlaywrightBrowser } from '../../adapters/playwright/playwright-browser';
 import { TerminalOperator } from '../../adapters/terminal-operator/terminal-operator';
 import { SESSION_FLAGS, type SessionConfig } from '../../config';
 import { FirstAnswer } from '../../core/first-answer';
+import { SESSION_KIND } from '../../core/identity';
 import type { BrainPort, Clock, OperatorChannel, StopSignal } from '../../core/ports';
 import { SessionRefused, type ConfiguredAdvisor } from '../../core/unit-advice';
 import type { BrainSettings } from '../../settings';
@@ -106,7 +104,7 @@ function remoteOperators(config: SessionConfig, bus: HttpBusClient): OperatorCha
   const { notifications } = config.settings.operator.channels;
   if (notifications === undefined) return [];
   const interactions = new InteractionClient(bus, {
-    source: SESSION_SOURCE,
+    source: SESSION_KIND,
     pullWaitMs: notifications.pullWaitMs,
     eventsPerPull: notifications.eventsPerPull,
   });
