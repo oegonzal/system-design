@@ -19,7 +19,12 @@ import {
   excerpt,
 } from '@sysdesign/contracts';
 
-import { fitSnapshot, type FittedSnapshot, type SnapshotNode } from './aria-snapshot';
+import {
+  fitSnapshot,
+  type FittedSnapshot,
+  type SnapshotNode,
+} from '../../core/snapshot/aria-snapshot';
+import { snapshotScopeOf } from '../../core/snapshot/snapshot-scope';
 import { hiddenTraitsOf, type ElementFacts } from './element-facts';
 import type { FileControlRef } from './file-controls';
 
@@ -161,26 +166,6 @@ function activeScopeOf(reading: PageReading): ActiveScope | null {
       : modal.find((scope) => sameScope(scope, reading.focusedScope as ActiveScope));
   const chosen = focused ?? modal[modal.length - 1];
   return chosen === undefined ? null : { role: chosen.role, name: chosen.name };
-}
-
-/**
- * The scope a snapshot keeps whole when it has to be cut: the modal dialog in
- * front, else the last dialog an element sits in, modal or not. A dialog that
- * does not block the page never becomes the active scope — the elements
- * behind it stay in reach — but it is what the page is saying now. Measured
- * 2026-10-10: the dialog confirming an application was sent carried no
- * aria-modal, sat last in a 696-line snapshot, and was the part the goal's cut
- * dropped, so planner and judges read the outcome from the pane alone.
- */
-export function snapshotScopeOf(
-  activeScope: ActiveScope | null,
-  elements: readonly ObservedElement[],
-): ActiveScope | null {
-  if (activeScope !== null) return activeScope;
-  const dialogs = elements.flatMap((element) =>
-    element.scope === null ? [] : [{ role: element.scope.role, name: element.scope.name }],
-  );
-  return dialogs[dialogs.length - 1] ?? null;
 }
 
 /**

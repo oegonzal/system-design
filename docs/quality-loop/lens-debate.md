@@ -68,7 +68,7 @@ All three lenses run in one wave: none is shown another's answer (section 2 says
    - It keeps up to 150 elements (`ct/browser-session/observation.schema.ts` `ELEMENTS_BOUND`),
      main landmark first.
    - The accessibility snapshot is fitted to its bound by rung
-     (`bs/adapters/playwright/aria-snapshot.ts` `fitSnapshot`). The rungs keep words, never
+     (`bs/core/snapshot/aria-snapshot.ts` `fitSnapshot`). The rungs keep words, never
      wordless lines.
    - `noteObservation` (`bs/core/session-state.ts`) compares the page's identity with the last
      one (`ct/browser-session/observation-fingerprint.ts`). An unchanged page counts toward the

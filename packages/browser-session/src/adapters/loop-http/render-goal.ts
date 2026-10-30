@@ -18,8 +18,8 @@ import type { UnitContext } from '../../core/open-unit';
 import type { FieldsInput, GoalComposition } from '../../core/ports';
 // The snapshot's own codec, not a browser: it reduces snapshot text by the
 // declared rungs and never touches a page.
-import { firstThatFit, fitSnapshot, withoutUnlistedRefs } from '../playwright/aria-snapshot';
-import { snapshotScopeOf } from '../playwright/observation-reading';
+import { firstThatFit, fitSnapshot, withoutUnlistedRefs } from '../../core/snapshot/aria-snapshot';
+import { snapshotScopeOf } from '../../core/snapshot/snapshot-scope';
 
 /**
  * The goals the session composes for the loop, fitted to the loop's budget

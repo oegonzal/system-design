@@ -20,7 +20,7 @@ import {
   settledSnapshot,
   subtreeText,
   unreadSnapshotLines,
-} from './aria-snapshot';
+} from '../../core/snapshot/aria-snapshot';
 import { readWithinBudget } from './budgeted-read';
 import { busyCheck } from './busy-check';
 import { readElementFacts } from './element-facts';

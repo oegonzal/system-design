@@ -5,7 +5,7 @@ import {
   type PageObservation,
 } from '@sysdesign/contracts';
 
-import type { SnapshotNode } from './aria-snapshot';
+import type { SnapshotNode } from '../../core/snapshot/aria-snapshot';
 import type { ElementFacts } from './element-facts';
 import {
   toObservation,

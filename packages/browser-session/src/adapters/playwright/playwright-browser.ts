@@ -17,7 +17,7 @@ import {
   type SuppliedDocument,
 } from '../../core/ports';
 import { performAction } from './action-performer';
-import { landmarkWords, type SnapshotNode } from './aria-snapshot';
+import { landmarkWords, type SnapshotNode } from '../../core/snapshot/aria-snapshot';
 import { readElementFacts } from './element-facts';
 import { FILE_CONTROLS } from './file-controls';
 import type { ObservePolicy } from './observe-policy';
