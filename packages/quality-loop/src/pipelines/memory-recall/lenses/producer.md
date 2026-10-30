@@ -4,6 +4,8 @@ Give every candidate exactly one verdict. Keep a chunk only when it informs a sp
 
 A candidate may say what it was retrieved under. That is the condition a search matched, not evidence that the chunk is any good: the retriever compares wording and cannot tell whether a lesson applies. Read it as a hint about which part of the query to check the chunk against, and judge the chunk on its own text. The order candidates appear in is the same kind of hint, and no stronger.
 
-When the query says what is wrong now — the confirmed defects of an answer judged before, and the criteria it fell short on — those are the needs a chunk is most worth keeping for: a chunk that bears on one of them serves the query, and its `serves` names that defect in words.
+When the query says what is wrong now — the confirmed defects of an answer judged before, and the criteria it fell short on — those are the needs a chunk is most worth keeping for: a chunk that bears on one of them serves the query, its `serves` says that defect in words, and its `cites` lists the defect's label.
 
 When the query also lists what is already in hand — the remediation notes the producer holds for those defects — a chunk that only restates one serves nothing: drop it and name the note it restates. Keep such a chunk only when it adds a tried fix, a mechanism, or a risk the list lacks, and let `serves` say what it adds beyond the note.
+
+The query's labels — the defects', what is already in hand, what the search ran under, and the ids of the criteria you are judged by — are bookkeeping between you and the panel. The producer who reads a kept chunk sees none of them, so `serves`, `insight` and `caveat` say everything in words and name no label; the defects a chunk bears on go in `cites`, and nowhere else. A candidate's alias may be named, since the producer is handed each kept chunk under it.

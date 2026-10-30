@@ -68,8 +68,14 @@ const RECALL_ANSWERS = [
   {
     summary: 'Both candidates speak to the read path of an order list.',
     kept: [
-      { chunk: 'm1', serves: 'the list read', insight: INSIGHTS[0], caveat: null },
-      { chunk: 'm2', serves: 'order status', insight: INSIGHTS[1], caveat: 'another prompt' },
+      { chunk: 'm1', serves: 'the list read', cites: [], insight: INSIGHTS[0], caveat: null },
+      {
+        chunk: 'm2',
+        serves: 'order status',
+        cites: [],
+        insight: INSIGHTS[1],
+        caveat: 'another prompt',
+      },
     ],
     dropped: [],
     gaps: [],

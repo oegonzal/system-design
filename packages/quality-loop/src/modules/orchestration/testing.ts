@@ -46,12 +46,14 @@ export const CANNED: readonly unknown[] = [
       {
         chunk: 'm1',
         serves: 'the list read',
+        cites: [],
         insight: 'serve the list from a store the page owns',
         caveat: null,
       },
       {
         chunk: 'm2',
         serves: 'order status',
+        cites: [],
         insight: 'record each status transition as a row',
         caveat: null,
       },

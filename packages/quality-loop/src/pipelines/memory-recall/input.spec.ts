@@ -38,7 +38,14 @@ describe('the memory-recall input codec', () => {
         alias: `m${position + 1}`,
         source: candidate.source,
       })),
+      focus: [],
+      known: [],
+      probes: ['p1'],
     });
+    // A goal composed before the index carried its labels reads as listing none.
+    const unlabelled = goal.replace(/,"focus":\[\],"known":\[\],"probes":\["p1"\]/u, '');
+    expect(unlabelled).not.toBe(goal);
+    expect(readIndex(unlabelled)).toMatchObject({ focus: [], known: [], probes: [] });
   });
 
   it('[QL-14] a plain prompt, a foreign index or a broken fence reads as no index', () => {
@@ -73,8 +80,8 @@ describe('the memory-recall input codec', () => {
       /### \[m1\] finding · run .* · ref unhandled_failure\|flow\.1 · origin chain\n/,
     );
     expect(goal).toMatch(/### \[m3\] lesson · run .* · origin other-pipeline\n/);
-    // The index the validators read is unchanged by either.
-    expect(readIndex(goal)).toEqual(readIndex(renderGoal(bare)));
+    // The index the validators read lists what is in hand by label, and is otherwise unchanged.
+    expect(readIndex(goal)).toEqual({ ...readIndex(renderGoal(bare)), known: ['k1', 'k2'] });
 
     // Nothing in hand: no section, no rule, no origin — the query a bare recall composes.
     expect(recallRules([])).toEqual([...RECALL_RULES]);

@@ -144,18 +144,22 @@ export type RunRecallReason = keyof typeof RUN_RECALL_REASON_STATUS;
 
 /**
  * One lesson a producer was handed: the stored lesson, what the curator said
- * it lends this goal, and where it was learned. The curator's words reach the
- * producer and the author in the goal's own terms: the labels the curator's
- * query gave the goal's needs — its defects, its derived criteria, its probes
- * and what was already in hand — are read back as the goal's own criterion
- * ids or the defect words they stand for, and dropped where they stand for
- * neither, so no label either one never saw reaches them.
+ * it lends this goal, and where it was learned. The curator writes its words
+ * with no label of its query in them, and cites the defects a lesson bears on
+ * by label; those are read back in the goal's own terms (`answers`), so no
+ * label the producer or the author never saw reaches them.
  */
 export interface RecalledLessonDto {
   /** The alias the curator kept it under (`m3`) — what the producer's prompt cites it by. */
   ref: string;
-  /** The part of the goal the curator says it informs, in the goal's own terms; empty when it named only labels that stand for nothing here. */
+  /** The part of the goal the curator says it informs, in its words. */
   serves: string;
+  /**
+   * The defects of the goal's judged answer it bears on, in the goal's own
+   * terms: the criterion the answer fell short on, or the defect's own words.
+   * Absent on a lesson recorded before the curator cited them.
+   */
+  answers?: string[];
   /** What it teaches for this goal, in the stored lesson's own terms. */
   insight: string;
   /** How the lesson's context differs from this goal's, or null. */

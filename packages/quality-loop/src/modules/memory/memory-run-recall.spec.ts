@@ -80,6 +80,7 @@ describe("the memory module's recall for a run's producer", () => {
     expect(recalled.lessons[0]).toEqual({
       ref: 'm1',
       serves: first.serves,
+      answers: [],
       insight: first.insight,
       caveat: first.caveat,
       text: 'serve the list from a store the page owns',

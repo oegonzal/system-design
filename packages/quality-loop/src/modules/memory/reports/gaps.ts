@@ -19,6 +19,7 @@
  * written; the service does the paging.
  */
 import type { GapDto, GapGroupDto, QualityRunDto, StandingGapsDto } from '@sysdesign/contracts';
+import { z } from 'zod';
 
 import { memoryPackSchema } from '../../../pipelines/memory-recall/output';
 import { bareGoal } from '../../../orchestrators/common';
@@ -49,11 +50,17 @@ export function gapsOf(recall: QualityRunDto): string[] {
     trace.iterations.find((iteration) => iteration.iteration === trace.bestIteration) ??
     trace.iterations[trace.iterations.length - 1];
   if (best === undefined) return [];
-  const pack = memoryPackSchema.safeParse(best.artifact);
+  const pack = PACK_GAPS.safeParse(best.artifact);
   if (!pack.success) return [];
   const faulted = new Set(best.ledger.findings.flatMap((finding) => finding.locationRefs));
   return pack.data.gaps.filter((_, position) => !faulted.has(`gap.${position + 1}`));
 }
+
+/**
+ * The part of a pack this report reads, and only that: a pack recorded before
+ * the pack's shape last grew still names its gaps.
+ */
+const PACK_GAPS = z.object({ gaps: memoryPackSchema.shape.gaps });
 
 /** When a recall ran, for the first and last a gap was named. */
 const whenOf = (recall: QualityRunDto): string => recall.finishedAt ?? recall.startedAt;

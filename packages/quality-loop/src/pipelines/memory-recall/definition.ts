@@ -51,8 +51,10 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
     output: memoryPackOutput,
   },
 
-  deriveCriteria: { persona: deriveCriteria, maxTokens: 4700 },
-  producer: { persona: producer, maxTokens: 16000, consumes: ['criteria'] },
+  // Every cap a fifth above the most its stage has written (`measured.json`, to
+  // 2026-10-30), thinking included where the client counts it.
+  deriveCriteria: { persona: deriveCriteria, maxTokens: 8900 },
+  producer: { persona: producer, maxTokens: 22700, consumes: ['criteria'] },
   validators: [referencesValidator, limitsValidator],
   // The floor, not the standard order: a pack accepted at 80.6 with coverage
   // at 59.1 is the case it exists for, and this is the pipeline that runs it
@@ -65,14 +67,14 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
       persona: criticRelevance,
       samples: 2,
       maxItems: 10,
-      maxTokens: 18000,
+      maxTokens: 18400,
     },
     {
       id: 'critic.grounding',
       persona: criticGrounding,
       samples: 2,
       maxItems: 10,
-      maxTokens: 20000,
+      maxTokens: 23500,
     },
   ],
 
@@ -82,7 +84,7 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
       persona: evaluatorCoverage,
       samples: 2,
       consumes: [],
-      maxTokens: 8000,
+      maxTokens: 11100,
       criterionKinds: ['need'],
     },
     {
@@ -90,7 +92,7 @@ export const MEMORY_RECALL: PipelineDefinition<MemoryPack> = {
       persona: evaluatorAdmissibility,
       samples: 2,
       consumes: [],
-      maxTokens: 8800,
+      maxTokens: 11000,
       criterionKinds: ['admissibility'],
     },
   ],

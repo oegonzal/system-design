@@ -226,10 +226,18 @@ export const recallRules = (known: readonly string[]): string[] => [
   ...(known.length > 0 ? [NOVELTY_RULE] : []),
 ];
 
+/** The labels of one listed section, in the goal's order; a goal written before the index carried them lists none. */
+const labelsSchema = z.array(z.string().min(1)).default([]);
+
 const indexSchema = z.strictObject({
   pipeline: z.literal(MEMORY_RECALL_ID),
   maxKept: z.number().int().min(1),
   candidates: z.array(z.strictObject({ alias: z.string().min(1), source: chunkSourceSchema })),
+  /** The defects the query is focused on, by label: all a kept chunk may cite. */
+  focus: labelsSchema,
+  /** What the producer already holds, and what the search ran under: labels the reader of the pack never sees. */
+  known: labelsSchema,
+  probes: labelsSchema,
 });
 export type MemoryIndex = z.infer<typeof indexSchema>;
 
@@ -277,6 +285,9 @@ const indexOf = (input: MemoryQuery): MemoryIndex => ({
     alias: alias(position),
     source: candidate.source,
   })),
+  focus: input.focus.map((_, position) => focusAlias(position)),
+  known: input.known.map((_, position) => knownAlias(position)),
+  probes: input.probes.map((_, position) => probeAlias(position)),
 });
 
 export function renderGoal(input: MemoryQuery): string {

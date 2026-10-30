@@ -69,8 +69,6 @@ describe('reading a recall', () => {
     const readout = readPack(redundant, hits, ACCEPT_AT);
     expect(readout.usable.map((item) => item.alias)).toEqual(['m2', 'm1']);
     expect(readout.withheld).toEqual([]);
-    // Every usable memory carries the rubric its curator's words cite needs by.
-    expect(readout.usable[0].rubric).toEqual(redundant.contract.criteria);
   });
 
   it('[QL-16] a pack whose validators failed is withheld whole, however well it scored', () => {

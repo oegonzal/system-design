@@ -14,10 +14,8 @@ const MEMORY_LEAD =
 
 /**
  * One remembered item: where it was learned, the stored lesson verbatim, and
- * the curator's words read back in the target's own terms (`lessonOf`) — the
- * labels its query gave the target's needs mean nothing in the target's goal,
- * and its own criterion ids would read as the target's — each part it named
- * only by such labels left unsaid.
+ * the curator's words (`lessonOf`), which name no label of its query — a label
+ * would mean nothing in the target's goal, and the pipeline refuses one.
  */
 const rememberedLine = (usable: UsableMemory): string => {
   const { source } = usable.hit;

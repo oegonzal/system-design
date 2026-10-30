@@ -81,8 +81,16 @@ export function artifactValidator<A>(
   };
 }
 
-/** A rule reads a parsed artifact against the index; what it finds are the problems. */
-export type IndexedRule<A, I> = (artifact: A, index: I) => ValidationProblem[];
+/**
+ * A rule reads a parsed artifact against the index — and the contract, for a
+ * rule that also checks the derived criteria's ids; what it finds are the
+ * problems.
+ */
+export type IndexedRule<A, I> = (
+  artifact: A,
+  index: I,
+  contract: TaskContract<A>,
+) => ValidationProblem[];
 
 /** A gate an indexed validator may declare: its problems refuse, one way or the other. */
 type RefusingGate = Exclude<ValidatorGate, 'warn'>;
@@ -100,7 +108,7 @@ export function indexedValidator<A, I>(
 ): Validator<A> {
   return artifactValidator<A>(id, gate, (artifact, contract) => {
     const index = readIndex(contract.goal);
-    return index === null ? whenNoIndex : rule(artifact, index);
+    return index === null ? whenNoIndex : rule(artifact, index, contract);
   });
 }
 

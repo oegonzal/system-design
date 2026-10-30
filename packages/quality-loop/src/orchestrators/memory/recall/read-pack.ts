@@ -9,7 +9,7 @@
  * the ledger — never over prose; the pack is read as the seam read the reply,
  * so one kept past a ceiling is drawn on rather than refused for its size.
  */
-import { parseLenient, type Admission, type SuccessCriterion } from '@sysdesign/contracts';
+import { parseLenient, type Admission } from '@sysdesign/contracts';
 
 import {
   admission,
@@ -31,12 +31,6 @@ export interface UsableMemory {
   hit: MemoryHit;
   /** How many passing criteria cited the chunk as evidence. */
   support: number;
-  /**
-   * The rubric the recall run was judged against — the ids the curator's own
-   * words cite its needs by, shared by every memory of one pack — so what it
-   * wrote can be read back in the asker's terms (`provenance.ts`).
-   */
-  rubric: readonly SuccessCriterion[];
 }
 
 export interface RecallReadout {
@@ -73,15 +67,12 @@ export function readPack(
   );
   const faulted = withheldRefs(withheld);
   const supportOf = supportIn(best.ledger);
-  const rubric = outputs.trace.contract.criteria;
   const byAlias = new Map(hits.map((hit, position) => [alias(position), hit]));
   const usable = pack.value.kept
     .filter((item) => !faulted.has(item.chunk))
     .flatMap((item) => {
       const hit = byAlias.get(item.chunk);
-      return hit
-        ? [{ alias: item.chunk, kept: item, hit, support: supportOf(item.chunk), rubric }]
-        : [];
+      return hit ? [{ alias: item.chunk, kept: item, hit, support: supportOf(item.chunk) }] : [];
     })
     .sort((a, b) => b.support - a.support);
   return { admission: 'admitted', kept, usable, withheld };

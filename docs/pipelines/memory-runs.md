@@ -1640,26 +1640,33 @@ it named iterations stamps from the run's best, as before. The curator's rule
 that a lesson from a rejected or escalated iteration informs a risk, never a
 recommendation, reads that per-lesson stamp.
 
-**A recalled lesson arrives in the asker's terms, with where it was learned.**
+**A recalled lesson names no label, cites its defects structurally, and says where it was learned.**
 The curator's query labels the asker's needs for it — `d1…` the focused
 defects, `p1…` the derived conditions, `k1…` the notes already in hand — and
 its own rubric's ids, `c1…`, name the needs it derived. None of those means
 anything to the producer, the author or the target's stages, and `c8` would
-read as the asker's own c8. So `lessonOf` (`recall/provenance.ts`) reads the
-curator's `serves`, `insight` and `caveat` back through one mapping: a defect
-label becomes the asker's criterion it fell short on, or the defect's own
-words; a curator criterion stands for what the focus labels its statement
-cites stand for; every other label is dropped — a focus label too, up to
-`MAX_FOCUS`, when the recall listed none by it — and with it what it leaves
-behind: the separators and stops at either end of a part and a space before
-a stop. A part with no letter or digit left is left unsaid, so `c1 (p2, k1)`
-is no `serves: ()` and `d1: availability` no `: availability`. The curator's
-other words are kept as written — `answers c2 and p1 directly` reads
-`answers and directly` — because mending its grammar would be a guess. Each
-lesson carries the run, `pipeline`, `iteration`, `decision` and `when` the
-curator was shown beside it. The producer's briefing, the studio's coach
-panel, the run's `recall.json` and `run.md`, and the section the memory
-orchestrator appends to a target's goal all read the lesson this way.
+read as the asker's own c8. So the curator writes `serves`, `insight` and
+`caveat` in words, and lists the focused defects a kept chunk bears on in
+`cites`. The references validator holds both, from the index and the
+contract, never from prose: a cite must be a listed defect, once, and a
+listed label of any of the four kinds in a kept chunk's words blocks, located
+at that chunk. `lessonOf` (`recall/provenance.ts`) hands the words on as
+written and reads each cite back as `answers`: the asker's criterion the
+defect fell short on, or the defect's own words. Each lesson carries the run,
+`pipeline`, `iteration`, `decision` and `when` the curator was shown beside
+it. The producer's briefing, the studio's coach panel, the run's
+`recall.json` and `run.md`, and the section the memory orchestrator appends
+to a target's goal all read the lesson this way.
+
+Measured on 2026-10-30 over 9 recorded recall goals (5 focused, 4 not), each
+run with its recorded criteria on the build before this change and on this
+one, judged on each run's best iteration. Kept chunks whose words held a label
+went from 70 of 70 to 0 of 69, and 38 of the 40 chunks kept on focused goals
+cited a defect. The mean overall moved by −1.4 (sd 6.4), acceptances went from
+4 to 5, and iterations from 14 to 13. One revision in 13 was refused for a
+`c6` left in a caveat; its run kept its first iteration. The curator's first
+answer cost a median 2,134 more output tokens, mostly thinking, and about 10%
+more written text.
 
 **A lesson the store holds always fits the query that recalls it.** A program
 writes every field of the curator's query, so every bound on it is exact, and

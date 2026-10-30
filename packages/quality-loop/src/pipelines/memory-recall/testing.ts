@@ -85,12 +85,14 @@ export const samplePack = (overrides: Partial<MemoryPack> = {}): MemoryPack => (
     {
       chunk: 'm1',
       serves: 'availability of the list read',
+      cites: [],
       insight: 'a read path with a single store behind it went down with the POS',
       caveat: null,
     },
     {
       chunk: 'm2',
       serves: 'the data model',
+      cites: [],
       insight: 'an order store that holds merged orders',
       caveat: 'from an accepted iteration of a different prompt',
     },

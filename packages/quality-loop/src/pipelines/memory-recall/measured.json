@@ -1,28 +1,30 @@
 {
   "since": "2026-09-07T07:37:24.391Z",
-  "until": "2026-10-03T08:53:38.832Z",
-  "runs": 96,
+  "until": "2026-10-30T08:30:41.470Z",
+  "runs": 110,
   "fields": {
-    "criteria": { "n": 96, "max": 12, "p99": 12, "overTarget": 0 },
-    "criteria[].statement": { "n": 1142, "max": 332, "p99": 252, "overTarget": 0 },
-    "dropped": { "n": 118, "max": 9, "p99": 9, "overTarget": 0 },
-    "dropped[].chunk": { "n": 884, "max": 3, "p99": 3, "overTarget": 0 },
-    "dropped[].reason": { "n": 884, "max": 290, "p99": 240, "overTarget": 9 },
-    "gaps": { "n": 118, "max": 9, "p99": 9, "overTarget": 0 },
-    "gaps[]": { "n": 615, "max": 258, "p99": 205, "overTarget": 1 },
-    "kept": { "n": 118, "max": 9, "p99": 9, "overTarget": 3 },
-    "kept[].caveat": { "n": 904, "max": 277, "p99": 251, "overTarget": 127 },
-    "kept[].chunk": { "n": 924, "max": 3, "p99": 3, "overTarget": 0 },
-    "kept[].insight": { "n": 923, "max": 575, "p99": 489, "overTarget": 139 },
-    "kept[].serves": { "n": 923, "max": 163, "p99": 137, "overTarget": 0 },
-    "summary": { "n": 118, "max": 907, "p99": 842, "overTarget": 104 }
+    "criteria": { "n": 101, "max": 12, "p99": 12, "overTarget": 0 },
+    "criteria[].statement": { "n": 1202, "max": 332, "p99": 258, "overTarget": 0 },
+    "dropped": { "n": 141, "max": 10, "p99": 9, "overTarget": 0 },
+    "dropped[].chunk": { "n": 1074, "max": 3, "p99": 3, "overTarget": 0 },
+    "dropped[].reason": { "n": 1074, "max": 339, "p99": 269, "overTarget": 12 },
+    "gaps": { "n": 141, "max": 9, "p99": 9, "overTarget": 0 },
+    "gaps[]": { "n": 701, "max": 349, "p99": 219, "overTarget": 2 },
+    "kept": { "n": 141, "max": 9, "p99": 9, "overTarget": 3 },
+    "kept[].caveat": { "n": 1080, "max": 459, "p99": 308, "overTarget": 131 },
+    "kept[].chunk": { "n": 1102, "max": 3, "p99": 3, "overTarget": 0 },
+    "kept[].cites": { "n": 100, "max": 5, "p99": 5, "overTarget": 0 },
+    "kept[].cites[]": { "n": 133, "max": 2, "p99": 2, "overTarget": 0 },
+    "kept[].insight": { "n": 1101, "max": 575, "p99": 497, "overTarget": 139 },
+    "kept[].serves": { "n": 1101, "max": 271, "p99": 191, "overTarget": 9 },
+    "summary": { "n": 141, "max": 1109, "p99": 1105, "overTarget": 106 }
   },
   "caps": {
-    "criteria": { "n": 96, "max": 3899, "p99": 3899, "maxApiCalls": 1 },
-    "critic.grounding": { "n": 230, "max": 15092, "p99": 13557, "maxApiCalls": 1 },
-    "critic.relevance": { "n": 230, "max": 14404, "p99": 12872, "maxApiCalls": 1 },
-    "evaluator.admissibility": { "n": 227, "max": 7294, "p99": 6368, "maxApiCalls": 1 },
-    "evaluator.coverage": { "n": 230, "max": 5406, "p99": 4433, "maxApiCalls": 1 },
-    "producer": { "n": 118, "max": 11584, "p99": 11569, "maxApiCalls": 1 }
+    "criteria": { "n": 101, "max": 7395, "p99": 7210, "maxApiCalls": 1 },
+    "critic.grounding": { "n": 274, "max": 19513, "p99": 17394, "maxApiCalls": 1 },
+    "critic.relevance": { "n": 274, "max": 15328, "p99": 14584, "maxApiCalls": 1 },
+    "evaluator.admissibility": { "n": 271, "max": 9126, "p99": 7294, "maxApiCalls": 1 },
+    "evaluator.coverage": { "n": 274, "max": 9233, "p99": 5876, "maxApiCalls": 1 },
+    "producer": { "n": 141, "max": 18875, "p99": 14533, "maxApiCalls": 1 }
   }
 }

@@ -185,7 +185,7 @@ function recallSection(record: RunRecord): string[] {
         ...(lesson.decision === undefined ? [] : [`decided ${lesson.decision}`]),
         ...(origin === undefined ? [] : [`origin ${origin}`]),
       ];
-      return `- [${lesson.ref}] ${lesson.insight}${lesson.serves ? ` — serves: ${lesson.serves}` : ''}${lesson.caveat ? `; caveat: ${lesson.caveat}` : ''} (${learned.join(' · ')})`;
+      return `- [${lesson.ref}] ${lesson.insight}${lesson.serves ? ` — serves: ${lesson.serves}` : ''}${lesson.answers?.length ? ` — answers: ${lesson.answers.join(', ')}` : ''}${lesson.caveat ? `; caveat: ${lesson.caveat}` : ''} (${learned.join(' · ')})`;
     }),
     ...(recall.lessons.length > 0 ? [``] : []),
   ];

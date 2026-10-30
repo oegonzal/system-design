@@ -8,25 +8,27 @@ import { bound, bounded, exact } from '@sysdesign/contracts';
 import { z } from 'zod';
 
 import { section, type OutputShape } from '../../core/contracts';
-import { ALIAS_MAX, MAX_CANDIDATES, MAX_KEPT } from './input';
+import { ALIAS_MAX, MAX_CANDIDATES, MAX_FOCUS, MAX_KEPT } from './input';
 
 /*
  * What the curator is asked for, each above what it has measurably written
- * (`measured.json`, every recorded pack to 2026-10-02): the summary's
- * longest was 907 characters (p99 842), a `serves` 163 (140), an insight 575
- * (489), a caveat 277 (250), a drop's reason 290 (230), a gap 224 (187),
+ * (`measured.json`, every recorded pack to 2026-10-30): the summary's
+ * longest was 1,109 characters (p99 1,105), a `serves` 271 (191), an insight
+ * 575 (497), a caveat 459 (308), a drop's reason 339 (269), a gap 349 (219),
  * and at most 9 gaps. The two verdict lists are the query's own counts —
- * at most the kept limit, one per candidate — so they are exact.
+ * at most the kept limit, one per candidate — so they are exact, and so is
+ * what a kept chunk cites: at most every defect the query lists.
  */
-const SUMMARY_BOUND = bound(1100);
-const SERVES_BOUND = bound(200);
+const SUMMARY_BOUND = bound(1200);
+const SERVES_BOUND = bound(230);
 const INSIGHT_BOUND = bound(720);
-const CAVEAT_BOUND = bound(340);
+const CAVEAT_BOUND = bound(380);
 const REASON_BOUND = bound(320);
-const GAP_BOUND = bound(250);
+const GAP_BOUND = bound(290);
 const GAPS_BOUND = bound(10, 'list');
 const KEPT_BOUND = exact(MAX_KEPT);
 const DROPPED_BOUND = exact(MAX_CANDIDATES);
+const CITES_BOUND = exact(MAX_FOCUS);
 
 const chunk = bounded.id(ALIAS_MAX, {
   min: 1,
@@ -45,16 +47,25 @@ export const memoryPackSchema = z.strictObject({
       chunk,
       serves: bounded.text(SERVES_BOUND, {
         min: 1,
-        description: 'The part of the query this chunk informs.',
+        description: 'The part of the query this chunk informs, in words — no label.',
       }),
+      cites: bounded.list(
+        CITES_BOUND,
+        bounded.id(ALIAS_MAX, { min: 1, description: 'A defect label exactly as listed.' }),
+        {
+          description:
+            'The defects listed under What is wrong now that this chunk bears on; empty when the query lists none or it bears on none.',
+        },
+      ),
       insight: bounded.text(INSIGHT_BOUND, {
         min: 1,
         description:
-          "What the chunk teaches for this query, in the chunk's own terms — nothing the chunk does not say.",
+          "What the chunk teaches for this query, in the chunk's own terms — nothing the chunk does not say, and no label of the query.",
       }),
       caveat: bounded
         .text(CAVEAT_BOUND, {
-          description: "How the chunk's context differs from the query, or null.",
+          description:
+            "How the chunk's context differs from the query, in words with no label of the query, or null.",
         })
         .nullable(),
     }),
@@ -86,7 +97,7 @@ export const memoryPackOutput: OutputShape<MemoryPack> = {
         'Kept',
         pack.kept.map(
           (item) =>
-            `[${item.chunk}] keep — serves: ${item.serves}; insight: ${item.insight}${item.caveat ? `; caveat: ${item.caveat}` : ''}`,
+            `[${item.chunk}] keep — serves: ${item.serves}${item.cites.length > 0 ? `; cites: ${item.cites.join(', ')}` : ''}; insight: ${item.insight}${item.caveat ? `; caveat: ${item.caveat}` : ''}`,
         ),
       ),
       ...section(
