@@ -1,4 +1,4 @@
-import type { PageObservation } from '@sysdesign/contracts';
+import { elementByRef, type PageObservation } from '@sysdesign/contracts';
 
 import type { BrowserAction } from './ports';
 
@@ -26,7 +26,7 @@ export interface PendingExpectation {
 }
 
 const elementCheck = (ref: string, observation: PageObservation): ExactCheck | null => {
-  const element = observation.elements.find((candidate) => candidate.ref === ref);
+  const element = elementByRef(observation.elements, ref);
   return element === undefined ? null : { kind: 'element', role: element.role, name: element.name };
 };
 

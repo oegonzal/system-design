@@ -1,4 +1,4 @@
-import type { ObservedElement } from './observation.schema';
+import { elementByRef, type ObservedElement } from './observation.schema';
 import type { StepAction } from './step-plan.schema';
 
 /**
@@ -48,7 +48,7 @@ export function ranActionOf(action: StepAction, elements: readonly Named[]): Ran
     case 'fill':
     case 'select':
     case 'upload': {
-      const element = elements.find((candidate) => candidate.ref === action.ref);
+      const element = elementByRef(elements, action.ref);
       return {
         kind: action.kind,
         role: element?.role ?? null,

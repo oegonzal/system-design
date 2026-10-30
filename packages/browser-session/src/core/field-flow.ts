@@ -7,6 +7,7 @@ import {
   type PageObservation,
   excerpt,
   quoted,
+  elementByRef,
 } from '@sysdesign/contracts';
 
 import { captureAfter } from './capture';
@@ -258,7 +259,7 @@ const summarize = (results: readonly FieldResult[], listed: number): string => {
 /** The listed fields the refs name, in the order asked. */
 const fieldsOf = (refs: readonly string[], observation: PageObservation): FieldSpec[] =>
   refs.flatMap((ref) => {
-    const element = observation.elements.find((candidate) => candidate.ref === ref);
+    const element = elementByRef(observation.elements, ref);
     return element === undefined ? [] : [fieldSpecOf(element)];
   });
 

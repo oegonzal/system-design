@@ -1,4 +1,4 @@
-import { actionRefs, fieldLabelOf, type PageObservation } from '@sysdesign/contracts';
+import { actionRefs, fieldLabelOf, type PageObservation, elementByRef } from '@sysdesign/contracts';
 
 import type { EngineContext } from './engine-context';
 import type { BrowserAction, BrowserActionKind } from './ports';
@@ -20,7 +20,7 @@ const ENTRY_KINDS: readonly BrowserActionKind[] = ['fill', 'select', 'upload'];
 export function touchedName(action: BrowserAction, observation: PageObservation): string | null {
   const [ref] = actionRefs(action);
   if (ref === undefined) return action.kind === 'press' ? action.key : null;
-  const element = observation.elements.find((candidate) => candidate.ref === ref);
+  const element = elementByRef(observation.elements, ref);
   return element === undefined ? null : (fieldLabelOf(element) ?? element.role);
 }
 

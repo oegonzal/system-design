@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 
 import {
   actionRefs,
+  elementByRef,
   INTERRUPTED,
   INTERRUPTED_STATUS,
   interruptedDetail,
@@ -193,7 +194,7 @@ export class FakeBrowser implements BrowserPort {
   async readValue(ref: string): Promise<string | null> {
     const typed = this.values.get(ref);
     if (typed !== undefined) return typed;
-    return this.current.observation.elements.find((e) => e.ref === ref)?.value ?? null;
+    return elementByRef(this.current.observation.elements, ref)?.value ?? null;
   }
 
   async screenshot(outline: string | null): Promise<Uint8Array> {

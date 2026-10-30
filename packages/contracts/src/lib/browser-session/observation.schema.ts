@@ -189,6 +189,12 @@ export const observedElementSchema = z.strictObject({
 });
 export type ObservedElement = z.infer<typeof observedElementSchema>;
 
+/** The element a read listed under a ref: refs are minted per read, so only that read's elements answer for one. */
+export const elementByRef = <E extends Pick<ObservedElement, 'ref'>>(
+  elements: readonly E[],
+  ref: string,
+): E | undefined => elements.find((element) => element.ref === ref);
+
 /**
  * What one read of the page did not reach. Never both zero: an observation
  * with nothing unread carries null instead.

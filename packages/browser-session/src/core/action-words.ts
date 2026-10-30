@@ -6,6 +6,7 @@ import {
   type RanAction,
   type StepAction,
   type StepPlan,
+  elementByRef,
 } from '@sysdesign/contracts';
 
 /**
@@ -42,7 +43,7 @@ export const touchedBy = (
  * cited `e114`, a ref from four observations before, and was refused.
  */
 const named = (ref: string, observation: PageObservation): string => {
-  const element = observation.elements.find((candidate) => candidate.ref === ref);
+  const element = elementByRef(observation.elements, ref);
   return element === undefined
     ? 'an element no longer listed'
     : `${element.role} ${quoted(element.name)}`;
