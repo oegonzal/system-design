@@ -101,6 +101,7 @@ describe('parseOptions', () => {
       rails: SPEC_RAILS,
       subject: undefined,
       startUrl: undefined,
+      documents: [],
     });
     // `--url` on run is where the browser opens, so the loop never plans on about:blank.
     expect(
@@ -190,6 +191,29 @@ describe('parseOptions', () => {
     });
   });
 
+  it('[BRW-26] reads each --document as a file supplied for a declared document, in the order given, and none when the flag is absent', () => {
+    expect(
+      parsed([
+        'run',
+        '--goal',
+        'g.md',
+        '--profile',
+        'p',
+        '--document',
+        'resume=docs/resume.pdf',
+        '--document',
+        'cover-letter=docs/letter.pdf',
+      ]),
+    ).toMatchObject({
+      command: 'run',
+      documents: [
+        { name: 'resume', path: 'docs/resume.pdf' },
+        { name: 'cover-letter', path: 'docs/letter.pdf' },
+      ],
+    });
+    expect(parsed(['run', '--goal', 'g.md', '--profile', 'p'])).toMatchObject({ documents: [] });
+  });
+
   it.each([
     [[], USAGE],
     [['fly'], USAGE],
@@ -201,6 +225,15 @@ describe('parseOptions', () => {
       '--max-tasks must be a positive integer',
     ],
     [['run', '--goal', 'g.md', '--profile', 'p', '--bogus'], "Unknown option '--bogus'"],
+    [
+      ['run', '--goal', 'g.md', '--profile', 'p', '--document', 'x'],
+      '--document takes <name>=<path>',
+    ],
+    [
+      ['run', '--goal', 'g.md', '--profile', 'p', '--document', 'Resume=/x.pdf'],
+      '--document takes <name>=<path>',
+    ],
+    [['sessions', '--document', 'resume=/x.pdf'], "Unknown option '--document'"],
     [['login', '--profile', 'p'], '--url is required'],
     [['sessions', '--limit', '0'], '--limit must be a positive integer'],
     [['show'], 'show takes one id'],

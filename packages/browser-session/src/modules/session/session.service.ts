@@ -40,6 +40,7 @@ import {
   type BrainForTenant,
 } from './tokens';
 import { replayFields, type ReplayFieldsOptions, type ReplayFieldsReport } from './replay-fields';
+import { presentDocuments } from './supplied-documents';
 import { subjectFor, teachAgain, type TeachAgainReport } from './teach-again';
 
 /**
@@ -97,8 +98,10 @@ export class SessionService {
     @Optional() @Inject(MemoryClient) private readonly memory: MemoryClient | null = null,
   ) {}
 
-  run(options: RunOptions): Promise<SessionOutcome> {
+  async run(options: RunOptions): Promise<SessionOutcome> {
     const { capture, operator, session, answering, sources } = this.config.settings;
+    // Each supplied file checked to be there before the browser opens or a row is touched.
+    const documents = await presentDocuments(options.documents ?? []);
     // A configuration read once at boot is invisible afterwards: say which files are in force.
     this.operator.notify(
       `settings: ${Object.entries(sources)
@@ -127,7 +130,7 @@ export class SessionService {
       },
       {
         ...options,
-        documents: options.documents ?? [],
+        documents,
         subject: options.subject ?? this.config.subject,
         // Given by the flag, or set in the environment: anything but the declared fallback.
         subjectDeclared:

@@ -38,7 +38,9 @@ import {
   SessionConfigError,
   type SessionConfig,
   type SessionFlag,
+  suppliedDocumentOf,
 } from './config';
+import type { SuppliedDocument } from './core/ports';
 import { SessionRefused } from './core/unit-advice';
 import { AppModule } from './modules/app/app.module';
 import { DEFAULT_REPLAYS_DIR } from './modules/session/replay-fields';
@@ -55,8 +57,9 @@ import { readSessionSettings, type SessionDefaults } from './settings';
 const flag = (key: SessionFlag): string => SESSION_FLAGS[key].name;
 
 export const USAGE = `usage: browser-session <command> [options]
-  run       ${flag('goal')} <md> ${flag('profile')} <name> [${flag('url')} <url>] [${flag('headed')}|${flag('headless')}] [${flag('targetDone')} n] [${flag('maxTasks')} n] [${flag('maxMinutes')} n] [${flag('maxFailures')} n] [${flag('maxStalledSteps')} n] [${flag('subject')} <name>]
-            every decision is a quality-loop run; the operator is asked at the terminal when a field needs a person
+  run       ${flag('goal')} <md> ${flag('profile')} <name> [${flag('url')} <url>] [${flag('headed')}|${flag('headless')}] [${flag('targetDone')} n] [${flag('maxTasks')} n] [${flag('maxMinutes')} n] [${flag('maxFailures')} n] [${flag('maxStalledSteps')} n] [${flag('subject')} <name>] [${flag('document')} <name>=<path> …]
+            every decision is a quality-loop run; the operator is asked at the terminal when a field needs a person;
+            each ${flag('document')} supplies the file for a document the mission declares under Documents, by name
   login     ${flag('profile')} <name> ${flag('url')} <url>
             opens the profile headed; sign in, press Enter; the profile keeps the cookies
   sessions  [${flag('limit')} n] [${flag('json')}]
@@ -90,6 +93,7 @@ const RUN_FLAGS: readonly SessionFlag[] = [
   'maxFailures',
   'maxStalledSteps',
   'subject',
+  'document',
 ];
 
 /** The commands, as data: the flags each reads, what each takes as a positional, and whether it reads or writes the session's tables. */
@@ -126,6 +130,8 @@ export type Options =
       subject: string | undefined;
       /** Where to open the browser before the first plan; unset leaves it on about:blank. */
       startUrl: string | undefined;
+      /** The files for the documents the mission declares, by name, as given. */
+      documents: SuppliedDocument[];
     }
   | { command: 'login'; profile: string; url: string }
   | { command: 'sessions'; limit: number; json: boolean }
@@ -197,6 +203,11 @@ export function parseOptions(argv: readonly string[], defaults: SessionDefaults)
       const value = values[flagKey(key)];
       return typeof value === 'boolean' ? value : undefined;
     };
+    /** A repeatable flag's values, in the order given; none when it was not given. */
+    const list = (key: SessionFlag): string[] => {
+      const value = values[flagKey(key)];
+      return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
+    };
     switch (command) {
       case 'run':
         return {
@@ -216,6 +227,7 @@ export function parseOptions(argv: readonly string[], defaults: SessionDefaults)
           ),
           subject: text('subject'),
           startUrl: text('url'),
+          documents: list('document').map(suppliedDocumentOf),
         };
       case 'login':
         return {

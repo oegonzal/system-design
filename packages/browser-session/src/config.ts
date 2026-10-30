@@ -1,6 +1,12 @@
 import { resolve } from 'node:path';
 
-import { ADVISOR_ID_PATTERN, type SessionRailsDto } from '@sysdesign/contracts';
+import {
+  ADVISOR_ID_PATTERN,
+  DOCUMENT_NAME_PATTERN,
+  type SessionRailsDto,
+} from '@sysdesign/contracts';
+
+import type { SuppliedDocument } from './core/ports';
 
 import type { SessionSettings } from './settings';
 
@@ -64,6 +70,12 @@ export const SESSION_FLAGS = {
     help: 'observations in a row of a page that did not change before it stops',
   },
   subject: { name: '--subject', valued: true, help: "whom the operator's answers are about" },
+  document: {
+    name: '--document',
+    valued: true,
+    repeatable: true,
+    help: '<name>=<path>: the file for a document the mission declares under Documents, by name; repeat per document',
+  },
   limit: { name: '--limit', valued: true, help: 'how many sessions to list' },
   json: { name: '--json', valued: false, help: 'print the records as JSON' },
   sessions: {
@@ -312,10 +324,33 @@ export function headedOf(values: { headed?: boolean; headless?: boolean }, base:
  */
 export function parseArgsOptions(
   flags: readonly SessionFlag[],
-): Record<string, { type: 'string' | 'boolean' }> {
+): Record<string, { type: 'string' | 'boolean'; multiple?: true }> {
   return Object.fromEntries(
-    flags.map((key) => [flagKey(key), { type: SESSION_FLAGS[key].valued ? 'string' : 'boolean' }]),
+    flags.map((key) => {
+      const flag = SESSION_FLAGS[key];
+      return [
+        flagKey(key),
+        {
+          type: flag.valued ? 'string' : 'boolean',
+          // A flag given more than once collects its values, in order.
+          ...('repeatable' in flag ? { multiple: true as const } : {}),
+        },
+      ];
+    }),
   );
+}
+
+/** A `--document` value: `<name>=<path>`, the name as a mission declares one; refused by name otherwise. */
+export function suppliedDocumentOf(raw: string): SuppliedDocument {
+  const at = raw.indexOf('=');
+  const name = at < 0 ? raw : raw.slice(0, at);
+  const path = at < 0 ? '' : raw.slice(at + 1);
+  if (!DOCUMENT_NAME_PATTERN.test(name) || path.trim() === '') {
+    throw new SessionConfigError(
+      `${SESSION_FLAGS.document.name} takes <name>=<path>, the name lower-case words joined by hyphens, got "${raw}"`,
+    );
+  }
+  return { name, path };
 }
 
 /** A flag's value as `parseArgs` keys it: by its long name without the dashes. */

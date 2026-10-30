@@ -25,6 +25,8 @@ export const DOCUMENT_NAME_MAX_LENGTH = 40;
 
 /** One bullet: the document's name, a colon, what it is. */
 const DOCUMENT_LINE = new RegExp(`^- (?<name>${WORD}): .+$`);
+/** A document's name as one whole word: what a mission declares, and what a run supplies a file under. */
+export const DOCUMENT_NAME_PATTERN = new RegExp(`^${WORD}$`);
 
 const documentSchema = z.strictObject({
   name: bounded.id(DOCUMENT_NAME_MAX_LENGTH, { min: 1 }),

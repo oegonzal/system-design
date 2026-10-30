@@ -53,6 +53,7 @@ function elementFactsInPage(
   const tag = el.tagName.toLowerCase();
   const input = el as HTMLInputElement;
   const attr = (name: string): string | null => el.getAttribute(name);
+  const fileControl = tag === 'input' && (attr('type') ?? 'text').toLowerCase() === 'file';
   const text = (node: Element | null | undefined): string =>
     (node?.textContent ?? '').replace(/\s+/g, ' ').trim();
   const byIds = (ids: string | null): string =>
@@ -156,7 +157,7 @@ function elementFactsInPage(
       value = chosen !== undefined && answerable(chosen) ? text(chosen) || chosen.value : null;
     } else if (tag === 'input' && (inputType === 'checkbox' || inputType === 'radio')) {
       value = input.checked ? 'checked' : 'unchecked';
-    } else if (tag === 'input' && inputType === 'file') {
+    } else if (fileControl) {
       // A file control holds the file chosen, by name — never the placeholder path the browser reports as its value.
       value = input.files?.[0]?.name ?? null;
     } else if (tag === 'input' || tag === 'textarea') {
@@ -330,10 +331,7 @@ function elementFactsInPage(
     const maxLength =
       (tag === 'input' || tag === 'textarea') && input.maxLength > 0 ? input.maxLength : null;
     // What a file control accepts is what the page tells a person beside it.
-    const accept =
-      tag === 'input' && (attr('type') ?? 'text').toLowerCase() === 'file'
-        ? (attr('accept') ?? '')
-        : '';
+    const accept = fileControl ? (attr('accept') ?? '') : '';
     const context = [
       byIds(attr('aria-describedby')),
       attr('placeholder') ?? '',

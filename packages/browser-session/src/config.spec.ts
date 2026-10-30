@@ -15,6 +15,7 @@ import {
   sessionConfigFromEnv,
   SessionConfigError,
   type SessionFlag,
+  suppliedDocumentOf,
 } from './config';
 import { SPEC_RAILS } from './core/testing-session';
 
@@ -121,6 +122,8 @@ describe('the session configuration', () => {
       judge: { type: 'boolean' },
       retract: { type: 'string' },
       out: { type: 'string' },
+      // A document is supplied per flag, so the flag collects its values.
+      document: { type: 'string', multiple: true },
     });
     expect(flagKey('tenant')).toBe('tenant');
     expect(flagKey('dryRun')).toBe('dry-run');
@@ -178,5 +181,21 @@ describe('the session configuration', () => {
     expect(() => headedOf({ headed: true, headless: true }, true)).toThrow(
       '--headed and --headless contradict each other',
     );
+  });
+
+  it('[BRW-26] reads a supplied document as <name>=<path>, the name as a mission declares one, and refuses anything else by name', () => {
+    expect(suppliedDocumentOf('resume=docs/resume.pdf')).toEqual({
+      name: 'resume',
+      path: 'docs/resume.pdf',
+    });
+    // The path may hold an equals sign of its own; the first one ends the name.
+    expect(suppliedDocumentOf('cover-letter=/tmp/a=b.pdf')).toEqual({
+      name: 'cover-letter',
+      path: '/tmp/a=b.pdf',
+    });
+    for (const raw of ['resume', 'resume=', 'Resume=/x.pdf', '=/x.pdf', 'my resume=/x.pdf']) {
+      expect(() => suppliedDocumentOf(raw)).toThrow(SessionConfigError);
+      expect(() => suppliedDocumentOf(raw)).toThrow(`--document takes <name>=<path>`);
+    }
   });
 });
