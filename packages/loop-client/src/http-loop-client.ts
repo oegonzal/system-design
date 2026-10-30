@@ -1,11 +1,16 @@
 import {
+  bodyMessage,
+  JsonCallFailed,
   NO_RECOVERY,
   rideOut,
+  sendJson,
   type ApiResponse,
   type DeriveCriteriaRequest,
   type DerivedCriteriaDto,
   type IterationEvidenceDto,
   type IterationRef,
+  type JsonAnswer,
+  type JsonMethod,
   type OrchestrationRunDto,
   type OrchestrationRunStartedDto,
   type PromptLibraryDocumentDto,
@@ -35,13 +40,6 @@ import { DerivationFailed, LoopRefused, LoopTimeout, LoopUnreachable } from './l
 export const READ_TIMEOUT_MS = 15_000;
 export const DERIVE_TIMEOUT_MS = 240_000;
 
-type Method = 'GET' | 'POST' | 'DELETE';
-
-interface Answer {
-  status: number;
-  body: unknown;
-}
-
 /**
  * Whether an attempt may be asked again within the declared recovery: one
  * that never reached the loop — the connection failed, never a timeout, which
@@ -49,25 +47,10 @@ interface Answer {
  * 5xx, both idempotent. A start the loop answered is never repeated, whatever
  * it said: it may have opened a run.
  */
-const repeatable = (method: Method, outcome: Settled<Answer>): boolean =>
+const repeatable = (method: JsonMethod, outcome: Settled<JsonAnswer>): boolean =>
   'error' in outcome
     ? outcome.error instanceof LoopUnreachable
     : method !== 'POST' && outcome.value.status >= 500;
-
-const isTimeout = (error: unknown): boolean =>
-  error instanceof Error && (error.name === 'TimeoutError' || error.name === 'AbortError');
-
-const describeCause = (error: unknown): string =>
-  error instanceof Error ? `${error.name}: ${error.message}` : String(error);
-
-/** The loop's own error message, when its body carried one. */
-const messageOf = (body: unknown): string => {
-  if (body && typeof body === 'object' && 'message' in body) {
-    const { message } = body as { message: unknown };
-    return typeof message === 'string' ? message : JSON.stringify(message);
-  }
-  return body === undefined ? '' : JSON.stringify(body);
-};
 
 const data = <T>(body: unknown): T => (body as ApiResponse<T>).data;
 
@@ -106,7 +89,7 @@ export class HttpLoopClient extends LoopClient {
     if (answer.status === 503) {
       const body = answer.body as { llm?: unknown; diagnostic?: unknown };
       throw new DerivationFailed(
-        `the quality loop could not derive criteria: ${messageOf(answer.body)}`,
+        `the quality loop could not derive criteria: ${bodyMessage(answer.body)}`,
         (body.llm as DerivedCriteriaDto['llm'] | undefined) ?? null,
         (body.diagnostic as DerivedCriteriaDto['diagnostic'] | undefined) ?? null,
       );
@@ -192,7 +175,12 @@ export class HttpLoopClient extends LoopClient {
   }
 
   /** The loop's answer, asked again within the declared recovery while the attempt is repeatable. */
-  private call(method: Method, path: string, body: unknown, timeoutMs: number): Promise<Answer> {
+  private call(
+    method: JsonMethod,
+    path: string,
+    body: unknown,
+    timeoutMs: number,
+  ): Promise<JsonAnswer> {
     return rideOut(
       this.recovery,
       () => this.attempt(method, path, body, timeoutMs),
@@ -203,35 +191,23 @@ export class HttpLoopClient extends LoopClient {
 
   /** One request: the loop's answer, or `LoopTimeout` / `LoopUnreachable` thrown instead of one. */
   private async attempt(
-    method: Method,
+    method: JsonMethod,
     path: string,
     body: unknown,
     timeoutMs: number,
-  ): Promise<Answer> {
-    let response: Response;
+  ): Promise<JsonAnswer> {
     try {
-      response = await this.fetchImpl(`${this.baseUrl}${path}`, {
-        method,
-        headers: { accept: 'application/json', 'content-type': 'application/json' },
-        body: body === undefined ? undefined : JSON.stringify(body),
-        signal: AbortSignal.timeout(timeoutMs),
-      });
+      return await sendJson(this.fetchImpl, this.baseUrl, path, { method, body, timeoutMs });
     } catch (error) {
-      throw isTimeout(error)
-        ? new LoopTimeout(`${method} ${path}`, timeoutMs)
-        : new LoopUnreachable(describeCause(error));
+      if (!(error instanceof JsonCallFailed)) throw error;
+      // No caller's abort is passed, so a failure is a timeout or no answer at all.
+      throw error.failure === 'timeout'
+        ? new LoopTimeout(error.route, timeoutMs)
+        : new LoopUnreachable(error.detail);
     }
-    const text = await response.text();
-    let parsed: unknown;
-    try {
-      parsed = text.length > 0 ? JSON.parse(text) : undefined;
-    } catch {
-      parsed = text;
-    }
-    return { status: response.status, body: parsed };
   }
 
-  private refused(route: string, answer: Answer): LoopRefused {
-    return new LoopRefused(answer.status, messageOf(answer.body), route);
+  private refused(route: string, answer: JsonAnswer): LoopRefused {
+    return new LoopRefused(answer.status, bodyMessage(answer.body), route);
   }
 }

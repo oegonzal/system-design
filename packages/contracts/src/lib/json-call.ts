@@ -79,8 +79,9 @@ export async function sendJson(
   return { status: response.status, body: parseBody(await response.text()) };
 }
 
-/** What a service said in an error body: its `message` when it gave one, else the body as JSON — or as written when it is no JSON value, like an empty body. */
+/** What a service said in an error body: its `message` when it gave one, else the body as JSON — and that there was none when the body was empty. */
 export const bodyMessage = (body: unknown): string => {
+  if (body === undefined) return 'no body';
   const message = (body as { message?: unknown } | null)?.message;
-  return typeof message === 'string' ? message : (JSON.stringify(body) ?? String(body));
+  return typeof message === 'string' ? message : JSON.stringify(body);
 };

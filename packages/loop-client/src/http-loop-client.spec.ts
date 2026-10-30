@@ -135,7 +135,7 @@ describe('HttpLoopClient', () => {
       scripted(() => new TypeError('fetch failed')).fetch,
     );
     await expect(dead.health()).rejects.toBeInstanceOf(LoopUnreachable);
-    await expect(dead.health()).rejects.toThrow(/unreachable: TypeError: fetch failed/);
+    await expect(dead.health()).rejects.toThrow(/unreachable: fetch failed/);
   });
 
   it('[LC-3] rides out a restarting loop within a declared window: asks again what never arrived and a read the loop failed, never a timeout or an answered start', async () => {

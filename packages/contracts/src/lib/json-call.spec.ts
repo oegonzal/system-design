@@ -81,6 +81,6 @@ describe('one JSON call', () => {
   it("reads a service's error body by its message, or as JSON when it gave none", () => {
     expect(bodyMessage({ message: 'no such space' })).toBe('no such space');
     expect(bodyMessage({ issues: [] })).toBe('{"issues":[]}');
-    expect(bodyMessage(undefined)).toBe('undefined');
+    expect(bodyMessage(undefined)).toBe('no body');
   });
 });
