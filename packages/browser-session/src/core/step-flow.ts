@@ -9,10 +9,21 @@ import {
   type UnitsOnRecord,
 } from '@sysdesign/contracts';
 
-import { describeRefusedPlan, NOTHING_RAN } from './action-words';
+import {
+  CLOSING_PAGES,
+  describeClosedPages,
+  describeRefusedPlan,
+  NOTHING_RAN,
+} from './action-words';
 import type { EngineContext } from './engine-context';
 import { checkExact, unmetNote } from './expectations';
-import { BrainFaulted, type Decided, type Termination } from './ports';
+import {
+  ActionFailed,
+  BrainFaulted,
+  type Decided,
+  type PagesClosed,
+  type Termination,
+} from './ports';
 import { checkRails } from './rails';
 import { observationFiles, stepJsonFile } from './session-dump';
 import {
@@ -239,6 +250,35 @@ function settlePasses(
   state.pendingPass = ids.length === 0 ? null : { ids, scope };
 }
 
+/**
+ * A unit of work's pages close with it: once the plan in which a unit closed
+ * has run whole — a mission may go on from a `taskDone` to a click on the
+ * same page, so never inside the close itself — every page opened since the
+ * session opened or since the last such close is closed, and the next step
+ * observes the page the unit was taken from. The last action's promise was
+ * about a page now gone, so it is dropped rather than counted unmet. A
+ * session whose units open no page sees nothing: nothing closed, no line.
+ */
+async function closeUnitPages(ctx: EngineContext): Promise<void> {
+  const { deps, state } = ctx;
+  let closed: PagesClosed;
+  try {
+    closed = await deps.browser.closeOpenedPages();
+  } catch (error) {
+    if (!(error instanceof ActionFailed)) throw error;
+    pushHistory(state, CLOSING_PAGES, 'failed', error.message);
+    return;
+  }
+  if (closed.closed === 0) return;
+  state.pending = null;
+  pushHistory(
+    state,
+    describeClosedPages(closed.closed),
+    'ok',
+    `the page in front is ${closed.front}`,
+  );
+}
+
 /** The executable prefix run against the page — every taskStart held to the record the plan was composed with — and what it passed held for the next observation. */
 async function executePlan(
   ctx: EngineContext,
@@ -251,6 +291,7 @@ async function executePlan(
   const before = { open: state.tasks.open !== null, closed: tasksClosed(state) };
   const executed = await executeActions(ctx, decided, readout, observation, onRecord);
   if (executed.termination !== null) return executed.termination;
+  if (tasksClosed(state) !== before.closed) await closeUnitPages(ctx);
   settlePasses(ctx, readout, executed, before);
   return null;
 }

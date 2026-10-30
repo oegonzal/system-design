@@ -33,6 +33,7 @@ import {
   type OperatorQuestion,
   QuestionWithdrawn,
   type SessionClose,
+  type PagesClosed,
   type TaskClose,
   type Withdrawal,
 } from './ports';
@@ -51,8 +52,10 @@ export * from './testing-advisor';
 export interface ScriptedPage {
   id: string;
   observation: PageObservation;
-  /** Action key (`click e3`, `navigate https://…`, `press Enter`) → the page shown after it. */
+  /** Action key (`click e3`, `navigate https://…`, `press Enter`) → the page shown after it, in the same page. */
   transitions?: Record<string, string>;
+  /** Action key → the page shown on a new page over this one, as a link that opens a tab does; `closeOpenedPages` closes it. */
+  opens?: Record<string, string>;
   /** What the page states under each landmark, node by node, as a browser reads it from the tree; a landmark not listed says nothing. */
   states?: Partial<Record<LandmarkRole, readonly string[]>>;
 }
@@ -96,7 +99,10 @@ export class FakeBrowser implements BrowserPort {
   readonly values = new Map<string, string>();
   opened: { profile: string; headed: boolean } | null = null;
   closed = false;
-  private current: ScriptedPage;
+  /** The pages open, oldest first: the one the browser opened with, then each a page opened over it. */
+  private stack: ScriptedPage[];
+  /** How many pages are kept by `closeOpenedPages`: the one the browser opened with. */
+  private readonly keptDepth = 1;
   private observed = new Set<string>();
   /** The page the last `observe` read: what `wordsUnder` answers from, as the real browser answers from its last tree. */
   private lastObserved: ScriptedPage | null = null;
@@ -104,11 +110,18 @@ export class FakeBrowser implements BrowserPort {
   constructor(private readonly pages: readonly ScriptedPage[]) {
     const [first] = pages;
     if (first === undefined) throw new Error('a fake browser needs at least one page');
-    this.current = first;
+    this.stack = [first];
   }
 
   get pageId(): string {
     return this.current.id;
+  }
+
+  /** The page in front: the newest. */
+  private get current(): ScriptedPage {
+    const top = this.stack[this.stack.length - 1];
+    if (top === undefined) throw new Error('the fake browser has no page open');
+    return top;
   }
 
   async open(profile: string, options: { headed: boolean }): Promise<void> {
@@ -137,16 +150,34 @@ export class FakeBrowser implements BrowserPort {
     }
     if (action.kind === 'fill') this.values.set(action.ref, action.value);
     if (action.kind === 'select') this.values.set(action.ref, action.option);
+    const over = this.current.opens?.[key];
+    if (over !== undefined) {
+      this.stack.push(this.pageOf(over));
+      this.values.clear();
+      return;
+    }
     const next = this.current.transitions?.[key];
     if (next !== undefined) this.show(next);
   }
 
   /** Jump to a page, as a site would after something the script did not model. */
   show(pageId: string): void {
+    this.stack[this.stack.length - 1] = this.pageOf(pageId);
+    this.values.clear();
+  }
+
+  private pageOf(pageId: string): ScriptedPage {
     const page = this.pages.find((candidate) => candidate.id === pageId);
     if (page === undefined) throw new Error(`the fake browser has no page ${pageId}`);
-    this.current = page;
-    this.values.clear();
+    return page;
+  }
+
+  async closeOpenedPages(): Promise<PagesClosed> {
+    const closed = Math.max(0, this.stack.length - this.keptDepth);
+    this.stack.length = this.keptDepth;
+    this.calls.push(`closeOpenedPages ${closed}`);
+    if (closed > 0) this.observed.clear();
+    return { closed, front: this.current.observation.url };
   }
 
   async highlight(ref: string): Promise<void> {

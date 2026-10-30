@@ -18,6 +18,13 @@ import {
 /** The last step of a plan that ran nothing: refused whole, faulted, or never answered. */
 export const NOTHING_RAN: LastStep = { ran: 0, touched: [], held: [] };
 
+/** The session's own close of the pages a unit of work opened, as the next goal reads it: how many, never which. */
+export const describeClosedPages = (closed: number): string =>
+  `closed ${closed} page(s) the unit opened`;
+
+/** The same close when the browser refused it. */
+export const CLOSING_PAGES = 'close the pages the unit opened';
+
 /** The page actions among those that ran, as the page would recognise them again: a wait, a scroll or a unit event has no such identity. */
 export const touchedBy = (
   actions: readonly StepAction[],

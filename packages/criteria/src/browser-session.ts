@@ -126,6 +126,11 @@ export const BROWSER_SESSION_CRITERIA: readonly Criterion[] = [
     statement:
       "A brain that keeps its memories in a space is bound before any session row — when a run or a teaching through it starts, never when a command that only reads the ledger composes it — and a binding whose run nobody has judged yet is refused by name before any space is ensured: the space is ensured under the declared name from the declared run and checked against the binding — every register by name, kind, operations and metadata fields, the partition and the unit key against the space's declared scope keys — and against what this program needs beyond it — the project key every request names, a teach register of the kind an answer is written as, and metadata fields this program fills — every unmet need collected into one refusal; a tenant the environment leaves unnamed, a space that does not serve the session, a strategy that does not compile and a host that refuses the ensure are each refused by name, as a bad flag is; and a host that does not answer at boot is said once, the session running with no evidence until a step's probe binds it.",
   },
+  {
+    id: 'BRW-25',
+    statement:
+      "A unit of work's pages close with it: after the plan in which a unit closes, whatever its outcome and however the plan ended — never inside the close itself, since a mission may go on from a taskDone to a click on the same page — the session closes every page opened since it opened or since the last such close, newest first, a page the site itself closed not counted and the last page open never closed, and brings the newest page kept to the front; the next goal's recent actions say how many pages closed and which page is in front, the promise the last action made about a page now gone is dropped rather than counted unmet, the refs of the closed pages resolve no more, and a session whose units open no page sees no change: nothing closed, no history line.",
+  },
   // Memory ingest (packages/memory-ingest)
   {
     id: 'ING-1',

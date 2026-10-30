@@ -79,6 +79,12 @@ export class ActionFailed extends Error {
   }
 }
 
+/** What closing a unit's pages did: how many closed, and the URL of the page now in front. */
+export interface PagesClosed {
+  closed: number;
+  front: string;
+}
+
 export interface BrowserPort {
   open(profile: string, options: { headed: boolean }): Promise<void>;
   /** The page as it is now; the refs it lists resolve only until the next `observe`. */
@@ -97,6 +103,14 @@ export interface BrowserPort {
    * leaves the image unmarked rather than failing it.
    */
   screenshot(outline: string | null): Promise<Uint8Array>;
+  /**
+   * Close every page opened since `open` or since the last call, newest
+   * first, and bring the newest page kept to the front: a unit of work's
+   * pages close with it. A page the site itself closed is not counted, and
+   * the last page open is never closed, whoever opened it. A call that
+   * closed anything invalidates the last observation's refs.
+   */
+  closeOpenedPages(): Promise<PagesClosed>;
   close(): Promise<void>;
 }
 

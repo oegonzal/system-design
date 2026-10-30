@@ -9,7 +9,12 @@ import {
 } from '@sysdesign/contracts';
 import { chromium, type BrowserContext, type Locator, type Page } from 'playwright';
 
-import { ActionFailed, type BrowserAction, type BrowserPort } from '../../core/ports';
+import {
+  ActionFailed,
+  type BrowserAction,
+  type BrowserPort,
+  type PagesClosed,
+} from '../../core/ports';
 import { performAction } from './action-performer';
 import { landmarkWords, type SnapshotNode } from './aria-snapshot';
 import { readElementFacts } from './element-facts';
@@ -24,8 +29,10 @@ import { actionFailureOf } from './playwright-errors';
  * snapshot Playwright mints refs for and acted on through those same refs.
  * A ref is good for one observation: the adapter keeps the elements of the
  * last one, and an action on any other ref is refused before Playwright is
- * asked. Nothing here knows what the page is for; how it waits on and reads a
- * page is the observe policy's.
+ * asked. The pages open when the browser opened, or when a unit's pages were
+ * last closed, are kept; `closeOpenedPages` closes the rest, so a unit of
+ * work's pages close with it. Nothing here knows what the page is for; how it
+ * waits on and reads a page is the observe policy's.
  */
 export interface PlaywrightBrowserOptions {
   profilesDir: string;
@@ -61,6 +68,8 @@ export class PlaywrightBrowser implements BrowserPort {
   private known = new Map<string, ObservedElement>();
   /** The tree of the last observation reported: what `wordsUnder` reads, so a unit's statement is the page as the plan saw it. */
   private tree: readonly SnapshotNode[] = [];
+  /** The pages kept open: those present at `open`, then those present after each `closeOpenedPages`. */
+  private kept = new Set<Page>();
   private readonly reader: PageReader;
 
   constructor(private readonly options: PlaywrightBrowserOptions) {
@@ -74,6 +83,7 @@ export class PlaywrightBrowser implements BrowserPort {
     );
     this.context.setDefaultTimeout(this.options.observe.actionTimeoutMs);
     if (this.context.pages().length === 0) await this.context.newPage();
+    this.kept = new Set(this.context.pages());
   }
 
   /** The page in front: the newest, so a link that opened a tab is followed. */
@@ -147,11 +157,37 @@ export class PlaywrightBrowser implements BrowserPort {
     return markedScreenshot(this.page, listed === undefined ? null : () => this.locate(listed.ref));
   }
 
+  /**
+   * Every page opened since `open` or since the last call, closed newest
+   * first; the newest page kept comes to the front. A page the site itself
+   * closed has left `context.pages()` and is neither closed nor counted, and
+   * the last page open is never closed, whoever opened it: `page` would have
+   * nothing left. Closing anything drops the last observation's refs: they
+   * belonged to a page that may be gone.
+   */
+  async closeOpenedPages(): Promise<PagesClosed> {
+    if (this.context === null)
+      throw new ActionFailed('closeOpenedPages', 'the browser is not open');
+    const pages = this.context.pages();
+    const opened = pages.filter((page) => !this.kept.has(page));
+    const closing = opened.length === pages.length ? opened.slice(1) : opened;
+    for (const page of [...closing].reverse()) await page.close();
+    this.kept = new Set(this.context.pages());
+    if (closing.length > 0) {
+      this.known.clear();
+      this.tree = [];
+    }
+    const front = this.page;
+    await front.bringToFront();
+    return { closed: closing.length, front: front.url() };
+  }
+
   async close(): Promise<void> {
     const context = this.context;
     this.context = null;
     this.known.clear();
     this.tree = [];
+    this.kept.clear();
     if (context !== null) await context.close();
   }
 
