@@ -235,6 +235,35 @@ describe('routeFields', () => {
     });
   });
 
+  it('[BRW-27] holds no answer in words typed into a chooser that none of its options has: never kept, never kept by answering them again', () => {
+    const typed = fields().map((field) =>
+      field.ref === 'e2'
+        ? {
+            ...field,
+            role: 'combobox',
+            inputType: 'search',
+            value: 'United States',
+            options: ['United States Minor Outlying Islands', 'United States of America'],
+            optionsOmitted: 0,
+          }
+        : field,
+    );
+    const kept = route(
+      decided(judgedRun({ artifact: answers({ e2: { decision: 'keep', value: null } }) })),
+      typed,
+    );
+    expect(kept[1]).toMatchObject({ route: 'ask-operator' });
+    const again = route(
+      decided(
+        judgedRun({
+          artifact: answers({ e2: { value: 'United States', rests: 'stated', basis: ['m1'] } }),
+        }),
+      ),
+      typed,
+    );
+    expect(again[1]?.route).not.toBe('keep');
+  });
+
   it('[QL-37] asks for a choice the page asks with nothing chosen, marked required or not, and leaves one that holds an answer to the model', () => {
     // Measured 2026-10-09: the form marked every select and text field
     // required and none of its radio questions; each was left blank as

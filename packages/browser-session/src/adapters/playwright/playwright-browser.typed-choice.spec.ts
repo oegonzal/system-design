@@ -28,6 +28,12 @@ const FORM = `<!doctype html><html><head><title>Apply — address</title></head>
       <ul id="region-list" role="listbox"></ul>
       <label for="city">City</label>
       <input id="city" type="text">
+      <label for="nickname">Nickname</label>
+      <input id="nickname" type="text" role="combobox" aria-autocomplete="list">
+      <label for="language">Language</label>
+      <input id="language" type="search" role="combobox" aria-autocomplete="list" aria-controls="language-list">
+      <ul id="language-list" role="listbox"></ul>
+      <ul id="elsewhere" role="listbox" aria-label="Recent searches"><li role="option">United States</li></ul>
       <span id="size-label">Team size</span>
       <div id="size" role="combobox" aria-labelledby="size-label" aria-controls="sizes" tabindex="0">Choose</div>
       <ul id="sizes" role="listbox"><li role="option">Small</li><li role="option">Large</li></ul>
@@ -61,6 +67,27 @@ const FORM = `<!doctype html><html><head><title>Apply — address</title></head>
     });
     country.addEventListener('blur', () => {
       if (country.value !== chosen) country.value = '';
+    });
+    // A list that renders, then renders again in another order a moment later, as a search-as-you-type list does.
+    const language = document.getElementById('language');
+    const languages = document.getElementById('language-list');
+    const render = (names) => {
+      languages.innerHTML = '';
+      for (const name of names) {
+        const option = document.createElement('li');
+        option.setAttribute('role', 'option');
+        option.textContent = name;
+        option.addEventListener('mousedown', (event) => {
+          event.preventDefault();
+          language.value = name;
+          languages.innerHTML = '';
+        });
+        languages.appendChild(option);
+      }
+    };
+    language.addEventListener('input', () => {
+      setTimeout(() => render(['Spanish', 'English']), 30);
+      setTimeout(() => render(['English', 'Spanish']), 60);
     });
     document.getElementById('sizes').addEventListener('click', (event) => {
       document.getElementById('size').textContent = event.target.textContent;
@@ -137,6 +164,23 @@ describe('the Playwright browser and a field typed into and chosen from', () => 
     });
     await leave();
     expect((await read()).value).toBeNull();
+  });
+
+  it('[BRW-27] chooses only from the lists the control names, by the option’s words, never its place — and a control naming no list keeps the words typed', async () => {
+    await browser.page.setContent(FORM);
+    const first = await browser.observe();
+    // Another list on the page shows the exact words; the control's own list does not: nothing is chosen.
+    await expect(
+      browser.act(select(byName(first, 'combobox', 'Country *').ref, 'United States')),
+    ).rejects.toThrow('the field offered "United States Minor Outlying Islands"');
+    // A list that renders again in another order between the find and the click: the option asked for is chosen.
+    const second = await browser.observe();
+    await browser.act(select(byName(second, 'combobox', 'Language').ref, 'Spanish'));
+    expect(byName(await browser.observe(), 'combobox', 'Language').value).toBe('Spanish');
+    // A control naming no list of its own declares no choices: the words typed stand, as a fill's would.
+    const third = await browser.observe();
+    await browser.act(select(byName(third, 'combobox', 'Nickname').ref, 'Al'));
+    expect(byName(await browser.observe(), 'combobox', 'Nickname').value).toBe('Al');
   });
 
   it('[BRW-27] never chooses on a fill: the words typed whole are still no choice', async () => {

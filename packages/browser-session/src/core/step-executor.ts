@@ -185,6 +185,7 @@ async function closeTask(
   queue.write(`task ${task.ordinal} close`, () => deps.ledger.closeTask(task.id, close));
   ctx.events.publish(unitClosedEvent(ctx, task, action.outcome));
   pushHistory(state, label, 'ok', null);
+  ctx.unitClosed();
 }
 
 /** What one engine event did to the step: the failure it counts, if any, and whether the session is ending — the operator's stop, or its time being up. */

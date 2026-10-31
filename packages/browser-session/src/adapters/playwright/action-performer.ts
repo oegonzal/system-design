@@ -3,14 +3,11 @@
  * observation listed under its ref. Nothing here decides what to do: the
  * action is the plan's, and the adapter only does it.
  */
-import { choosesByTyping, escapeRegExp, type ObservedElement } from '@sysdesign/contracts';
+import { choosesByTyping, type ObservedElement } from '@sysdesign/contracts';
 import type { Locator, Page } from 'playwright';
 
 import type { BrowserAction } from '../../core/ports';
-import { chooseByTyping } from './typed-choice';
-
-/** Words an element shows whole, around its own whitespace — never a longer text they begin. */
-const wholeText = (words: string): RegExp => new RegExp(`^\\s*${escapeRegExp(words)}\\s*$`);
+import { chooseByTyping, wholeText } from './typed-choice';
 
 /** What the performer acts through: the page in front, and the element under a ref. */
 export interface ActionSurface {

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   acceptsTypedText,
   choosesByTyping,
+  holdsUnchosenWords,
   ELEMENT_KIND_BY_ROLE,
   ELEMENT_KIND_WHEN_TYPED,
   elementKind,
@@ -22,6 +23,24 @@ describe('what an element affords', () => {
     // A role typed into that offers no choice, and a choice no one types into, are neither.
     expect(choosesByTyping('textbox', { inputType: 'text' })).toBe(false);
     expect(choosesByTyping('radio', { inputType: 'radio' })).toBe(false);
+  });
+
+  it('[BRW-27] reads words typed into a chooser that none of its whole list has as no answer — and a control chosen from alone as holding what was chosen', () => {
+    const typed = {
+      role: 'combobox',
+      inputType: 'search',
+      value: 'United States',
+      options: ['United States Minor Outlying Islands', 'United States of America'],
+      optionsOmitted: 0,
+    };
+    expect(holdsUnchosenWords(typed)).toBe(true);
+    expect(holdsUnchosenWords({ ...typed, value: 'United States of America' })).toBe(false);
+    // A list counted past its bound says nothing either way; nothing held is nothing unchosen.
+    expect(holdsUnchosenWords({ ...typed, optionsOmitted: 3 })).toBe(false);
+    expect(holdsUnchosenWords({ ...typed, value: null })).toBe(false);
+    // A native select or a radio group holds only what was chosen, its option text cut or not.
+    expect(holdsUnchosenWords({ ...typed, inputType: 'select' })).toBe(false);
+    expect(holdsUnchosenWords({ ...typed, role: 'radiogroup', inputType: null })).toBe(false);
   });
 
   it('[BRW-2] settles an ambiguous role by the control beneath it, and leaves every unambiguous role to the table', () => {

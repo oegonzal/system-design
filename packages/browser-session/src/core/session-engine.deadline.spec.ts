@@ -10,19 +10,27 @@ import {
 } from './testing-journey';
 import { runScripted as run, SPEC_RAILS } from './testing-session';
 
-/** An operator who lets the given minutes pass before the first answer, the clock moving with them, and the withdrawals they saw. */
+/** An operator who lets the given minutes pass before the first answer, the clock moving with them, and the withdrawals of questions still waiting. */
 const slowOperator = (clock: FixedClock, minutes: number, lines: string[]) => {
   const operator = new ScriptedOperator(lines);
   const withdrawals: unknown[] = [];
   const ask = operator.ask.bind(operator);
   let waited = false;
-  operator.ask = (question, signal) => {
-    signal?.addEventListener('abort', () => withdrawals.push(signal.reason), { once: true });
-    if (!waited) {
-      waited = true;
-      clock.advance(minutes * 60_000);
+  operator.ask = async (question, signal) => {
+    // Only a stop that lands while the question waits withdraws it; one after its answer withdraws nothing.
+    const withdrawn = (): void => {
+      withdrawals.push(signal?.reason);
+    };
+    signal?.addEventListener('abort', withdrawn, { once: true });
+    try {
+      if (!waited) {
+        waited = true;
+        clock.advance(minutes * 60_000);
+      }
+      return await ask(question, signal);
+    } finally {
+      signal?.removeEventListener('abort', withdrawn);
     }
-    return ask(question, signal);
   };
   return { operator, withdrawals };
 };
@@ -128,6 +136,65 @@ describe('the grace of a unit open when the time runs out', () => {
       'click e6',
     ]);
     expect(outcome.termination.reason).toBe('max-minutes');
+  });
+
+  it('[BRW-28] withdraws a question waiting at the limit when no unit of work is open, whatever the grace', async () => {
+    const clock = new FixedClock();
+    const { operator, withdrawals } = slowOperator(clock, SPEC_RAILS.maxMinutes, ['Yes']);
+    // The listing's link is followed with no unit opened: the form is asked outside any unit.
+    const results = {
+      ...PLANS.results,
+      actions: PLANS.results.actions.filter((action) => action.kind !== 'taskStart'),
+    };
+    const { outcome, detail } = await run({
+      script: {
+        plans: [PLANS.search, results, PLANS.form].map((p) => decidedPlan(p)),
+        answers: [decidedAnswers(ANSWERS)],
+      },
+      operator,
+      clock,
+      rails: GRACE,
+    });
+    expect(withdrawals).toEqual([OUT_OF_TIME]);
+    expect(detail.tasks).toEqual([]);
+    expect(outcome.termination.reason).toBe('max-minutes');
+    expect(outcome.termination.detail).toContain(', no unit of work open');
+  });
+
+  it('[BRW-28] leaves a session whose unit closes past the limit out of time at once: a question its plan asks after the close is never put', async () => {
+    const clock = new FixedClock();
+    const { operator } = slowOperator(clock, SPEC_RAILS.maxMinutes, ['Yes', 'No']);
+    const common = { reason: 'the procedure says so', expect: null, serves: [] };
+    // On the form, past the limit: the unit closes, and the same plan asks a field again.
+    const closeThenAsk = {
+      assessment: 'the application was sent; one more question on the page',
+      actions: [
+        { kind: 'taskDone' as const, outcome: 'done' as const, detail: 'sent', ...common },
+        { kind: 'askFields' as const, refs: ['e2'], ...common },
+      ],
+    };
+    const again = {
+      ...ANSWERS,
+      fields: ANSWERS.fields.map((field) =>
+        field.ref === 'e2' ? { ...field, value: 'No' } : field,
+      ),
+    };
+    const { outcome, detail } = await run({
+      script: {
+        plans: [PLANS.search, PLANS.results, PLANS.formOnly, closeThenAsk].map((p) =>
+          decidedPlan(p),
+        ),
+        answers: [decidedAnswers(ANSWERS), decidedAnswers(again)],
+      },
+      operator,
+      clock,
+      rails: GRACE,
+    });
+    // The one question put was the first, while the unit was open; the one after the close never went out.
+    expect(operator.questions).toHaveLength(1);
+    expect(detail.tasks.map((task) => task.outcome)).toEqual(['done']);
+    expect(outcome.termination.reason).toBe('max-minutes');
+    expect(clock.pendingTimers).toBe(0);
   });
 
   it('[BRW-28] withdraws the question waiting on the operator once the grace runs out, and ends the session naming the grace with the unit still open', async () => {

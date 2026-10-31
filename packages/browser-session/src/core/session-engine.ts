@@ -23,11 +23,11 @@ import {
   type Termination,
   type Withdrawal,
 } from './ports';
-import { timeLimitOf } from './rails';
+import { timeIsUp, timeLimitOf } from './rails';
 import { closeInterrupted, closeSession, warnOf } from './session-close';
 import { rubricsFile } from './session-dump';
 import { createSessionEvents, startedEvent } from './session-events';
-import { createState, pushHistory, type SessionState } from './session-state';
+import { createState, pushHistory, railStateOf, type SessionState } from './session-state';
 import { step } from './step-flow';
 import { resolveAdvisors } from './unit-advice';
 
@@ -76,10 +76,10 @@ export const STOPPING: Withdrawal = { reason: 'abandoned', note: 'the session is
 export const OUT_OF_TIME: Withdrawal = { reason: 'abandoned', note: "the session's time is up" };
 
 /**
- * The time limit's two moments: at the limit a question waiting on the
- * operator is withdrawn unless a unit of work is open — that unit may finish
- * within the declared grace — and at the grace's end it is withdrawn whatever
- * is open. With no grace both fall at the limit.
+ * The time limit's moments: at the limit a question waiting on the operator
+ * is withdrawn unless a unit of work is open — that unit may finish within the
+ * declared grace — the moment that unit closes past the limit, and at the
+ * grace's end whatever is open. With no grace all fall at the limit.
  */
 function armTimeLimit(
   deps: Pick<SessionDeps, 'clock'>,
@@ -87,14 +87,20 @@ function armTimeLimit(
   rails: SessionRailsDto,
   state: SessionState,
   timeUp: () => void,
-): () => void {
+): { cancel: () => void; unitClosed: () => void } {
   const atLimit = deps.clock.at(timeLimitOf(startedAt, false, rails), () => {
     if (state.tasks.open === null) timeUp();
   });
   const atGraceEnd = deps.clock.at(timeLimitOf(startedAt, true, rails), timeUp);
-  return () => {
-    atLimit();
-    atGraceEnd();
+  return {
+    cancel: () => {
+      atLimit();
+      atGraceEnd();
+    },
+    // The limit's timer passed over the unit open then; once it closes, the session is out of time at once.
+    unitClosed: () => {
+      if (timeIsUp(railStateOf(state), rails, deps.clock.now())) timeUp();
+    },
   };
 }
 
@@ -175,6 +181,7 @@ export async function runSession(
     advisors,
     events,
     stopping: stopping.signal,
+    unitClosed: deadline.unitClosed,
   });
 
   let termination: Termination = { reason: 'error', detail: 'the session ended before deciding' };
@@ -234,7 +241,7 @@ export async function runSession(
     if (!state.terminationRecorded) ctx.terminate(termination, 'engine', null);
   } finally {
     release();
-    deadline();
+    deadline.cancel();
     // A beat in flight is let finish before the session's closing writes.
     await ticker.stop();
     await deps.browser.close().catch((caught: unknown) => warn('browser not closed', caught));

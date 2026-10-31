@@ -57,29 +57,34 @@ describe('the field-answer validators', () => {
     ]);
   });
 
-  it('[BRW-27] keeping words a field holds that are none of its options is a warning on that field: such words are no choice', () => {
-    const holding = (value: string, options: string[]) =>
+  it('[BRW-27] words typed into a chooser that none of its options has are no answer: keeping them, or giving them again, is a warning on that field', () => {
+    const holding = (value: string, options: string[], inputType = 'search') =>
       fieldGoal(
         undefined,
         sampleFields().map((field) =>
-          field.ref === 'e2' ? { ...field, inputType: 'search', value, options } : field,
+          field.ref === 'e2' ? { ...field, inputType, value, options } : field,
         ),
       );
-    const kept = withAnswer('e2', answer('e2', { decision: 'keep', value: null, rests: 'none' }));
-    expect(
-      problems(kept, holding('United States', ['United States Minor Outlying Islands', 'Canada']))
-        .limits,
-    ).toEqual([
+    const unchosen = holding('United States', ['United States Minor Outlying Islands', 'Canada']);
+    const warned = [
       {
         severity: 'medium',
         locationRefs: ['field.2'],
         message:
-          'e2 holds "United States", none of its options: words that are no choice are answered, never kept',
+          'e2 holds "United States", typed but never chosen: none of its options has those words — answer with one of its options\' exact words',
       },
-    ]);
-    // Words that are one of its options are kept freely.
+    ];
+    const kept = withAnswer('e2', answer('e2', { decision: 'keep', value: null, rests: 'none' }));
+    expect(problems(kept, unchosen).limits).toEqual(warned);
+    const again = withAnswer('e2', answer('e2', { value: 'United States', basis: ['m1'] }));
+    expect(problems(again, unchosen).limits).toEqual(warned);
+    // Words that are one of its options are kept freely; a native select holds only what was chosen.
     expect(
       problems(kept, holding('Canada', ['United States of America', 'Canada'])).limits,
+    ).toEqual([]);
+    expect(
+      problems(kept, holding('A long consent statement…', ['A long consent stat…'], 'select'))
+        .limits,
     ).toEqual([]);
   });
 

@@ -115,6 +115,8 @@ export interface EngineContext {
   events: SessionEvents;
   /** Aborted, with the withdrawal, the moment the operator tells the session to stop: a question waiting on them is withdrawn, and none is asked after. */
   stopping: AbortSignal;
+  /** Told when a unit of work closes: one closed past the time limit leaves the session out of time at once, so nothing after it waits on the operator. */
+  unitClosed(): void;
   /** Queue one decision row for the current step; answers its id. */
   record(decision: DecisionInput): string;
   /** Queue dump files; a write that fails is reported under `what`. */
@@ -136,6 +138,7 @@ export interface EngineParts {
   advisors: ResolvedAdvisor[];
   events: SessionEvents;
   stopping: AbortSignal;
+  unitClosed(): void;
 }
 
 /**

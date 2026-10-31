@@ -17,6 +17,7 @@ import type { IterationTrace } from '../quality-loop/decision';
 import { bestIterationOf } from '../quality-loop/read-back';
 import type { QualityRunDto } from '../quality-loop/runs';
 import type { AnsweringSettings } from './answering';
+import { holdsUnchosenWords } from './element-kind';
 import { fieldAnswersSchema, type FieldAnswer } from './field-answers.schema';
 import type { FieldSpec } from './field-goal';
 import { fieldLocation } from './pipelines';
@@ -68,7 +69,9 @@ const readout = (
 });
 
 /** What the field holds already, as a value worth a keep: non-empty. */
-const holds = (field: FieldSpec): boolean => field.value !== null && field.value !== '';
+/** Whether the field holds an answer: words typed into a field chosen from that none of its options has hold none. */
+const holds = (field: FieldSpec): boolean =>
+  field.value !== null && field.value !== '' && !holdsUnchosenWords(field);
 
 /**
  * Whether the page needs a value in the field: one it marks required, or a

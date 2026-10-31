@@ -1,4 +1,5 @@
 import {
+  fieldLabelOf,
   fieldQuestionOf,
   fieldSpecOf,
   type FieldAnswers,
@@ -242,20 +243,23 @@ const decisionOf = (
  * never read as none. Measured 2026-10-08: one field went to the operator,
  * who answered, and the note read "0 asked".
  */
-const summarize = (results: readonly FieldResult[], listed: number): string => {
+const summarize = (results: readonly FieldResult[], routed: readonly RoutedField[]): string => {
+  const listed = routed.length;
   const asked = results.filter((r) => r.reply !== null);
   const answered = asked.filter((r) => r.reply === 'answer' || r.reply === 'read-back').length;
   const count = (route: FieldRoute): number =>
     results.filter((r) => r.reply === null && r.route === route && r.outcome === 'ok').length;
   const failed = results.filter((r) => r.outcome === 'failed').length;
-  // The field the page refused, by name, and why: the next plan answers it, never repeats it.
+  // The field the page refused, as a person would name it, and why: the next plan answers it, never repeats it.
   const refusal = results.find((r) => r.outcome === 'failed');
+  const refused = routed.find((r) => r.field.ref === refusal?.ref);
+  const refusedName = (refused === undefined ? null : fieldLabelOf(refused.field)) ?? refusal?.ref;
   const unattempted = listed - results.length;
   return `${listed} field(s): ${count('fill')} filled, ${count('keep')} kept, ${asked.length} asked${
     asked.length > 0 ? ` (${answered} answered by the operator)` : ''
   }, ${count('leave-blank')} blank${failed > 0 ? `, ${failed} failed` : ''}${
     unattempted > 0 ? `, ${unattempted} not attempted` : ''
-  }${refusal === undefined ? '' : ` — ${refusal.label}: ${refusal.detail ?? 'refused'}`}`;
+  }${refusal === undefined ? '' : ` — ${refusedName}: ${refusal.detail ?? 'refused'}`}`;
 };
 
 /** The listed fields the refs name, in the order asked. */
@@ -390,6 +394,6 @@ export async function askFields(
   return {
     stopped,
     failed: results.some((outcome) => outcome.outcome === 'failed'),
-    note: summarize(results, routed.length),
+    note: summarize(results, routed),
   };
 }

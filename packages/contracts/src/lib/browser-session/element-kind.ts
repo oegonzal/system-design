@@ -115,3 +115,24 @@ export const choosesByTyping = (
   role: string,
   facts: { readonly inputType: string | null },
 ): boolean => elementKindOf(role) === 'selectable' && acceptsTypedText(facts.inputType);
+
+/**
+ * Whether a control typed into and chosen from holds words that none of its
+ * whole list of options has: typed, never chosen, so it holds no answer to
+ * keep or to give again. A list counted past its bound says nothing either
+ * way, and a control chosen from alone — a native select, a radio group —
+ * holds only what was chosen.
+ */
+export const holdsUnchosenWords = (field: {
+  readonly role: string;
+  readonly inputType: string | null;
+  readonly value: string | null;
+  readonly options: readonly string[] | null;
+  readonly optionsOmitted: number;
+}): boolean =>
+  choosesByTyping(field.role, field) &&
+  field.value !== null &&
+  field.value !== '' &&
+  field.options !== null &&
+  field.optionsOmitted === 0 &&
+  !field.options.includes(field.value);

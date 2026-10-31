@@ -139,12 +139,12 @@ export const BROWSER_SESSION_CRITERIA: readonly Criterion[] = [
   {
     id: 'BRW-27',
     statement:
-      'A control both typed into and chosen from commits by a choice: a select on it types the option’s words and chooses, from the lists the control itself names, the option whose words are exactly those within the declared option wait — otherwise it fails naming what those lists offered and chooses nothing; a fill only types; a field answer on such a control is a select, its listed options an open list, and words it holds that match none of them are answered, never kept; and the step’s limits let a select through on a typed control that lists options.',
+      'A control both typed into and chosen from commits by a choice: a select on it types the option’s words and chooses, by its words and never its place, from the lists the control itself names and no other, the option whose words are exactly those within the declared option wait — when the control names a list and no such option shows, it fails naming what that list offered and chooses nothing, and when it names none, the words typed stand as a fill’s do; a fill only types; a field answer on such a control is a select, its listed options an open list, and words it holds that none of its options has hold no answer — never kept, never given again; and the step’s limits let a select through on a typed control that lists options.',
   },
   {
     id: 'BRW-28',
     statement:
-      'A session out of time starts no unit of work: a taskStart once its maxMinutes have elapsed is not run, nor anything after it in its plan, and the session ends max-minutes; a unit open when the time runs out may finish within the declared unitGraceMinutes — the rail, and the timer withdrawing a question waiting on the operator, moving to the grace’s end while it is open — and the session ends max-minutes once no unit is open past the limit or when the grace runs out, its detail naming the grace; a grace of 0 ends it at the limit as before; and its events carry the limit and the grace together as its lifetime.',
+      'A session out of time starts no unit of work: a taskStart once its maxMinutes have elapsed is not run, nor anything after it in its plan, and the session ends max-minutes; a unit open when the time runs out may finish within the declared unitGraceMinutes — the rail, and the withdrawal of a question waiting on the operator, moving to the grace’s end while it is open, and to the moment it closes when that is past the limit — and the session ends max-minutes once no unit is open past the limit or when the grace runs out, its detail naming the grace; a grace of 0 ends it at the limit as before; and its events carry the limit and the grace together as its lifetime.',
   },
   // Memory ingest (packages/memory-ingest)
   {
