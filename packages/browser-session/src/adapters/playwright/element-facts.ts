@@ -1,7 +1,7 @@
 import { ELEMENT_NAME_BOUND, HIDDEN_TRAITS, type HiddenTrait } from '@sysdesign/contracts';
 import type { Locator } from 'playwright';
 
-import { MODAL_DIALOGS } from './dom-selectors';
+import { MODAL_DIALOGS, RADIO_OPTIONS } from './dom-selectors';
 
 /**
  * The DOM facts about one interactive element, read in the page. The
@@ -15,6 +15,12 @@ export interface ElementFacts {
   inputType: string | null;
   value: string | null;
   options: string[] | null;
+  /**
+   * A radio group's options as a select matches them: the words of every
+   * option, in the page's order, disabled ones included; null for any other
+   * element.
+   */
+  radioWords: string[] | null;
   required: boolean;
   /** Marked invalid by the page: `aria-invalid`, or the browser's own validity once a person has touched it. */
   invalid: boolean;
@@ -48,7 +54,11 @@ export interface ElementFacts {
  */
 function elementFactsInPage(
   el: Element,
-  { textMax, modal: modalDialogs }: { textMax: number; modal: typeof MODAL_DIALOGS },
+  {
+    textMax,
+    modal: modalDialogs,
+    radioOptions,
+  }: { textMax: number; modal: typeof MODAL_DIALOGS; radioOptions: string },
 ): ElementFacts {
   const tag = el.tagName.toLowerCase();
   const input = el as HTMLInputElement;
@@ -116,20 +126,12 @@ function elementFactsInPage(
     text(Array.from((node as HTMLInputElement).labels ?? [])[0]) ||
     text(node);
   /**
-   * A radio group's options, each once — a native input drawn inside a
-   * styled `role="radio"` is that option's control, not an option of its
-   * own — and what a person reads on each: its own words, else its label.
-   * Measured 2026-10-09: a form named both radios of a yes/no question after
-   * the question itself, showed "Yes" and "No" only as their words, and
-   * declared required on neither radio nor group.
+   * A radio group's options, each once (`RADIO_OPTIONS`). Measured
+   * 2026-10-09: a form named both radios of a yes/no question after the
+   * question itself, showed "Yes" and "No" only as their words, and declared
+   * required on neither radio nor group.
    */
-  const radios =
-    attr('role') === 'radiogroup'
-      ? Array.from(el.querySelectorAll('[role="radio"], input[type="radio"]')).filter(
-          (radio) => radio.parentElement?.closest('[role="radio"]') == null,
-        )
-      : [];
-  const optionLabel = (option: Element): string => text(option) || labelOf(option);
+  const radios = attr('role') === 'radiogroup' ? Array.from(el.querySelectorAll(radioOptions)) : [];
   const isChecked = (radio: Element): boolean =>
     radio.getAttribute('aria-checked') === 'true' ||
     (radio as HTMLInputElement).checked === true ||
@@ -148,7 +150,7 @@ function elementFactsInPage(
    * its words, in a group the tree gave no name and no legend; read as having
    * no question, it was put to the operator as "a field on the page".
    */
-  const sharedQuestion = (): string => {
+  const sharedQuestion = ((): string => {
     const names = radios.map(
       (radio) => radio.getAttribute('aria-label') || byIds(radio.getAttribute('aria-labelledby')),
     );
@@ -158,6 +160,33 @@ function elementFactsInPage(
       !radios.some((radio) => text(radio) === first)
       ? first
       : '';
+  })();
+  /** The words of an option's row: the nearest container, inside the group, that holds words and no other option. */
+  const rowWords = (option: Element): string => {
+    const others = radios.filter((other) => other !== option);
+    const holdsAnother = (node: Element): boolean => others.some((other) => node.contains(other));
+    for (
+      let node = option.parentElement;
+      node !== null && node !== el && !holdsAnother(node);
+      node = node.parentElement
+    ) {
+      const words = text(node);
+      if (words !== '') return words;
+    }
+    return '';
+  };
+  /**
+   * What a person reads on one option: its own words, else its label — unless
+   * that label is the question every option is named after, which tells no
+   * option from another; then the words of its row. Measured 2026-10-31: a
+   * job site named both native radios of each yes/no question after the
+   * question and showed "Yes" and "No" only in a paragraph beside each, so
+   * both options read as the question, a select of "Yes" found no radio, and
+   * a read-back taught the words of every option as the answer.
+   */
+  const optionLabel = (option: Element): string => {
+    const label = text(option) || labelOf(option);
+    return label !== '' && label === sharedQuestion ? rowWords(option) || label : label;
   };
 
   /**
@@ -169,7 +198,7 @@ function elementFactsInPage(
    * lettered choice, a dropdown's disabled "Select an option" was picked, and
    * filling it timed out because the browser would not select it.
    */
-  const readControl = (): Pick<ElementFacts, 'inputType' | 'value' | 'options'> => {
+  const readControl = (): Pick<ElementFacts, 'inputType' | 'value' | 'options' | 'radioWords'> => {
     const inputType =
       tag === 'input'
         ? (attr('type') ?? 'text').toLowerCase()
@@ -182,6 +211,7 @@ function elementFactsInPage(
 
     let value: string | null = null;
     let options: string[] | null = null;
+    let radioWords: string[] | null = null;
     if (tag === 'select') {
       const select = el as HTMLSelectElement;
       const first = select.options[0];
@@ -213,12 +243,15 @@ function elementFactsInPage(
       value = text(el) || null;
     }
     if (options === null && role === 'radiogroup') {
-      options = radios
-        .filter((radio) => !radioSays(radio, 'disabled') && !radioSays(radio, 'aria-disabled'))
-        .map(optionLabel)
-        .filter((option) => option.length > 0);
-      const chosen = radios.find(isChecked);
-      value = chosen === undefined ? null : optionLabel(chosen) || null;
+      const read = radios.map((radio) => ({ radio, words: optionLabel(radio) }));
+      radioWords = read.map(({ words }) => words);
+      options = read
+        .filter(
+          ({ radio, words }) =>
+            words.length > 0 && !radioSays(radio, 'disabled') && !radioSays(radio, 'aria-disabled'),
+        )
+        .map(({ words }) => words);
+      value = read.find(({ radio }) => isChecked(radio))?.words || null;
     }
     if (options === null && (role === 'listbox' || role === 'combobox')) {
       // The lists the control names as its own — `aria-controls`, else
@@ -238,7 +271,7 @@ function elementFactsInPage(
       }
     }
     if (options !== null && options.length === 0) options = null;
-    return { inputType, value, options };
+    return { inputType, value, options, radioWords };
   };
 
   /** What state the page puts it in: required, disabled. */
@@ -378,7 +411,7 @@ function elementFactsInPage(
     // Its question: the legend of its fieldset, the question its radios are
     // named after, else the words before it — one of them, never two.
     const question =
-      text(el.closest('fieldset')?.querySelector('legend')) || sharedQuestion() || precedingWords();
+      text(el.closest('fieldset')?.querySelector('legend')) || sharedQuestion || precedingWords();
     const context = [
       byIds(attr('aria-describedby')),
       attr('placeholder') ?? '',
@@ -433,7 +466,7 @@ export async function readElementFacts(
   try {
     return await locator.evaluate(
       elementFactsInPage,
-      { textMax: ELEMENT_NAME_BOUND.target, modal: MODAL_DIALOGS },
+      { textMax: ELEMENT_NAME_BOUND.target, modal: MODAL_DIALOGS, radioOptions: RADIO_OPTIONS },
       { timeout },
     );
   } catch {

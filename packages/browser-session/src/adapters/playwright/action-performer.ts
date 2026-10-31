@@ -7,7 +7,8 @@ import { choosesByTyping, type ObservedElement } from '@sysdesign/contracts';
 import type { Locator, Page } from 'playwright';
 
 import type { BrowserAction } from '../../core/ports';
-import { chooseByTyping, wholeText } from './typed-choice';
+import { chooseRadio } from './radio-choice';
+import { chooseByTyping } from './typed-choice';
 
 /** What the performer acts through: the page in front, and the element under a ref. */
 export interface ActionSurface {
@@ -17,7 +18,7 @@ export interface ActionSurface {
   documentPath(name: string): string;
   /** How far one page-level scroll moves, in CSS pixels. */
   scrollPx: number;
-  /** How long a select on a control typed into waits for the option whose words it typed. */
+  /** How long a select waits for the page to show its choice: the option a typed control lists, or a radio clicked beside it reading as chosen. */
   optionWaitMs: number;
 }
 
@@ -70,11 +71,10 @@ export async function performAction(
 }
 
 /**
- * A `<select>` takes the option by label; a radio group checks the radio
- * its option names — by its accessible name when that names one radio, else
- * by the words it shows, as the observation read its options; a control typed
- * into types the option's words and chooses that option; anything else opens
- * and picks.
+ * A `<select>` takes the option by label; a radio group chooses the radio
+ * whose words, as the observation read them, are the option's; a control
+ * typed into types the option's words and chooses that option; anything else
+ * opens and picks.
  */
 async function select(
   { page, locate, optionWaitMs }: ActionSurface,
@@ -88,12 +88,7 @@ async function select(
     return;
   }
   if (target?.role === 'radiogroup') {
-    const named = locator.getByRole('radio', { name: option, exact: true });
-    const radio =
-      (await named.count()) === 1
-        ? named
-        : locator.getByRole('radio').filter({ hasText: wholeText(option) });
-    await radio.first().check();
+    await chooseRadio(locator, option, optionWaitMs);
     return;
   }
   if (target?.role === 'radio') {

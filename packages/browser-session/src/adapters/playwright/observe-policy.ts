@@ -60,11 +60,13 @@ export interface ObservePolicy {
   /** How far one page-level scroll moves, in CSS pixels. */
   scrollPx: number;
   /**
-   * How long a select on a control both typed into and chosen from waits,
-   * after typing the option's words, for that option to show in the lists the
-   * control names. It ends the moment the option shows, so only a choice that
-   * fails waits it out. Provisional (2026-10-30): a typing debounce plus one
-   * lookup, twice over; measured live and resized as `pageOpenWaitMs` was.
+   * How long a select waits for the page to show its choice: on a control
+   * both typed into and chosen from, for the option whose words it typed to
+   * show in the lists the control names; on a radio group whose radio takes
+   * no click of its own, for the radio clicked beside it to read as chosen. It
+   * ends the moment the choice shows, so only a choice that fails waits it
+   * out. Provisional (2026-10-30): a typing debounce plus one lookup, twice
+   * over; measured live and resized as `pageOpenWaitMs` was.
    */
   optionWaitMs: number;
 }

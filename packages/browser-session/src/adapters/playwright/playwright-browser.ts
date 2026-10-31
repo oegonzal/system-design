@@ -172,9 +172,12 @@ export class PlaywrightBrowser implements BrowserPort {
   async readValue(ref: string): Promise<string | null> {
     try {
       const located = this.locate(this.resolve(ref, 'readValue').ref);
-      // A select holds what an observation reads it to hold — never an option no one can answer with.
+      // A control chosen from the options it holds — a select, a radio group — holds what an
+      // observation reads it to hold: never an option no one can answer with, nor every option's words.
       const facts = await readElementFacts(located);
-      if (facts?.inputType === 'select') return facts.value;
+      if (facts !== null && (facts.inputType === 'select' || facts.radioWords !== null)) {
+        return facts.value;
+      }
       return await located.evaluate((el) => {
         if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return el.value;
         return el.textContent?.trim() ?? null;

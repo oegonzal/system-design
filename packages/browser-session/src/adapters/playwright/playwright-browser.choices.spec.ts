@@ -4,6 +4,7 @@ import { join } from 'node:path';
 
 import type { ObservedElement, PageObservation } from '@sysdesign/contracts';
 
+import type { BrowserAction } from '../../core/ports';
 import { PlaywrightBrowser } from './playwright-browser';
 import { specBrowserOptions } from './testing';
 
@@ -54,8 +55,64 @@ const QUESTIONS = `<!doctype html><html><head><title>Apply — additional questi
   </script>
 </body></html>`;
 
+/**
+ * Radio questions drawn the way a live job-site form drew them on
+ * 2026-10-31: native radios each named after their question — by
+ * `aria-labelledby` in the first, by `aria-label` in the others — showing
+ * "Yes" and "No" only beside them, and taking no click of their own. The
+ * first's radios have no box: the circle drawn around each takes the click.
+ * The second's take no pointer events: each row is a label, which passes a
+ * click to its radio. The third is drawn like the first, with nothing that
+ * takes a click.
+ */
+const NAMED_AFTER_QUESTION = `<!doctype html><html><head><title>Apply — additional questions</title>
+  <style>
+    .circle { display: inline-block; width: 16px; height: 16px; border: 1px solid #555; border-radius: 50%; }
+    .boxless { position: absolute; width: 0; height: 0; margin: 0; opacity: 0; }
+    .untouchable { pointer-events: none; opacity: 0; width: 16px; height: 16px; margin: 0; }
+  </style>
+</head><body>
+  <div role="dialog" aria-modal="true" aria-label="Apply to Acme">
+    <p>Are you licensed to practise in the state?*</p>
+    <span id="licensed" hidden>Are you licensed to practise in the state?</span>
+    <div role="radiogroup">
+      <div><span class="circle"><input class="boxless" type="radio" name="licensed" aria-labelledby="licensed"></span><p>Yes</p></div>
+      <div><span class="circle"><input class="boxless" type="radio" name="licensed" aria-labelledby="licensed"></span><p>No</p></div>
+    </div>
+    <p>Would your last employers recommend you?*</p>
+    <div role="radiogroup">
+      <label><input class="untouchable" type="radio" name="recommend" aria-label="Would your last employers recommend you?"><span>Yes</span></label>
+      <label><input class="untouchable" type="radio" name="recommend" aria-label="Would your last employers recommend you?"><span>No</span></label>
+    </div>
+    <p>Do you hold a clearance?*</p>
+    <div role="radiogroup">
+      <div><span class="inert circle"><input class="boxless" type="radio" name="clearance" aria-label="Do you hold a clearance?"></span><p>Yes</p></div>
+      <div><span class="inert circle"><input class="boxless" type="radio" name="clearance" aria-label="Do you hold a clearance?"></span><p>No</p></div>
+    </div>
+    <button type="button">Review</button>
+  </div>
+  <script>
+    for (const circle of document.querySelectorAll('.circle:not(.inert)')) {
+      circle.addEventListener('click', () => {
+        const radio = circle.querySelector('input');
+        radio.checked = true;
+        radio.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+    }
+  </script>
+</body></html>`;
+
 const groups = (observation: PageObservation): ObservedElement[] =>
   observation.elements.filter((element) => element.role === 'radiogroup');
+
+const choose = (ref: string, option: string): BrowserAction => ({
+  kind: 'select',
+  ref,
+  option,
+  reason: 'from the evidence',
+  expect: null,
+  serves: [],
+});
 
 describe('the Playwright browser, on radio questions', () => {
   let profiles: string;
@@ -140,5 +197,47 @@ describe('the Playwright browser, on radio questions', () => {
     const [termsAfter, relocateAfter] = groups(await browser.observe());
     expect(termsAfter.value).toBe('Yes');
     expect(relocateAfter.value).toBe('No');
+  });
+
+  it('[BRW-2] reads the answers of a question every radio is named after by the words of their rows, chooses one where a person’s click lands, and reads the choice back by its words', async () => {
+    await browser.page.setContent(NAMED_AFTER_QUESTION);
+    const [licensed, recommend] = groups(await browser.observe());
+    expect(licensed).toMatchObject({
+      options: ['Yes', 'No'],
+      value: null,
+      context: 'Are you licensed to practise in the state?',
+    });
+    expect(recommend).toMatchObject({
+      options: ['Yes', 'No'],
+      value: null,
+      context: 'Would your last employers recommend you?',
+    });
+
+    await browser.act(choose(licensed.ref, 'No'));
+    await browser.act(choose(recommend.ref, 'Yes'));
+    const [licensedAfter, recommendAfter] = groups(await browser.observe());
+    expect(licensedAfter.value).toBe('No');
+    expect(recommendAfter.value).toBe('Yes');
+    // A read-back finds the choice, never the words of every option.
+    expect(await browser.readValue(licensedAfter.ref)).toBe('No');
+    expect(await browser.readValue(recommendAfter.ref)).toBe('Yes');
+  });
+
+  it('[BRW-2] fails a radio select naming the options when none reads its words, and after the declared wait when its click took nowhere', async () => {
+    const quick = new PlaywrightBrowser(specBrowserOptions(profiles, { optionWaitMs: 300 }));
+    await quick.open('spec-radio-quick', { headed: false, documents: [] });
+    try {
+      await quick.page.setContent(NAMED_AFTER_QUESTION);
+      const [licensed, , clearance] = groups(await quick.observe());
+      expect(await quick.readValue(clearance.ref)).toBeNull();
+      await expect(quick.act(choose(licensed.ref, 'Maybe'))).rejects.toThrow(
+        `select: no option reads "Maybe": the field offers "Yes", "No" — answer it with one of its options' exact words`,
+      );
+      await expect(quick.act(choose(clearance.ref, 'Yes'))).rejects.toThrow(
+        'select: clicked the option "Yes", and the field then held nothing',
+      );
+    } finally {
+      await quick.close();
+    }
   });
 });

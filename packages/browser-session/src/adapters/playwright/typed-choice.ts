@@ -5,7 +5,7 @@ import { ActionFailed } from '../../core/ports';
 import { readElementFacts } from './element-facts';
 
 /** Words an element shows whole, around its own whitespace — never a longer text they begin. */
-export const wholeText = (words: string): RegExp => new RegExp(`^\\s*${escapeRegExp(words)}\\s*$`);
+const wholeText = (words: string): RegExp => new RegExp(`^\\s*${escapeRegExp(words)}\\s*$`);
 
 /**
  * A control both typed into and chosen from — an input with the combobox

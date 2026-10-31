@@ -9,3 +9,13 @@ export const MODAL_DIALOGS = {
   /** For an engine without `:modal`: the ARIA half alone. */
   aria: '[role="dialog"][aria-modal="true"], [role="alertdialog"][aria-modal="true"]',
 } as const;
+
+/**
+ * The options of a radio group, each once: every radio — a `role="radio"`
+ * or a native one — but a native input drawn inside a styled `role="radio"`,
+ * which is that option's control, not an option of its own. Declared once for
+ * the element facts, which read each option's words, and the select, which
+ * finds the option by them in the same order.
+ */
+export const RADIO_OPTIONS =
+  '[role="radio"]:not([role="radio"] *), input[type="radio"]:not([role="radio"] *)';
