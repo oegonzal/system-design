@@ -89,7 +89,15 @@ facts they teach are self-contained. To run until a number of applications are
 submitted, add `--target-done n` (with `--max-tasks` at least n): the session
 ends `complete`, reason `target-reached`, once n units have closed `done`.
 
-Read, per form page: one `form-memory` orchestration whose goal's index names
+Under the memory brain (the shipped choice since 30 Oct 2026), a form page's
+fields are answered by one `field-answer` run over the evidence recalled from
+the memory space — the step's `fields.json` carries
+`recall: {requests, evidence, latencyMs, fault}` — and each answer given on a
+taught channel is written to the space at once as a fact of the subject's, the
+record id landing on the decision row (`teaching_ref`).
+
+Read, per form page under the loop brain (the shipped choice until 30 Oct
+2026): one `form-memory` orchestration whose goal's index names
 the open unit of work by its key (`unitKey`: the identity the mission
 declares, or the task row's id when it declares none), whose `recall` step
 counts `{probes, candidates, evidence}` — of the memories bound to a unit of

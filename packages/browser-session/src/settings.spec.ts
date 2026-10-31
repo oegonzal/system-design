@@ -105,9 +105,9 @@ describe('the session settings', () => {
     expect(shipped.session.busRecovery).toEqual({ windowMs: 60000, pauseMs: 2000 });
     // The beat and the stale window the session constants held before they were declared.
     expect(shipped.session.liveness).toEqual({ heartbeatEveryMs: 15000, staleAfterMs: 60000 });
-    // The brain the package ships decides through the loop alone; the memory-backed one is a one-word edit away.
-    expect(shipped.sources.brain).toMatch(/config\/brain\/loop\.json$/);
-    expect(shipped.brain).toEqual({ adapter: 'loop' });
+    // The brain the package ships decides through the memory space; the loop-only brain stays one word away until the cutover.
+    expect(shipped.sources.brain).toMatch(/config\/brain\/memory\.json$/);
+    expect(shipped.brain.adapter).toBe('memory');
 
     // Every file a choice could name is a complete, valid configuration of its kind.
     expect(profiles('capture').sort()).toEqual(['every-action', 'field-entries', 'observations']);
@@ -311,7 +311,10 @@ describe('the session settings', () => {
     expect(() =>
       readSessionSettings(
         PACKAGE_ROOT,
-        choosing(SHIPPED, { 'brain/loop.json': '{"adapter":"loop","project":"x"}' }),
+        choosing(
+          { ...SHIPPED, brain: 'loop' },
+          { 'brain/loop.json': '{"adapter":"loop","project":"x"}' },
+        ),
       ),
     ).toThrow(EngineConfigError);
   });

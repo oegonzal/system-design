@@ -2,8 +2,8 @@
 
 _As of 28 Oct 2026, 09:10 UTC._ This page reports plan Step 6 of the move of the job assistant's memory onto the
 agentic-memory runtime: an offline replay of recorded form pages against a memory space seeded for a verification
-tenant, with no live session involved. The live flow still runs on the loop's own memory (`brain: loop`); switching
-it is the owner's call and is not made here.
+tenant, with no live session involved. The live flow ran on the loop's own memory (`brain: loop`) until the go-live
+of 30 Oct 2026 (plan step 7); this page records the state before it.
 
 ## What was set up
 
@@ -75,7 +75,7 @@ answer carries them; whether that is acceptable for the first supervised session
 ## How to reproduce
 
 From a checkout whose `packages/browser-session/config/engine.json` names `"brain": "memory"` (the worktree used
-here; the shipped file still names `loop`), with the env names `MEMORY_TENANT`, `AGENTIC_SYSTEM_URL` set:
+here; the shipped file named `loop` until 30 Oct 2026), with the env names `MEMORY_TENANT`, `AGENTIC_SYSTEM_URL` set:
 
 ```
 pnpm browser-session teach-again --sessions static/sessions --tenant verify-20261028 --subject "<name>"
