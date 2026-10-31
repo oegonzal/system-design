@@ -3,6 +3,7 @@ import type { Locator } from 'playwright';
 
 import { ActionFailed } from '../../core/ports';
 import { readElementFacts } from './element-facts';
+import { offeredNote } from './playwright-errors';
 
 /** Words an element shows whole, around its own whitespace — never a longer text they begin. */
 const wholeText = (words: string): RegExp => new RegExp(`^\\s*${escapeRegExp(words)}\\s*$`);
@@ -45,7 +46,7 @@ export async function chooseByTyping(
   if (list === false) {
     if (!(await namesAList(locator))) return;
     const offered = (await readElementFacts(locator))?.options ?? null;
-    throw new ActionFailed('select', noChoice(words, offered));
+    throw new ActionFailed('select', `typed ${JSON.stringify(words)}: ${offeredNote(offered)}`);
   }
   await locator
     .page()
@@ -60,14 +61,6 @@ const namesAList = (locator: Locator): Promise<boolean> =>
   locator.evaluate(
     (el) => (el.getAttribute('aria-controls') ?? el.getAttribute('aria-owns') ?? '').trim() !== '',
   );
-
-/** Why nothing was chosen, in the words the next plan reads: what was typed, and what the control offered for it. */
-const noChoice = (words: string, offered: readonly string[] | null): string =>
-  `typed ${JSON.stringify(words)}: ${
-    offered === null || offered.length === 0
-      ? 'the field offered nothing for those words'
-      : `the field offered ${offered.map((option) => JSON.stringify(option)).join(', ')}`
-  } — answer it with one of its options' exact words`;
 
 /**
  * In the page: the id of the first list the control names whose enabled

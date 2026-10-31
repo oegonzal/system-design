@@ -1,3 +1,11 @@
+/** What a field offered a select that found no option for its words, and what the next answer must be. */
+export const offeredNote = (offered: readonly string[] | null): string =>
+  `${
+    offered === null || offered.length === 0
+      ? 'the field offered nothing for those words'
+      : `the field offered ${offered.map((option) => JSON.stringify(option)).join(', ')}`
+  } — answer it with one of its options' exact words`;
+
 /** How many of the call log's last distinct entries a failure keeps: a retry repeats its reason, then waits. */
 const CALL_LOG_TAIL = 3;
 

@@ -2,108 +2,95 @@ import type { Locator } from 'playwright';
 
 import { ActionFailed } from '../../core/ports';
 import { RADIO_OPTIONS } from './dom-selectors';
-import { readElementFacts } from './element-facts';
+import { offeredNote } from './playwright-errors';
+import { aimAtOption, answerable, readRadioGroup, type RadioGroupReading } from './radio-group';
 
-/**
- * A radio group's option chosen as a person chooses it. The option is found
- * by the words an observation reads on it — never by its name alone, which a
- * form may give every option of a question — and clicked where a person's
- * click on it lands: the radio itself when it takes the click, else whatever
- * the page draws at the point a person aims at, inside the group. A click
- * that lands beside the radio is read back: the radio reads as chosen within
- * the declared wait, or the select failed, saying what the field then held.
- * Measured 2026-10-31: a job site's native radios were named after their
- * question and took no click of their own — the snapshot gave them no ref —
- * so checking the one asked for waited out the action timeout, and the
- * operator chose in the browser.
- */
-export async function chooseRadio(group: Locator, words: string, waitMs: number): Promise<void> {
-  const facts = await readElementFacts(group);
-  const at = facts?.radioWords?.indexOf(words) ?? -1;
-  if (at < 0) throw new ActionFailed('select', noSuchOption(words, facts?.options ?? null));
-  const radio = group.locator(RADIO_OPTIONS).nth(at);
-  const aimed = await radio.evaluateHandle(clickLandsOnInPage);
-  const landing = aimed.asElement();
-  try {
-    if (landing === null || (await radio.evaluate(isOrHolds, landing))) {
-      await radio.check();
-      return;
-    }
-    await landing.click();
-  } finally {
-    await aimed.dispose();
-  }
-  await readBack(group, radio, words, waitMs);
+/** How a select on a radio group waits on the page: for the choice to show, and between reads of it. */
+interface RadioWaits {
+  optionWaitMs: number;
+  settleRetryMs: number;
 }
 
-/** After a click beside the radio: it reads as chosen within the wait, or the select failed. */
+/**
+ * A radio group's option chosen as a person chooses it: the one option the
+ * observation offers whose words are the option's — never one the page
+ * disables, and none at all when two read alike — clicked where a person's
+ * click on it lands (`radio-group.ts`). A radio that takes the click itself
+ * is Playwright's check, which reads the choice back itself. Otherwise each
+ * point a person tries — its labels, the box drawn around it, the marks
+ * beside it, its row, its words — is clicked in turn until the group reads
+ * the option as chosen; then the group is read again until the declared wait
+ * ends. Each read is of the option at the place the words were read at, and
+ * still of those words. Measured 2026-10-31: a job site's native radios were
+ * named after their question and took no click of their own, so checking the
+ * one asked for waited out the action timeout, and the operator chose in the
+ * browser.
+ */
+export async function chooseRadio(group: Locator, words: string, waits: RadioWaits): Promise<void> {
+  const reading = await readRadioGroup(group);
+  if (reading === null) throw new ActionFailed('select', 'the field could not be read');
+  const offered = answerable(reading);
+  const matching = offered.filter((option) => option.words === words);
+  const [option] = matching;
+  if (option === undefined) {
+    const note = offeredNote(offered.map((each) => each.words));
+    throw new ActionFailed('select', `no option reads ${JSON.stringify(words)}: ${note}`);
+  }
+  if (matching.length > 1) {
+    throw new ActionFailed(
+      'select',
+      `${matching.length} options read ${JSON.stringify(words)} — the field cannot tell them apart`,
+    );
+  }
+  const at = reading.options.indexOf(option);
+  const aimed = await aimAtOption(group, at);
+  if (aimed?.options[at]?.words !== words) {
+    throw new ActionFailed(
+      'select',
+      `the field changed before ${JSON.stringify(words)} was chosen`,
+    );
+  }
+  const [first] = aimed.aims;
+  if (first === undefined) {
+    throw new ActionFailed(
+      'select',
+      `the option ${JSON.stringify(words)} shows nowhere a click would reach it`,
+    );
+  }
+  if (first.self) {
+    await group.locator(RADIO_OPTIONS).nth(at).check();
+    return;
+  }
+  for (const aim of aimed.aims) {
+    await group.page().mouse.click(aim.x, aim.y);
+    if (chosen(await readRadioGroup(group), at, words)) return;
+  }
+  await readBack(group, at, words, waits);
+}
+
+/** Whether the group reads the option at `at`, still of those words, as chosen. */
+const chosen = (reading: RadioGroupReading | null, at: number, words: string): boolean =>
+  reading?.options[at]?.words === words && reading.options[at]?.checked === true;
+
+/** After the clicks: the group reads the option as chosen within the wait, or the select failed, saying what the field holds. */
 async function readBack(
   group: Locator,
-  radio: Locator,
+  at: number,
   words: string,
-  waitMs: number,
+  { optionWaitMs, settleRetryMs }: RadioWaits,
 ): Promise<void> {
-  const control = await radio.elementHandle();
-  try {
-    await group.page().waitForFunction(checkedInPage, control, { timeout: waitMs, polling: 'raf' });
-    return;
-  } catch {
-    // Not chosen within the wait: said below, by what the field holds.
-  } finally {
-    await control.dispose();
+  const until = Date.now() + optionWaitMs;
+  let reading = await readRadioGroup(group);
+  while (!chosen(reading, at, words) && Date.now() < until) {
+    await group.page().waitForTimeout(settleRetryMs);
+    reading = await readRadioGroup(group);
   }
-  const held = (await readElementFacts(group))?.value ?? null;
+  if (chosen(reading, at, words)) return;
+  const held = reading?.options.find((each) => each.checked)?.words ?? null;
   throw new ActionFailed(
     'select',
     `clicked the option ${JSON.stringify(words)}, and the field then held ${
       held === null ? 'nothing' : JSON.stringify(held)
     }`,
-  );
-}
-
-/** Why no option was chosen, in the words the next plan reads: what was asked for, and what the group offers. */
-const noSuchOption = (words: string, offered: readonly string[] | null): string =>
-  `no option reads ${JSON.stringify(words)}: ${
-    offered === null || offered.length === 0
-      ? 'the field offers none'
-      : `the field offers ${offered.map((option) => JSON.stringify(option)).join(', ')}`
-  } — answer it with one of its options' exact words`;
-
-/** Whether the click lands on the radio itself or on what it holds. */
-const isOrHolds = (radio: Element, landing: Element): boolean =>
-  radio === landing || radio.contains(landing);
-
-/**
- * In the page: where a person's click on the radio lands — the topmost
- * element at the middle of the radio's box, or, for a radio drawn with no box
- * of its own, of the nearest box around it — when that is inside the radio's
- * group; else the radio itself, so a click covered by something outside the
- * group fails as Playwright says it does. One function on purpose: Playwright
- * serialises it whole.
- */
-function clickLandsOnInPage(radio: Element): Element {
-  let aimed: Element | null = radio;
-  while (aimed !== null) {
-    const box = aimed.getBoundingClientRect();
-    if (box.width > 0 && box.height > 0) break;
-    aimed = aimed.parentElement;
-  }
-  const group = radio.closest('[role="radiogroup"]');
-  if (aimed === null || group === null) return radio;
-  aimed.scrollIntoView({ block: 'center', inline: 'center' });
-  const box = aimed.getBoundingClientRect();
-  const landing = radio.ownerDocument.elementFromPoint(
-    box.left + box.width / 2,
-    box.top + box.height / 2,
-  );
-  return landing !== null && group.contains(landing) ? landing : radio;
-}
-
-/** In the page: whether the radio reads as chosen — by its ARIA state, its own, or that of the native radio drawn inside it. */
-function checkedInPage(radio: Element): boolean {
-  return (
-    radio.getAttribute('aria-checked') === 'true' ||
-    (radio as HTMLInputElement).checked === true ||
-    radio.querySelector('input[type="radio"]:checked') !== null
   );
 }

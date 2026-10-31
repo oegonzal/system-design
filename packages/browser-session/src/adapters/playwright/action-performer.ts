@@ -20,6 +20,8 @@ export interface ActionSurface {
   scrollPx: number;
   /** How long a select waits for the page to show its choice: the option a typed control lists, or a radio clicked beside it reading as chosen. */
   optionWaitMs: number;
+  /** How long a select waits between reads of a radio group it clicked beside, until the group reads as chosen. */
+  settleRetryMs: number;
 }
 
 export async function performAction(
@@ -77,7 +79,7 @@ export async function performAction(
  * opens and picks.
  */
 async function select(
-  { page, locate, optionWaitMs }: ActionSurface,
+  { page, locate, optionWaitMs, settleRetryMs }: ActionSurface,
   target: ObservedElement | null,
   ref: string,
   option: string,
@@ -88,7 +90,7 @@ async function select(
     return;
   }
   if (target?.role === 'radiogroup') {
-    await chooseRadio(locator, option, optionWaitMs);
+    await chooseRadio(locator, option, { optionWaitMs, settleRetryMs });
     return;
   }
   if (target?.role === 'radio') {

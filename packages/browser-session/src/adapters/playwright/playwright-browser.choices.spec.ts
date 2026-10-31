@@ -231,7 +231,7 @@ describe('the Playwright browser, on radio questions', () => {
       const [licensed, , clearance] = groups(await quick.observe());
       expect(await quick.readValue(clearance.ref)).toBeNull();
       await expect(quick.act(choose(licensed.ref, 'Maybe'))).rejects.toThrow(
-        `select: no option reads "Maybe": the field offers "Yes", "No" — answer it with one of its options' exact words`,
+        `select: no option reads "Maybe": the field offered "Yes", "No" — answer it with one of its options' exact words`,
       );
       await expect(quick.act(choose(clearance.ref, 'Yes'))).rejects.toThrow(
         'select: clicked the option "Yes", and the field then held nothing',

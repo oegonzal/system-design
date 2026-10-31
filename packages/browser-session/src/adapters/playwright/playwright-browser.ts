@@ -131,6 +131,7 @@ export class PlaywrightBrowser implements BrowserPort {
           documentPath: (name) => this.documentPath(name),
           scrollPx: this.options.observe.scrollPx,
           optionWaitMs: this.options.observe.optionWaitMs,
+          settleRetryMs: this.options.observe.settleRetryMs,
         },
         action,
         targets[0] ?? null,
@@ -171,17 +172,17 @@ export class PlaywrightBrowser implements BrowserPort {
 
   async readValue(ref: string): Promise<string | null> {
     try {
-      const located = this.locate(this.resolve(ref, 'readValue').ref);
-      // A control chosen from the options it holds — a select, a radio group — holds what an
-      // observation reads it to hold: never an option no one can answer with, nor every option's words.
+      const listed = this.resolve(ref, 'readValue');
+      const located = this.locate(listed.ref);
       const facts = await readElementFacts(located);
-      if (facts !== null && (facts.inputType === 'select' || facts.radioWords !== null)) {
+      if (facts === null) return null;
+      // A field holds what an observation reads it to hold: a control's value, the option a select or
+      // a radio group has chosen — never every option's words, nor a checkbox's bare "on". Only a
+      // drawn control, whose value no observation reads, is read by the words it shows.
+      if (facts.inputType !== null || listed.role === 'radiogroup' || facts.value !== null) {
         return facts.value;
       }
-      return await located.evaluate((el) => {
-        if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) return el.value;
-        return el.textContent?.trim() ?? null;
-      });
+      return await located.evaluate((el) => el.textContent?.trim() ?? null);
     } catch {
       return null;
     }

@@ -19,7 +19,6 @@ const facts = (overrides: Partial<ElementFacts> = {}): ElementFacts => ({
   inputType: null,
   value: null,
   options: null,
-  radioWords: null,
   required: false,
   invalid: false,
   disabled: false,

@@ -20,7 +20,11 @@ export interface ObservePolicy {
   pageOpenWaitMs: number;
   /** How long the observer waits for the document to settle before each read of the page. */
   settleTimeoutMs: number;
-  /** How long it waits between reads that came back without a ref or that differ from the read before. */
+  /**
+   * How long it waits between reads that came back without a ref or that
+   * differ from the read before — and between reads of a radio group a select
+   * clicked beside, until the group reads as chosen.
+   */
   settleRetryMs: number;
   /**
    * How many times a ref-less read is taken again before the page is reported
