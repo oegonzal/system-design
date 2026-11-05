@@ -15,9 +15,11 @@ import type { Page } from 'playwright';
 
 import {
   ancestryOf,
+  type Ancestry,
   decodeAriaSnapshot,
   landmarkRolesOf,
   settledSnapshot,
+  type SnapshotNode,
   subtreeText,
   unreadSnapshotLines,
 } from '../../core/snapshot/aria-snapshot';
@@ -25,6 +27,7 @@ import { readWithinBudget } from './budgeted-read';
 import { busyCheck } from './busy-check';
 import { readElementFacts } from './element-facts';
 import { readFileControls } from './file-controls';
+import { readRadioNameGroups } from './radio-name-groups';
 import type { ObservePolicy } from './observe-policy';
 import {
   failedWholesale,
@@ -129,20 +132,32 @@ export class PageReader {
       () => Date.now(),
       Math.max(0, deadline - Date.now()),
     );
-    const elements: ObservedElement[] = interactive.flatMap(({ node, index }) => {
+    const listed = interactive.flatMap(({ node, index }) => {
       const read = facts.get(node.ref ?? '');
       return read === undefined
         ? []
         : [
-            toObservedElement(
-              node,
-              read,
-              ancestry[index]?.scope ?? null,
-              subtreeText(nodes, index),
-              ancestry[index]?.landmark ?? null,
-            ),
+            {
+              index,
+              element: toObservedElement(
+                node,
+                read,
+                ancestry[index]?.scope ?? null,
+                subtreeText(nodes, index),
+                ancestry[index]?.landmark ?? null,
+              ),
+            },
           ];
     });
+    const groups = await this.radioNameGroups(nodes, ancestry, deadline);
+    const grouped = new Set(groups.flatMap((group) => [group.index, ...group.options]));
+    // A group stands where its box sits in the page, and its radios are its options, never fields apart from it.
+    const elements: ObservedElement[] = [
+      ...listed.filter(({ index }) => !grouped.has(index)),
+      ...groups,
+    ]
+      .sort((a, b) => a.index - b.index)
+      .map(({ element }) => element);
     const files = await readFileControls(page, this.policy.factsTimeoutMs);
     const focused = nodes.findIndex((node) => node.attributes['active'] === true);
     return {
@@ -158,6 +173,41 @@ export class PageReader {
       landmarks: landmarkRolesOf(nodes),
       ...(await busyCheck(page)),
     };
+  }
+
+  /**
+   * The radio groups the page makes by name alone, each as one element under
+   * its box's ref, read as the radio group it is; a box whose facts never
+   * come back leaves its radios as the tree lists them.
+   */
+  private async radioNameGroups(
+    nodes: readonly SnapshotNode[],
+    ancestry: readonly Ancestry[],
+    deadline: number,
+  ): Promise<{ index: number; element: ObservedElement; options: number[] }[]> {
+    const page = this.page();
+    const timeout = this.policy.factsTimeoutMs;
+    const groups = await readRadioNameGroups(page, nodes, timeout, deadline);
+    const read = await Promise.all(
+      groups.map(async ({ box, options }) => {
+        const node = nodes[box];
+        if (node === undefined || node.ref === null) return null;
+        const facts = await readElementFacts(page.locator(`aria-ref=${node.ref}`), timeout, {
+          asRadioGroup: true,
+        });
+        if (facts === null) return null;
+        // Named by nothing of its own: its question is the words before its box, its context.
+        const element = toObservedElement(
+          { ...node, role: 'radiogroup', name: '' },
+          facts,
+          ancestry[box]?.scope ?? null,
+          '',
+          ancestry[box]?.landmark ?? null,
+        );
+        return { index: box, element, options };
+      }),
+    );
+    return read.flatMap((group) => (group === null ? [] : [group]));
   }
 
   /** The page, read again while a read fails wholesale; what the last read reached, either way. */

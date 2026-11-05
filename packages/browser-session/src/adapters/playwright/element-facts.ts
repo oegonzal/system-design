@@ -97,38 +97,59 @@ function elementFactsInPage(
     text(Array.from(input.labels ?? [])[0]) ||
     attr('title') ||
     '';
-  /** A select's placeholder option — the first — by its words; a name that is only those words asks nothing. */
-  const selectPlaceholder = tag === 'select' ? text((el as HTMLSelectElement).options[0]) : '';
   /**
-   * The words just before a control whose name asks nothing, in its group —
-   * what a person reads as its question: the node before it, over any blank
-   * text, unless that node is or holds a control of its own; its question
-   * only when no legend and no shared question names it (`contextOf`). A name asks nothing when
-   * nothing explains the control, or when a select is named by its own
-   * placeholder option. Measured 2026-10-30: a job site's own form
-   * put each question in the node before its select and named the select
-   * "Please Select", so seven required selects were observed with no words
-   * of their own — two of them yes-or-no questions with opposite answers.
+   * The words a control shows until it holds a value: a select's placeholder
+   * option — the first — or a text field's placeholder. The HTML standard
+   * calls a placeholder a hint, never a label, so a control named by nothing
+   * but these words is named by nothing that asks.
+   */
+  const selectPlaceholder = tag === 'select' ? text((el as HTMLSelectElement).options[0]) : '';
+  const placeholderWords =
+    tag === 'select' ? selectPlaceholder : (attr('placeholder') ?? '').replace(/\s+/g, ' ').trim();
+  /** Whether its name asks nothing: nothing names it but its placeholder's words, if that. */
+  const nameAsksNothing =
+    ownName === '' || (placeholderWords !== '' && ownName === placeholderWords);
+  /**
+   * The words a person reads just before a control whose name asks nothing —
+   * its question: the nearest words before it, over nodes that show none, in
+   * the containers it fills alone, climbing out of each until one holds
+   * another control. Words in a node that is or holds another control belong
+   * to that control, and so does whatever lies past a container another
+   * control shares. Only a legend or a shared question outranks them
+   * (`contextOf`). Measured 2026-10-30: a job site's own form put each
+   * question in the node before its select and named the select "Please
+   * Select", so seven required selects were observed with no words of their
+   * own — two of them yes-or-no questions with opposite answers. Measured
+   * 2026-11-01: an employer's form put "Desired Salary?" in the row's label
+   * box and the textarea, named only by its placeholder "Type your response",
+   * alone in the field box beside it, so the question was never read and the
+   * operator would have been asked "Type your response".
    */
   const precedingWords = (): string => {
-    const nameAsksNothing =
-      !explained || (selectPlaceholder !== '' && ownName === selectPlaceholder);
     if (!nameAsksNothing) return '';
-    let node: ChildNode | null = el.previousSibling;
-    while (
-      node !== null &&
-      node.nodeType === Node.TEXT_NODE &&
-      (node.textContent ?? '').trim() === ''
-    ) {
-      node = node.previousSibling;
+    const control =
+      'input:not([type="hidden"]), select, textarea, button, [role="combobox"], [role="radiogroup"]';
+    const another = (node: Element): boolean =>
+      Array.from(node.querySelectorAll(control)).some(
+        (other) => other !== el && !el.contains(other),
+      );
+    let node: Element = el;
+    for (let parent = el.parentElement; parent !== null; parent = node.parentElement) {
+      for (let before = node.previousSibling; before !== null; before = before.previousSibling) {
+        if (before.nodeType === Node.ELEMENT_NODE) {
+          const element = before as Element;
+          if (element.matches(control) || element.querySelector(control) !== null) return '';
+          const words = text(element);
+          if (words !== '') return words;
+        } else if (before.nodeType === Node.TEXT_NODE) {
+          const words = (before.textContent ?? '').replace(/\s+/g, ' ').trim();
+          if (words !== '') return words;
+        }
+      }
+      if (another(parent)) return '';
+      node = parent;
     }
-    if (node === null) return '';
-    if (node.nodeType !== Node.ELEMENT_NODE) {
-      return (node.textContent ?? '').replace(/\s+/g, ' ').trim();
-    }
-    const before = node as Element;
-    const control = 'input, select, textarea, button, [role="combobox"], [role="radiogroup"]';
-    return before.matches(control) || before.querySelector(control) !== null ? '' : text(before);
+    return '';
   };
 
   /**
@@ -335,7 +356,8 @@ function elementFactsInPage(
       (tag === 'input' || tag === 'textarea') && input.maxLength > 0 ? input.maxLength : null;
     const contextParts: ContextParts = {
       described: byIds(attr('aria-describedby')),
-      placeholder: attr('placeholder') ?? '',
+      // A placeholder whose words name the control is its name already, not words beside it.
+      placeholder: nameAsksNothing && tag !== 'select' ? '' : (attr('placeholder') ?? ''),
       legend: text(el.closest('fieldset')?.querySelector('legend')),
       preceding: precedingWords(),
       // What a file control accepts is what the page tells a person beside it.
@@ -397,7 +419,9 @@ const contextOf = (parts: ContextParts, groupQuestion: string): string | null =>
 
 /**
  * The facts for one located element, or null when the element is gone, the
- * read fails, or it does not answer inside `timeout`. A facts read is a single
+ * read fails, or it does not answer inside `timeout`. A radio group is read
+ * by its own reader: one the page declares by role, or a box the observation
+ * reads as the group its radios make by name (`radio-name-groups.ts`). A facts read is a single
  * DOM evaluate on an element Playwright has already located, so it answers in
  * about a millisecond; left to inherit the action timeout it was given fifteen
  * seconds, which is the whole of the hazard `readWithinBudget` bounds.
@@ -405,6 +429,7 @@ const contextOf = (parts: ContextParts, groupQuestion: string): string | null =>
 export async function readElementFacts(
   locator: Locator,
   timeout?: number,
+  read: { asRadioGroup: boolean } = { asRadioGroup: false },
 ): Promise<ElementFacts | null> {
   try {
     const { radioGroup, contextParts, ...facts } = await locator.evaluate(
@@ -412,7 +437,8 @@ export async function readElementFacts(
       { textMax: ELEMENT_NAME_BOUND.target, modal: MODAL_DIALOGS },
       { timeout },
     );
-    if (!radioGroup) return { ...facts, context: contextOf(contextParts, '') };
+    if (!radioGroup && !read.asRadioGroup)
+      return { ...facts, context: contextOf(contextParts, '') };
     // A radio group's options, its choice and its question are what its own reader says of it.
     const group = await readRadioGroup(locator, timeout);
     if (group === null) return null;

@@ -174,7 +174,9 @@ export class PlaywrightBrowser implements BrowserPort {
     try {
       const listed = this.resolve(ref, 'readValue');
       const located = this.locate(listed.ref);
-      const facts = await readElementFacts(located);
+      const facts = await readElementFacts(located, undefined, {
+        asRadioGroup: listed.role === 'radiogroup',
+      });
       if (facts === null) return null;
       // A field holds what an observation reads it to hold: a control's value, the option a select or
       // a radio group has chosen — never every option's words, nor a checkbox's bare "on". Only a

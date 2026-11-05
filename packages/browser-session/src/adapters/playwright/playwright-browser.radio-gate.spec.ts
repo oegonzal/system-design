@@ -379,13 +379,14 @@ describe('the Playwright browser, on radio questions drawn every way a form draw
     },
   );
 
+  // Each radio alone in its group — no other shares its name — so neither the page nor the name groups them.
   it('[BRW-2] reads back a lone radio outside any group as its observation does, never as its bare "on"', async () => {
     await browser.page.setContent(
       page(
         Q,
         `<fieldset><legend>${Q}</legend>
-        <label class="row"><input type="radio" name="x"> Yes</label>
-        <label class="row"><input type="radio" name="x"> No</label></fieldset>`,
+        <label class="row"><input type="radio" name="x-yes"> Yes</label>
+        <label class="row"><input type="radio" name="x-no"> No</label></fieldset>`,
       ),
     );
     const [yes] = (await browser.observe()).elements.filter((e) => e.role === 'radio');
