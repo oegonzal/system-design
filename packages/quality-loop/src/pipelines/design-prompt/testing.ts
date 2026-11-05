@@ -39,6 +39,10 @@ export const sampleDraft = (overrides: Partial<DesignPromptDraft> = {}): DesignP
   interfaces: [
     'The storefront webhook is accepted idempotently: a redelivered order is stored once.',
   ],
+  requestPaths: [
+    'A shopper’s history read enters at the front door and is answered from the customer-sharded read model, every hop synchronous with a stated timeout, touching neither source system.',
+    'A storefront webhook is acknowledged once queued and reaches the read model through one idempotent indexer, every hop asynchronous and a redelivery tolerated.',
+  ],
   nonFunctionalRequirements: [
     { kind: 'latency', requirement: 'Order-history reads', target: 'p99 ≤ 300 ms' },
     {

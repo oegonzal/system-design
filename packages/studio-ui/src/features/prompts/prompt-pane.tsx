@@ -19,6 +19,7 @@ import {
 
 import { humanizeToken } from '../evaluation/humanize';
 import { groupCriteriaByKind, humanizeKind } from './criteria';
+import { platformLabel } from './prompt-platform';
 
 /** The levels a pane's title can take: the page's own h1, or a section's h2 in a dock. */
 export type PromptTitleLevel = 1 | 2;
@@ -80,6 +81,11 @@ export function PromptPane({
           <Badge tone="accent" data-testid="prompt-format">
             {PRACTICE_FORMATS[prompt.format].label}
           </Badge>
+          {prompt.platform !== null ? (
+            <Badge tone="neutral" data-testid="prompt-platform">
+              {platformLabel(prompt.platform)}
+            </Badge>
+          ) : null}
           {prompt.status === 'archived' ? (
             <Badge tone="neutral" data-testid="prompt-archived">
               {humanizeToken(prompt.status)}

@@ -1,8 +1,10 @@
 import {
+  platformCatalogue,
   renderIndexSection,
   withinBudget,
   type InterviewIndex,
   type InterviewItemKind,
+  type PlatformId,
   type SuccessCriterion,
   type TranscriptTurn,
 } from '@sysdesign/contracts';
@@ -17,6 +19,8 @@ export interface InterviewGoalSource {
   title: string;
   /** The whole prompt: the interviewer's notes, every section. */
   markdown: string;
+  /** The platform the design is drawn on, so the interviewer can answer which; null for a neutral prompt. */
+  platform: PlatformId | null;
   criteria: readonly SuccessCriterion[];
   /** The turns taken so far, in order; the interviewer reads them as the conversation. */
   turns: readonly TranscriptTurn[];
@@ -50,6 +54,9 @@ export function renderInterviewGoal(source: InterviewGoalSource): string {
     '',
     '## Interviewer notes',
     '',
+    ...(source.platform === null
+      ? []
+      : [`Target platform: ${platformCatalogue(source.platform).label}.`, '']),
     source.markdown.trim(),
     '',
     '## Rubric',

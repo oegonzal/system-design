@@ -95,6 +95,15 @@ describe('renderNodeLine', () => {
     expect(line).toContain(`note="${'x'.repeat(MAX_SERIALIZED_NOTE_LENGTH)}…"`);
   });
 
+  it('prints the platform service a node names right after its kind, and nothing when it names none', () => {
+    expect(
+      renderNodeLine({ id: 'n-3', kind: 'queue', service: 'aws.sqs', label: 'Order events' }),
+    ).toBe('  node n-3 kind=queue service=aws.sqs label="Order events"');
+    expect(renderNodeLine({ id: 'n-3', kind: 'queue', label: 'Order events' })).toBe(
+      '  node n-3 kind=queue label="Order events"',
+    );
+  });
+
   it("stands a blank label in with its kind's own name, so no reader prints nothing", () => {
     expect(renderNodeLine({ id: 'n-1', kind: 'load-balancer', label: '' })).toBe(
       '  node n-1 kind=load-balancer label="Load Balancer"',
@@ -117,5 +126,24 @@ describe('renderEdgeLine', () => {
         carries: ['OrderPlaced'],
       }),
     ).toBe('  edge e-1: n-1 -> n-2 (async) label="publishes" carries=[OrderPlaced]');
+  });
+
+  it('prints a connection’s config as one object between its label and its carries, as a node’s is printed', () => {
+    expect(
+      renderEdgeLine({
+        id: 'e-1',
+        source: 'n-1',
+        target: 'n-2',
+        kind: 'async',
+        label: 'publishes',
+        config: [
+          { key: 'delivery', value: 'at-least-once' },
+          { key: 'dlq', value: true },
+        ],
+        carries: ['OrderPlaced'],
+      }),
+    ).toBe(
+      '  edge e-1: n-1 -> n-2 (async) label="publishes" config={"delivery":"at-least-once","dlq":true} carries=[OrderPlaced]',
+    );
   });
 });

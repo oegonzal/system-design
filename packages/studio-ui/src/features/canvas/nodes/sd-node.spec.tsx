@@ -38,6 +38,14 @@ describe('SdNode', () => {
     expect(root.getAttribute('data-severity')).toBe('critical');
   });
 
+  it('[UX-31] names the platform service a block is before its role, and stamps it as data', async () => {
+    renderNode({ kind: 'queue', service: 'aws.sqs', label: 'Order events' });
+    const root = await screen.findByTestId('node-n-1');
+    expect(root.getAttribute('data-kind')).toBe('queue');
+    expect(root.getAttribute('data-service')).toBe('aws.sqs');
+    expect(root.textContent).toContain('SQS · queue');
+  });
+
   it('shows the config entry count', async () => {
     renderNode({
       kind: 'cache',

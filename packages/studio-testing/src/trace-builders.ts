@@ -449,6 +449,7 @@ function draftFromGoal(goal: string): DesignPromptDraft {
     ],
     domainAndData: [],
     interfaces: [],
+    requestPaths: [],
     nonFunctionalRequirements: [
       { kind: 'latency', requirement: 'primary reads', target: 'p99 ≤ 300 ms' },
       { kind: 'availability', requirement: 'the write path', target: '99.9% monthly' },

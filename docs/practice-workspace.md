@@ -26,9 +26,19 @@ generated. It is data on the prompt; nothing in the studio branches on it.
   competes with the page's), and its **criteria** as chips grouped by kind —
   functional, domain model, interface, boundary, workflow, non-functional,
   scale, evolution, trade-off, constraint — each with an id (`c1`, `c2`, …)
-  and its statement. Two standing trade-off criteria close every rubric:
-  every load-bearing decision records an alternative and its cost, and the
-  design's assumptions are stated. For a written or imported prompt the criteria
+  and its statement — communication among them: how the parts talk, hop by
+  hop. Five standing criteria close every rubric: three on trade-offs (every
+  load-bearing decision records an alternative and its cost, every binding
+  that had a choice says why, the design's assumptions are stated) and two on
+  communication (every hop declares its call style and mechanism and every
+  request path is traced from where it enters to where it comes to rest; every
+  async hop names its failure handling and every sync hop its timeout). A
+  prompt that declares a **platform** adds one constraint: every component the
+  platform offers a managed service for names it, and every hop between two
+  services is an integration the platform offers. The platform shows beside
+  the format; its catalogue — the services, the roles each plays, what each is
+  for and the knobs an interviewer asks about — is what the palette shelves
+  first and what every grader reads as a section of the goal. For a written or imported prompt the criteria
   are derived once by the grader, the first time the prompt is opened
   ("normalising requirements…" while it answers), and can be re-derived until
   a session has been graded against them; a generated prompt's criteria are
@@ -214,10 +224,18 @@ export carries it as `transcript.md`.
 
 ## The Properties panel
 
-Select a block and the panel shows, in order: **Kind** (grouped by category,
-with a one-line guide: what the kind is and when to use it), **Label**,
-**Configuration**, **Responsibilities** and **Operations**. Select an edge and
-it shows the edge's **kind** (sync or async), a label, and what it **carries**.
+Select a block and the panel shows, in order: **Label**, **Service** (on a
+platform prompt: which of the platform's services the block is, or none —
+choosing one keeps the block's kind among the roles the catalogue lists for
+that service, and the block shows the service beside its role), **Kind**
+(grouped by category, or the roles the named service plays, with a one-line
+guide: what the service or kind is and when to use it), **Configuration**
+(with the service's knobs offered as chips), **Responsibilities** and
+**Operations**. Select an edge and
+it shows the edge's **kind** (sync or async), a label, what it **carries**, and
+its own **Configuration** — how the hop is made and what happens when it fails
+(protocol, auth, a timeout, retries, a dead-letter queue, the delivery or
+ordering guarantee), offered as chips and free-form like a block's.
 
 - **Configuration** is free-form: any key, with a value typed as you enter it
   — `true`/`false` become flags, a number stays a number, anything else is
@@ -252,13 +270,13 @@ walkthrough** (Narrative).
 You author three things; the prompt's criteria are the answer key it's all
 measured against:
 
-| Input                | What's in it                                                                             | Read by                                                                |
-| -------------------- | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| **Diagram** (canvas) | nodes (kind, config, responsibilities, operations) + edges (sync/async, what they carry) | every lens — requirements, model, structure, fitness                   |
-| **Model**            | entities (owner, key, fields, invariants, states) and their relations                    | the model critic; the design evaluator                                 |
-| **Brief**            | a claim, components, entities and a path per criterion                                   | the explanation critic; every evaluator, as the evidence for a pass    |
-| **Narrative**        | overview + rationales + narrations                                                       | the explanation critic; the reasoning evaluator                        |
-| **Prompt**           | its markdown and its criteria                                                            | the goal every lens reads, and the rubric the evaluators grade against |
+| Input                | What's in it                                                                                                                 | Read by                                                                |
+| -------------------- | ---------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| **Diagram** (canvas) | nodes (kind, the platform service named, config, responsibilities, operations) + edges (sync/async, what they carry, config) | every lens — requirements, model, structure, communication, fitness    |
+| **Model**            | entities (owner, key, fields, invariants, states) and their relations                                                        | the model critic; the design evaluator                                 |
+| **Brief**            | a claim, components, entities and a path per criterion                                                                       | the explanation critic; every evaluator, as the evidence for a pass    |
+| **Narrative**        | overview + rationales + narrations                                                                                           | the explanation critic; the reasoning evaluator                        |
+| **Prompt**           | its markdown and its criteria                                                                                                | the goal every lens reads, and the rubric the evaluators grade against |
 
 Two rules keep the grade honest:
 
@@ -283,8 +301,9 @@ the engine validates at boot — says how:
 
 1. **Each criterion is judged** pass, partial or fail by the evaluator that
    owns its kind (functional and constraint → coverage; domain model,
-   interface, boundary and workflow → design; non-functional, scale and
-   evolution → qualities; trade-off → reasoning), weighted by confidence. An
+   interface, boundary, workflow and communication → design; non-functional,
+   scale and evolution → qualities; trade-off → reasoning), weighted by
+   confidence. An
    evaluator with no criteria of its kinds on a prompt is skipped without a
    call.
 2. **Each dimension is earned by its criteria** — every kind at the same
@@ -293,7 +312,7 @@ the engine validates at boot — says how:
    clamped at a per-dimension cap; a finding prices onto the dimension its
    critic's kinds earn.
 3. **Overall is the weighted average** of the assessed dimensions
-   (`coverage` 0.25, `design` 0.35, `qualities` 0.2, `reasoning` 0.1,
+   (`coverage` 0.2, `design` 0.3, `qualities` 0.15, `reasoning` 0.25,
    `compliance` 0.1); a dimension with no criteria and no findings drops out
    and the rest rescale, which is how a prompt that states no load gives scale
    no weight at all.

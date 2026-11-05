@@ -162,6 +162,13 @@ export const NODE_ICONS = {
       <circle cx="12.5" cy="12" r="1.2" />
     </svg>
   ),
+  /* A folder of files, mounted by many. */
+  'file-store': (
+    <svg {...svgProps}>
+      <path d="M2.5 5.5h4l1.5 1.5h5.5v5.5h-11z" />
+      <path d="M2.5 5.5V4h3.5" />
+    </svg>
+  ),
   cache: (
     <svg {...svgProps}>
       <path d="M9.5 1.5 4 9h3.5L6.5 14.5 12 7H8.5z" />
@@ -225,6 +232,14 @@ export const NODE_ICONS = {
       <path d="M2.5 5.5c0 4 2.3 6.5 5.5 6.5s5.5-2.5 5.5-6.5" />
       <path d="M4.5 7.2c1.2-1 2.3 1 3.5 0s2.3 1 3.5 0" />
       <path d="M5.5 9.8c.9-.8 1.7.8 2.5 0s1.6.8 2.5 0" />
+    </svg>
+  ),
+  /* A lens over lines of data: a query run where the data lies. */
+  'query-engine': (
+    <svg {...svgProps}>
+      <circle cx="6.8" cy="6.8" r="3.6" />
+      <path d="M9.5 9.5L13 13" />
+      <path d="M5.2 6h3.2M5.2 7.8h2.2" />
     </svg>
   ),
   /* Two inputs, one prediction — the smallest possible network. */

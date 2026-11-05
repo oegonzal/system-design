@@ -93,6 +93,20 @@ describe('submissionLocations', () => {
     });
   });
 
+  it('[UX-31] labels a node that names a platform service with the service after its kind, so a finding reads as what the author drew', () => {
+    const serviced = submission();
+    serviced.graph.nodes = [
+      { id: 'n-1', kind: 'queue', service: 'aws.sqs', label: 'Order events' },
+    ];
+    expect(submissionLocations(serviced)[0]).toEqual({
+      id: 'node.1',
+      label: 'n-1 · queue (SQS) · Order events',
+      part: 'node',
+      key: 'n-1',
+      name: 'Order events',
+    });
+  });
+
   it('has no overview entry for a blank overview, and only nodes and edges without a brief or narrative', () => {
     const blank: DesignSubmission = {
       ...submission(),

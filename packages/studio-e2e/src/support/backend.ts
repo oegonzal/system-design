@@ -100,10 +100,12 @@ export const AUTHORED_CRITERIA_BY_KIND: Readonly<Record<string, readonly string[
   non_functional: ['c3'],
   scale: ['c4'],
   constraint: ['c5'],
-  // The standing trade-off criteria the studio closes every rubric with.
+  // The standing criteria the studio closes every rubric with: trade-offs, then communication.
   tradeoff: ['c6', 'c7', 'c8'],
+  communication: ['c9', 'c10'],
 };
 
+/** The rubric of the authored fixture on a platform-neutral prompt, as the API authors it. */
 export const AUTHORED_CRITERIA_IDS: readonly string[] = [
   'c1',
   'c2',
@@ -113,7 +115,12 @@ export const AUTHORED_CRITERIA_IDS: readonly string[] = [
   'c6',
   'c7',
   'c8',
+  'c9',
+  'c10',
 ];
+
+/** The same rubric on a platform prompt — the composer's default — closed by the platform's one constraint. */
+export const AUTHORED_PLATFORM_CRITERIA_IDS: readonly string[] = [...AUTHORED_CRITERIA_IDS, 'c11'];
 
 export async function authorPrompt(
   request: APIRequestContext,

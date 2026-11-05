@@ -64,6 +64,8 @@ describe('the design-prompt pipeline', () => {
       'functional.3',
       'domain.1',
       'interface.1',
+      'request.1',
+      'request.2',
       'nfr.1',
       'nfr.2',
       'nfr.3',

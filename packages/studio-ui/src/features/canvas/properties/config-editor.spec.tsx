@@ -1,7 +1,7 @@
 import {
   NODE_CONFIG_KEYS_BOUND,
-  NODE_CONFIG_STRING_VALUE_BOUND,
-  type NodeConfigEntry,
+  CONFIG_STRING_VALUE_BOUND,
+  type ConfigEntry,
 } from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
 import { fireEvent, screen, within } from '@testing-library/react';
@@ -11,21 +11,25 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { ConfigEditor } from './config-editor';
 
-const NONE: NodeConfigEntry[] = [];
+const NONE: ConfigEntry[] = [];
 const noop = () => undefined;
 
 /** Controlled harness — the panel wires `onChange` back into the store the same way. */
 function Harness({
   initial = NONE,
+  hints,
   onChange = noop,
 }: {
-  initial?: NodeConfigEntry[];
-  onChange?: (next: NodeConfigEntry[]) => void;
+  initial?: ConfigEntry[];
+  hints?: readonly string[];
+  onChange?: (next: ConfigEntry[]) => void;
 }) {
   const [config, setConfig] = useState(initial);
   return (
     <ConfigEditor
       config={config}
+      keysBound={NODE_CONFIG_KEYS_BOUND}
+      hints={hints}
       onChange={(next) => {
         setConfig(next);
         onChange(next);
@@ -138,12 +142,12 @@ describe('ConfigEditor', () => {
     expect(editor.queryByText(/characters? left/)).toBeNull();
 
     fireEvent.change(value, {
-      target: { value: 'x'.repeat(NODE_CONFIG_STRING_VALUE_BOUND.target - 5) },
+      target: { value: 'x'.repeat(CONFIG_STRING_VALUE_BOUND.target - 5) },
     });
     expect(editor.getByText('5 characters left')).toBeTruthy();
 
     // At the ask the field still takes more, up to the bound's ceiling.
-    const { target, ceiling } = NODE_CONFIG_STRING_VALUE_BOUND;
+    const { target, ceiling } = CONFIG_STRING_VALUE_BOUND;
     expect((value as HTMLInputElement).maxLength).toBe(ceiling);
     fireEvent.change(value, { target: { value: 'x'.repeat(target) } });
     expect(editor.getByText(`At the ${target} asked — ${ceiling} at most`)).toBeTruthy();
@@ -152,5 +156,24 @@ describe('ConfigEditor', () => {
 
     fireEvent.change(value, { target: { value: 'x'.repeat(ceiling) } });
     expect(editor.getByText(`Limit reached — ${ceiling} characters at most.`)).toBeTruthy();
+  });
+
+  it('[UX-31] offers the hints it is given as chips — only the keys not yet set — and a chip fills the draft key, never the value', async () => {
+    const user = userEvent.setup();
+    renderWithTheme(
+      <Harness initial={[{ key: 'dlq', value: true }]} hints={['dlq', 'retries', 'timeoutMs']} />,
+    );
+    const chips = within(screen.getByTestId('config-hints')).getAllByRole('button');
+    expect(chips.map((chip) => chip.textContent)).toEqual(['retries', 'timeoutMs']);
+    await user.click(screen.getByTestId('config-hint-retries'));
+    expect((screen.getByTestId('config-key') as HTMLInputElement).value).toBe('retries');
+    expect((screen.getByTestId('config-value') as HTMLInputElement).value).toBe('');
+    // Nothing is added until a value is typed and the draft is confirmed.
+    expect(screen.queryByTestId('config-row-retries')).toBeNull();
+  });
+
+  it('offers no chips without hints', () => {
+    renderWithTheme(<Harness />);
+    expect(screen.queryByTestId('config-hints')).toBeNull();
   });
 });

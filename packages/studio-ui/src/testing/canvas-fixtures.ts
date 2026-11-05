@@ -29,6 +29,65 @@ export function makeGraph(overrides: Partial<CanvasGraph> = {}): CanvasGraph {
 }
 
 /**
+ * A design drawn on a platform: a client at a managed front door, a function
+ * behind it, a queue it publishes to and a worker draining it — every block
+ * but the client naming the catalogue service it is, and the async hop
+ * declaring how it is made and what happens when it fails.
+ */
+export function makePlatformGraph(overrides: Partial<CanvasGraph> = {}): CanvasGraph {
+  return {
+    nodes: [
+      { id: 'n-1', kind: 'client', label: 'Shopper', position: { x: 40, y: 40 } },
+      {
+        id: 'n-2',
+        kind: 'gateway',
+        service: 'aws.api-gateway',
+        label: 'Orders API',
+        position: { x: 40, y: 200 },
+      },
+      {
+        id: 'n-3',
+        kind: 'serverless-function',
+        service: 'aws.lambda',
+        label: 'Place order',
+        position: { x: 40, y: 360 },
+      },
+      {
+        id: 'n-4',
+        kind: 'queue',
+        service: 'aws.sqs',
+        label: 'Order events',
+        config: [{ key: 'queueType', value: 'fifo' }],
+        position: { x: 40, y: 520 },
+      },
+      {
+        id: 'n-5',
+        kind: 'worker',
+        service: 'aws.lambda',
+        label: 'Indexer',
+        position: { x: 40, y: 680 },
+      },
+    ],
+    edges: [
+      { id: 'e-1', source: 'n-1', target: 'n-2', kind: 'sync' },
+      { id: 'e-2', source: 'n-2', target: 'n-3', kind: 'sync' },
+      {
+        id: 'e-3',
+        source: 'n-3',
+        target: 'n-4',
+        kind: 'async',
+        config: [
+          { key: 'delivery', value: 'at-least-once' },
+          { key: 'dlq', value: true },
+        ],
+      },
+      { id: 'e-4', source: 'n-4', target: 'n-5', kind: 'async' },
+    ],
+    ...overrides,
+  };
+}
+
+/**
  * A graph exercising the interface layer: declared operations on the
  * gateway/service, responsibilities on the service, an event on the queue,
  * and carries on the call and produce/consume edges.

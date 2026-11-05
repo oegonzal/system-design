@@ -2,10 +2,10 @@
 
 import styled from '@emotion/styled';
 import {
-  NODE_CONFIG_KEY_MAX_LENGTH,
-  NODE_CONFIG_KEYS_BOUND,
-  NODE_CONFIG_STRING_VALUE_BOUND,
-  type NodeConfigEntry,
+  CONFIG_KEY_MAX_LENGTH,
+  CONFIG_STRING_VALUE_BOUND,
+  type Bound,
+  type ConfigEntry,
 } from '@sysdesign/contracts';
 import { Badge, Button, Stack, Text, TextField } from '@sysdesign/design-system';
 import { useState, type KeyboardEvent } from 'react';
@@ -19,8 +19,12 @@ import {
 } from './config-value';
 
 export interface ConfigEditorProps {
-  config: NodeConfigEntry[];
-  onChange: (config: NodeConfigEntry[]) => void;
+  config: ConfigEntry[];
+  /** How many entries the owner may carry — a block's bound or a connection's. */
+  keysBound: Bound;
+  /** Keys worth setting on this owner, offered as chips; a suggestion, never a vocabulary — any key is accepted. */
+  hints?: readonly string[];
+  onChange: (config: ConfigEntry[]) => void;
 }
 
 const Row = styled.li`
@@ -55,6 +59,9 @@ const DraftFields = styled.div`
   gap: ${({ theme }) => theme.space[2]}px;
 `;
 
+/** No keys suggested — one array, so a render without hints is never a new default. */
+const NO_HINTS: readonly string[] = [];
+
 /** The width a draft field asks for before the row shares out what is left. */
 const DRAFT_FIELD_BASIS = '10rem';
 
@@ -78,13 +85,17 @@ const Problem = styled(Text)`
  * Free-form typed configuration: one row per key, typed by what the author
  * wrote (`3` is a number, `true` a flag, anything else text) and shown with
  * its type so the lenses and the author read the same value. Nothing here
- * knows which keys matter — the quality loop judges whatever was declared.
- * Purely controlled; only the half-typed draft row is local state.
+ * knows which keys matter — the quality loop judges whatever was declared;
+ * the hints a caller passes are the keys an interviewer tends to ask about
+ * (a platform service's knobs, how a hop is made), and a chip only fills the
+ * draft's Key so the author still writes the value. Purely controlled; only
+ * the half-typed draft row is local state.
  */
-export function ConfigEditor({ config, onChange }: ConfigEditorProps) {
+export function ConfigEditor({ config, keysBound, hints = NO_HINTS, onChange }: ConfigEditorProps) {
   const [key, setKey] = useState('');
   const [value, setValue] = useState('');
-  const atCap = config.length >= NODE_CONFIG_KEYS_BOUND.target;
+  const atCap = config.length >= keysBound.target;
+  const suggested = hints.filter((hint) => !config.some((entry) => entry.key === hint));
 
   const normalizedKey = normalizeConfigKey(key);
   const duplicate = config.some((entry) => entry.key === normalizedKey);
@@ -135,13 +146,37 @@ export function ConfigEditor({ config, onChange }: ConfigEditorProps) {
         </Text>
       )}
 
+      {suggested.length > 0 ? (
+        <Stack
+          direction="row"
+          gap={2}
+          wrap
+          role="group"
+          aria-label="Suggested keys"
+          data-testid="config-hints"
+        >
+          {suggested.map((hint) => (
+            <Button
+              key={hint}
+              variant="subtle"
+              size="sm"
+              disabled={atCap}
+              data-testid={`config-hint-${hint}`}
+              onClick={() => setKey(hint)}
+            >
+              {hint}
+            </Button>
+          ))}
+        </Stack>
+      ) : null}
+
       <DraftFields>
         <DraftField>
           <TextField
             label="Key"
             data-testid="config-key"
             value={key}
-            maxLength={NODE_CONFIG_KEY_MAX_LENGTH}
+            maxLength={CONFIG_KEY_MAX_LENGTH}
             disabled={atCap}
             placeholder="e.g. replicas"
             onChange={(event) => setKey(event.target.value)}
@@ -153,8 +188,8 @@ export function ConfigEditor({ config, onChange }: ConfigEditorProps) {
             label="Value"
             data-testid="config-value"
             value={value}
-            maxLength={NODE_CONFIG_STRING_VALUE_BOUND.ceiling}
-            target={NODE_CONFIG_STRING_VALUE_BOUND.target}
+            maxLength={CONFIG_STRING_VALUE_BOUND.ceiling}
+            target={CONFIG_STRING_VALUE_BOUND.target}
             disabled={atCap}
             placeholder="3, true, or text"
             onChange={(event) => setValue(event.target.value)}
@@ -174,8 +209,8 @@ export function ConfigEditor({ config, onChange }: ConfigEditorProps) {
         </Problem>
       ) : null}
       <Text as="span" size="sm" tone="muted">
-        {config.length} of {NODE_CONFIG_KEYS_BOUND.target} · numbers and true/false are typed as
-        such, anything else is text.
+        {config.length} of {keysBound.target} · numbers and true/false are typed as such, anything
+        else is text.
       </Text>
     </Stack>
   );

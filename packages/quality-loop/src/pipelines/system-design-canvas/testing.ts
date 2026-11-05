@@ -66,6 +66,12 @@ export const sampleCriteria = (): SuccessCriterion[] => [
     kind: 'tradeoff',
     statement: 'The choice to own a read model rather than query both sources live is defended.',
   },
+  {
+    id: 'c11',
+    kind: 'communication',
+    statement:
+      'The storefront webhook is traced from the receiver to the read model, every hop declaring its call style and what happens when it fails.',
+  },
 ];
 
 export const sampleBrief = (): DesignBrief => ({

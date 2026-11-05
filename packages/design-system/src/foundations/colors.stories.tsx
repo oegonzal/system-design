@@ -259,7 +259,7 @@ export const NodeKinds: Story = {
 };
 
 /**
- * The eleven category anchors behind `nodeKind` — including the categories
+ * The twelve category anchors behind `nodeKind` — including the categories
  * that hold no kinds yet, which `NodeKinds` above cannot show. Each pair
  * prints its computed ratio, same as every other swatch in this catalog.
  */

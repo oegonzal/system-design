@@ -12,9 +12,9 @@
  * processes it carries (design); the quality targets, the load it is sized
  * for and how it arrives and changes (qualities); the decisions it defends
  * (reasoning); the rules it may not break (compliance). Scale is one kind
- * among ten and earns only what a prompt's own figures give it.
+ * among eleven and earns only what a prompt's own figures give it.
  *
- * Three things shape the policy:
+ * Four things shape the policy:
  *
  * 1. A dimension is earned by its criteria. One with no criteria on a prompt
  *    and no findings leaves the score; one with findings but no criteria
@@ -33,6 +33,14 @@
  *    a process onto design; a target or a figure missed onto qualities.
  * 3. Proportion. The fitness critic holds a design to the goal's own figures,
  *    and over-building where the goal states no load is a defect too.
+ * 4. Communication is a competency of design: how the parts talk, hop by hop,
+ *    and whether a request can be walked from where it enters to where it
+ *    comes to rest — earned by the two standing communication criteria and
+ *    the request paths a prompt names, and charged by a critic of its own.
+ *    Where the goal declares a platform and its catalogue, every lens reads a
+ *    component as the service it names and a hop as an integration that
+ *    platform offers: one shared paragraph (`lenses/platform.md`) says so in
+ *    the shape of the work, and no lens knows a vendor by name.
  *
  * The studio always provides the artifact, so the producer is the coach: it
  * runs on revise only — the controller never decides retry, because a fresh
@@ -49,6 +57,7 @@ import {
 
 import type { PipelineDefinition } from '../../core/pipeline';
 import { STANDARD_SCORING } from '../../core/policy';
+import criticCommunication from './lenses/critic.communication.md?raw';
 import criticExplanation from './lenses/critic.explanation.md?raw';
 import criticFitness from './lenses/critic.fitness.md?raw';
 import criticModel from './lenses/critic.model.md?raw';
@@ -59,15 +68,19 @@ import evaluatorCoverage from './lenses/evaluator.coverage.md?raw';
 import evaluatorDesign from './lenses/evaluator.design.md?raw';
 import evaluatorQualities from './lenses/evaluator.qualities.md?raw';
 import evaluatorReasoning from './lenses/evaluator.reasoning.md?raw';
+import platform from './lenses/platform.md?raw';
 import producer from './lenses/producer.md?raw';
 import { REVISE_ONLY } from './controller';
 import { canvasOutput, type CanvasSubmission } from './output';
 import { referencesValidator, structureValidator } from './validators';
 
+/** A judge's persona closed by the one paragraph on reading a declared platform — the same words for every critic and evaluator. */
+const onPlatform = (persona: string): string => `${persona.trim()}\n\n${platform.trim()}\n`;
+
 export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   id: CANVAS_PIPELINE_ID,
 
-  version: '2.0.0',
+  version: '2.1.0',
 
   // A goal another program composes; never a route, a target, or a choice in the UI.
 
@@ -112,6 +125,9 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
 
       constraint:
         'A hard rule the design may not break: an imposed platform, a data boundary, a compliance rule, a vendor that only behaves one way.',
+
+      communication:
+        'How the components talk: each hop’s call style and mechanism, the request path traced from where it enters to where it comes to rest, and what each hop does when it fails.',
     } satisfies Record<CanvasCriterionKind, string>,
     findingTypes: {
       missing_requirement: 'A stated requirement nothing in the diagram delivers.',
@@ -159,6 +175,21 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
 
       tradeoff_missing:
         'A load-bearing decision with no alternative considered, no cost accepted, or no condition to revisit it.',
+
+      flow_gap:
+        'A request the goal names that no path traces from where it enters to where it comes to rest, or a traced path that skips a part the request must pass through.',
+
+      hop_undeclared:
+        'A hop whose call style or mechanism nothing declares: sync or async says half of it; what carries the call, who initiates it and what the message is are left to be guessed.',
+
+      failure_path_missing:
+        'A hop with no answer to its own failure where the goal does not forgive it: an async hop with no retry, ordering or dead-letter story, a sync hop with no timeout or fallback.',
+
+      integration_misfit:
+        'A hop the two parts cannot make as drawn — a mechanism neither end supports, a call style the target does not answer, or, where the goal declares a platform, an integration that platform does not offer between the two services named.',
+
+      service_misfit:
+        'A component used for work it is not built for, a service named for a role other than the one the component plays, or a platform-neutral role where the goal’s declared catalogue offers a managed service for exactly that work.',
     } satisfies Record<CanvasFindingType, string>,
     maxCriteria: CANVAS_MAX_CRITERIA,
     // The transcript is the host's record of the interview — composed by the
@@ -188,8 +219,9 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   // coached canvas has taken up to 40.2k output tokens in one turn, thinking
   // included (2026-10-02, a revision the seam now keeps whole), critics up
   // to 25.4k on a dense diagram and evaluators up to 12.0k under the lenses
-  // this version replaced — the seeds the spec holds until this version's
-  // own runs are measured.
+  // 2.0.0 replaced — the seeds the spec holds until this version's own runs
+  // are measured; the communication critic holds the same seed as its
+  // siblings.
   producer: {
     persona: producer,
     maxTokens: 50000,
@@ -205,7 +237,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   critics: [
     {
       id: 'critic.requirements',
-      persona: criticRequirements,
+      persona: onPlatform(criticRequirements),
       samples: 2,
       maxItems: 10,
       maxTokens: 30000,
@@ -213,7 +245,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
     },
     {
       id: 'critic.model',
-      persona: criticModel,
+      persona: onPlatform(criticModel),
       samples: 2,
       maxItems: 10,
       maxTokens: 32000,
@@ -221,15 +253,29 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
     },
     {
       id: 'critic.structure',
-      persona: criticStructure,
+      persona: onPlatform(criticStructure),
       samples: 2,
       maxItems: 10,
       maxTokens: 32000,
       findingTypes: ['boundary_defect', 'workflow_gap', 'topology_defect'],
     },
     {
+      id: 'critic.communication',
+      persona: onPlatform(criticCommunication),
+      samples: 2,
+      maxItems: 10,
+      maxTokens: 32000,
+      findingTypes: [
+        'flow_gap',
+        'hop_undeclared',
+        'failure_path_missing',
+        'integration_misfit',
+        'service_misfit',
+      ],
+    },
+    {
       id: 'critic.fitness',
-      persona: criticFitness,
+      persona: onPlatform(criticFitness),
       samples: 2,
       maxItems: 8,
       maxTokens: 32000,
@@ -237,7 +283,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
     },
     {
       id: 'critic.explanation',
-      persona: criticExplanation,
+      persona: onPlatform(criticExplanation),
       samples: 2,
       maxItems: 12,
       maxTokens: 32000,
@@ -256,7 +302,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   evaluators: [
     {
       id: 'evaluator.coverage',
-      persona: evaluatorCoverage,
+      persona: onPlatform(evaluatorCoverage),
       samples: 2,
       consumes: ['findings'],
       maxTokens: 12200,
@@ -264,15 +310,15 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
     },
     {
       id: 'evaluator.design',
-      persona: evaluatorDesign,
+      persona: onPlatform(evaluatorDesign),
       samples: 2,
       consumes: ['findings'],
       maxTokens: 16000,
-      criterionKinds: ['domain_model', 'interface', 'boundary', 'workflow'],
+      criterionKinds: ['domain_model', 'interface', 'boundary', 'workflow', 'communication'],
     },
     {
       id: 'evaluator.qualities',
-      persona: evaluatorQualities,
+      persona: onPlatform(evaluatorQualities),
       samples: 2,
       consumes: ['findings'],
       maxTokens: 16000,
@@ -280,7 +326,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
     },
     {
       id: 'evaluator.reasoning',
-      persona: evaluatorReasoning,
+      persona: onPlatform(evaluatorReasoning),
       samples: 2,
       consumes: ['findings'],
       maxTokens: 12200,
@@ -322,6 +368,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       evolution: { dimension: 'qualities', weight: 1, gate: false },
       tradeoff: { dimension: 'reasoning', weight: 1, gate: false },
       constraint: { dimension: 'compliance', weight: 1, gate: true },
+      communication: { dimension: 'design', weight: 1, gate: false },
     } satisfies Record<CanvasCriterionKind, { dimension: string; weight: number; gate: boolean }>,
 
     // A type prices onto the dimension its owning critic's kinds earn.
@@ -342,6 +389,11 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       boundary_defect: { dimension: 'design', gate: false },
       workflow_gap: { dimension: 'design', gate: false },
       tradeoff_missing: { dimension: 'reasoning', gate: false },
+      flow_gap: { dimension: 'design', gate: false },
+      hop_undeclared: { dimension: 'design', gate: false },
+      failure_path_missing: { dimension: 'design', gate: false },
+      integration_misfit: { dimension: 'design', gate: false },
+      service_misfit: { dimension: 'design', gate: false },
     } satisfies Record<CanvasFindingType, { dimension: string; gate: boolean }>,
 
     ...STANDARD_SCORING,

@@ -28,6 +28,7 @@ describe('the design-prompt shape validator', () => {
       functionalRequirements: [],
       domainAndData: [],
       interfaces: [],
+      requestPaths: [],
       nonFunctionalRequirements: [],
       scale: [],
       decisions: [],

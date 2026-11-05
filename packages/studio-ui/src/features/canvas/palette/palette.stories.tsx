@@ -1,4 +1,5 @@
 import styled from '@emotion/styled';
+import { PLATFORM_IDS, platformCatalogue } from '@sysdesign/contracts';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { userEvent, within } from 'storybook/test';
 
@@ -31,6 +32,24 @@ export const Filtered: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     await userEvent.type(canvas.getByLabelText('Filter blocks'), 'cache');
+  },
+};
+
+/**
+ * The palette on a platform prompt: the catalogue's shelves first, one entry
+ * per service wearing its first role's glyph and colour, then the roles —
+ * the smoke gate axe-checks every service entry here.
+ */
+export const OnPlatform: Story = {
+  args: { catalogue: platformCatalogue(PLATFORM_IDS[0]) },
+};
+
+/** Filtered by a word a service answers to that no role does: the services it finds, their shelves kept. */
+export const FilteredOnPlatform: Story = {
+  args: { catalogue: platformCatalogue(PLATFORM_IDS[0]) },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.type(canvas.getByLabelText('Filter blocks'), 'kafka');
   },
 };
 

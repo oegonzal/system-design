@@ -1,5 +1,5 @@
 import { NODE_OPERATIONS_BOUND, OPERATION_NOTES_BOUND } from './canvas';
-import type { CanvasEdge, CanvasNode, NodeOperation } from './canvas.schema';
+import type { CanvasEdge, CanvasNode, ConfigEntry, NodeOperation } from './canvas.schema';
 import { nodeLabel } from './node-label';
 
 /**
@@ -53,11 +53,15 @@ function renderOperation(operation: NodeOperation): string {
   return `${kind}${operation.name}${idempotency}${notes}`;
 }
 
+/** ` config={"replicas":3}` — the entries as one object, or nothing when none were set; the same on a node and on an edge. */
+const renderConfig = (entries: readonly ConfigEntry[] | undefined): string =>
+  entries && entries.length > 0
+    ? ` config=${JSON.stringify(Object.fromEntries(entries.map((entry) => [entry.key, entry.value])))}`
+    : '';
+
 export function renderNodeLine(node: CanvasNode): string {
-  const config =
-    node.config && node.config.length > 0
-      ? ` config=${JSON.stringify(Object.fromEntries(node.config.map((entry) => [entry.key, entry.value])))}`
-      : '';
+  const service = node.service !== undefined ? ` service=${node.service}` : '';
+  const config = renderConfig(node.config);
   const roles =
     node.responsibilities && node.responsibilities.length > 0
       ? ` roles=[${node.responsibilities.join('|')}]`
@@ -69,11 +73,11 @@ export function renderNodeLine(node: CanvasNode): string {
     shown.length > 0
       ? ` ops=[${shown.map(renderOperation).join('; ')}${elided > 0 ? `; …+${elided} more` : ''}]`
       : '';
-  return `  node ${node.id} kind=${node.kind} label=${JSON.stringify(nodeLabel(node))}${config}${roles}${ops}`;
+  return `  node ${node.id} kind=${node.kind}${service} label=${JSON.stringify(nodeLabel(node))}${config}${roles}${ops}`;
 }
 
 export function renderEdgeLine(edge: CanvasEdge): string {
   return `  edge ${edge.id}: ${edge.source} -> ${edge.target} (${edge.kind})${
     edge.label ? ` label=${JSON.stringify(edge.label)}` : ''
-  }${edge.carries && edge.carries.length > 0 ? ` carries=[${edge.carries.join(',')}]` : ''}`;
+  }${renderConfig(edge.config)}${edge.carries && edge.carries.length > 0 ? ` carries=[${edge.carries.join(',')}]` : ''}`;
 }

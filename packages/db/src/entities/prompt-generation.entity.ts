@@ -29,6 +29,10 @@ export class PromptGeneration {
   @Property({ type: 'text' })
   format: Opt<Contracts.PracticeFormatId> = 'system';
 
+  /** The platform the prompt was asked for, copied to the prompt when the draft is claimed; the writer never sees it. */
+  @Property({ type: 'text', nullable: true })
+  platform: Contracts.PlatformId | null = null;
+
   @Property({ type: 'timestamptz' })
   startedAt: Opt<Date> = new Date();
 }

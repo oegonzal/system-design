@@ -21,6 +21,7 @@ import {
   promptMarkdown,
   revisionsMarkdown,
 } from './markdown';
+import { diagramMarkdown } from './markdown-diagram';
 import { modelMarkdown } from './markdown-model';
 import { transcriptMarkdown } from './markdown-transcript';
 
@@ -74,8 +75,9 @@ function triggerDownload(blob: Blob, filename: string): void {
 }
 
 /**
- * Bundle a run into one `.zip` — `diagram.pdf` plus the five separate Markdown
- * files — and hand it to the browser as a single download. `diagram` is null
+ * Bundle a run into one `.zip` — `diagram.pdf` plus one Markdown file per
+ * artifact, the diagram's own among them — and hand it to the browser as a
+ * single download. `diagram` is null
  * when nothing is drawn. All libs are dynamically imported (client-only).
  * A page reaches this through `useRunExport`, which supplies the capture.
  */
@@ -87,6 +89,7 @@ export async function exportRun(
   const zip = new JSZip();
 
   zip.file('prompt.md', promptMarkdown(input.prompt, input.criteria));
+  zip.file('diagram.md', diagramMarkdown(input.graph));
   zip.file('narrative.md', narrativeMarkdown(input.narrative, input.graph, input.criteria));
   zip.file('brief.md', briefMarkdown(input.brief, input.graph, input.criteria));
   zip.file('model.md', modelMarkdown(input.model, input.graph));

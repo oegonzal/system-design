@@ -51,9 +51,10 @@ function edgeIndex(graph: CanvasGraph) {
 
 /**
  * A binding's traced path, as its own line: `path, 2 edges, n-1 (node.1) to
- * n-3 (node.3): edge.1 (e-1: n-1 -> n-2) → edge.4 (e-3: n-2 -> n-3)`. Each
- * hop leads with the id to cite and repeats the Edges section's own words for
- * it. A hop naming no drawn edge says so and the summary is left out — where
+ * n-3 (node.3): edge.1 (e-1: n-1 -> n-2, sync) → edge.4 (e-3: n-2 -> n-3, async)`.
+ * Each hop leads with the id to cite, repeats the Edges section's own words
+ * for it and names its call style, so a flow reads as the sequence of calls
+ * it is. A hop naming no drawn edge says so and the summary is left out — where
  * a broken walk starts and ends is not the render's to guess.
  */
 function renderPath(
@@ -72,7 +73,7 @@ function renderPath(
     const hop = hops[index];
     return hop === undefined
       ? `${id} (no such edge)`
-      : `${hop.ref} (${id}: ${hop.edge.source} -> ${hop.edge.target})`;
+      : `${hop.ref} (${id}: ${hop.edge.source} -> ${hop.edge.target}, ${hop.edge.kind})`;
   });
   return `    path, ${path.length} ${path.length === 1 ? 'edge' : 'edges'}${span}: ${walk.join(' → ')}`;
 }
@@ -161,7 +162,7 @@ export const canvasOutput: OutputShape<CanvasSubmission> = {
     const edges = edgeIndex(graph);
     const overview = narrative?.overview?.trim() ?? '';
     const lines: string[] = [
-      'Cite parts by the bracketed ids. The token after each bracket is the author’s own canvas id; the model, brief and narrative refer to those. An author’s id is a name, not a position: `e-4` need not be `edge.4`. A binding’s path is the line under it, each hop led by the id to cite.',
+      'Cite parts by the bracketed ids. The token after each bracket is the author’s own canvas id; the model, brief and narrative refer to those. An author’s id is a name, not a position: `e-4` need not be `edge.4`. A binding’s path is the line under it, each hop led by the id to cite, with its call style.',
       '',
       '## Nodes',
       ...graph.nodes.map((item, index) => `[node.${index + 1}] ${renderNodeLine(item).trim()}`),

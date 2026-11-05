@@ -106,9 +106,9 @@ export const PRACTICE_FORMATS = {
     blurb:
       'Carry a business process end to end: its states, what happens when a step fails, and how it recovers.',
     parts: { brief: 'required', model: 'optional', narrative: 'required' },
-    emphasis: ['workflow', 'domain_model', 'tradeoff'],
+    emphasis: ['workflow', 'communication', 'domain_model', 'tradeoff'],
     guidance:
-      'A business process with states, deadlines, retries and compensations: what happens when a step fails, arrives twice or arrives late, and who is told. Ask for the process walked end to end, not for a fleet sized to a peak.',
+      'A business process with states, deadlines, retries and compensations: what happens when a step fails, arrives twice or arrives late, and who is told. Ask for the process walked end to end, every hop between the parts named with its call style and failure handling, not for a fleet sized to a peak.',
   },
   evolution: {
     ...UNTIMED,

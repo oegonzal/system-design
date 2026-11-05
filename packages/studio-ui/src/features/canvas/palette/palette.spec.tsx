@@ -3,6 +3,8 @@ import {
   NODE_KIND_CATEGORIES,
   NODE_KIND_GUIDE,
   kindsInCategory,
+  PLATFORM_IDS,
+  platformCatalogue,
 } from '@sysdesign/contracts';
 import { renderWithTheme } from '@sysdesign/web-testing';
 import { act, screen } from '@testing-library/react';
@@ -13,6 +15,7 @@ import { createCanvasStore } from '../canvas-store';
 import { CanvasStoreProvider } from '../canvas-store-context';
 import { CANVAS_COPY } from '../copy';
 import { Palette } from './palette';
+import { paletteSections } from './palette-entries';
 
 function renderPalette() {
   const store = createCanvasStore();
@@ -157,5 +160,56 @@ describe('Palette', () => {
 
     expect(screen.getByRole('status').textContent).toContain('No blocks match');
     expect(screen.queryAllByRole('listitem')).toHaveLength(0);
+  });
+
+  describe('on a platform', () => {
+    const aws = platformCatalogue(PLATFORM_IDS[0]);
+    function renderPlatformPalette() {
+      const store = createCanvasStore();
+      renderWithTheme(
+        <CanvasStoreProvider store={store}>
+          <Palette catalogue={aws} />
+        </CanvasStoreProvider>,
+      );
+      return store;
+    }
+
+    it('[UX-31] shelves the platform’s services ahead of the roles, one entry per service with its own hint', () => {
+      renderPlatformPalette();
+      const headings = screen.getAllByRole('heading', { level: 3 }).map((h) => h.textContent);
+      expect(headings.slice(0, aws.categories.length)).toEqual(
+        aws.categories.map((category) => `${aws.label} · ${category.label}`),
+      );
+      for (const service of aws.services) {
+        const entry = screen.getByTestId(`palette-service-${service.id}`);
+        expect(entry.getAttribute('title')).toBe(service.what);
+        expect(entry.textContent).toBe(service.label);
+      }
+      // Every role is still there: the service entries sit beside them, not in their place.
+      for (const kind of NODE_KINDS) expect(screen.getByTestId(`palette-${kind}`)).toBeTruthy();
+      expect(screen.getAllByRole('listitem')).toHaveLength(NODE_KINDS.length + aws.services.length);
+    });
+
+    it('[UX-31] adding a service adds a block of its first role, named after it and carrying it', async () => {
+      const user = userEvent.setup();
+      const store = renderPlatformPalette();
+      await user.click(screen.getByTestId('palette-service-aws.sqs'));
+      expect(store.getState().nodes[0]?.data).toEqual({
+        kind: 'queue',
+        service: 'aws.sqs',
+        label: 'SQS',
+      });
+    });
+
+    it('[UX-4] filters the services by their declared words as it filters the roles', async () => {
+      const user = userEvent.setup();
+      renderPlatformPalette();
+      await user.type(screen.getByLabelText('Filter blocks'), 'cache');
+      const expected = paletteSections(aws, 'cache').flatMap((section) => section.entries);
+      expect(screen.getAllByRole('listitem')).toHaveLength(expected.length);
+      expect(screen.getByTestId('palette-cache')).toBeTruthy();
+      expect(screen.getByTestId('palette-service-aws.elasticache')).toBeTruthy();
+      expect(screen.queryByTestId('blocks-category-data-stores')).toBeNull();
+    });
   });
 });

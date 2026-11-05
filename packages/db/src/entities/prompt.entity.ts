@@ -79,6 +79,17 @@ export class Prompt {
   @Property({ type: 'text' })
   format: Opt<Contracts.PracticeFormatId> = 'system';
 
+  /**
+   * The platform the design is drawn on (`PLATFORM_IDS` in contracts), or
+   * null for a platform-neutral prompt; fixed with the text once a session
+   * exists. An open list the contract declares and the row keeps no check
+   * on, as `memory_record.kind` since 2026-10-30: a new platform is a
+   * catalogue, never a migration. Never in the markdown — the grading goal
+   * is composed from the two.
+   */
+  @Property({ type: 'text', nullable: true })
+  platform: Contracts.PlatformId | null = null;
+
   @Index()
   @Property({ type: 'text' })
   status: Opt<Contracts.PromptStatus> = 'active';

@@ -31,7 +31,7 @@ export const DESIGN_PROMPT: PipelineDefinition<ReturnType<typeof designPromptOut
   {
     id: PROMPT_PIPELINE_ID,
 
-    version: '2.0.0',
+    version: '2.1.0',
 
     // A goal another program composes; never a route, a target, or a choice in the UI.
 
@@ -46,7 +46,7 @@ export const DESIGN_PROMPT: PipelineDefinition<ReturnType<typeof designPromptOut
           'A fact of the experience the prompt must build on: its domain, the shape of an integration, a figure, a failure the system survived.',
 
         gradeability:
-          'A property that lets a panel grade answers: a requirement a grader can check, a target that is a figure or a checkable property, a decision with named options, a constraint a design must respect.',
+          'A property that lets a panel grade answers: a requirement a grader can check, a target that is a figure or a checkable property, a request path a grader can trace, a decision with named options, a constraint a design must respect.',
 
         scope:
           "A boundary the prompt must hold: no employer, product or vendor named, and one session's worth of design.",

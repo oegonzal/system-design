@@ -82,6 +82,7 @@ export function makePrompt(overrides: Partial<PromptDto> = {}): PromptDto {
     criteria: makeCriteria(),
     source: 'authored',
     format: 'system',
+    platform: null,
     status: 'active',
     rubricLocked: false,
     createdAt: AT,

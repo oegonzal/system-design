@@ -8,6 +8,7 @@ import { memo } from 'react';
 
 import { NODE_WIDTH } from '../geometry';
 import type { SdNode as SdNodeModel } from '../types';
+import { serviceOf } from '../platform-services';
 import { NODE_ICONS } from './node-icons';
 
 const Root = styled('div', transient)<{
@@ -91,6 +92,7 @@ function SdNodeComponent({ id, data, selected }: NodeProps<SdNodeModel>) {
       $severity={severity}
       data-testid={`node-${id}`}
       data-kind={data.kind}
+      {...(data.service !== undefined ? { 'data-service': data.service } : {})}
       {...(opCount > 0 ? { 'data-op-count': opCount } : {})}
       {...(severity ? { 'data-severity': severity } : {})}
     >
@@ -99,7 +101,9 @@ function SdNodeComponent({ id, data, selected }: NodeProps<SdNodeModel>) {
       <Body>
         <Label title={data.label}>{data.label}</Label>
         <Meta>
-          {data.kind}
+          {data.service !== undefined
+            ? `${serviceOf(data.service).label} · ${data.kind}`
+            : data.kind}
           {opCount > 0 ? ` · ${opCount} ops` : ''}
           {roleCount > 0 ? ` · ${roleCount} roles` : ''}
           {configCount > 0 ? ` · ${configCount} config` : ''}

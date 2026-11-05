@@ -1,5 +1,12 @@
 import { expect, type APIRequestContext, type Locator, type Page } from '@playwright/test';
-import type { EdgeKind, NodeKind, OperationKind, PromptDto, Severity } from '@sysdesign/contracts';
+import type {
+  EdgeKind,
+  NodeKind,
+  OperationKind,
+  PlatformServiceId,
+  PromptDto,
+  Severity,
+} from '@sysdesign/contracts';
 
 import { createPracticeSession } from './backend';
 import { BriefPanel } from './brief.panel';
@@ -69,6 +76,16 @@ export class CanvasPage {
     return this.page.getByTestId(`palette-${kind}`);
   }
 
+  /** A platform service's entry: shelved ahead of the roles on a platform prompt, absent on a neutral one. */
+  paletteService(serviceId: PlatformServiceId): Locator {
+    return this.page.getByTestId(`palette-service-${serviceId}`);
+  }
+
+  /** A platform shelf, by the platform and its own category id. */
+  platformShelf(platformId: string, categoryId: string): Locator {
+    return this.page.getByTestId(`blocks-platform-${platformId}-${categoryId}`);
+  }
+
   /** The canvas loads client-side behind a skeleton; wait for the real pane. */
   async ready(): Promise<void> {
     await expect(this.pane).toBeVisible();
@@ -85,6 +102,11 @@ export class CanvasPage {
    */
   async addFromPalette(kind: NodeKind): Promise<void> {
     await this.paletteItem(kind).click();
+  }
+
+  /** The click path for a platform service: a block of the service's first role, named after it and carrying it. */
+  async addServiceFromPalette(serviceId: PlatformServiceId): Promise<void> {
+    await this.paletteService(serviceId).click();
   }
 
   async filterBlocks(query: string): Promise<void> {
@@ -254,6 +276,25 @@ export class CanvasPage {
 
   get kindGuide(): Locator {
     return this.page.getByTestId('kind-guide');
+  }
+
+  /** The Service control: which of the platform's services the selected block is, or none. */
+  get nodeService(): Locator {
+    return this.page.getByTestId('service-select');
+  }
+
+  async setNodeService(serviceId: PlatformServiceId | ''): Promise<void> {
+    await this.nodeService.selectOption(serviceId);
+  }
+
+  /** A suggested config key, offered as a chip under the editor; clicking fills the draft's key. */
+  async clickConfigHint(key: string): Promise<void> {
+    await this.page.getByTestId(`config-hint-${key}`).click();
+  }
+
+  async expectNodeService(nodeId: string, serviceId: PlatformServiceId | null): Promise<void> {
+    if (serviceId === null) await expect(this.node(nodeId)).not.toHaveAttribute('data-service');
+    else await expect(this.node(nodeId)).toHaveAttribute('data-service', serviceId);
   }
 
   get edgeCallStyle(): Locator {

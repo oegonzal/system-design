@@ -36,6 +36,21 @@ const findings = {
   ],
 };
 
+/** What the communication critic's samples say: the webhook path stops short, named at its binding and the hop. Only its schema admits the type. */
+const flowFindings = {
+  findings: [
+    {
+      type: 'flow_gap',
+      severity: 'medium',
+      confidence: 'high',
+      fixability: 'fixable_local',
+      locationRefs: ['binding.2', 'edge.5'],
+      criterionIds: ['c11'],
+      rationale: 'the webhook path stops at the queue; nothing walks it on to the store',
+    },
+  ],
+};
+
 const noFindings = { findings: [] };
 
 /** Four evaluators, four rubrics: the fake answers each by the criterion ids its schema locks to. */
@@ -116,6 +131,13 @@ const designResults = {
       locationRefs: ['edge.3'],
       rationale: 'no path carries a refund back to its order',
     },
+    {
+      criterionId: 'c11',
+      result: 'partial',
+      confidence: 'medium',
+      locationRefs: ['binding.2'],
+      rationale: 'the hops are drawn; two declare no mechanism',
+    },
   ],
   advisoryVerdict: 'revise',
 };
@@ -133,9 +155,10 @@ const reasoningResults = {
   advisoryVerdict: 'revise',
 };
 
-/** Every judge's answer, in the order the fake tries them: a typed finding first, then nothing, then one results reply per evaluator. */
+/** Every judge's answer, in the order the fake tries them: the two typed findings first, then nothing, then one results reply per evaluator. */
 const judges = [
   findings,
+  flowFindings,
   noFindings,
   requirementResults,
   qualityResults,
@@ -194,13 +217,13 @@ describe('the system-design-canvas loop', () => {
     );
 
     expect(trace.contract.criteria.map((criterion) => criterion.id)).toEqual(
-      Array.from({ length: 10 }, (_, index) => `c${index + 1}`),
+      Array.from({ length: 11 }, (_, index) => `c${index + 1}`),
     );
     const scopes = new Set(exchanges.map((exchange) => exchange.scope));
     expect(scopes.has('criteria')).toBe(false);
     expect(scopes.has('producer')).toBe(false);
-    // Nine lenses, two samples each — every one attributed.
-    expect(exchanges).toHaveLength(18);
+    // Ten lenses, two samples each — every one attributed.
+    expect(exchanges).toHaveLength(20);
 
     expect(trace.iterations).toHaveLength(1);
     const [only] = trace.iterations;
@@ -208,10 +231,12 @@ describe('the system-design-canvas loop', () => {
     expect(only.validation.every((report) => report.problems.length === 0)).toBe(true);
     expect(only.ledger.findings.map((finding) => finding.key)).toEqual([
       'unhandled_failure|edge.3,node.3',
+      'flow_gap|binding.2,edge.5',
     ]);
-    // Only the critic that owns the type raised it; its two samples confirm it.
+    // Only the critic that owns a type raised it; its two samples confirm it.
     expect(only.ledger.findings[0].lenses).toEqual(['critic.fitness']);
     expect(only.ledger.findings[0].rationale).toContain('300 ms');
+    expect(only.ledger.findings[1].lenses).toEqual(['critic.communication']);
     expect(
       Object.fromEntries(only.ledger.criteria.map((row) => [row.criterionId, row.result])),
     ).toEqual({
@@ -225,6 +250,7 @@ describe('the system-design-canvas loop', () => {
       c8: 'partial',
       c9: 'fail',
       c10: 'partial',
+      c11: 'partial',
     });
     expect(only.decision.finalDecision).toBe('revise');
     expect(trace.stopReason).toBe('max-iterations');

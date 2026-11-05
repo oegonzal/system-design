@@ -2,6 +2,7 @@ import { BadGatewayException } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
 import {
   describeInFlight,
+  renderCanvasGoal,
   type ApiErrorResponse,
   type GetRevisionResponse,
   type GetSessionResponse,
@@ -58,7 +59,7 @@ describe('revisions', () => {
       expect(h.loop.startRequests).toHaveLength(2);
       expect(h.loop.startRequests[1]).toMatchObject({
         pipeline: 'system-design-canvas',
-        goal: prompt.markdown,
+        goal: renderCanvasGoal({ markdown: prompt.markdown, platform: null }),
         criteria: prompt.criteria,
         maxIterations: 1,
         output: submission(),

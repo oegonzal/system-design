@@ -119,6 +119,11 @@ export const NODE_KIND_GUIDE = {
     whenToUse:
       "Recommendations, semantic search, RAG — anywhere 'find things like this' is the query.",
   },
+  'file-store': {
+    what: 'A shared file system many instances, containers and functions mount at once — files by path, not objects by key.',
+    whenToUse:
+      'Workers that must all read and write the same files mid-processing; never the place a record of truth lives.',
+  },
   // ── Caching
   cache: {
     what: 'Keeps repeated reads in memory so they never reach the store — at the price of serving data that may be stale.',
@@ -163,6 +168,11 @@ export const NODE_KIND_GUIDE = {
   'data-lake': {
     what: "Cheap storage for raw, schema-on-read data — everything lands here before it's refined.",
     whenToUse: 'Retaining raw events for reprocessing, ML training sets, and audits.',
+  },
+  'query-engine': {
+    what: 'A serverless SQL engine that queries data where it already lies — a lake, an export, a log bucket — without loading it first.',
+    whenToUse:
+      'Ad-hoc questions over files and lake tables that no warehouse needs to own; pay per query, not per cluster.',
   },
   'ml-inference': {
     what: 'Serves model predictions behind an API — embeddings, ranking, fraud scores — with its own scaling profile.',

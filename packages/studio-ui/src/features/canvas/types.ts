@@ -1,8 +1,9 @@
 import type {
+  ConfigEntry,
   EdgeKind,
-  NodeConfigEntry,
   NodeKind,
   NodeOperation,
+  PlatformServiceId,
   Severity,
 } from '@sysdesign/contracts';
 import type { Edge, Node } from '@xyflow/react';
@@ -17,8 +18,10 @@ import type { Edge, Node } from '@xyflow/react';
  */
 export type SdNodeData = {
   kind: NodeKind;
+  /** The platform service the block is, when it names one; `kind` is one of its roles. */
+  service?: PlatformServiceId;
   label: string;
-  config?: NodeConfigEntry[];
+  config?: ConfigEntry[];
   responsibilities?: string[];
   operations?: NodeOperation[];
   /** Set while a finding highlights this element; drives the outline color. */
@@ -30,6 +33,8 @@ export type SdNode = Node<SdNodeData, 'sd'>;
 export type SdEdgeData = {
   kind: EdgeKind;
   carries?: string[];
+  /** How the hop is made and what happens when it fails, as free-form entries. */
+  config?: ConfigEntry[];
   severity?: Severity | null;
 };
 

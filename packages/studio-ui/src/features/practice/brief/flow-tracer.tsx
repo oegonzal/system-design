@@ -89,9 +89,12 @@ export function FlowTracer({
                 variant="subtle"
                 data-testid={`flow-hop-${criterionId}-${edge.id}`}
                 disabled={disabled}
+                title={edge.config
+                  ?.map((entry) => `${entry.key}=${String(entry.value)}`)
+                  .join(' · ')}
                 onClick={() => onChange([...path, edge.id])}
               >
-                {labelOf(edge.source)} → {labelOf(edge.target)}
+                {labelOf(edge.source)} → {labelOf(edge.target)} ({edge.kind})
               </Button>
             ))}
           </Stack>

@@ -4,6 +4,7 @@ import styled from '@emotion/styled';
 import {
   CANVAS_CRITERION_KINDS,
   DEFAULT_PRACTICE_FORMAT,
+  PLATFORM_IDS,
   PRACTICE_FORMAT_IDS,
   PRACTICE_FORMATS,
   practiceFormatForLibraryFolder,
@@ -11,6 +12,7 @@ import {
   PROMPT_TITLE_BOUND,
   type CanvasCriterionKind,
   type ExperienceProfileDto,
+  type PlatformId,
   type PracticeFormatId,
   type PromptLibraryDocumentDto,
   type PromptLibraryEntryDto,
@@ -40,6 +42,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { ComposerGenerateTab } from './composer-generate-tab';
 import { FormatField } from './format-field';
+import { PlatformField } from './platform-field';
 import { usePromptGeneration } from './use-prompt-generation';
 
 const isFormatId = (value: string | null): value is PracticeFormatId =>
@@ -134,6 +137,9 @@ export function PromptComposer() {
     isFormatId(linkedFormat) ? linkedFormat : DEFAULT_PRACTICE_FORMAT,
   );
   const [importFormat, setImportFormat] = useState<PracticeFormatId | null>(null);
+  // The first declared platform is the default: the studio is practised on one.
+  const [platform, setPlatform] = useState<PlatformId | null>(PLATFORM_IDS[0]);
+  const [importPlatform, setImportPlatform] = useState<PlatformId | null>(PLATFORM_IDS[0]);
   const [experiences, setExperiences] = useState<ExperienceProfileDto[]>([]);
   const [title, setTitle] = useState('');
   const [markdown, setMarkdown] = useState('');
@@ -187,6 +193,7 @@ export function PromptComposer() {
         title: title.trim(),
         markdown,
         format,
+        ...(platform !== null ? { platform } : {}),
         ...(experienceId ? { experienceId } : {}),
       });
       router.push(`/prompts/${prompt.id}`);
@@ -204,6 +211,7 @@ export function PromptComposer() {
       const prompt = await api.importPrompt({
         libraryId: selectedId,
         ...(importFormat !== null ? { format: importFormat } : {}),
+        ...(importPlatform !== null ? { platform: importPlatform } : {}),
       });
       router.push(`/prompts/${prompt.id}`);
     } catch (caught) {
@@ -253,6 +261,7 @@ export function PromptComposer() {
                 data-testid="compose-markdown"
               />
               <FormatField value={format} onChange={setFormat} />
+              <PlatformField value={platform} onChange={setPlatform} />
               <SelectField
                 label="Experience it draws on (optional)"
                 value={experienceId}
@@ -339,6 +348,11 @@ export function PromptComposer() {
                           onChange={setImportFormat}
                           data-testid="import-format"
                         />
+                        <PlatformField
+                          value={importPlatform}
+                          onChange={setImportPlatform}
+                          data-testid="import-platform"
+                        />
                         <Markdown
                           label={previewed.title}
                           title={previewed.title}
@@ -360,6 +374,8 @@ export function PromptComposer() {
               experiences={experiences}
               format={format}
               onFormat={setFormat}
+              platform={platform}
+              onPlatform={setPlatform}
               initialEmphasis={linkedEmphasis}
               generation={generation}
             />

@@ -186,6 +186,7 @@ export class InterviewService {
       goal = renderInterviewGoal({
         title: prompt.title,
         markdown: prompt.markdown,
+        platform: prompt.platform,
         criteria: prompt.criteria,
         turns: turns.flatMap((turn) => {
           const mapped = toTranscriptTurn(turn);

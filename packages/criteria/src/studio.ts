@@ -106,7 +106,7 @@ export const STUDIO_CRITERIA: readonly Criterion[] = [
   {
     id: 'EVAL-4',
     statement:
-      'A design is graded as competencies — coverage, design, qualities, reasoning, compliance — each earned by the criterion kinds a prompt’s rubric states, scale one kind among ten weighted only by the figures the prompt gives it, every finding type owned by one critic and priced where that critic’s kinds earn, and two standing trade-off criteria closing every rubric so reasoning is earnable on every prompt.',
+      'A design is graded as competencies — coverage, design, qualities, reasoning, compliance — each earned by the criterion kinds a prompt’s rubric states, scale one kind among eleven weighted only by the figures the prompt gives it, every finding type owned by one critic and priced where that critic’s kinds earn, and three standing trade-off criteria closing every rubric so reasoning is earnable on every prompt.',
   },
   {
     id: 'EVAL-5',
@@ -192,6 +192,21 @@ export const STUDIO_CRITERIA: readonly Criterion[] = [
     id: 'DEL-11',
     statement:
       'A coaching run may be given an aim — the overall the coach must reach before it stops, above the pipeline’s accept threshold — which rides on the loop run as its raised bar, is reported back on the run, and lets a design be improved past the pipeline’s own bar through the coach and nothing else.',
+  },
+  {
+    id: 'UX-31',
+    statement:
+      'The canvas offers a platform’s managed services as declared data — each naming the generic roles it may play, what it is, when to use it and the knobs an interviewer asks about — shelved by the platform’s own categories ahead of the roles and found by its aliases; a block drawn as one names the service, keeps one of its roles as its kind, shows the service beside the role, and a service in a role it does not play is refused as a reference problem, never judged.',
+  },
+  {
+    id: 'EVAL-6',
+    statement:
+      'Communication is a graded competency: a connection carries free-form config the graders read beside its call style and the operations it carries, two standing criteria on every rubric ask that every hop declare its call style, mechanism and failure handling and that every request path be traced from where it enters to where it comes to rest, a communication critic owns the hop and flow defects and the design evaluator judges the kind, and a prompt that declares a platform adds one constraint that every component the platform offers a service for names it and every hop is an integration the platform offers.',
+  },
+  {
+    id: 'GEN-7',
+    statement:
+      'A prompt carries the platform its design is drawn on from compose, import or generate — never in its text, so the writer’s brand gate holds and the criteria are derived from the text alone — fixed with the text once a session exists; the grading goal is the prompt closed by the platform’s catalogue section, the interviewer’s notes state the platform in one line, the generator drafts a Request paths section whose rows are communication criteria, and a platform-neutral prompt grades exactly as before.',
   },
   // STAR repository
   {

@@ -1,7 +1,9 @@
 /**
  * The diagram's notation: which blocks the palette offers, how they are
  * shelved, the two kinds of connection and the four kinds of operation, plus
- * the size limits every side enforces. The vocabulary spans the whole of a
+ * the size limits every side enforces. A block is a generic role; a
+ * platform's managed service (`platforms/`) names the roles it may play, so
+ * a node drawn as one keeps a role here as its kind. The vocabulary spans the whole of a
  * software design, from the people and modules of an application to the
  * infrastructure under it; nothing here grades a design — the vocabulary is
  * what the author draws with, and the quality loop's lenses judge whatever
@@ -42,6 +44,7 @@ export const NODE_KINDS = [
   'kv-store',
   'time-series-db',
   'vector-db',
+  'file-store',
   // ── Caching
   'cache',
   // ── Messaging & Streaming
@@ -54,6 +57,7 @@ export const NODE_KINDS = [
   'stream-processor',
   'data-warehouse',
   'data-lake',
+  'query-engine',
   'ml-inference',
   // ── Coordination & Config
   'scheduler',
@@ -128,6 +132,7 @@ export const NODE_KIND_CATEGORY = {
   'kv-store': 'data-stores',
   'time-series-db': 'data-stores',
   'vector-db': 'data-stores',
+  'file-store': 'data-stores',
   cache: 'caching',
   queue: 'messaging',
   'event-stream': 'messaging',
@@ -137,6 +142,7 @@ export const NODE_KIND_CATEGORY = {
   'stream-processor': 'analytics',
   'data-warehouse': 'analytics',
   'data-lake': 'analytics',
+  'query-engine': 'analytics',
   'ml-inference': 'analytics',
   scheduler: 'coordination',
   'workflow-engine': 'coordination',
@@ -185,6 +191,7 @@ export const DEFAULT_NODE_LABELS = {
   'kv-store': 'KV Store',
   'time-series-db': 'Time-Series DB',
   'vector-db': 'Vector DB',
+  'file-store': 'File Store',
   cache: 'Cache',
   queue: 'Queue',
   'event-stream': 'Event Stream',
@@ -194,6 +201,7 @@ export const DEFAULT_NODE_LABELS = {
   'stream-processor': 'Stream Processor',
   'data-warehouse': 'Data Warehouse',
   'data-lake': 'Data Lake',
+  'query-engine': 'Query Engine',
   'ml-inference': 'ML Inference',
   scheduler: 'Scheduler',
   'workflow-engine': 'Workflow Engine',
@@ -249,9 +257,28 @@ export const EDGE_CARRIES_BOUND = bound(8, 'list');
 /** Whole-graph operation budget, enforced by the graph validator. */
 export const CANVAS_MAX_TOTAL_OPERATIONS = 400;
 
+/** A node's config entries; an edge's are bounded apart — a hop declares less than a component does. */
 export const NODE_CONFIG_KEYS_BOUND = bound(20, 'list');
-export const NODE_CONFIG_KEY_MAX_LENGTH = 40;
-export const NODE_CONFIG_STRING_VALUE_BOUND = bound(120);
+export const EDGE_CONFIG_KEYS_BOUND = bound(10, 'list');
+/** One config entry, on a node or an edge: the key is exact, the value's text bounded. */
+export const CONFIG_KEY_MAX_LENGTH = 40;
+export const CONFIG_STRING_VALUE_BOUND = bound(120);
+/**
+ * The keys a connection's config is offered as suggestions: how a hop is made
+ * and what happens when it fails. Suggestions only — any key is accepted, as
+ * on a node (UX-9) — read by the panel and never by a grader.
+ */
+export const EDGE_CONFIG_HINTS = [
+  'protocol',
+  'auth',
+  'timeoutMs',
+  'retries',
+  'dlq',
+  'delivery',
+  'ordering',
+  'batchSize',
+  'idempotencyKey',
+] as const;
 
 export const BRIEF_BINDINGS_BOUND = bound(24, 'list');
 export const BINDING_NODES_BOUND = bound(12, 'list');

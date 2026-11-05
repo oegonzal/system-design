@@ -16,10 +16,13 @@ import {
   type DesignPromptDraft,
 } from './design-prompt.schema';
 import { CRITERION_STATEMENT_BOUND } from './quality-loop/evidence';
+import { PLATFORM_IDS } from './platforms';
 import {
   CANVAS_CRITERION_KINDS,
   CANVAS_MAX_CRITERIA,
   CANVAS_STANDING_CRITERIA,
+  PLATFORM_STANDING_CRITERIA,
+  standingCriteriaFor,
 } from './studio-pipelines';
 
 export function draftFixture(): DesignPromptDraft {
@@ -43,28 +46,32 @@ export function draftFixture(): DesignPromptDraft {
     constraints: ['The point-of-sale system only answers polling'],
     domainAndData: ['An order is owned by the history store once, whichever source it came from'],
     interfaces: ['The storefront webhook is accepted idempotently'],
+    requestPaths: [
+      'A shopper’s order list is served from the history store without touching either source system',
+    ],
     decisions: ['Own a read model, or query both sources live on each request'],
   };
 }
 
-/** Every section at its target: 6 + 4 + 4 + 4 + 2 + 2 + 2 rows, the room the standing criteria leave — or at its ceiling, a little over each. */
+/** Every section at its target: 6 + 4 + 4 + 2 + 4 + 2 + 2 + 2 rows, the room every standing criterion leaves — or at its ceiling, a little over each. */
 function maximalDraft(at: 'target' | 'ceiling' = 'target'): DesignPromptDraft {
   const row = (n: number) => `requirement ${n}`;
-  const rows = { target: [6, 4, 4, 4, 2, 2, 2], ceiling: [8, 6, 6, 6, 4, 4, 4] }[at];
+  const rows = { target: [6, 4, 4, 2, 4, 2, 2, 2], ceiling: [8, 6, 6, 4, 6, 4, 4, 4] }[at];
   const list = (count: number) => Array.from({ length: count }, (_, i) => row(i));
   return {
     ...draftFixture(),
     functionalRequirements: list(rows[0]),
     domainAndData: list(rows[1]),
     interfaces: list(rows[2]),
-    nonFunctionalRequirements: Array.from({ length: rows[3] }, (_, i) => ({
+    requestPaths: list(rows[3]),
+    nonFunctionalRequirements: Array.from({ length: rows[4] }, (_, i) => ({
       kind: 'latency',
       requirement: row(i),
       target: `${i} ms`,
     })),
-    scale: Array.from({ length: rows[4] }, (_, i) => ({ metric: `metric ${i}`, target: `${i}` })),
-    decisions: list(rows[5]),
-    constraints: list(rows[6]),
+    scale: Array.from({ length: rows[5] }, (_, i) => ({ metric: `metric ${i}`, target: `${i}` })),
+    decisions: list(rows[6]),
+    constraints: list(rows[7]),
   };
 }
 
@@ -79,7 +86,7 @@ describe('designPromptDraftSchema', () => {
     expect(designPromptDraftSchema.safeParse(maximalDraft('ceiling')).success).toBe(true);
     const { bounds } = modelSchema(designPromptDraftSchema);
     expect(DRAFT_SECTION_KEYS.reduce((sum, path) => sum + bounds[path].target, 0)).toBe(
-      CANVAS_MAX_CRITERIA - CANVAS_STANDING_CRITERIA.length,
+      CANVAS_MAX_CRITERIA - CANVAS_STANDING_CRITERIA.length - PLATFORM_STANDING_CRITERIA.length,
     );
     const over = (draft: DesignPromptDraft) => designPromptDraftSchema.safeParse(draft).success;
     const max = maximalDraft('ceiling');
@@ -110,7 +117,12 @@ describe('the draft’s bounds', () => {
     // a ceiling at or under the longest would keep it past the ceiling. The
     // row counts are policy: their targets sum to the canvas criteria cap, so
     // a draft is one rubric — and the drafts measured were asked for more.
-    const rows = `the row targets sum to the room the standing criteria leave in the canvas cap (${CANVAS_MAX_CRITERIA})`;
+    const rows = `the row targets sum to the room every standing criterion leaves in the canvas cap (${CANVAS_MAX_CRITERIA})`;
+    // Request paths arrived with the canvas pipeline's 2.1.0 (2026-11-05); no
+    // writer has drafted one yet. Re-measure with
+    // `pnpm measure:bounds --pipeline=design-prompt`, then drop.
+    const unwritten =
+      'added with the canvas pipeline’s 2.1.0 (2026-11-05); no writer has drafted a request path yet — re-measure, then drop';
     // Every section is measured since the six live generations of
     // 2026-10-20 (`pnpm measure:bounds --pipeline=design-prompt`), the data,
     // interface and decision sections among them. A decision row maps to one
@@ -128,6 +140,8 @@ describe('the draft’s bounds', () => {
           functionalRequirements: rows,
           domainAndData: rows,
           interfaces: rows,
+          requestPaths: rows,
+          'requestPaths[]': unwritten,
           nonFunctionalRequirements: rows,
           scale: rows,
           decisions: rows,
@@ -155,10 +169,13 @@ describe('DRAFT_SECTIONS', () => {
       expect(DRAFT_SECTIONS[key].heading.startsWith('## ')).toBe(true);
     }
     // A quality target needs no figure; a blank one composes to nothing and is still a criterion.
-    const rows = criteriaFromDraft({
-      ...draftFixture(),
-      nonFunctionalRequirements: [{ kind: 'security', requirement: 'Only the owner reads' }],
-    });
+    const rows = criteriaFromDraft(
+      {
+        ...draftFixture(),
+        nonFunctionalRequirements: [{ kind: 'security', requirement: 'Only the owner reads' }],
+      },
+      null,
+    );
     expect(rows.find((c) => c.kind === 'non_functional')?.statement).toBe(
       'security — Only the owner reads',
     );
@@ -168,29 +185,59 @@ describe('DRAFT_SECTIONS', () => {
 describe('criteriaFromDraft', () => {
   it('[GEN-1] [GEN-6] yields one criterion per row, in render order, kinded by the section’s declared kind, ids c1…cN', () => {
     expect(
-      criteriaFromDraft(draftFixture()).map((c) => `${c.id}:${c.kind}:${c.statement}`),
+      criteriaFromDraft(draftFixture(), null).map((c) => `${c.id}:${c.kind}:${c.statement}`),
     ).toEqual([
       'c1:functional:Show one order list per signed-in customer',
       'c2:functional:Merge online and in-store orders',
       'c3:domain_model:An order is owned by the history store once, whichever source it came from',
       'c4:interface:The storefront webhook is accepted idempotently',
-      'c5:non_functional:freshness — An online order appears in the list — ≤ 60 s',
-      'c6:non_functional:security — A customer sees only their own orders — 0 cross-customer reads',
-      'c7:scale:Peak requests — 150 req/s',
-      'c8:tradeoff:Own a read model, or query both sources live on each request',
-      'c9:constraint:The point-of-sale system only answers polling',
-      ...CANVAS_STANDING_CRITERIA.map((c, index) => `c${10 + index}:${c.kind}:${c.statement}`),
+      'c5:communication:A shopper’s order list is served from the history store without touching either source system',
+      'c6:non_functional:freshness — An online order appears in the list — ≤ 60 s',
+      'c7:non_functional:security — A customer sees only their own orders — 0 cross-customer reads',
+      'c8:scale:Peak requests — 150 req/s',
+      'c9:tradeoff:Own a read model, or query both sources live on each request',
+      'c10:constraint:The point-of-sale system only answers polling',
+      ...CANVAS_STANDING_CRITERIA.map((c, index) => `c${11 + index}:${c.kind}:${c.statement}`),
     ]);
   });
 
+  it('[GEN-7] kinds a request-path row as communication in print position, and closes a platform prompt with the platform constraint', () => {
+    const [platform] = PLATFORM_IDS;
+    const criteria = criteriaFromDraft(
+      {
+        ...draftFixture(),
+        requestPaths: [
+          'A shopper’s history read reaches the store and back, every hop synchronous with a stated timeout',
+        ],
+      },
+      platform,
+    );
+    expect(criteria.map((c) => `${c.id}:${c.kind}`).slice(3, 6)).toEqual([
+      'c4:interface',
+      'c5:communication',
+      'c6:non_functional',
+    ]);
+    expect(criteria.at(-1)).toEqual({
+      id: `c${criteria.length}`,
+      kind: 'constraint',
+      statement: PLATFORM_STANDING_CRITERIA[0].statement,
+    });
+    expect(criteria.slice(-standingCriteriaFor(platform).length).map((c) => c.kind)).toEqual(
+      standingCriteriaFor(platform).map((c) => c.kind),
+    );
+  });
+
   it('[GEN-1] [EVAL-4] never exceeds the canvas cap, kinds each section and closes with the standing criteria, and trims a statement', () => {
-    const criteria = criteriaFromDraft(maximalDraft());
-    expect(criteria).toHaveLength(CANVAS_MAX_CRITERIA);
+    // A platform-neutral rubric leaves the platform row's room unused; a platform rubric fills the cap.
+    const criteria = criteriaFromDraft(maximalDraft(), null);
+    expect(criteria).toHaveLength(CANVAS_MAX_CRITERIA - PLATFORM_STANDING_CRITERIA.length);
+    expect(criteriaFromDraft(maximalDraft(), PLATFORM_IDS[0])).toHaveLength(CANVAS_MAX_CRITERIA);
     expect(new Set(criteria.map((c) => c.kind))).toEqual(
       new Set([
         'functional',
         'domain_model',
         'interface',
+        'communication',
         'non_functional',
         'scale',
         'tradeoff',
@@ -200,14 +247,19 @@ describe('criteriaFromDraft', () => {
     expect(criteria.slice(-CANVAS_STANDING_CRITERIA.length).map((c) => c.statement)).toEqual(
       CANVAS_STANDING_CRITERIA.map((c) => c.statement),
     );
-    expect(new Set(criteria.map((c) => c.id)).size).toBe(CANVAS_MAX_CRITERIA);
+    expect(new Set(criteria.map((c) => c.id)).size).toBe(criteria.length);
     // A draft kept past the row targets yields its first rows, never more than the cap.
-    expect(criteriaFromDraft(maximalDraft('ceiling'))).toHaveLength(CANVAS_MAX_CRITERIA);
+    expect(criteriaFromDraft(maximalDraft('ceiling'), PLATFORM_IDS[0])).toHaveLength(
+      CANVAS_MAX_CRITERIA,
+    );
 
-    const long = criteriaFromDraft({
-      ...draftFixture(),
-      functionalRequirements: [`  ${'x'.repeat(240)}  `],
-    })[0];
+    const long = criteriaFromDraft(
+      {
+        ...draftFixture(),
+        functionalRequirements: [`  ${'x'.repeat(240)}  `],
+      },
+      null,
+    )[0];
     expect(long.statement).toBe('x'.repeat(240));
   });
 
@@ -227,6 +279,7 @@ describe('criteriaFromDraft', () => {
       ...draftFixture(),
       domainAndData: [],
       interfaces: [],
+      requestPaths: [],
       decisions: [],
       functionalRequirements: [full(shape.functionalRequirements.element.maxLength)],
       nonFunctionalRequirements: [
@@ -240,7 +293,7 @@ describe('criteriaFromDraft', () => {
       constraints: [full(shape.constraints.element.maxLength)],
     };
     expect(designPromptDraftSchema.safeParse(draft).success).toBe(true);
-    expect(criteriaFromDraft(draft).map((c) => c.statement.length)).toEqual([
+    expect(criteriaFromDraft(draft, null).map((c) => c.statement.length)).toEqual([
       DESIGN_PROMPT_ROW_STATEMENT_BOUNDS.functional.ceiling,
       DESIGN_PROMPT_ROW_STATEMENT_BOUNDS.nonFunctional.ceiling,
       DESIGN_PROMPT_ROW_STATEMENT_BOUNDS.scale.ceiling,
@@ -263,6 +316,7 @@ describe('criteriaFromDraft', () => {
       ...draftFixture(),
       domainAndData: [],
       interfaces: [],
+      requestPaths: [],
       decisions: [],
       functionalRequirements: [longest('functionalRequirements[]')],
       nonFunctionalRequirements: [
@@ -275,7 +329,7 @@ describe('criteriaFromDraft', () => {
       scale: [{ metric: longest('scale[].metric'), target: longest('scale[].target') }],
       constraints: [longest('constraints[]')],
     };
-    const criteria = criteriaFromDraft(draft);
+    const criteria = criteriaFromDraft(draft, null);
     expect(criteria.map((criterion) => criterion.kind)).toEqual([
       'functional',
       'non_functional',

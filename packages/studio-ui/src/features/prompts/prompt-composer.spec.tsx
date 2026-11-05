@@ -52,11 +52,41 @@ describe('PromptComposer', () => {
 
     await waitFor(() => expect(routerMock.push).toHaveBeenCalledWith('/prompts/prompt-1'));
     const post = fetchMock.mock.calls.find((call) => (call[1] as RequestInit)?.method === 'POST');
+    // The first declared platform is the composer's default; the body carries it.
     expect(JSON.parse((post?.[1] as RequestInit).body as string)).toEqual({
       title: 'Design an order-history service',
       markdown: '# Design it',
       format: 'system',
+      platform: 'aws',
       experienceId: 'exp-1',
+    });
+  });
+
+  it('[GEN-7] a platform-neutral prompt sends no platform at all', async () => {
+    const user = userEvent.setup();
+    const { fetchMock } = stubApi([
+      EXPERIENCES,
+      LIBRARY,
+      { method: 'POST', path: '/api/prompts', body: { data: makePrompt() } },
+    ]);
+    renderWithTheme(<PromptComposer />);
+    await user.type(screen.getByTestId('compose-title'), 'Design an order-history service');
+    await user.type(screen.getByTestId('compose-markdown'), '# Design it');
+    expect(screen.getByTestId('compose-platform-blurb').textContent).toContain(
+      'services on the palette',
+    );
+    await user.selectOptions(screen.getByTestId('compose-platform'), '');
+    expect(screen.getByTestId('compose-platform-blurb').textContent).toContain(
+      'Generic roles only',
+    );
+    await user.click(screen.getByTestId('compose-submit'));
+
+    await waitFor(() => expect(routerMock.push).toHaveBeenCalledWith('/prompts/prompt-1'));
+    const post = fetchMock.mock.calls.find((call) => (call[1] as RequestInit)?.method === 'POST');
+    expect(JSON.parse((post?.[1] as RequestInit).body as string)).toEqual({
+      title: 'Design an order-history service',
+      markdown: '# Design it',
+      format: 'system',
     });
   });
 

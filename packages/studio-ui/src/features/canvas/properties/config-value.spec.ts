@@ -1,4 +1,4 @@
-import { NODE_CONFIG_KEY_MAX_LENGTH } from '@sysdesign/contracts';
+import { CONFIG_KEY_MAX_LENGTH } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -47,8 +47,8 @@ describe('formatConfigValue / configValueType', () => {
 describe('normalizeConfigKey', () => {
   it('trims and clips to the contract length', () => {
     expect(normalizeConfigKey('  replicas ')).toBe('replicas');
-    expect(normalizeConfigKey('k'.repeat(NODE_CONFIG_KEY_MAX_LENGTH + 5))).toHaveLength(
-      NODE_CONFIG_KEY_MAX_LENGTH,
+    expect(normalizeConfigKey('k'.repeat(CONFIG_KEY_MAX_LENGTH + 5))).toHaveLength(
+      CONFIG_KEY_MAX_LENGTH,
     );
     expect(normalizeConfigKey('   ')).toBe('');
   });

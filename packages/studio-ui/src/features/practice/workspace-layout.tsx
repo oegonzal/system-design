@@ -1,6 +1,7 @@
 'use client';
 
 import styled from '@emotion/styled';
+import type { PlatformCatalogue } from '@sysdesign/contracts';
 import { Skeleton } from '@sysdesign/design-system';
 import dynamic from 'next/dynamic';
 import type { ReactNode } from 'react';
@@ -127,6 +128,8 @@ export interface WorkspaceLayoutProps {
   /** The session's title and, beside it, its status. */
   title: ReactNode;
   status: ReactNode;
+  /** The platform the prompt declares, for the palette's shelves and the panel's Service control; none for a neutral prompt. */
+  catalogue: PlatformCatalogue | null;
   /** What sits above the canvas: its toolbar and the notices about it. */
   aboveCanvas: ReactNode;
   /** The dock beside the canvas. */
@@ -138,7 +141,13 @@ export interface WorkspaceLayoutProps {
  * and the properties, the canvas, the dock — that clamp to the viewport and
  * scroll inside, and stack when there is not room for them side by side.
  */
-export function WorkspaceLayout({ title, status, aboveCanvas, dock }: WorkspaceLayoutProps) {
+export function WorkspaceLayout({
+  title,
+  status,
+  catalogue,
+  aboveCanvas,
+  dock,
+}: WorkspaceLayoutProps) {
   return (
     <WorkspaceRoot>
       <TitleRow>
@@ -147,8 +156,8 @@ export function WorkspaceLayout({ title, status, aboveCanvas, dock }: WorkspaceL
       </TitleRow>
       <Layout>
         <SideColumn>
-          <WorkspacePalette />
-          <WorkspaceProperties />
+          <WorkspacePalette catalogue={catalogue} />
+          <WorkspaceProperties catalogue={catalogue} />
         </SideColumn>
 
         <CanvasColumn>

@@ -1,5 +1,6 @@
 import type { DesignSubmission } from './canvas.schema';
 import { nodeLabel } from './node-label';
+import { platformServiceById } from './platforms';
 import {
   joinMention,
   keyBeside,
@@ -63,6 +64,12 @@ const numbered = <I>(
     name: name(item),
   }));
 
+/** ` (SQS)` after the kind when the node names a platform service, so a finding reads as the service the author drew. */
+const serviceLabel = (serviceId: string | undefined): string => {
+  const found = serviceId === undefined ? null : platformServiceById(serviceId);
+  return found === null ? '' : ` (${found.service.label})`;
+};
+
 export function submissionLocations(submission: DesignSubmission): SubmissionLocation[] {
   const { graph, brief, narrative } = submission;
   const model = submission.model ?? null;
@@ -77,7 +84,7 @@ export function submissionLocations(submission: DesignSubmission): SubmissionLoc
     ...numbered(
       'node',
       graph.nodes,
-      (node) => `${node.id} · ${node.kind} · ${nodeLabel(node)}`,
+      (node) => `${node.id} · ${node.kind}${serviceLabel(node.service)} · ${nodeLabel(node)}`,
       (node) => node.id,
       nodeLabel,
     ),

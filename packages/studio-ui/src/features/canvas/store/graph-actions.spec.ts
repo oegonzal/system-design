@@ -49,6 +49,59 @@ describe('canvas-store', () => {
     expect(store.getState().edges).toHaveLength(1);
   });
 
+  it('[UX-31] adds a platform service as a block of its first role, named after it and carrying it', () => {
+    const store = createCanvasStore();
+    const node = store.getState().addNode('aws.sqs');
+    expect(node?.data).toEqual({ kind: 'queue', service: 'aws.sqs', label: 'SQS' });
+    expect(store.getState().addNode('aws.lambda')?.data).toEqual({
+      kind: 'serverless-function',
+      service: 'aws.lambda',
+      label: 'Lambda',
+    });
+  });
+
+  it('[UX-31] a block that names a service plays one of its roles: naming one sets the kind, a kind it does not play takes it off', () => {
+    const store = createCanvasStore(makeGraph());
+    store.getState().updateNode('n-3', { service: 'aws.dynamodb' });
+    expect(store.getState().nodes[2].data).toMatchObject({
+      kind: 'database',
+      service: 'aws.dynamodb',
+    });
+    store.getState().updateNode('n-3', { kind: 'kv-store' });
+    expect(store.getState().nodes[2].data).toMatchObject({
+      kind: 'kv-store',
+      service: 'aws.dynamodb',
+    });
+    store.getState().updateNode('n-3', { kind: 'cache' });
+    expect(store.getState().nodes[2].data.service).toBeUndefined();
+    expect(store.getState().nodes[2].data.kind).toBe('cache');
+  });
+
+  it('[UX-3] a sync call and an async hop may both join one pair of blocks; a second sync call is the duplicate refused', () => {
+    const store = createCanvasStore();
+    store.getState().addNode('service');
+    store.getState().addNode('queue');
+    const connection = { source: 'n-1', target: 'n-2', sourceHandle: null, targetHandle: null };
+    store.getState().onConnect(connection);
+    store.getState().updateEdge('e-1', { kind: 'async' });
+    store.getState().onConnect(connection);
+    expect(store.getState().edges.map((edge) => edge.data?.kind)).toEqual(['async', 'sync']);
+    store.getState().onConnect(connection);
+    expect(store.getState().edges).toHaveLength(2);
+  });
+
+  it('[EVAL-6] updateEdge keeps a connection’s config on a kind-only patch and writes the list it is given', () => {
+    const store = createCanvasStore(makeGraph());
+    store.getState().updateEdge('e-1', { config: [{ key: 'timeoutMs', value: 500 }] });
+    store.getState().updateEdge('e-1', { kind: 'async' });
+    expect(store.getState().edges[0].data).toMatchObject({
+      kind: 'async',
+      config: [{ key: 'timeoutMs', value: 500 }],
+    });
+    store.getState().updateEdge('e-1', { config: [] });
+    expect(store.getState().edges[0].data?.config).toEqual([]);
+  });
+
   it('[UX-2] updates node label, kind and typed config entries', () => {
     const store = createCanvasStore(makeGraph());
 

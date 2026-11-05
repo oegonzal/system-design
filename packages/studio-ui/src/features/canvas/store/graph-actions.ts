@@ -3,10 +3,19 @@ import { applyEdgeChanges, applyNodeChanges, type NodePositionChange } from '@xy
 
 import { NODE_MIN_FOOTPRINT } from '../geometry';
 import { dropPosition, placeBlock, type Placement } from '../placement';
+import { isNodeKind, serviceOf, type PaletteBlock } from '../platform-services';
 import type { SdEdge, SdNode } from '../types';
 import { isViewChange, nextId, selectionAfter, unselected } from './elements';
 import type { ActionDeps } from './history';
+import { patchedNodeData } from './node-patch';
 import type { CanvasState } from './state';
+
+/** A role adds a block of that kind under the kind's name; a platform service adds a block of its first role, named after it and carrying it. */
+function blockData(block: PaletteBlock): SdNode['data'] {
+  if (isNodeKind(block)) return { kind: block, label: DEFAULT_NODE_LABELS[block] };
+  const service = serviceOf(block);
+  return { kind: service.roles[0], service: block, label: service.label };
+}
 
 /** One history key per field of one element, so a typed word is one undo step. */
 const fieldKey = (scope: string, id: string, patch: object): string =>
@@ -27,7 +36,7 @@ export type GraphActions = Pick<
 
 /** Author edits to the diagram itself: blocks and connections added, moved, changed and removed. */
 export const graphActions = ({ set, get, edits: { commit } }: ActionDeps): GraphActions => ({
-  addNode(kind, position) {
+  addNode(block, position) {
     const { nodes, edges, readOnly, viewport } = get();
     if (readOnly) return null;
     const area = viewport?.area() ?? null;
@@ -44,7 +53,7 @@ export const graphActions = ({ set, get, edits: { commit } }: ActionDeps): Graph
       type: 'sd',
       position: placed.position,
       selected: true,
-      data: { kind, label: DEFAULT_NODE_LABELS[kind] },
+      data: blockData(block),
     };
     commit({
       nodes: [...nodes.map(unselected), node],
@@ -103,10 +112,16 @@ export const graphActions = ({ set, get, edits: { commit } }: ActionDeps): Graph
   onConnect(connection) {
     const { edges } = get();
     if (!connection.source || !connection.target) return;
-    // Self-loops model nothing at this altitude; exact duplicates add noise.
+    // Self-loops model nothing at this altitude; a second connection saying the
+    // same thing adds noise. A new connection is a sync call, so one sync call
+    // already drawn between the two is the duplicate — an async one beside it
+    // is a different hop, and the pair fans out on the canvas.
     if (connection.source === connection.target) return;
     const duplicate = edges.some(
-      (edge) => edge.source === connection.source && edge.target === connection.target,
+      (edge) =>
+        edge.source === connection.source &&
+        edge.target === connection.target &&
+        (edge.data?.kind ?? 'sync') === 'sync',
     );
     if (duplicate) return;
 
@@ -126,7 +141,7 @@ export const graphActions = ({ set, get, edits: { commit } }: ActionDeps): Graph
     commit(
       {
         nodes: nodes.map((node) =>
-          node.id === id ? { ...node, data: { ...node.data, ...patch } } : node,
+          node.id === id ? { ...node, data: patchedNodeData(node.data, patch) } : node,
         ),
       },
       fieldKey('node', id, patch),
@@ -143,17 +158,14 @@ export const graphActions = ({ set, get, edits: { commit } }: ActionDeps): Graph
             ? {
                 ...edge,
                 ...(patch.label !== undefined ? { label: patch.label } : {}),
+                // Spread, never rebuilt: a kind-only patch keeps the carries
+                // and the config as they were, and an empty list clears its own
+                // field (serialization omits empty lists).
                 data: {
+                  ...edge.data,
                   kind: patch.kind ?? edge.data?.kind ?? 'sync',
-                  // The rebuilt literal must pass carries through: a kind-only
-                  // patch keeps the existing list, and `carries: []` clears it
-                  // (serialization omits empty lists).
-                  ...(patch.carries !== undefined
-                    ? { carries: patch.carries }
-                    : edge.data?.carries !== undefined
-                      ? { carries: edge.data.carries }
-                      : {}),
-                  severity: edge.data?.severity ?? null,
+                  ...(patch.carries !== undefined ? { carries: patch.carries } : {}),
+                  ...(patch.config !== undefined ? { config: patch.config } : {}),
                 },
               }
             : edge,

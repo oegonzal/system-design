@@ -47,15 +47,40 @@ function controlPoint(side: Position, from: XYPosition, to: XYPosition): XYPosit
   }
 }
 
-/** The curve between two handles: out of each through its side, as React Flow's default edge bends. */
-export function connectionCurve({ source, sourceSide, target, targetSide }: ConnectionEnds): Curve {
+/**
+ * The curve between two handles: out of each through its side, as React
+ * Flow's default edge bends. A `lane` other than 0 pushes both control points
+ * that many lanes off the straight line between the handles, square to it, so
+ * two connections between the same blocks are two visible lines; lane 0 is
+ * the default curve exactly.
+ */
+export function connectionCurve(
+  { source, sourceSide, target, targetSide }: ConnectionEnds,
+  lane = 0,
+  laneGap = 0,
+): Curve {
+  const offset = laneOffset(source, target, lane * laneGap);
   return {
     from: source,
-    fromControl: controlPoint(sourceSide, source, target),
-    toControl: controlPoint(targetSide, target, source),
+    fromControl: shifted(controlPoint(sourceSide, source, target), offset),
+    toControl: shifted(controlPoint(targetSide, target, source), offset),
     to: target,
   };
 }
+
+/** The shift square to the line from `from` to `to`, `by` units long; none for a zero shift or two coincident ends. */
+function laneOffset(from: XYPosition, to: XYPosition, by: number): XYPosition {
+  const dx = to.x - from.x;
+  const dy = to.y - from.y;
+  const length = Math.hypot(dx, dy);
+  if (by === 0 || length === 0) return { x: 0, y: 0 };
+  return { x: (-dy / length) * by, y: (dx / length) * by };
+}
+
+const shifted = (point: XYPosition, by: XYPosition): XYPosition => ({
+  x: point.x + by.x,
+  y: point.y + by.y,
+});
 
 /** The curve as an SVG path. */
 export function curvePath({ from, fromControl, toControl, to }: Curve): string {

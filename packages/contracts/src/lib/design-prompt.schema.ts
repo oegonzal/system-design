@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { bound, bounded, composedBound, type Bound } from './bounds';
+import type { PlatformId } from './platforms/service';
 import { PROMPT_TITLE_BOUND } from './prompts';
 import { CRITERION_STATEMENT_BOUND, type SuccessCriterion } from './quality-loop/evidence';
 import { withStandingCriteria, type CanvasCriterionKind } from './studio-pipelines';
@@ -18,9 +19,9 @@ import { withStandingCriteria, type CanvasCriterionKind } from './studio-pipelin
  * inside a row are open strings on purpose: the model chooses the words and
  * the numbers; nothing here is a closed vocabulary a grader keys on.
  *
- * The row targets sum to the room the standing criteria leave in the canvas
- * pipeline's cap, because a generated prompt's rubric is its rows
- * (`criteriaFromDraft`) closed by those: one criterion per row, never a
+ * The row targets sum to the room every standing criterion a rubric can carry
+ * leaves in the canvas pipeline's cap, because a generated prompt's rubric is
+ * its rows (`criteriaFromDraft`) closed by those: one criterion per row, never a
  * blank one, and never more than the grader can hold — a draft a little over
  * a row bound is kept whole, and the cap takes the first rows. And each row
  * fits a criterion statement whole — a row is one, or composes into one with
@@ -33,6 +34,7 @@ import { withStandingCriteria, type CanvasCriterionKind } from './studio-pipelin
 const FUNCTIONAL_ROWS_BOUND = bound(6, 'list');
 const DOMAIN_ROWS_BOUND = bound(4, 'list');
 const INTERFACE_ROWS_BOUND = bound(4, 'list');
+const REQUEST_PATH_ROWS_BOUND = bound(2, 'list');
 const NON_FUNCTIONAL_ROWS_BOUND = bound(4, 'list');
 const SCALE_ROWS_BOUND = bound(2, 'list');
 const DECISION_ROWS_BOUND = bound(2, 'list');
@@ -53,6 +55,7 @@ export const DESIGN_PROMPT_ROW_STATEMENT_BOUNDS = {
   functional: CRITERION_STATEMENT_BOUND,
   domainAndData: CRITERION_STATEMENT_BOUND,
   interfaces: CRITERION_STATEMENT_BOUND,
+  requestPaths: CRITERION_STATEMENT_BOUND,
   nonFunctional: composedBound([
     NFR_KIND_BOUND,
     STATEMENT_SEPARATOR,
@@ -91,6 +94,14 @@ export const designPromptDraftSchema = z.strictObject({
     {
       description:
         'A contract the system must expose or honour: an operation and its idempotency, pagination or versioning, an event published, an integration that only behaves one way.',
+    },
+  ),
+  requestPaths: bounded.list(
+    REQUEST_PATH_ROWS_BOUND,
+    bounded.text(CRITERION_STATEMENT_BOUND, { min: 1 }),
+    {
+      description:
+        'A request or message the design must carry from where it enters to where it comes to rest — who calls whom, sync or async — and what must hold on the way: a timeout, a retry, an ordering, a delivery guarantee, a failure handled. Never the mechanism the candidate should choose.',
     },
   ),
   nonFunctionalRequirements: bounded.list(
@@ -186,6 +197,13 @@ export const DRAFT_SECTIONS = {
     layout: 'bullets',
     cells: (row) => [row],
   },
+  requestPaths: {
+    heading: '## Request paths',
+    kind: 'communication',
+    locationPrefix: 'request',
+    layout: 'bullets',
+    cells: (row) => [row],
+  },
   nonFunctionalRequirements: {
     heading: '## Non-functional requirements',
     kind: 'non_functional',
@@ -237,6 +255,7 @@ export const DESIGN_PROMPT_HEADINGS = {
   functional: DRAFT_SECTIONS.functionalRequirements.heading,
   domainAndData: DRAFT_SECTIONS.domainAndData.heading,
   interfaces: DRAFT_SECTIONS.interfaces.heading,
+  requestPaths: DRAFT_SECTIONS.requestPaths.heading,
   nonFunctional: DRAFT_SECTIONS.nonFunctionalRequirements.heading,
   scale: DRAFT_SECTIONS.scale.heading,
   decisions: DRAFT_SECTIONS.decisions.heading,
@@ -303,13 +322,17 @@ const statement = (cells: readonly string[]): string =>
 /**
  * A generated prompt's rubric is its rows: one criterion per row, in the
  * order the markdown prints the sections, kinded by the section it came from,
- * and closed by the standing criteria every canvas rubric carries. No model
- * is asked to read back what the draft already states, so the ids `c1…cN`
- * are fixed the moment the prompt is claimed, and there are never more than
- * the grader's cap: the row targets sum to the room the standing criteria
- * leave, and a draft kept past them yields its first rows.
+ * and closed by the standing criteria every canvas rubric carries — the
+ * platform's too, when the prompt declares one. No model is asked to read
+ * back what the draft already states, so the ids `c1…cN` are fixed the
+ * moment the prompt is claimed, and there are never more than the grader's
+ * cap: the row targets sum to the room the standing criteria leave, and a
+ * draft kept past them yields its first rows.
  */
-export function criteriaFromDraft(draft: DesignPromptDraft): SuccessCriterion[] {
+export function criteriaFromDraft(
+  draft: DesignPromptDraft,
+  platform: PlatformId | null,
+): SuccessCriterion[] {
   return withStandingCriteria(
     DRAFT_SECTION_KEYS.flatMap((key) =>
       draftRows(draft, key).map((row) => ({
@@ -317,5 +340,6 @@ export function criteriaFromDraft(draft: DesignPromptDraft): SuccessCriterion[] 
         statement: statement(sectionCells(key, row)),
       })),
     ),
+    platform,
   );
 }

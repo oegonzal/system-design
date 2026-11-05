@@ -56,6 +56,9 @@ interface GenerationBrief {
  * competency: the first declared format that emphasises it, with that kind
  * emphasised — so "surprise me" practises what the record says needs it,
  * and the whole system by default while too little has been graded to say.
+ * The platform asked for never reaches the writer, whose prose stays
+ * vendor-neutral under its own brand gate; it rides on the row and onto the
+ * prompt the draft is claimed as.
  */
 @Injectable()
 export class PromptGenerationService {
@@ -79,7 +82,14 @@ export class PromptGenerationService {
       goal: renderExperienceGoal(experience, { format, emphasis }),
       maxIterations: GENERATION_ITERATIONS,
     });
-    this.em.persist(this.em.create(PromptGeneration, { runId: started.runId, experience, format }));
+    this.em.persist(
+      this.em.create(PromptGeneration, {
+        runId: started.runId,
+        experience,
+        format,
+        platform: request.platform ?? null,
+      }),
+    );
     await this.em.flush();
     return started;
   }
@@ -142,7 +152,7 @@ export class PromptGenerationService {
         `prompt generation ${runId}: claimed with ${draft.overruns.length} field(s) past what was asked — ${draft.overruns.map(describeOverrun).join('; ')}`,
       );
     }
-    const claimed = await this.claim(runId, row.experience, row.format, draft.value);
+    const claimed = await this.claim(runId, row, draft.value);
     return answer({
       status: 'complete',
       error: null,
@@ -188,12 +198,11 @@ export class PromptGenerationService {
    */
   private async claim(
     runId: string,
-    experience: ExperienceProfile | null,
-    format: PracticeFormatId,
+    asked: Pick<PromptGeneration, 'experience' | 'format' | 'platform'>,
     draft: DesignPromptDraft,
   ): Promise<Prompt> {
     const markdown = renderDesignPromptMarkdown(draft);
-    const criteria = criteriaFromDraft(draft);
+    const criteria = criteriaFromDraft(draft, asked.platform);
     let id: string;
     try {
       id = await this.em.transactional(async (em) => {
@@ -202,8 +211,9 @@ export class PromptGenerationService {
           markdown,
           criteria,
           source: 'generated',
-          format,
-          experience,
+          format: asked.format,
+          platform: asked.platform,
+          experience: asked.experience,
         });
         em.persist(prompt);
         await em.flush();

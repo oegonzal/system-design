@@ -12,9 +12,13 @@ import {
   CANVAS_ID_MAX_LENGTH,
   CANVAS_MAX_TOTAL_OPERATIONS,
   CANVAS_NODES_BOUND,
+  CONFIG_KEY_MAX_LENGTH,
+  CONFIG_STRING_VALUE_BOUND,
   DECISION_NODES_BOUND,
   DECISION_TEXT_BOUND,
   EDGE_CARRIES_BOUND,
+  EDGE_CONFIG_HINTS,
+  EDGE_CONFIG_KEYS_BOUND,
   EDGE_KINDS,
   EDGE_LABEL_BOUND,
   FLOW_STEPS_BOUND,
@@ -24,9 +28,7 @@ import {
   NARRATION_PROSE_BOUND,
   NARRATIVE_ASSUMPTIONS_BOUND,
   NARRATIVE_DECISIONS_BOUND,
-  NODE_CONFIG_KEY_MAX_LENGTH,
   NODE_CONFIG_KEYS_BOUND,
-  NODE_CONFIG_STRING_VALUE_BOUND,
   NODE_KINDS,
   NODE_LABEL_BOUND,
   NODE_OPERATIONS_BOUND,
@@ -37,6 +39,7 @@ import {
   RESPONSIBILITY_BOUND,
 } from './canvas';
 import { designModelDraftSchema, designModelSchema } from './model.schema';
+import { ALL_PLATFORM_SERVICE_IDS, PLATFORM_SECTION_HEADING } from './platforms';
 import { designTranscriptSchema } from './transcript.schema';
 import { CRITERION_ID_MAX_LENGTH } from './quality-loop/evidence';
 
@@ -63,23 +66,24 @@ const canvasId = (description?: string) =>
 const criterionId = () => bounded.id(CRITERION_ID_MAX_LENGTH, { min: 1 });
 
 /** A config value is a scalar the author typed: text, a number or a flag. */
-export const nodeConfigValueSchema = z.union([
-  bounded.text(NODE_CONFIG_STRING_VALUE_BOUND),
+export const configValueSchema = z.union([
+  bounded.text(CONFIG_STRING_VALUE_BOUND),
   z.number(),
   z.boolean(),
 ]);
-export type NodeConfigValue = z.infer<typeof nodeConfigValueSchema>;
+export type ConfigValue = z.infer<typeof configValueSchema>;
 
 /**
- * Free-form configuration, one entry per key. A list rather than a record so
- * the same schema serves a model on every route — a JSON-schema record loses
- * its keys under structured output, a list does not.
+ * Free-form configuration, one entry per key, on a node or on an edge. A
+ * list rather than a record so the same schema serves a model on every route
+ * — a JSON-schema record loses its keys under structured output, a list does
+ * not.
  */
-export const nodeConfigEntrySchema = z.strictObject({
-  key: bounded.id(NODE_CONFIG_KEY_MAX_LENGTH, { min: 1 }),
-  value: nodeConfigValueSchema,
+export const configEntrySchema = z.strictObject({
+  key: bounded.id(CONFIG_KEY_MAX_LENGTH, { min: 1 }),
+  value: configValueSchema,
 });
-export type NodeConfigEntry = z.infer<typeof nodeConfigEntrySchema>;
+export type ConfigEntry = z.infer<typeof configEntrySchema>;
 
 /**
  * One entry in a node's declared interface: a `command` mutates, a `query`
@@ -97,6 +101,13 @@ export type NodeOperation = z.infer<typeof nodeOperationSchema>;
 export const canvasNodeSchema = z.strictObject({
   id: canvasId("The author's id; keep it. A new node takes an id starting with `ai-`."),
   kind: z.enum(NODE_KINDS),
+  /** The platform service the node is, when the goal declares a platform; `kind` is one of the roles the catalogue lists for it. */
+  service: z
+    .enum(ALL_PLATFORM_SERVICE_IDS)
+    .optional()
+    .describe(
+      `The platform service this node is, by an id the goal's \`${PLATFORM_SECTION_HEADING}\` section lists; its kind must be one of the roles that section states for the service. Omit when the goal declares no platform.`,
+    ),
   label: bounded.text(NODE_LABEL_BOUND),
   /** Canvas layout, so a stored revision re-renders where the author left it. */
   position: z
@@ -104,7 +115,7 @@ export const canvasNodeSchema = z.strictObject({
     .optional()
     .describe('Omit for a new node; the studio lays it out.'),
   config: bounded
-    .list(NODE_CONFIG_KEYS_BOUND, nodeConfigEntrySchema, {
+    .list(NODE_CONFIG_KEYS_BOUND, configEntrySchema, {
       description: 'One entry per key; a key set twice is refused.',
     })
     .optional(),
@@ -128,6 +139,12 @@ export const canvasEdgeSchema = z.strictObject({
   /** A solid request/response call, or fire-and-forget messaging. */
   kind: z.enum(EDGE_KINDS),
   label: bounded.text(EDGE_LABEL_BOUND).optional(),
+  /** How the hop is made and what happens when it fails, as free-form entries; the hints are suggestions, never a vocabulary. */
+  config: bounded
+    .list(EDGE_CONFIG_KEYS_BOUND, configEntrySchema, {
+      description: `How this connection is made and what happens when it fails. One entry per key; a key set twice is refused. Suggested keys: ${EDGE_CONFIG_HINTS.join(', ')} — any key is accepted.`,
+    })
+    .optional(),
   /** Operation names this connection exercises — declared on its source or its target. */
   carries: bounded
     .list(EDGE_CARRIES_BOUND, bounded.id(OPERATION_NAME_MAX_LENGTH, { min: 1 }), {

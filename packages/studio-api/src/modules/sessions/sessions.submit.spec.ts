@@ -1,15 +1,18 @@
 import { BadGatewayException } from '@nestjs/common';
 import { describe, expect, it } from 'vitest';
-import type {
-  ApiErrorResponse,
-  DesignBrief,
-  DesignNarrative,
-  GetSessionResponse,
-  ListRevisionsResponse,
+import {
+  PLATFORM_SECTION_HEADING,
+  renderCanvasGoal,
+  type ApiErrorResponse,
+  type DesignBrief,
+  type DesignNarrative,
+  type GetSessionResponse,
+  type ListRevisionsResponse,
 } from '@sysdesign/contracts';
 import { Prompt } from '@sysdesign/db';
 
 import { call, UNKNOWN_UUID, useHarness } from '../../test/harness';
+import { authoredPrompt, promptsApi } from '../../test/prompts';
 import {
   sessionsApi,
   submission,
@@ -47,7 +50,7 @@ describe('sessions', () => {
       expect(h.loop.startRequests).toEqual([
         {
           pipeline: 'system-design-canvas',
-          goal: prompt.markdown,
+          goal: renderCanvasGoal({ markdown: prompt.markdown, platform: null }),
           output: submission(),
           criteria: prompt.criteria,
           maxIterations: 1,
@@ -72,7 +75,7 @@ describe('sessions', () => {
       graph.edges[1] = { ...graph.edges[1], carries: ['CancelOrder'] };
       const brief: DesignBrief = {
         version: 1,
-        bindings: [{ criterionId: 'c9', nodeIds: ['nobody'], claim: 'bound to nothing' }],
+        bindings: [{ criterionId: 'c11', nodeIds: ['nobody'], claim: 'bound to nothing' }],
       };
       const narrative: DesignNarrative = {
         version: 1,
@@ -90,7 +93,7 @@ describe('sessions', () => {
         'unknown target node: ghost',
         'self-loop',
         'carries CancelOrder',
-        'unknown criterion: c9',
+        'unknown criterion: c11',
         'unknown node: nobody',
         'explains unknown node: ghost',
       ]) {
@@ -222,6 +225,27 @@ describe('sessions', () => {
       });
       expect((await submit(sessionId, submission())).status).toBe(422);
       expect((await submit(UNKNOWN_UUID, submission())).status).toBe(404);
+    });
+  });
+
+  describe('the goal a grade reads', () => {
+    it('[GEN-7] closes a platform prompt with its catalogue, so every lens reads the services the author drew with', async () => {
+      const { body: authored } = await promptsApi(h).author({
+        ...authoredPrompt(),
+        platform: 'aws',
+      });
+      expect(authored.data.platform).toBe('aws');
+      const { body: created } = await call<GetSessionResponse>(`${h.url}/sessions`, {
+        method: 'POST',
+        body: JSON.stringify({ promptId: authored.data.id }),
+      });
+      const { status } = await submit(created.data.id, submission());
+      expect(status).toBe(201);
+      const goal = h.loop.startRequests.at(-1)?.goal ?? '';
+      expect(goal).toBe(renderCanvasGoal({ markdown: authored.data.markdown, platform: 'aws' }));
+      expect(goal.startsWith(authored.data.markdown.trimEnd())).toBe(true);
+      expect(goal).toContain(PLATFORM_SECTION_HEADING);
+      expect(goal).toContain('`aws.sqs`');
     });
   });
 });

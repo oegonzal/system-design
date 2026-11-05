@@ -1,9 +1,5 @@
 import { expect, test } from '@playwright/test';
-import {
-  NODE_CONFIG_STRING_VALUE_BOUND,
-  NODE_KIND_CATEGORIES,
-  NODE_KINDS,
-} from '@sysdesign/contracts';
+import { CONFIG_STRING_VALUE_BOUND, NODE_KIND_CATEGORIES, NODE_KINDS } from '@sysdesign/contracts';
 
 import { createPracticeSession, saveDraft } from '../support/backend';
 import { CanvasPage, openPracticeSession } from '../support/canvas.page';
@@ -15,6 +11,7 @@ import { CanvasPage, openPracticeSession } from '../support/canvas.page';
  */
 test.describe('interactive design canvas', () => {
   test('[UX-1] the palette offers every node kind in the contract', async ({ page, request }) => {
+    // A prompt authored over the API declares no platform, so the palette shelves the roles alone.
     const { canvas } = await openPracticeSession(page, request);
 
     for (const kind of NODE_KINDS) {
@@ -95,6 +92,19 @@ test.describe('interactive design canvas', () => {
     // The rendered edge switches over, not just the form.
     await expect(canvas.edge('e-1')).toHaveAttribute('data-kind', 'async');
     await expect(canvas.edgeCallStyle).toHaveValue('async');
+
+    // A sync call may join the same pair beside the async hop; a second sync
+    // call is the duplicate refused — and the pair fans out as two lines.
+    await canvas.connect('n-1', 'n-2'); // e-2
+    await expect(canvas.edge('e-2')).toHaveAttribute('data-kind', 'sync');
+    await canvas.connect('n-1', 'n-2');
+    await expect(page.locator('[data-testid^="edge-e-"]')).toHaveCount(2);
+    const [first, second] = await Promise.all(
+      ['e-1', 'e-2'].map((id) =>
+        canvas.edge(id).locator('.react-flow__edge-path').getAttribute('d'),
+      ),
+    );
+    expect(first).not.toBe(second);
   });
 
   test('[UX-2] drops a palette block at an exact spot (HTML5 drag-and-drop)', async ({
@@ -156,7 +166,7 @@ test.describe('interactive design canvas', () => {
     const width = async (field: typeof key) => (await field.boundingBox())?.width;
     const before = await width(value);
     expect(before).toBe(await width(key));
-    await value.fill('x'.repeat(NODE_CONFIG_STRING_VALUE_BOUND.ceiling));
+    await value.fill('x'.repeat(CONFIG_STRING_VALUE_BOUND.ceiling));
     await expect(canvas.properties.getByText(/Limit reached/)).toBeVisible();
     expect(await width(value)).toBe(before);
     expect(await width(key)).toBe(before);

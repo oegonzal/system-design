@@ -4,6 +4,9 @@ import {
   CANVAS_MAX_CRITERIA,
   CANVAS_STANDING_CRITERIA,
   type DesignTranscript,
+  isPlatformServiceId,
+  PLATFORM_IDS,
+  platformCatalogue,
   submissionLocations,
   TRANSCRIPT_VERSION,
 } from '@sysdesign/contracts';
@@ -54,18 +57,20 @@ describe('the system-design-canvas pipeline', () => {
 
   it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage has measurably written, or above the seed it holds until this version is measured', () => {
     // `measured.json`, refreshed by `pnpm measure:bounds --pipeline=system-design-canvas
-    // --since=<the date 2.0.0 first ran>`. A cap is also the call's time
+    // --since=<the date 2.1.0 first ran>`. A cap is also the call's time
     // limit, so one a stage outwrites is a call cut short. The coach writes
     // into the submission schema contracts declares, so its fields are
     // measured and held there (`canvas.schema.spec.ts`). Until this version's
     // own runs are measured, every stage holds the most its predecessor wrote
     // under 1.0.0 (48 runs, 2026-09-30 to 10-03): the three critics that
-    // replaced the architecture critic hold its 25,362; a measurement
-    // replaces a seed the moment it exists.
+    // replaced the architecture critic hold its 25,362, and so does the
+    // communication critic 2.1.0 added; a measurement replaces a seed the
+    // moment it exists.
     const seeds = seededCaps({
       'critic.requirements': 24678,
       'critic.model': 25362,
       'critic.structure': 25362,
+      'critic.communication': 25362,
       'critic.fitness': 25362,
       'critic.explanation': 25094,
       'evaluator.coverage': 10135,
@@ -88,7 +93,7 @@ describe('the system-design-canvas pipeline', () => {
     ).toEqual([]);
   });
 
-  it('[EVAL-4] grades a design as competencies: every finding type is owned by one critic, scale weighs the same as every other kind, and reasoning is earned by the standing criteria every rubric carries', () => {
+  it('[EVAL-4] [EVAL-6] grades a design as competencies: every finding type is owned by one critic, scale weighs the same as every other kind, reasoning and communication are earned by the standing criteria every rubric carries, and the hop and flow defects price onto design', () => {
     const owners = new Map<string, string[]>();
     for (const critic of SYSTEM_DESIGN_CANVAS.critics) {
       for (const type of critic.findingTypes ?? []) {
@@ -109,13 +114,37 @@ describe('the system-design-canvas pipeline', () => {
       (kind) => criterionKinds[kind].dimension === 'reasoning',
     );
     expect(reasoningKinds).toEqual(['tradeoff']);
-    for (const standing of CANVAS_STANDING_CRITERIA)
-      expect(reasoningKinds).toContain(standing.kind);
-    expect(
-      SYSTEM_DESIGN_CANVAS.evaluators.find((evaluator) =>
-        evaluator.criterionKinds.includes('tradeoff'),
-      )?.id,
-    ).toBe('evaluator.reasoning');
+    // The standing criteria earn reasoning (the trade-off rows) and design (the communication rows).
+    expect(new Set(CANVAS_STANDING_CRITERIA.map((c) => criterionKinds[c.kind].dimension))).toEqual(
+      new Set(['reasoning', 'design']),
+    );
+    expect(criterionKinds.communication.dimension).toBe('design');
+    const judgeOf = (kind: string) =>
+      SYSTEM_DESIGN_CANVAS.evaluators.find((evaluator) => evaluator.criterionKinds.includes(kind))
+        ?.id;
+    expect(judgeOf('tradeoff')).toBe('evaluator.reasoning');
+    expect(judgeOf('communication')).toBe('evaluator.design');
+    for (const type of [
+      'flow_gap',
+      'hop_undeclared',
+      'failure_path_missing',
+      'integration_misfit',
+      'service_misfit',
+    ]) {
+      expect(owners.get(type)).toEqual(['critic.communication']);
+      expect(SYSTEM_DESIGN_CANVAS.policy.findingTypes[type].dimension).toBe('design');
+    }
+    // Every judge reads the one paragraph on a declared platform, and no persona names a vendor.
+    for (const lens of [...SYSTEM_DESIGN_CANVAS.critics, ...SYSTEM_DESIGN_CANVAS.evaluators]) {
+      expect(lens.persona).toContain('Where the goal declares a platform and lists its catalogue');
+    }
+    for (const platform of PLATFORM_IDS) {
+      const { label, services } = platformCatalogue(platform);
+      for (const lens of [...SYSTEM_DESIGN_CANVAS.critics, ...SYSTEM_DESIGN_CANVAS.evaluators]) {
+        expect(lens.persona).not.toContain(label);
+        for (const service of services) expect(lens.persona).not.toContain(service.label);
+      }
+    }
   });
 
   it('[QL-81] the transcript is carried: a coached design keeps the interview it was graded with, and the coach writes none of it', () => {
@@ -177,7 +206,7 @@ describe('the system-design-canvas pipeline', () => {
       '[binding.1] c1 ← gateway-1 (node.2), service-1 (node.3), database-1 (node.11), order (entity.1): ',
     );
     expect(rendered).toContain(
-      '    path, 3 edges, client-1 (node.1) to database-1 (node.11): edge.1 (edge-1: client-1 -> gateway-1) → edge.2 (edge-2: gateway-1 -> service-1) → edge.3 (edge-3: service-1 -> database-1)',
+      '    path, 3 edges, client-1 (node.1) to database-1 (node.11): edge.1 (edge-1: client-1 -> gateway-1, sync) → edge.2 (edge-2: gateway-1 -> service-1, sync) → edge.3 (edge-3: service-1 -> database-1, sync)',
     );
     expect(rendered).toContain('[rationale.1] service-1 (node.3):');
     expect(rendered).toContain('[narration.1] c1:');
@@ -230,10 +259,10 @@ describe('the system-design-canvas pipeline', () => {
     const under = (binding: string) => lines[lines.findIndex((l) => l.startsWith(binding)) + 1];
 
     expect(under('[binding.1]')).toBe(
-      '    path, 2 edges, n-1 (node.1) to n-5 (node.3): edge.1 (e-1: n-1 -> n-3) → edge.3 (e-3: n-3 -> n-5)',
+      '    path, 2 edges, n-1 (node.1) to n-5 (node.3): edge.1 (e-1: n-1 -> n-3, sync) → edge.3 (e-3: n-3 -> n-5, sync)',
     );
     expect(under('[binding.2]')).toBe(
-      '    path, 2 edges, n-1 (node.1) to ai-db-replica (node.4): edge.1 (e-1: n-1 -> n-3) → edge.4 (e-4: n-3 -> ai-db-replica)',
+      '    path, 2 edges, n-1 (node.1) to ai-db-replica (node.4): edge.1 (e-1: n-1 -> n-3, sync) → edge.4 (e-4: n-3 -> ai-db-replica, sync)',
     );
     // No path, no path line: the trade-off line, printed even when empty so
     // a choice nobody defended is visible, is all that stands before the
@@ -244,12 +273,42 @@ describe('the system-design-canvas pipeline', () => {
     );
     // A hop no edge answers to is named as such, and the walk's ends are not guessed.
     expect(under('[binding.4]')).toBe(
-      '    path, 2 edges: edge.1 (e-1: n-1 -> n-3) → gone (no such edge)',
+      '    path, 2 edges: edge.1 (e-1: n-1 -> n-3, sync) → gone (no such edge)',
     );
     // The claim closes the binding's own line; the path never rides inside it.
     expect(lines.find((l) => l.startsWith('[binding.2]'))).toBe(
       '[binding.2] c5 ← n-3 (node.2): "fallback read"',
     );
+  });
+
+  it('[QL-21] [UX-31] a node prints the platform service it names after its kind and a connection its config, as the contract renders them', () => {
+    const [platformId] = PLATFORM_IDS;
+    const [service] = platformCatalogue(platformId).services;
+    // A catalogue id is one the schema admits by construction; the guard says so to the compiler.
+    if (!isPlatformServiceId(service.id)) throw new Error(`${service.id} is no service id`);
+    const rendered = canvasOutput.render({
+      graph: {
+        nodes: [
+          { id: 'n-1', kind: 'client', label: 'Client' },
+          { id: 'managed', kind: service.roles[0], service: service.id, label: 'Managed' },
+        ],
+        edges: [
+          {
+            id: 'e-1',
+            source: 'n-1',
+            target: 'managed',
+            kind: 'sync',
+            config: [{ key: 'timeoutMs', value: 500 }],
+          },
+        ],
+      },
+      brief: null,
+      narrative: null,
+    });
+    expect(rendered).toContain(
+      `[node.2] node managed kind=${service.roles[0]} service=${service.id} label="Managed"`,
+    );
+    expect(rendered).toContain('[edge.1] edge e-1: n-1 -> managed (sync) config={"timeoutMs":500}');
   });
 
   it('[QL-21] a submission without a model, a brief or a narrative says so, and exposes nothing to cite there', () => {

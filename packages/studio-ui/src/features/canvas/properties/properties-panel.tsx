@@ -3,23 +3,29 @@
 import styled from '@emotion/styled';
 import {
   DEFAULT_NODE_LABELS,
+  EDGE_CONFIG_HINTS,
+  EDGE_CONFIG_KEYS_BOUND,
   EDGE_KINDS,
   EDGE_LABEL_BOUND,
   kindsInCategory,
+  NODE_CONFIG_KEYS_BOUND,
   NODE_KIND_CATEGORIES,
   NODE_KIND_GUIDE,
   NODE_LABEL_BOUND,
   type EdgeKind,
   type NodeKind,
+  type PlatformCatalogue,
 } from '@sysdesign/contracts';
 import { Button, Heading, SelectField, Stack, Text, TextField } from '@sysdesign/design-system';
 
 import { useCanvasStore } from '../canvas-store-context';
 import { CANVAS_COPY } from '../copy';
+import { catalogueFor, serviceOf } from '../platform-services';
 import { ConfigEditor } from './config-editor';
 import { EdgeCarriesField } from './edge-carries-field';
 import { OperationsEditor } from './operations-editor';
 import { ResponsibilitiesEditor } from './responsibilities-editor';
+import { ServiceField } from './service-field';
 import { useDescriptionInView } from './use-description-in-view';
 
 const Root = styled.aside`
@@ -50,6 +56,8 @@ const Fields = styled.fieldset`
 export interface PropertiesPanelProps {
   /** Lets a parent layout size the panel as a flex item (Emotion composition). */
   className?: string;
+  /** The platform the session's prompt declares, whose services a block may be; none for a neutral prompt. */
+  catalogue?: PlatformCatalogue | null;
 }
 
 /**
@@ -59,7 +67,7 @@ export interface PropertiesPanelProps {
  * whether a queue with a query or a client with three replicas makes sense.
  * While the canvas is read-only the element can be inspected, not edited.
  */
-export function PropertiesPanel({ className }: PropertiesPanelProps) {
+export function PropertiesPanel({ className, catalogue = null }: PropertiesPanelProps) {
   const selectedId = useCanvasStore((state) => state.selectedId);
   const node = useCanvasStore((state) =>
     state.selectedId === null
@@ -95,6 +103,10 @@ export function PropertiesPanel({ className }: PropertiesPanelProps) {
 
   const sourceNode = edge ? nodes.find((candidate) => candidate.id === edge.source) : undefined;
   const targetNode = edge ? nodes.find((candidate) => candidate.id === edge.target) : undefined;
+  // The service a block names, and the catalogue its Service control lists.
+  const service = node?.data.service === undefined ? null : serviceOf(node.data.service);
+  const shelves = node ? catalogueFor(catalogue, node.data.service) : null;
+  const guide = service ?? (node ? NODE_KIND_GUIDE[node.data.kind] : null);
 
   return (
     <Root
@@ -129,36 +141,56 @@ export function PropertiesPanel({ className }: PropertiesPanelProps) {
                 }
               }}
             />
+            {shelves ? (
+              <ServiceField
+                catalogue={shelves}
+                value={node.data.service ?? null}
+                onChange={(next) => updateNode(node.id, { service: next })}
+              />
+            ) : null}
             <SelectField
               label="Kind"
               value={node.data.kind}
               onChange={(event) => updateNode(node.id, { kind: event.target.value as NodeKind })}
             >
-              {/* One group per contract category; a category with no kinds renders nothing. */}
-              {NODE_KIND_CATEGORIES.map((category) => {
-                const kinds = kindsInCategory(category.id);
-                if (kinds.length === 0) return null;
+              {service ? (
+                /* A block that names a service plays one of the roles the catalogue lists for it. */
+                <optgroup label={`Roles ${service.label} plays`}>
+                  {service.roles.map((kind) => (
+                    <option key={kind} value={kind}>
+                      {DEFAULT_NODE_LABELS[kind]}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : (
+                /* One group per contract category; a category with no kinds renders nothing. */
+                NODE_KIND_CATEGORIES.map((category) => {
+                  const kinds = kindsInCategory(category.id);
+                  if (kinds.length === 0) return null;
 
-                return (
-                  <optgroup key={category.id} label={category.label}>
-                    {kinds.map((kind) => (
-                      <option key={kind} value={kind}>
-                        {DEFAULT_NODE_LABELS[kind]}
-                      </option>
-                    ))}
-                  </optgroup>
-                );
-              })}
+                  return (
+                    <optgroup key={category.id} label={category.label}>
+                      {kinds.map((kind) => (
+                        <option key={kind} value={kind}>
+                          {DEFAULT_NODE_LABELS[kind]}
+                        </option>
+                      ))}
+                    </optgroup>
+                  );
+                })
+              )}
             </SelectField>
-            {/* The product explains its own vocabulary: what this kind is and when to use it. */}
-            <Stack gap={1} data-testid="kind-guide">
-              <Text size="sm" tone="muted">
-                {NODE_KIND_GUIDE[node.data.kind].what}
-              </Text>
-              <Text size="sm" tone="muted">
-                {NODE_KIND_GUIDE[node.data.kind].whenToUse}
-              </Text>
-            </Stack>
+            {/* The product explains its own vocabulary: what this service or kind is and when to use it. */}
+            {guide ? (
+              <Stack gap={1} data-testid="kind-guide">
+                <Text size="sm" tone="muted">
+                  {guide.what}
+                </Text>
+                <Text size="sm" tone="muted">
+                  {guide.whenToUse}
+                </Text>
+              </Stack>
+            ) : null}
 
             <Stack gap={2} data-testid="config-section">
               <Heading level={3}>Configuration</Heading>
@@ -169,6 +201,8 @@ export function PropertiesPanel({ className }: PropertiesPanelProps) {
               </Text>
               <ConfigEditor
                 config={node.data.config ?? []}
+                keysBound={NODE_CONFIG_KEYS_BOUND}
+                hints={service?.knobs ?? []}
                 onChange={(config) => updateNode(node.id, { config })}
               />
             </Stack>
@@ -239,6 +273,20 @@ export function PropertiesPanel({ className }: PropertiesPanelProps) {
                 onChange={(carries) => updateEdge(edge.id, { carries })}
               />
             ) : null}
+            <Stack gap={2} data-testid="edge-config-section">
+              <Heading level={3}>Configuration</Heading>
+              <Text size="sm" tone="muted" data-testid="edge-config-guide">
+                How this hop is made and what happens when it fails — the protocol, the auth, a
+                timeout, the retries, a dead-letter queue, the delivery or ordering guarantee. The
+                graders read every hop as declared; one left silent is a finding.
+              </Text>
+              <ConfigEditor
+                config={edge.data?.config ?? []}
+                keysBound={EDGE_CONFIG_KEYS_BOUND}
+                hints={EDGE_CONFIG_HINTS}
+                onChange={(config) => updateEdge(edge.id, { config })}
+              />
+            </Stack>
           </Stack>
         ) : null}
 

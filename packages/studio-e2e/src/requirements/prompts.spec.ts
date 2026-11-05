@@ -3,8 +3,8 @@ import { expect, test } from '@playwright/test';
 import { AppNav } from '../support/app-nav';
 import {
   AUTHORED_CRITERIA_BY_KIND,
-  AUTHORED_CRITERIA_IDS,
   AUTHORED_MARKDOWN,
+  AUTHORED_PLATFORM_CRITERIA_IDS,
   AUTHORED_TITLE,
   authorPrompt,
   getPrompt,
@@ -73,10 +73,14 @@ test.describe('prompts', () => {
     await prompts.expectTitledOnce(AUTHORED_TITLE);
     await expect(prompts.markdownHeading('Scale targets')).toBeVisible();
     await expect(prompts.markdownPane.getByRole('table').first()).toBeVisible();
-    await prompts.expectCriteriaChips(AUTHORED_CRITERIA_IDS);
+    // The composer's default platform is the first declared one: the rubric
+    // closes with the platform constraint, and the badge says which platform.
+    await prompts.expectCriteriaChips(AUTHORED_PLATFORM_CRITERIA_IDS);
+    await expect(page.getByTestId('prompt-platform')).toHaveText('AWS');
 
     const stored = await getPrompt(request, prompts.promptIdFromUrl());
     expect(stored.markdown).toBe(AUTHORED_MARKDOWN);
+    expect(stored.platform).toBe('aws');
   });
 
   test('[GEN-3] a library document previews, imports as a prompt with its own rubric, and the browser filters by source', async ({
@@ -90,7 +94,8 @@ test.describe('prompts', () => {
     await prompts.expectSource('library');
     await prompts.expectTitledOnce(ORDER_HISTORY_DOCUMENT.title);
     await expect(prompts.markdownHeading('Constraints')).toBeVisible();
-    await prompts.expectCriteriaChips(AUTHORED_CRITERIA_IDS);
+    // Imported under the composer's default platform, as a written prompt is.
+    await prompts.expectCriteriaChips(AUTHORED_PLATFORM_CRITERIA_IDS);
 
     // The source filter narrows the browser to imports alone. Other workers
     // may be importing the same document, so the list is asserted by

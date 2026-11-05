@@ -4,7 +4,6 @@ import '@xyflow/react/dist/style.css';
 
 import { useTheme } from '@emotion/react';
 import styled from '@emotion/styled';
-import { NODE_KINDS, type NodeKind } from '@sysdesign/contracts';
 import {
   Background,
   BackgroundVariant,
@@ -25,6 +24,7 @@ import { flowVariableDeclarations } from './flow-theme';
 import { FIT_ZOOM, MINIMAP_SIZE, revealShift, viewArea } from './framing';
 import { SdNode } from './nodes/sd-node';
 import { NODE_DRAG_MIME } from './palette/palette';
+import { isPaletteBlock } from './platform-services';
 import type { SdEdge as SdEdgeModel, SdNode as SdNodeModel } from './types';
 import { useCanvasShortcuts } from './use-canvas-shortcuts';
 import { useFitRequests } from './use-fit-requests';
@@ -130,9 +130,9 @@ export function SdCanvas() {
     (event: DragEvent<HTMLDivElement>) => {
       event.preventDefault();
       if (readOnly) return;
-      const kind = event.dataTransfer.getData(NODE_DRAG_MIME);
-      if (!(NODE_KINDS as readonly string[]).includes(kind)) return;
-      addNode(kind as NodeKind, screenToFlowPosition({ x: event.clientX, y: event.clientY }));
+      const block = event.dataTransfer.getData(NODE_DRAG_MIME);
+      if (!isPaletteBlock(block)) return;
+      addNode(block, screenToFlowPosition({ x: event.clientX, y: event.clientY }));
     },
     [addNode, readOnly, screenToFlowPosition],
   );

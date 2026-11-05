@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  PLATFORM_STANDING_CRITERIA,
   PROMPT_COPY,
   PROMPT_MARKDOWN_BOUND,
   PROMPT_TITLE_BOUND,
@@ -38,10 +39,40 @@ describe('prompts', () => {
         'c6:tradeoff',
         'c7:tradeoff',
         'c8:tradeoff',
+        'c9:communication',
+        'c10:communication',
       ]);
       expect(h.loop.criteriaRequests).toEqual([
         { pipeline: 'system-design-canvas', goal: AUTHORED_MARKDOWN },
       ]);
+      // Platform-neutral unless one is asked for.
+      expect(body.data.platform).toBeNull();
+    });
+
+    it('[GEN-7] keeps the platform a prompt is written for and closes its rubric with the platform constraint — derived from the text alone', async () => {
+      const { status, body } = await author({ ...authoredPrompt(), platform: 'aws' });
+      expect(status).toBe(201);
+      expect(body.data.platform).toBe('aws');
+      expect(body.data.criteria.map((c) => `${c.id}:${c.kind}`)).toEqual([
+        'c1:functional',
+        'c2:functional',
+        'c3:non_functional',
+        'c4:scale',
+        'c5:constraint',
+        'c6:tradeoff',
+        'c7:tradeoff',
+        'c8:tradeoff',
+        'c9:communication',
+        'c10:communication',
+        'c11:constraint',
+      ]);
+      expect(body.data.criteria[10]?.statement).toBe(PLATFORM_STANDING_CRITERIA[0].statement);
+      // The derivation read the markdown and nothing of the platform.
+      expect(h.loop.criteriaRequests).toEqual([
+        { pipeline: 'system-design-canvas', goal: AUTHORED_MARKDOWN },
+      ]);
+      const refused = await author({ ...authoredPrompt(), platform: 'gcp' });
+      expect(refused.status).toBe(400);
     });
 
     it('[DEL-2] the rubric is derived once and its ids are stable on every later read', async () => {
@@ -109,6 +140,8 @@ describe('prompts', () => {
         'tradeoff',
         'tradeoff',
         'tradeoff',
+        'communication',
+        'communication',
       ]);
     });
 
@@ -125,6 +158,8 @@ describe('prompts', () => {
         'tradeoff',
         'tradeoff',
         'tradeoff',
+        'communication',
+        'communication',
       ]);
       const overridden = await call<GetPromptResponse>(`${h.url}/prompts/import`, {
         method: 'POST',
@@ -203,7 +238,16 @@ describe('prompts', () => {
       );
       expect(status).toBe(200);
       expect(body.data.title).toBe('Renamed');
-      expect(body.data.criteria.map((c) => c.id)).toEqual(['c1', 'c2', 'c3', 'c4', 'c5']);
+      // Two derived rows closed by the five standing criteria.
+      expect(body.data.criteria.map((c) => c.id)).toEqual([
+        'c1',
+        'c2',
+        'c3',
+        'c4',
+        'c5',
+        'c6',
+        'c7',
+      ]);
       expect(h.loop.criteriaRequests).toHaveLength(2);
     });
 

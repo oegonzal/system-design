@@ -1,7 +1,7 @@
 import { canvasGraphSchema, LAYOUT_BLOCK, layoutGraph } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { makeGraph, makeInterfaceGraph } from '../../testing/canvas-fixtures';
+import { makeGraph, makeInterfaceGraph, makePlatformGraph } from '../../testing/canvas-fixtures';
 import { grown, NODE_FOOTPRINT, NODE_GAP, overlaps } from './geometry';
 import { fromCanvasGraph, toCanvasGraph } from './graph-io';
 import { boxOf } from './placement';
@@ -20,6 +20,14 @@ describe('graph-io', () => {
     const roundTripped = toCanvasGraph(nodes, edges);
 
     expect(roundTripped).toEqual(graph);
+  });
+
+  it('[UX-31] [EVAL-6] round-trips the service a block names and the config a connection carries', () => {
+    const graph = makePlatformGraph();
+    const { nodes, edges } = fromCanvasGraph(graph);
+    expect(nodes.find((node) => node.id === 'n-4')?.data.service).toBe('aws.sqs');
+    expect(edges.find((edge) => edge.id === 'e-3')?.data?.config).toEqual(graph.edges[2].config);
+    expect(toCanvasGraph(nodes, edges)).toEqual(graph);
   });
 
   it('[UX-3] rounds fractional positions to integers on serialization', () => {

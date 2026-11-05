@@ -1,4 +1,4 @@
-import { NODE_CONFIG_KEYS_BOUND, type NodeConfigEntry } from '@sysdesign/contracts';
+import { NODE_CONFIG_KEYS_BOUND, type ConfigEntry } from '@sysdesign/contracts';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { useState } from 'react';
 
@@ -13,9 +13,9 @@ export default meta;
 type Story = StoryObj<typeof ConfigEditor>;
 
 /** Controlled the way the panel controls it: state out, changes back in. */
-function Controlled({ initial }: { initial: NodeConfigEntry[] }) {
+function Controlled({ initial }: { initial: ConfigEntry[] }) {
   const [config, setConfig] = useState(initial);
-  return <ConfigEditor config={config} onChange={setConfig} />;
+  return <ConfigEditor config={config} keysBound={NODE_CONFIG_KEYS_BOUND} onChange={setConfig} />;
 }
 
 /** Nothing configured yet — the draft row invites the first entry. */
@@ -34,6 +34,34 @@ export const Typed: Story = {
     />
   ),
 };
+
+/** Keys worth setting, as chips: a click fills the draft's key, the author writes the value. */
+export const WithHints: Story = {
+  render: () => (
+    <ConfigEditorWithHints
+      initial={[{ key: 'dlq', value: true }]}
+      hints={['dlq', 'retries', 'timeoutMs', 'delivery']}
+    />
+  ),
+};
+
+function ConfigEditorWithHints({
+  initial,
+  hints,
+}: {
+  initial: ConfigEntry[];
+  hints: readonly string[];
+}) {
+  const [config, setConfig] = useState(initial);
+  return (
+    <ConfigEditor
+      config={config}
+      keysBound={NODE_CONFIG_KEYS_BOUND}
+      hints={hints}
+      onChange={setConfig}
+    />
+  );
+}
 
 /** The contract cap: the draft row disables and the counter reads full. */
 export const AtCapacity: Story = {

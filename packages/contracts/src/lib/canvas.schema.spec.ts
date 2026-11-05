@@ -25,10 +25,21 @@ export function submissionFixture(): DesignSubmission {
           operations: [{ name: 'placeOrder', kind: 'command', idempotent: true, notes: 'keyed' }],
         },
         { id: 'n-3', kind: 'database', label: 'Orders DB' },
+        { id: 'n-4', kind: 'queue', service: 'aws.sqs', label: 'Order events' },
       ],
       edges: [
         { id: 'e-1', source: 'n-1', target: 'n-2', kind: 'sync', carries: ['placeOrder'] },
         { id: 'e-2', source: 'n-2', target: 'n-3', kind: 'sync', label: 'writes' },
+        {
+          id: 'e-3',
+          source: 'n-2',
+          target: 'n-4',
+          kind: 'async',
+          config: [
+            { key: 'delivery', value: 'at-least-once' },
+            { key: 'dlq', value: true },
+          ],
+        },
       ],
     },
     brief: {
@@ -72,11 +83,16 @@ describe('designSubmissionSchema', () => {
     );
   });
 
-  it('rejects an unknown node kind, an unknown key, and a nested config value', () => {
+  it('rejects an unknown node kind, an unknown service, an unknown key, and a nested config value', () => {
     const fixture = submissionFixture();
     const badKind = structuredClone(fixture);
     (badKind.graph.nodes[0] as { kind: string }).kind = 'mainframe';
     expect(designSubmissionSchema.safeParse(badKind).success).toBe(false);
+
+    // A service is an id the catalogue lists, exactly as a kind is — a wrong one is a structural fault.
+    const badService = structuredClone(fixture);
+    (badService.graph.nodes[3] as { service: string }).service = 'aws.mainframe';
+    expect(designSubmissionSchema.safeParse(badService).success).toBe(false);
 
     const extraKey = { ...structuredClone(fixture), archetype: 'x' };
     expect(designSubmissionSchema.safeParse(extraKey).success).toBe(false);
@@ -193,6 +209,11 @@ describe('designSubmissionSchema', () => {
     // pipeline's 2.0.0; no coach has written one yet. The exemptions go the
     // day `pnpm measure:bounds --pipeline=system-design-canvas` first finds them.
     const unwritten = 'added with the canvas pipeline’s 2.0.0; no coach has written one yet';
+    // A connection's config arrived with 2.1.0, the platform catalogues' day;
+    // the exemption goes when `pnpm measure:bounds --pipeline=system-design-canvas`
+    // first finds a coach writing one.
+    const hopConfig =
+      'added with the canvas pipeline’s 2.1.0 (2026-11-05); no coach has written one yet';
     // The transcript is composed by the studio from stored turns, never
     // written by a model; its bounds hold what the interviewer pipeline's
     // own schema allows a reply, and are measured where that is measured.
@@ -214,6 +235,9 @@ describe('designSubmissionSchema', () => {
           'narrative.assumptions[]': unwritten,
           'brief.bindings[].entityIds': unwritten,
           'brief.bindings[].entityIds[]': unwritten,
+          'graph.edges[].config': hopConfig,
+          'graph.edges[].config[].key': hopConfig,
+          'graph.edges[].config[].value': hopConfig,
           'transcript.turns': composed,
           'transcript.turns[].phase': composed,
           'transcript.turns[].text': composed,
@@ -262,6 +286,9 @@ describe('designSubmissionSchema', () => {
       'One entry per key; a key set twice is refused.',
       'A name must be unique on the node',
       'each declared on its source or its target, and none repeated',
+      // A node's service and a connection's config, since 2.1.0.
+      'its kind must be one of the roles that section states for the service',
+      'Suggested keys: protocol, auth, timeoutMs, retries, dlq, delivery, ordering, batchSize, idempotencyKey — any key is accepted.',
       // The rules that were already stated, kept here so one list is the record.
       "The author's id; keep it.",
       'One connected walk of existing edge ids',

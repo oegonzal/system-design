@@ -14,7 +14,7 @@ describe('the trade-offs in an export', () => {
     brief.bindings[0] = { ...brief.bindings[0], tradeoff: 'a table rather than a cache' };
     const md = briefMarkdown(brief, graph, criteria);
     expect(md).toMatch(
-      /Client → Order Service, then Order Service → Orders DB \| a table rather than a cache \|/,
+      /Client → Order Service \(sync\), then Order Service → Orders DB \(sync\) \| a table rather than a cache \|/,
     );
     expect(md).toMatch(/Orders DB \| — \| — \|/);
   });

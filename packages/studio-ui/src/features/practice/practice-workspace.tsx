@@ -30,6 +30,7 @@ import { coachStart, type CoachStart } from '../improve/coach-start';
 import { heartbeatOf } from '../improve/grader-availability';
 import { useGraderAvailability } from '../improve/use-grader-availability';
 import { usePromptCriteria } from '../prompts/use-prompt-criteria';
+import { promptPlatform } from '../prompts/prompt-platform';
 import { gradeSlot, latestUserRevision } from './feedback-target';
 import { SessionDock } from './session-dock';
 import { SubmissionStatus } from './submission-status';
@@ -398,6 +399,7 @@ function WorkspaceInner({ sessionId }: PracticeWorkspaceProps) {
   return (
     <WorkspaceLayout
       title={<Heading level={1}>{prompt?.title ?? 'Practice session'}</Heading>}
+      catalogue={promptPlatform(prompt)}
       status={
         <SubmissionStatus
           revisionNumber={latest?.revisionNumber ?? null}

@@ -1,5 +1,6 @@
 import { CANVAS_MAX_TOTAL_OPERATIONS } from './canvas';
-import type { CanvasGraph } from './canvas.schema';
+import type { CanvasGraph, ConfigEntry } from './canvas.schema';
+import { platformServiceById } from './platforms';
 
 /**
  * Referential validation of a graph whose *shape* already passed the schema.
@@ -8,11 +9,21 @@ import type { CanvasGraph } from './canvas.schema';
  *
  * The line this file holds: it rejects what is IMPOSSIBLE — an edge to a node
  * that is not there, a carry naming an operation neither endpoint declares,
- * two entries under one config key — and says nothing about what is merely
+ * two entries under one config key, a node drawn as a platform service in a
+ * role that service does not play — and says nothing about what is merely
  * unwise. Whether the design is any good is the quality loop's to judge.
  */
 export function validateGraphReferences(graph: CanvasGraph): string[] {
   const problems: string[] = [];
+
+  /** A key set twice on one owner — the same rule for a node's config and an edge's. */
+  const duplicateConfigKeys = (owner: string, entries: readonly ConfigEntry[] | undefined) => {
+    const seen = new Set<string>();
+    for (const entry of entries ?? []) {
+      if (seen.has(entry.key)) problems.push(`${owner} sets config key ${entry.key} twice`);
+      seen.add(entry.key);
+    }
+  };
 
   const nodeIds = new Set<string>();
   const operationsByNode = new Map<string, Set<string>>();
@@ -22,13 +33,17 @@ export function validateGraphReferences(graph: CanvasGraph): string[] {
       problems.push(`duplicate node id: ${node.id}`);
     }
     nodeIds.add(node.id);
+    duplicateConfigKeys(`node ${node.id}`, node.config);
 
-    const configKeys = new Set<string>();
-    for (const entry of node.config ?? []) {
-      if (configKeys.has(entry.key)) {
-        problems.push(`node ${node.id} sets config key ${entry.key} twice`);
+    if (node.service !== undefined) {
+      const found = platformServiceById(node.service);
+      if (found === null) {
+        problems.push(`node ${node.id} names a service no platform offers: ${node.service}`);
+      } else if (!(found.service.roles as readonly string[]).includes(node.kind)) {
+        problems.push(
+          `node ${node.id} is ${node.service} (${found.service.label}), which the platform offers as ${found.service.roles.join(' or ')}, not as ${node.kind}`,
+        );
       }
-      configKeys.add(entry.key);
     }
 
     const operations = node.operations ?? [];
@@ -65,6 +80,7 @@ export function validateGraphReferences(graph: CanvasGraph): string[] {
     if (edge.source === edge.target) {
       problems.push(`edge ${edge.id} is a self-loop on node: ${edge.source}`);
     }
+    duplicateConfigKeys(`edge ${edge.id}`, edge.config);
 
     const declaredAtEitherEnd = new Set([
       ...(operationsByNode.get(edge.source) ?? []),

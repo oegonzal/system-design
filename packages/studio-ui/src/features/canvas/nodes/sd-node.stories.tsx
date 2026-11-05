@@ -1,7 +1,7 @@
 import {
   DEFAULT_NODE_LABELS,
   kindsInCategory,
-  type NodeConfigEntry,
+  type ConfigEntry,
   type NodeKind,
   type NodeKindCategoryId,
 } from '@sysdesign/contracts';
@@ -26,7 +26,7 @@ function node(
   return { id, type: 'sd', position, data, selected };
 }
 
-const entries = (record: Record<string, string | number | boolean>): NodeConfigEntry[] =>
+const entries = (record: Record<string, string | number | boolean>): ConfigEntry[] =>
   Object.entries(record).map(([key, value]) => ({ key, value }));
 
 /**
@@ -34,7 +34,7 @@ const entries = (record: Record<string, string | number | boolean>): NodeConfigE
  * line interesting — for the category catalogs below. Anything not listed
  * renders under its palette default.
  */
-const SAMPLES: Partial<Record<NodeKind, { label?: string; config?: NodeConfigEntry[] }>> = {
+const SAMPLES: Partial<Record<NodeKind, { label?: string; config?: ConfigEntry[] }>> = {
   client: { label: 'Web + Mobile' },
   gateway: { config: entries({ rateLimit: true }) },
   'websocket-gateway': { label: 'Live Updates', config: entries({ maxConnections: 50_000 }) },
@@ -183,6 +183,39 @@ export const ObservabilityCategory: Story = {
 /** Neutral gray — the actors the design doesn't own. */
 export const ExternalCategory: Story = {
   args: { nodes: categoryNodes('external') },
+};
+
+/** Blocks that are platform services: the role's glyph and colour, the service named on the meta line. */
+export const WithPlatformService: Story = {
+  args: {
+    nodes: [
+      node(
+        'p-1',
+        { kind: 'gateway', service: 'aws.api-gateway', label: 'Orders API' },
+        { x: 0, y: 0 },
+      ),
+      node(
+        'p-2',
+        { kind: 'serverless-function', service: 'aws.lambda', label: 'Place order' },
+        { x: 260, y: 0 },
+      ),
+      node(
+        'p-3',
+        {
+          kind: 'queue',
+          service: 'aws.sqs',
+          label: 'Order events',
+          config: entries({ queueType: 'fifo' }),
+        },
+        { x: 0, y: 120 },
+      ),
+      node(
+        'p-4',
+        { kind: 'kv-store', service: 'aws.dynamodb', label: 'Orders' },
+        { x: 260, y: 120 },
+      ),
+    ],
+  },
 };
 
 /** The focus ring — theme border.focus, not a React Flow default. */

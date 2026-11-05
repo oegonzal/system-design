@@ -108,7 +108,7 @@ describe('briefMarkdown', () => {
     expect(md).toContain('c1 — A shopper reads their merged order history');
     expect(md).toContain('The service reads the history from the orders database');
     expect(md).toContain('Order Service, Orders DB');
-    expect(md).toContain('Client → Order Service, then Order Service → Orders DB');
+    expect(md).toContain('Client → Order Service (sync), then Order Service → Orders DB (sync)');
     // A binding with no path shows a dash, never an empty cell.
     expect(md).toMatch(/A replica keeps point reads under the budget \| Orders DB \| — \|/);
   });

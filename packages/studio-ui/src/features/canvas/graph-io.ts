@@ -49,6 +49,7 @@ export function toCanvasGraph(nodes: SdNode[], edges: SdEdge[]): CanvasGraph {
       label: node.data.label,
       position: { x: Math.round(node.position.x), y: Math.round(node.position.y) },
     };
+    if (node.data.service !== undefined) out.service = node.data.service;
     // Every list serializes only when non-empty, so an emptied editor never
     // leaves an `operations: []` key rattling around the wire.
     if (node.data.config && node.data.config.length > 0) {
@@ -74,6 +75,9 @@ export function toCanvasGraph(nodes: SdNode[], edges: SdEdge[]): CanvasGraph {
         kind: edge.data?.kind ?? 'sync',
       };
       if (typeof edge.label === 'string' && edge.label.length > 0) out.label = edge.label;
+      if (edge.data?.config && edge.data.config.length > 0) {
+        out.config = edge.data.config.map((entry) => ({ ...entry }));
+      }
       const declared = declaredOnEitherEnd(byId.get(edge.source), byId.get(edge.target));
       const carries = (edge.data?.carries ?? []).filter((name) => declared.has(name));
       if (carries.length > 0) out.carries = carries;
@@ -97,6 +101,7 @@ export function fromCanvasGraph(graph: CanvasGraph): { nodes: SdNode[]; edges: S
     position: node.position ?? LAYOUT_ORIGIN,
     data: {
       kind: node.kind,
+      ...(node.service !== undefined ? { service: node.service } : {}),
       label: node.label,
       ...(node.config ? { config: node.config.map((entry) => ({ ...entry })) } : {}),
       ...(node.responsibilities ? { responsibilities: [...node.responsibilities] } : {}),
@@ -115,6 +120,7 @@ export function fromCanvasGraph(graph: CanvasGraph): { nodes: SdNode[]; edges: S
     data: {
       kind: edge.kind,
       ...(edge.carries ? { carries: [...edge.carries] } : {}),
+      ...(edge.config ? { config: edge.config.map((entry) => ({ ...entry })) } : {}),
     },
   }));
 

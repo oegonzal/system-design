@@ -238,4 +238,23 @@ describe('placePills — pills among each other', () => {
       coveredBy(pillBox(pointAt(short, 0.5)), crossing) / 2,
     );
   });
+
+  it('[UX-3] lane 0 is the default curve exactly; other lanes push both control points the same way, square to the line, and opposite lanes mirror', () => {
+    const ends: ConnectionEnds = {
+      source: { x: 0, y: 0 },
+      sourceSide: Position.Bottom,
+      target: { x: 0, y: 200 },
+      targetSide: Position.Top,
+    };
+    const plain = connectionCurve(ends);
+    expect(connectionCurve(ends, 0, 24)).toEqual(plain);
+    const left = connectionCurve(ends, -0.5, 24);
+    const right = connectionCurve(ends, 0.5, 24);
+    expect(left.from).toEqual(plain.from);
+    expect(left.to).toEqual(plain.to);
+    expect(left.fromControl.x).toBeCloseTo(plain.fromControl.x + 12);
+    expect(left.toControl.x).toBeCloseTo(plain.toControl.x + 12);
+    expect(right.fromControl.x).toBeCloseTo(plain.fromControl.x - 12);
+    expect(left.fromControl.y).toBeCloseTo(plain.fromControl.y);
+  });
 });

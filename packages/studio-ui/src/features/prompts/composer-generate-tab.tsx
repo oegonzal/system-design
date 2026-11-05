@@ -6,6 +6,7 @@ import {
   PRACTICE_FORMATS,
   type CanvasCriterionKind,
   type ExperienceProfileDto,
+  type PlatformId,
   type PracticeFormatId,
 } from '@sysdesign/contracts';
 import {
@@ -20,12 +21,16 @@ import {
 import { useState } from 'react';
 
 import { FormatField } from './format-field';
+import { PlatformField } from './platform-field';
 import type { usePromptGeneration } from './use-prompt-generation';
 
 export interface ComposerGenerateTabProps {
   experiences: readonly ExperienceProfileDto[];
   format: PracticeFormatId;
   onFormat: (format: PracticeFormatId) => void;
+  /** The platform the prompt is for; the writer never hears of it, the prompt keeps it. */
+  platform: PlatformId | null;
+  onPlatform: (platform: PlatformId | null) => void;
   /** The emphasised kinds preselected from a link, if any. */
   initialEmphasis: readonly CanvasCriterionKind[];
   generation: ReturnType<typeof usePromptGeneration>;
@@ -41,6 +46,8 @@ export function ComposerGenerateTab({
   experiences,
   format,
   onFormat,
+  platform,
+  onPlatform,
   initialEmphasis,
   generation,
 }: ComposerGenerateTabProps) {
@@ -60,6 +67,7 @@ export function ComposerGenerateTab({
         the competencies to lean on; the writer is told both.
       </Text>
       <FormatField value={format} onChange={onFormat} data-testid="generate-format" />
+      <PlatformField value={platform} onChange={onPlatform} data-testid="generate-platform" />
       <SelectField
         label="Experience to draw from"
         value={experienceId}
@@ -94,6 +102,7 @@ export function ComposerGenerateTab({
             void generation.start({
               ...(experienceId ? { experienceId } : {}),
               format,
+              ...(platform !== null ? { platform } : {}),
               ...(emphasis.length > 0 ? { emphasis } : {}),
             })
           }

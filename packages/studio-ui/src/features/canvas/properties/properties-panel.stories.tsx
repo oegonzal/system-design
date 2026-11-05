@@ -1,6 +1,8 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 
-import { makeGraph, makeInterfaceGraph } from '../../../testing/canvas-fixtures';
+import { PLATFORM_IDS, platformCatalogue } from '@sysdesign/contracts';
+
+import { makeGraph, makeInterfaceGraph, makePlatformGraph } from '../../../testing/canvas-fixtures';
 import { withCanvasStore } from '../../../testing/story-decorators';
 import { PropertiesPanel } from './properties-panel';
 
@@ -52,6 +54,28 @@ export const ServiceInterfaceSelected: Story = {
     withCanvasStore((store) => {
       store.getState().setGraph(makeInterfaceGraph());
       store.getState().select('n-3');
+    }),
+  ],
+};
+
+/** A block that is a platform service: the Service control, the roles it plays, its guide and its knobs as chips. */
+export const ServiceSelected: Story = {
+  args: { catalogue: platformCatalogue(PLATFORM_IDS[0]) },
+  decorators: [
+    withCanvasStore((store) => {
+      store.getState().setGraph(makePlatformGraph());
+      store.getState().select('n-4');
+    }),
+  ],
+};
+
+/** An async hop with its config declared and the hop keys offered as chips. */
+export const EdgeConfigSelected: Story = {
+  args: { catalogue: platformCatalogue(PLATFORM_IDS[0]) },
+  decorators: [
+    withCanvasStore((store) => {
+      store.getState().setGraph(makePlatformGraph());
+      store.getState().select('e-3');
     }),
   ],
 };

@@ -9,9 +9,11 @@ import { EntityManager } from '@mikro-orm/postgresql';
 import {
   CANVAS_PIPELINE_ID,
   describeInFlight,
+  GoalBudgetExceeded,
   practiceFormat,
   PROMPT_COPY,
   regradable,
+  renderCanvasGoal,
   type DesignSubmission,
   type QualityRunStartedDto,
   type SessionDraft,
@@ -390,13 +392,32 @@ export class SessionsService {
     }
     return this.loop.startRun({
       pipeline: CANVAS_PIPELINE_ID,
-      goal: prompt.markdown,
+      goal: this.goalFor(prompt),
       criteria: prompt.criteria,
       maxIterations,
       ...(acceptAt !== undefined ? { acceptAt } : {}),
       ...source,
       ...RUN_KINDS[kind],
     });
+  }
+
+  /**
+   * The goal every grade and coach of the prompt reads: its markdown, closed
+   * by the declared platform's catalogue when it declares one. A prompt that
+   * would not fit the engine's budget with its catalogue is refused here,
+   * before any run starts.
+   */
+  private goalFor(prompt: Prompt): string {
+    try {
+      return renderCanvasGoal({ markdown: prompt.markdown, platform: prompt.platform });
+    } catch (error) {
+      if (error instanceof GoalBudgetExceeded) {
+        throw new UnprocessableEntityException(
+          `the prompt and its platform catalogue are more than the grader can read: ${error.message}`,
+        );
+      }
+      throw error;
+    }
   }
 
   async getDraft(sessionId: string): Promise<SessionDraft | null> {

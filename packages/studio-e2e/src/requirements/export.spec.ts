@@ -35,6 +35,7 @@ test.describe('exporting a run', () => {
     const names = Object.keys(zip.files);
     for (const artifact of [
       'prompt.md',
+      'diagram.md',
       'narrative.md',
       'brief.md',
       'feedback.md',

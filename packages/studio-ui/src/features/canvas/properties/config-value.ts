@@ -1,4 +1,4 @@
-import { NODE_CONFIG_KEY_MAX_LENGTH, type NodeConfigValue } from '@sysdesign/contracts';
+import { CONFIG_KEY_MAX_LENGTH, type ConfigValue } from '@sysdesign/contracts';
 
 /**
  * How a typed config value crosses the editor's one text input. The wire
@@ -12,7 +12,7 @@ export type ConfigValueType = 'boolean' | 'number' | 'string';
 /** A plain decimal — optional sign, digits, optional fraction. Not `1e3`, not `0x10`, not `Infinity`. */
 const DECIMAL = /^[+-]?(\d+\.?\d*|\.\d+)$/;
 
-export function parseConfigValue(raw: string): NodeConfigValue {
+export function parseConfigValue(raw: string): ConfigValue {
   const trimmed = raw.trim();
   const lowered = trimmed.toLowerCase();
   if (lowered === 'true') return true;
@@ -24,11 +24,11 @@ export function parseConfigValue(raw: string): NodeConfigValue {
   return trimmed;
 }
 
-export function formatConfigValue(value: NodeConfigValue): string {
+export function formatConfigValue(value: ConfigValue): string {
   return String(value);
 }
 
-export function configValueType(value: NodeConfigValue): ConfigValueType {
+export function configValueType(value: ConfigValue): ConfigValueType {
   if (typeof value === 'boolean') return 'boolean';
   if (typeof value === 'number') return 'number';
   return 'string';
@@ -36,5 +36,5 @@ export function configValueType(value: NodeConfigValue): ConfigValueType {
 
 /** Trimmed and clipped to the contract's key length; the schema requires nothing more. */
 export function normalizeConfigKey(raw: string): string {
-  return raw.trim().slice(0, NODE_CONFIG_KEY_MAX_LENGTH);
+  return raw.trim().slice(0, CONFIG_KEY_MAX_LENGTH);
 }

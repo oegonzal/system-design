@@ -1,20 +1,15 @@
 'use client';
 
 import styled from '@emotion/styled';
-import {
-  DEFAULT_NODE_LABELS,
-  kindsInCategory,
-  NODE_KIND_CATEGORIES,
-  NODE_KIND_GUIDE,
-  type NodeKind,
-  type NodeKindCategoryId,
-} from '@sysdesign/contracts';
+import type { NodeKind, NodeKindCategoryId, PlatformCatalogue } from '@sysdesign/contracts';
 import { Heading, Stack, Text, TextField, transient } from '@sysdesign/design-system';
 import { useState, type DragEvent } from 'react';
 
 import { useCanvasStore } from '../canvas-store-context';
 import { CANVAS_COPY } from '../copy';
 import { NODE_ICONS } from '../nodes/node-icons';
+import type { PaletteBlock } from '../platform-services';
+import { paletteSections } from './palette-entries';
 
 export const NODE_DRAG_MIME = 'application/sysdesign-node';
 
@@ -113,26 +108,20 @@ const IconChip = styled('span', transient)<{ $kind: NodeKind }>`
   color: ${({ theme, $kind }) => theme.color.nodeKindFg[$kind]};
 `;
 
-/** Case-insensitive substring match on label, slug, or category label. */
-function matches(kind: NodeKind, categoryLabel: string, query: string): boolean {
-  if (query === '') return true;
-  return (
-    DEFAULT_NODE_LABELS[kind].toLowerCase().includes(query) ||
-    kind.includes(query) ||
-    categoryLabel.toLowerCase().includes(query)
-  );
-}
-
 export interface PaletteProps {
   /** Lets a parent layout size the palette as a flex item (Emotion composition). */
   className?: string;
+  /** The platform the session's prompt declares, whose services shelve ahead of the roles; none for a neutral prompt. */
+  catalogue?: PlatformCatalogue | null;
 }
 
 /**
- * The building-block sidebar. Shelved by the contract's `NODE_KIND_CATEGORIES`
- * and mapped over `kindsInCategory` — the palette can never drift from the
- * vocabulary the eval engine grades, and a category with no kinds (or none
- * matching the filter) renders nothing rather than an empty shelf.
+ * The building-block sidebar. Shelved by `paletteSections`: the declared
+ * platform's categories first, one entry per service wearing its role's
+ * glyph and colour, then the contract's `NODE_KIND_CATEGORIES` over
+ * `kindsInCategory` — the palette can never drift from the vocabulary the
+ * graders read, and a shelf with no entries (or none matching the filter)
+ * renders nothing rather than an empty shelf.
  *
  * Every entry is both draggable (drop on the canvas for exact placement) and
  * a real button (click/Enter adds it in the free place nearest the middle of
@@ -141,25 +130,22 @@ export interface PaletteProps {
  * the store would refuse the add anyway.
  *
  * The filter is view state, not canvas state: it narrows what the sidebar
- * shows and touches nothing in the store. Testid discipline: only kind
- * buttons carry `palette-*` (an e2e gate counts them); everything the
- * category layer adds is `blocks-*`.
+ * shows and touches nothing in the store. Testid discipline: a role button
+ * carries `palette-<kind>` and a service button `palette-service-<id>` (an
+ * e2e gate counts the roles); everything the shelf layer adds is `blocks-*`.
  */
-export function Palette({ className }: PaletteProps) {
+export function Palette({ className, catalogue = null }: PaletteProps) {
   const addNode = useCanvasStore((state) => state.addNode);
   const readOnly = useCanvasStore((state) => state.readOnly);
   const [query, setQuery] = useState('');
   const normalized = query.trim().toLowerCase();
 
-  const handleDragStart = (event: DragEvent<HTMLButtonElement>, kind: NodeKind) => {
-    event.dataTransfer.setData(NODE_DRAG_MIME, kind);
+  const handleDragStart = (event: DragEvent<HTMLButtonElement>, block: PaletteBlock) => {
+    event.dataTransfer.setData(NODE_DRAG_MIME, block);
     event.dataTransfer.effectAllowed = 'move';
   };
 
-  const sections = NODE_KIND_CATEGORIES.map((category) => ({
-    category,
-    kinds: kindsInCategory(category.id).filter((kind) => matches(kind, category.label, normalized)),
-  })).filter((section) => section.kinds.length > 0);
+  const sections = paletteSections(catalogue, normalized);
 
   return (
     <Root aria-label="Building blocks" className={className}>
@@ -184,27 +170,29 @@ export function Palette({ className }: PaletteProps) {
           No blocks match “{query}”.
         </Text>
       ) : (
-        sections.map(({ category, kinds }) => (
-          <CategorySection key={category.id} data-testid={`blocks-category-${category.id}`}>
+        sections.map((section) => (
+          <CategorySection key={section.id} data-testid={section.id}>
             <CategoryHeader>
-              <CategoryDot $category={category.id} aria-hidden />
-              <Heading level={3}>{category.label}</Heading>
+              {section.swatch !== null ? (
+                <CategoryDot $category={section.swatch} aria-hidden />
+              ) : null}
+              <Heading level={3}>{section.label}</Heading>
             </CategoryHeader>
             <Stack as="ul" gap={2}>
-              {kinds.map((kind) => (
-                <li key={kind}>
+              {section.entries.map((entry) => (
+                <li key={entry.block}>
                   <KindButton
                     type="button"
-                    $kind={kind}
-                    title={NODE_KIND_GUIDE[kind].what}
+                    $kind={entry.kind}
+                    title={entry.hint}
                     disabled={readOnly}
                     draggable={!readOnly}
-                    onDragStart={(event) => handleDragStart(event, kind)}
-                    onClick={() => addNode(kind)}
-                    data-testid={`palette-${kind}`}
+                    onDragStart={(event) => handleDragStart(event, entry.block)}
+                    onClick={() => addNode(entry.block)}
+                    data-testid={entry.testId}
                   >
-                    <IconChip $kind={kind}>{NODE_ICONS[kind]}</IconChip>
-                    {DEFAULT_NODE_LABELS[kind]}
+                    <IconChip $kind={entry.kind}>{NODE_ICONS[entry.kind]}</IconChip>
+                    {entry.label}
                   </KindButton>
                 </li>
               ))}

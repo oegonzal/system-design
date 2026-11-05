@@ -77,6 +77,8 @@ describe('interview mode', () => {
     expect(request?.goal).toContain('[question.1] How fast must reads be?');
     expect(request?.goal).toContain('[question.2] Do we need returns?');
     expect(request?.goal).toContain('## Index');
+    // A platform-neutral prompt tells the interviewer nothing about a platform.
+    expect(request?.goal).not.toContain('Target platform:');
 
     const pending = (await read(sessionId)).body.data;
     expect(pending.pending).toEqual({ runId: 'fake-run-1', status: 'running', error: null });
@@ -239,5 +241,19 @@ describe('interview mode', () => {
       body: JSON.stringify({ markdown: '# One\n\n## Section\n\nonly' }),
     });
     expect(rewrite.status).toBe(422);
+  });
+
+  it('[GEN-7] tells the interviewer the platform a prompt declares, in one line of its notes', async () => {
+    const { author } = promptsApi(h);
+    const { body } = await author({ ...authoredPrompt(), format: 'interview', platform: 'aws' });
+    expect(body.data.platform).toBe('aws');
+    const { body: created } = await sessionsApi(h).createSession(body.data.id);
+    const started = await post<StartInterviewTurnResponse>(created.data.id, 'clarify', {
+      questions: ['Which cloud are we on?'],
+    });
+    expect(started.status).toBe(202);
+    const goal = h.loop.startRequests[0]?.goal ?? '';
+    expect(goal).toContain('## Interviewer notes\n\nTarget platform: AWS.\n\n');
+    expect(goal.split('Target platform:')).toHaveLength(2);
   });
 });

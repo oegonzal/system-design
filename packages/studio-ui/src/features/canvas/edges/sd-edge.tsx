@@ -4,12 +4,13 @@ import { css, keyframes, useTheme, type Theme } from '@emotion/react';
 import styled from '@emotion/styled';
 import type { EdgeKind, Severity } from '@sysdesign/contracts';
 import { transient } from '@sysdesign/design-system';
-import { BaseEdge, EdgeLabelRenderer, type EdgeProps } from '@xyflow/react';
+import { BaseEdge, EdgeLabelRenderer, useStore, type EdgeProps } from '@xyflow/react';
 import { memo, useEffect, useLayoutEffect, useMemo, useState, type CSSProperties } from 'react';
 
 import type { Size } from '../geometry';
 import type { SdEdge as SdEdgeModel } from '../types';
 import { connectionCurve, curvePath, type Curve } from './edge-path';
+import { laneOf, PARALLEL_LANE_GAP } from './parallel-edges';
 import { usePillPlace } from './pill-layout';
 
 /** Async edges drift their dashes — data flowing, not a call waiting. */
@@ -125,6 +126,8 @@ function EdgePill({ id, curve, text }: { id: string; curve: Curve; text: string 
 function SdEdgeComponent(props: EdgeProps<SdEdgeModel>) {
   const {
     id,
+    source,
+    target,
     sourceX,
     sourceY,
     targetX,
@@ -137,16 +140,23 @@ function SdEdgeComponent(props: EdgeProps<SdEdgeModel>) {
     selected = false,
   } = props;
   const theme = useTheme();
+  // Which lane this connection takes among those joining the same two blocks,
+  // so a sync call and an async hop between one pair are two lines, not one.
+  const lane = useStore((state) => laneOf(state.edges, { id, source, target }));
 
   const curve = useMemo(
     () =>
-      connectionCurve({
-        source: { x: sourceX, y: sourceY },
-        sourceSide: sourcePosition,
-        target: { x: targetX, y: targetY },
-        targetSide: targetPosition,
-      }),
-    [sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition],
+      connectionCurve(
+        {
+          source: { x: sourceX, y: sourceY },
+          sourceSide: sourcePosition,
+          target: { x: targetX, y: targetY },
+          targetSide: targetPosition,
+        },
+        lane,
+        PARALLEL_LANE_GAP,
+      ),
+    [sourceX, sourceY, sourcePosition, targetX, targetY, targetPosition, lane],
   );
 
   const kind = data?.kind ?? 'sync';

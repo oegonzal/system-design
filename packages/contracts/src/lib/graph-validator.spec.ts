@@ -109,4 +109,45 @@ describe('validateGraphReferences', () => {
     expect(canvasGraphSchema.safeParse(under).success).toBe(true);
     expect(validateGraphReferences(under)).toEqual([]);
   });
+
+  it('[UX-31] refuses a node drawn as a platform service in a role the service does not play, and accepts any role it does', () => {
+    const asQueue = graph({
+      nodes: [{ id: 'n-1', kind: 'queue', service: 'aws.sqs', label: 'Orders' }],
+      edges: [],
+    });
+    expect(validateGraphReferences(asQueue)).toEqual([]);
+    const asCache = graph({
+      nodes: [{ id: 'n-1', kind: 'cache', service: 'aws.sqs', label: 'Orders' }],
+      edges: [],
+    });
+    expect(validateGraphReferences(asCache)).toEqual([
+      'node n-1 is aws.sqs (SQS), which the platform offers as queue, not as cache',
+    ]);
+    // A service with several roles plays any of them.
+    const asWorker = graph({
+      nodes: [{ id: 'n-1', kind: 'worker', service: 'aws.lambda', label: 'Indexer' }],
+      edges: [],
+    });
+    expect(validateGraphReferences(asWorker)).toEqual([]);
+  });
+
+  it('names a config key a connection sets twice, as it does for a node', () => {
+    const problems = validateGraphReferences(
+      graph({
+        edges: [
+          {
+            id: 'e-1',
+            source: 'n-1',
+            target: 'n-2',
+            kind: 'sync',
+            config: [
+              { key: 'timeoutMs', value: 300 },
+              { key: 'timeoutMs', value: 500 },
+            ],
+          },
+        ],
+      }),
+    );
+    expect(problems).toEqual(['edge e-1 sets config key timeoutMs twice']);
+  });
 });

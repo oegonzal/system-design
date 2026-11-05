@@ -59,13 +59,13 @@ export function nodeLabels(graph: CanvasGraph): Map<string, string> {
   return new Map(graph.nodes.map((node) => [node.id, nodeLabel(node)]));
 }
 
-/** Edge id → "SourceLabel → TargetLabel", for rendering a traced path. */
+/** Edge id → "SourceLabel → TargetLabel (sync)", for rendering a traced path hop by hop with its call style. */
 function edgeHops(graph: CanvasGraph): Map<string, string> {
   const labels = nodeLabels(graph);
   return new Map(
     graph.edges.map((edge) => [
       edge.id,
-      `${labels.get(edge.source) ?? edge.source} → ${labels.get(edge.target) ?? edge.target}`,
+      `${labels.get(edge.source) ?? edge.source} → ${labels.get(edge.target) ?? edge.target} (${edge.kind})`,
     ]),
   );
 }

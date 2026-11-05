@@ -120,4 +120,14 @@ describe('PromptPane', () => {
     );
     expect(screen.getByTestId('criterion-c1').textContent).toContain('Freshly derived');
   });
+
+  it('[GEN-7] badges the platform a prompt declares beside its format, and nothing for a neutral prompt', () => {
+    renderWithTheme(<PromptPane prompt={makePrompt({ platform: 'aws' })} />);
+    expect(screen.getByTestId('prompt-platform').textContent).toBe('AWS');
+  });
+
+  it('[GEN-7] shows no platform badge for a platform-neutral prompt', () => {
+    renderWithTheme(<PromptPane prompt={makePrompt()} />);
+    expect(screen.queryByTestId('prompt-platform')).toBeNull();
+  });
 });

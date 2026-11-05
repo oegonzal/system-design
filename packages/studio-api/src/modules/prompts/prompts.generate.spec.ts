@@ -7,6 +7,7 @@ import {
   designPromptDraftSchema,
   keptAtMost,
   modelSchema,
+  PLATFORM_STANDING_CRITERIA,
   PROMPT_COPY,
   SOFT_ISSUE_NOTE,
   type ApiErrorResponse,
@@ -31,6 +32,7 @@ const draft = (): DesignPromptDraft => ({
   ],
   domainAndData: [],
   interfaces: [],
+  requestPaths: [],
   nonFunctionalRequirements: [
     { kind: 'latency', requirement: 'reservation', target: 'p99 ≤ 500 ms' },
   ],
@@ -93,7 +95,7 @@ describe('prompts', () => {
       expect(prompt?.markdown.startsWith('# Keep a flash on-sale fair\n')).toBe(true);
       expect(prompt?.markdown).toContain('## Non-functional requirements');
       // The rubric is the draft's rows, one criterion each — nothing was derived.
-      expect(prompt?.criteria).toEqual(criteriaFromDraft(draft()));
+      expect(prompt?.criteria).toEqual(criteriaFromDraft(draft(), null));
       expect(prompt?.criteria.map((c) => `${c.id}:${c.kind}`)).toEqual([
         'c1:functional',
         'c2:functional',
@@ -103,6 +105,8 @@ describe('prompts', () => {
         'c6:tradeoff',
         'c7:tradeoff',
         'c8:tradeoff',
+        'c9:communication',
+        'c10:communication',
       ]);
       expect(h.loop.criteriaRequests).toEqual([]);
 
@@ -116,6 +120,31 @@ describe('prompts', () => {
       const list = await call<ListPromptsResponse>(`${h.url}/prompts?source=generated`);
       expect(list.body.meta.total).toBe(1);
       expect(h.loop.criteriaRequests).toEqual([]);
+    });
+
+    it('[GEN-7] the platform asked for never reaches the writer, and the claimed prompt carries it with the platform constraint closing its rubric', async () => {
+      const started = await startGeneration({ experienceId: TICKETING_ID, platform: 'aws' });
+      expect(started.status).toBe(202);
+      // The writer's goal is the experience's, word for word the same as with no platform asked.
+      const neutral = await startGeneration({ experienceId: TICKETING_ID });
+      expect(neutral.status).toBe(202);
+      const goal = h.loop.startRequests[0]?.goal ?? '';
+      expect(goal).toBe(h.loop.startRequests[1]?.goal);
+      expect(goal).not.toContain('## Platform');
+      h.loop.complete('fake-run-1', [
+        { overall: 86, decision: 'accept', mode: 'initial', artifact: draft() },
+      ]);
+      const done = await generation('fake-run-1');
+      const prompt = done.body.data.prompt;
+      expect(prompt?.platform).toBe('aws');
+      expect(prompt?.criteria).toEqual(criteriaFromDraft(draft(), 'aws'));
+      expect(prompt?.criteria.at(-1)).toMatchObject({
+        kind: 'constraint',
+        statement: PLATFORM_STANDING_CRITERIA[0].statement,
+      });
+      // An unknown platform is refused at the edge.
+      const refused = await startGeneration({ experienceId: TICKETING_ID, platform: 'gcp' });
+      expect(refused.status).toBe(400);
     });
 
     it('[GEN-4] a format and the emphasised kinds reach the writer as sections of its goal, each kind once, and the claimed prompt keeps the format', async () => {
@@ -154,6 +183,7 @@ describe('prompts', () => {
         functionalRequirements: [longest('functionalRequirements[]')],
         domainAndData: [],
         interfaces: [],
+        requestPaths: [],
         decisions: [],
         nonFunctionalRequirements: [
           {
@@ -176,7 +206,7 @@ describe('prompts', () => {
       const prompt = done.body.data.prompt;
       if (!prompt) throw new Error('claimed nothing');
       expect(prompt.markdown).toContain(wordy.scenario);
-      expect(prompt.criteria).toEqual(criteriaFromDraft(wordy));
+      expect(prompt.criteria).toEqual(criteriaFromDraft(wordy, null));
       expect(logged).toHaveBeenCalledWith(
         expect.stringContaining(
           `scenario: ${wordy.scenario.length.toLocaleString('en-US')} characters; ${DESIGN_PROMPT_SCENARIO_BOUND.target.toLocaleString('en-US')} asked, ${DESIGN_PROMPT_SCENARIO_BOUND.ceiling.toLocaleString('en-US')} accepted ${SOFT_ISSUE_NOTE}`,
@@ -234,7 +264,16 @@ describe('prompts', () => {
         experienceId: TICKETING_ID,
         markdown: '# Rewritten\n\n- one thing\n- two things',
       });
-      expect(rewritten.body.data.criteria.map((c) => c.id)).toEqual(['c1', 'c2', 'c3', 'c4', 'c5']);
+      // Two derived rows closed by the five standing criteria.
+      expect(rewritten.body.data.criteria.map((c) => c.id)).toEqual([
+        'c1',
+        'c2',
+        'c3',
+        'c4',
+        'c5',
+        'c6',
+        'c7',
+      ]);
       expect(h.loop.criteriaRequests).toHaveLength(1);
       // Authored now: it can be re-derived like any written prompt.
       const again = await call<GetPromptResponse>(`${h.url}/prompts/${id}/criteria`, {

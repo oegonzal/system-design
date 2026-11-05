@@ -11,9 +11,7 @@ import type {
   EdgeKind,
   ModelEntity,
   ModelRelation,
-  NodeConfigEntry,
-  NodeKind,
-  NodeOperation,
+  ConfigEntry,
   SessionDraft,
   Severity,
 } from '@sysdesign/contracts';
@@ -22,7 +20,9 @@ import type { StoreApi } from 'zustand/vanilla';
 
 import type { ViewArea } from '../framing';
 import type { Box } from '../geometry';
+import type { PaletteBlock } from '../platform-services';
 import type { SdEdge, SdNode } from '../types';
+import type { NodePatch } from './node-patch';
 
 export interface HighlightState {
   nodeIds: string[];
@@ -130,27 +130,24 @@ export interface CanvasState extends CanvasContent {
 
   setGraph(graph: CanvasGraph): void;
   /**
-   * Author edit; the new block is the selection. `position` drops it there
-   * (kept on the pane); without one it takes the free place nearest the
-   * middle of what is visible, clear of every other block — and when nothing
-   * visible is free, the nearest free place beside it, which the view then
-   * moves to show. Null when read-only.
+   * Author edit; the new block is the selection. A role adds a block of that
+   * kind under the kind's name; a platform service adds a block of its first
+   * role, named after it and carrying it. `position` drops it there (kept on
+   * the pane); without one it takes the free place nearest the middle of
+   * what is visible, clear of every other block — and when nothing visible
+   * is free, the nearest free place beside it, which the view then moves to
+   * show. Null when read-only.
    */
-  addNode(kind: NodeKind, position?: XYPosition): SdNode | null;
+  addNode(block: PaletteBlock, position?: XYPosition): SdNode | null;
   onNodesChange(changes: NodeChange<SdNode>[]): void;
   onEdgesChange(changes: EdgeChange<SdEdge>[]): void;
   onConnect(connection: Connection): void;
-  updateNode(
+  /** Author edit; a block that names a service keeps one of its roles as its kind (`patchedNodeData`). */
+  updateNode(id: string, patch: NodePatch): void;
+  updateEdge(
     id: string,
-    patch: {
-      label?: string;
-      kind?: NodeKind;
-      config?: NodeConfigEntry[];
-      responsibilities?: string[];
-      operations?: NodeOperation[];
-    },
+    patch: { kind?: EdgeKind; label?: string; carries?: string[]; config?: ConfigEntry[] },
   ): void;
-  updateEdge(id: string, patch: { kind?: EdgeKind; label?: string; carries?: string[] }): void;
   /** Author edit — one step: the nodes, every connection touching them, and the edges named. */
   removeElements(ids: { nodeIds: readonly string[]; edgeIds: readonly string[] }): void;
   removeSelected(): void;

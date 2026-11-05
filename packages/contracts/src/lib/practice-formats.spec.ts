@@ -43,6 +43,7 @@ describe('practiceFormatForKind', () => {
     }
     expect(practiceFormatForKind('domain_model')).toBe('system');
     expect(practiceFormatForKind('workflow')).toBe('workflow');
+    expect(practiceFormatForKind('communication')).toBe('workflow');
     expect(practiceFormatForKind('evolution')).toBe('evolution');
     expect(practiceFormatForKind('constraint')).toBe(DEFAULT_PRACTICE_FORMAT);
   });

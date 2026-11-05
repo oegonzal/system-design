@@ -10,6 +10,7 @@ import {
   withStandingCriteria,
   type AuthorPromptRequest,
   type ImportPromptRequest,
+  type PlatformId,
   type PracticeFormatId,
   type PromptLibraryDocumentDto,
   type PromptLibraryEntryDto,
@@ -55,15 +56,17 @@ export class PromptsService {
   /** The rubric is derived before the row exists: a grader that cannot answer leaves nothing behind. */
   async author(request: AuthorPromptRequest): Promise<PromptView> {
     const format = request.format ?? DEFAULT_PRACTICE_FORMAT;
+    const platform = request.platform ?? null;
     assertRevealable(format, request.markdown);
     const experience = request.experienceId ? await this.experience(request.experienceId) : null;
-    const criteria = await this.rubricFor(request.markdown);
+    const criteria = await this.rubricFor(request.markdown, platform);
     const prompt = this.em.create(Prompt, {
       title: request.title,
       markdown: request.markdown,
       criteria,
       source: 'authored',
       format,
+      platform,
       experience,
     });
     this.em.persist(prompt);
@@ -77,14 +80,16 @@ export class PromptsService {
       throw new UnprocessableEntityException(`Unknown library prompt: ${request.libraryId}`);
     }
     const format = request.format ?? practiceFormatForLibraryFolder(document.folder);
+    const platform = request.platform ?? null;
     assertRevealable(format, document.markdown);
-    const criteria = await this.rubricFor(document.markdown);
+    const criteria = await this.rubricFor(document.markdown, platform);
     const prompt = this.em.create(Prompt, {
       title: document.title,
       markdown: document.markdown,
       criteria,
       source: 'library',
       format,
+      platform,
       experience: null,
     });
     this.em.persist(prompt);
@@ -145,7 +150,7 @@ export class PromptsService {
         assertRevealable(prompt.format, request.markdown);
         // Derived before anything is written: a grader that cannot derive
         // leaves the prompt exactly as it was, never rewritten without a rubric.
-        const criteria = await this.rubricFor(request.markdown);
+        const criteria = await this.rubricFor(request.markdown, prompt.platform);
         prompt.markdown = request.markdown;
         prompt.criteria = criteria;
         prompt.source = 'authored';
@@ -162,23 +167,27 @@ export class PromptsService {
    */
   async ensureCriteria(prompt: Prompt): Promise<Prompt> {
     if (prompt.criteria.length > 0) return prompt;
-    prompt.criteria = await this.rubricFor(prompt.markdown);
+    prompt.criteria = await this.rubricFor(prompt.markdown, prompt.platform);
     await this.em.flush();
     return prompt;
   }
 
   /**
    * The canvas pipeline's rubric for a prompt — the one derivation every
-   * source shares, closed by the standing criteria every canvas rubric
-   * carries (the loop uses a supplied rubric verbatim, so they are appended
-   * here and never derived).
+   * source shares, from the markdown alone, closed by the standing criteria
+   * every canvas rubric carries and the platform's when the prompt declares
+   * one (the loop uses a supplied rubric verbatim, so they are appended here
+   * and never derived).
    */
-  private async rubricFor(markdown: string): Promise<SuccessCriterion[]> {
+  private async rubricFor(
+    markdown: string,
+    platform: PlatformId | null,
+  ): Promise<SuccessCriterion[]> {
     const derived = await this.loop.deriveCriteria({
       pipeline: CANVAS_PIPELINE_ID,
       goal: markdown,
     });
-    return withStandingCriteria(derived.criteria);
+    return withStandingCriteria(derived.criteria, platform);
   }
 
   private async require(id: string): Promise<Prompt> {
