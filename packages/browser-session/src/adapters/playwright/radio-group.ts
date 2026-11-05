@@ -1,15 +1,18 @@
 import type { Locator } from 'playwright';
 
-import { RADIO_OPTIONS } from './dom-selectors';
+import { CHECKBOX_OPTIONS, RADIO_OPTIONS } from './dom-selectors';
 
-/** One option of a radio group as a person reads it: its words, whether it is chosen, and whether the page disables it. */
+/** Which options a group is read by: its radios, or its checkboxes. */
+export type GroupOptions = typeof RADIO_OPTIONS | typeof CHECKBOX_OPTIONS;
+
+/** One option of a group as a person reads it: its words, whether it is chosen, and whether the page disables it. */
 interface RadioOption {
   words: string;
   checked: boolean;
   disabled: boolean;
 }
 
-/** One point a person's click on an option may land, in the viewport, and whether it lands on the radio itself. */
+/** One point a person's click on an option may land, in the viewport, and whether it lands on the option itself. */
 interface RadioAim {
   x: number;
   y: number;
@@ -17,8 +20,9 @@ interface RadioAim {
 }
 
 /**
- * A radio group as a person reads it: every option in the page's order
- * (`RADIO_OPTIONS`), disabled ones included; the question every option is
+ * A group of choices as a person reads it — a radio group, or a group of
+ * checkboxes read the same way: every option in the page's order (the
+ * options selector), disabled ones included; the question every option is
  * named after, empty when they are not; whether the page marks any option
  * required or invalid; and, when one option is aimed at, the points a
  * person's click on it lands, in the order a person tries them.
@@ -35,28 +39,29 @@ export interface RadioGroupReading {
 const readInPage = async (
   group: Locator,
   aimAt: number | null,
+  options: GroupOptions,
   timeout?: number,
 ): Promise<RadioGroupReading | null> => {
   try {
-    return await group.evaluate(
-      radioGroupInPage,
-      { radioOptions: RADIO_OPTIONS, aimAt },
-      { timeout },
-    );
+    return await group.evaluate(radioGroupInPage, { radioOptions: options, aimAt }, { timeout });
   } catch {
     return null;
   }
 };
 
-/** The radio group under a locator as a person reads it; null when the read fails. */
+/** The group under a locator as a person reads it, by its radios unless told its options are checkboxes; null when the read fails. */
 export const readRadioGroup = (
   group: Locator,
   timeout?: number,
-): Promise<RadioGroupReading | null> => readInPage(group, null, timeout);
+  options: GroupOptions = RADIO_OPTIONS,
+): Promise<RadioGroupReading | null> => readInPage(group, null, options, timeout);
 
 /** The group read again with the option at `index` aimed at, its row scrolled into view; null when the read fails. */
-export const aimAtOption = (group: Locator, index: number): Promise<RadioGroupReading | null> =>
-  readInPage(group, index);
+export const aimAtOption = (
+  group: Locator,
+  index: number,
+  options: GroupOptions = RADIO_OPTIONS,
+): Promise<RadioGroupReading | null> => readInPage(group, index, options);
 
 /** The options a person can answer with: words to answer by, on an option the page does not disable. */
 export const answerable = (reading: RadioGroupReading): RadioOption[] =>
@@ -263,7 +268,7 @@ function radioGroupInPage(
 
   const says = (radio: Element, attribute: string): boolean => {
     const own = radio.getAttribute(attribute);
-    const control = radio.querySelector('input[type="radio"]');
+    const control = radio.querySelector('input[type="radio"], input[type="checkbox"]');
     return (
       (own !== null && own !== 'false') || (control?.getAttribute(attribute) ?? 'false') !== 'false'
     );
@@ -271,7 +276,7 @@ function radioGroupInPage(
   const isChecked = (radio: Element): boolean =>
     radio.getAttribute('aria-checked') === 'true' ||
     (radio as HTMLInputElement).checked === true ||
-    radio.querySelector('input[type="radio"]:checked') !== null;
+    radio.querySelector('input[type="radio"]:checked, input[type="checkbox"]:checked') !== null;
 
   /** The points a person's click on the option lands, in the order a person tries them; none when no point of it shows. */
   const aimsAt = (option: Element): RadioAim[] => {

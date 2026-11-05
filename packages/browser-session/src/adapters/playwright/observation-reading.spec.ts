@@ -48,6 +48,7 @@ const reading = (overrides: Partial<PageReading> = {}): PageReading => ({
   nodes: [],
   elements: [],
   fileControls: [],
+  choiceBoxes: [],
   unreadElements: 0,
   unreadSnapshotLines: 0,
   focusedScope: null,

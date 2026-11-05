@@ -27,7 +27,7 @@ import { readWithinBudget } from './budgeted-read';
 import { busyCheck } from './busy-check';
 import { readElementFacts } from './element-facts';
 import { readFileControls } from './file-controls';
-import { readRadioNameGroups } from './radio-name-groups';
+import { GROUP_OPTIONS, readNameGroups, type ChoiceBox } from './name-groups';
 import type { ObservePolicy } from './observe-policy';
 import {
   failedWholesale,
@@ -149,12 +149,12 @@ export class PageReader {
             },
           ];
     });
-    const groups = await this.radioNameGroups(nodes, ancestry, deadline);
-    const grouped = new Set(groups.flatMap((group) => [group.index, ...group.options]));
-    // A group stands where its box sits in the page, and its radios are its options, never fields apart from it.
+    const boxes = await this.choiceBoxes(nodes, ancestry, deadline);
+    const placed = new Set(boxes.flatMap((box) => [box.index, ...box.options]));
+    // A box stands where it sits in the page, and its options are its own, never fields apart from it.
     const elements: ObservedElement[] = [
-      ...listed.filter(({ index }) => !grouped.has(index)),
-      ...groups,
+      ...listed.filter(({ index }) => !placed.has(index)),
+      ...boxes,
     ]
       .sort((a, b) => a.index - b.index)
       .map(({ element }) => element);
@@ -167,6 +167,7 @@ export class PageReader {
       nodes,
       elements: [...elements, ...files.elements],
       fileControls: files.refs,
+      choiceBoxes: boxes.map(({ box }) => box),
       unreadElements: unread,
       unreadSnapshotLines: unreadSnapshotLines(snapshot, nodes),
       focusedScope: focused < 0 ? null : (ancestry[focused]?.scope ?? null),
@@ -176,38 +177,74 @@ export class PageReader {
   }
 
   /**
-   * The radio groups the page makes by name alone, each as one element under
-   * its box's ref, read as the radio group it is; a box whose facts never
-   * come back leaves its radios as the tree lists them.
+   * The groups the page makes by name alone and the checkboxes it draws
+   * itself (`name-groups.ts`), each as one element under its box's ref: a
+   * group read as the group it is, named by nothing of its own — its question
+   * is the words before its box, its context — and a drawn checkbox named as
+   * the tree names it, seen where its box is seen and holding what its
+   * checkbox holds. A box whose facts never come back leaves its options as
+   * the tree lists them.
    */
-  private async radioNameGroups(
+  private async choiceBoxes(
     nodes: readonly SnapshotNode[],
     ancestry: readonly Ancestry[],
     deadline: number,
-  ): Promise<{ index: number; element: ObservedElement; options: number[] }[]> {
+  ): Promise<{ index: number; element: ObservedElement; options: number[]; box: ChoiceBox }[]> {
     const page = this.page();
     const timeout = this.policy.factsTimeoutMs;
-    const groups = await readRadioNameGroups(page, nodes, timeout, deadline);
-    const read = await Promise.all(
-      groups.map(async ({ box, options }) => {
-        const node = nodes[box];
-        if (node === undefined || node.ref === null) return null;
-        const facts = await readElementFacts(page.locator(`aria-ref=${node.ref}`), timeout, {
-          asRadioGroup: true,
-        });
-        if (facts === null) return null;
-        // Named by nothing of its own: its question is the words before its box, its context.
-        const element = toObservedElement(
-          { ...node, role: 'radiogroup', name: '' },
-          facts,
-          ancestry[box]?.scope ?? null,
-          '',
-          ancestry[box]?.landmark ?? null,
-        );
-        return { index: box, element, options };
-      }),
-    );
-    return read.flatMap((group) => (group === null ? [] : [group]));
+    const { groups, drawn } = await readNameGroups(page, nodes, timeout, deadline);
+    const at = (index: number) => ({
+      scope: ancestry[index]?.scope ?? null,
+      landmark: ancestry[index]?.landmark ?? null,
+    });
+    const asGroups = groups.map(async ({ kind, box, options }) => {
+      const node = nodes[box];
+      if (node?.ref === null || node === undefined) return null;
+      const facts = await readElementFacts(page.locator(`aria-ref=${node.ref}`), timeout, {
+        asGroup: GROUP_OPTIONS[kind],
+      });
+      if (facts === null) return null;
+      const { scope, landmark } = at(box);
+      // A radio group is one by the HTML standard; a group of checkboxes is chosen from as a list is.
+      const role = kind === 'radio' ? 'radiogroup' : 'listbox';
+      const element = toObservedElement({ ...node, role, name: '' }, facts, scope, '', landmark);
+      return { index: box, element, options, box: { ref: node.ref, kind, drawn: false } };
+    });
+    const asCheckboxes = drawn.map(async ({ box, option }) => {
+      const holder = nodes[box];
+      const checkbox = nodes[option];
+      if (holder?.ref === null || holder === undefined || checkbox === undefined) return null;
+      const located = page.locator(`aria-ref=${holder.ref}`);
+      const seen = await readElementFacts(located, timeout);
+      const held = await readElementFacts(located, timeout, { asGroup: GROUP_OPTIONS.checkbox });
+      if (seen === null || held === null) return null;
+      const facts = {
+        ...seen,
+        inputType: 'checkbox',
+        value: held.value === null ? 'unchecked' : 'checked',
+        options: null,
+        required: held.required,
+        invalid: held.invalid,
+        // A checkbox its label names says what it is; the words before its box are its question only when nothing names it.
+        context: (checkbox.name ?? '') === '' ? seen.context : null,
+      };
+      const { scope, landmark } = at(box);
+      const element = toObservedElement(
+        { ...checkbox, ref: holder.ref },
+        facts,
+        scope,
+        '',
+        landmark,
+      );
+      return {
+        index: box,
+        element,
+        options: [option],
+        box: { ref: holder.ref, kind: 'checkbox' as const, drawn: true },
+      };
+    });
+    const read = await Promise.all([...asGroups, ...asCheckboxes]);
+    return read.flatMap((box) => (box === null ? [] : [box]));
   }
 
   /** The page, read again while a read fails wholesale; what the last read reached, either way. */

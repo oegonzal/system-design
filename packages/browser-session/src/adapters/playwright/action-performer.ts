@@ -7,7 +7,8 @@ import { choosesByTyping, type ObservedElement } from '@sysdesign/contracts';
 import type { Locator, Page } from 'playwright';
 
 import type { BrowserAction } from '../../core/ports';
-import { chooseRadio } from './radio-choice';
+import { GROUP_OPTIONS, type ChoiceBox } from './name-groups';
+import { chooseRadio, toggleCheckbox } from './radio-choice';
 import { chooseByTyping } from './typed-choice';
 
 /** What the performer acts through: the page in front, and the element under a ref. */
@@ -22,6 +23,8 @@ export interface ActionSurface {
   optionWaitMs: number;
   /** How long a select waits between reads of a radio group it clicked beside, until the group reads as chosen. */
   settleRetryMs: number;
+  /** The box the last observation listed in place of the choices it holds (`name-groups.ts`), or null. */
+  choiceBoxOf(ref: string): ChoiceBox | null;
 }
 
 export async function performAction(
@@ -35,6 +38,11 @@ export async function performAction(
       await page.goto(action.url, { waitUntil: 'domcontentloaded' });
       return;
     case 'click':
+      // A checkbox the page drew takes a person's click where it shows, until it reads the other way.
+      if (surface.choiceBoxOf(action.ref)?.drawn === true) {
+        await toggleCheckbox(locate(action.ref), surface);
+        return;
+      }
       await locate(action.ref).click();
       return;
     case 'fill':
@@ -73,13 +81,14 @@ export async function performAction(
 }
 
 /**
- * A `<select>` takes the option by label; a radio group chooses the radio
- * whose words, as the observation read them, are the option's; a control
+ * A `<select>` takes the option by label; a group the page makes by name
+ * alone chooses among the options its box holds; a radio group chooses the
+ * radio whose words, as the observation read them, are the option's; a control
  * typed into types the option's words and chooses that option; anything else
  * opens and picks.
  */
 async function select(
-  { page, locate, optionWaitMs, settleRetryMs }: ActionSurface,
+  { page, locate, optionWaitMs, settleRetryMs, choiceBoxOf }: ActionSurface,
   target: ObservedElement | null,
   ref: string,
   option: string,
@@ -87,6 +96,11 @@ async function select(
   const locator = locate(ref);
   if (target?.inputType === 'select') {
     await locator.selectOption({ label: option });
+    return;
+  }
+  const box = choiceBoxOf(ref);
+  if (box !== null && !box.drawn) {
+    await chooseRadio(locator, option, { optionWaitMs, settleRetryMs }, GROUP_OPTIONS[box.kind]);
     return;
   }
   if (target?.role === 'radiogroup') {

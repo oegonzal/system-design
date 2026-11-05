@@ -19,3 +19,11 @@ export const MODAL_DIALOGS = {
  */
 export const RADIO_OPTIONS =
   '[role="radio"]:not([role="radio"] *), input[type="radio"]:not([role="radio"] *)';
+
+/**
+ * The options of a group of checkboxes, each once, read the way a radio
+ * group's are (`RADIO_OPTIONS`): every checkbox — a `role="checkbox"` or a
+ * native one — but a native input drawn inside a styled `role="checkbox"`.
+ */
+export const CHECKBOX_OPTIONS =
+  '[role="checkbox"]:not([role="checkbox"] *), input[type="checkbox"]:not([role="checkbox"] *)';

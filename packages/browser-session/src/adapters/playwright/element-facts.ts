@@ -2,7 +2,7 @@ import { ELEMENT_NAME_BOUND, HIDDEN_TRAITS, type HiddenTrait } from '@sysdesign/
 import type { Locator } from 'playwright';
 
 import { MODAL_DIALOGS } from './dom-selectors';
-import { answerable, readRadioGroup } from './radio-group';
+import { answerable, readRadioGroup, type GroupOptions } from './radio-group';
 
 /**
  * The DOM facts about one interactive element, read in the page. The
@@ -419,17 +419,18 @@ const contextOf = (parts: ContextParts, groupQuestion: string): string | null =>
 
 /**
  * The facts for one located element, or null when the element is gone, the
- * read fails, or it does not answer inside `timeout`. A radio group is read
- * by its own reader: one the page declares by role, or a box the observation
- * reads as the group its radios make by name (`radio-name-groups.ts`). A facts read is a single
- * DOM evaluate on an element Playwright has already located, so it answers in
- * about a millisecond; left to inherit the action timeout it was given fifteen
- * seconds, which is the whole of the hazard `readWithinBudget` bounds.
+ * read fails, or it does not answer inside `timeout`. A group of choices is
+ * read by its own reader: a radio group the page declares by role, or a box
+ * the observation reads as the group its options make by name
+ * (`name-groups.ts`). A facts read is a single DOM evaluate on an element
+ * Playwright has already located, so it answers in about a millisecond; left
+ * to inherit the action timeout it was given fifteen seconds, which is the
+ * whole of the hazard `readWithinBudget` bounds.
  */
 export async function readElementFacts(
   locator: Locator,
   timeout?: number,
-  read: { asRadioGroup: boolean } = { asRadioGroup: false },
+  read: { asGroup: GroupOptions | null } = { asGroup: null },
 ): Promise<ElementFacts | null> {
   try {
     const { radioGroup, contextParts, ...facts } = await locator.evaluate(
@@ -437,16 +438,18 @@ export async function readElementFacts(
       { textMax: ELEMENT_NAME_BOUND.target, modal: MODAL_DIALOGS },
       { timeout },
     );
-    if (!radioGroup && !read.asRadioGroup)
+    if (!radioGroup && read.asGroup === null) {
       return { ...facts, context: contextOf(contextParts, '') };
-    // A radio group's options, its choice and its question are what its own reader says of it.
-    const group = await readRadioGroup(locator, timeout);
+    }
+    // A group's options, its choice and its question are what its own reader says of it.
+    const group = await readRadioGroup(locator, timeout, read.asGroup ?? undefined);
     if (group === null) return null;
     const options = answerable(group).map((option) => option.words);
+    const chosen = group.options.filter((option) => option.checked).map((option) => option.words);
     return {
       ...facts,
       options: options.length === 0 ? null : options,
-      value: group.options.find((option) => option.checked)?.words || null,
+      value: chosen.join(', ') || null,
       required: facts.required || group.required,
       invalid: facts.invalid || group.invalid,
       context: contextOf(contextParts, group.question),

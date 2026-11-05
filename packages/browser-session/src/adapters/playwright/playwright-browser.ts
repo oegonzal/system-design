@@ -21,6 +21,7 @@ import { performAction } from './action-performer';
 import { landmarkWords, type SnapshotNode } from '../../core/snapshot/aria-snapshot';
 import { readElementFacts } from './element-facts';
 import { FILE_CONTROLS } from './file-controls';
+import { GROUP_OPTIONS, type ChoiceBox } from './name-groups';
 import type { ObservePolicy } from './observe-policy';
 import { PageReader } from './page-reader';
 import { markedScreenshot } from './page-marker';
@@ -77,6 +78,8 @@ export class PlaywrightBrowser implements BrowserPort {
   private documents = new Map<string, string>();
   /** The hidden file controls of the last observation, by the adapter's own ref: which control each is, in document order. */
   private fileControls = new Map<string, number>();
+  /** The boxes the last observation listed in place of the choices they hold, by ref: what each holds. */
+  private choiceBoxes = new Map<string, ChoiceBox>();
   private readonly reader: PageReader;
 
   constructor(private readonly options: PlaywrightBrowserOptions) {
@@ -111,6 +114,7 @@ export class PlaywrightBrowser implements BrowserPort {
     const observation = pageObservationSchema.parse(read.observation);
     this.known = new Map(observation.elements.map((element) => [element.ref, element]));
     this.fileControls = new Map(read.reading.fileControls.map((file) => [file.ref, file.nth]));
+    this.choiceBoxes = new Map(read.reading.choiceBoxes.map((box) => [box.ref, box]));
     this.tree = read.reading.nodes;
     return observation;
   }
@@ -132,6 +136,7 @@ export class PlaywrightBrowser implements BrowserPort {
           scrollPx: this.options.observe.scrollPx,
           optionWaitMs: this.options.observe.optionWaitMs,
           settleRetryMs: this.options.observe.settleRetryMs,
+          choiceBoxOf: (ref) => this.choiceBoxes.get(ref) ?? null,
         },
         action,
         targets[0] ?? null,
@@ -174,10 +179,13 @@ export class PlaywrightBrowser implements BrowserPort {
     try {
       const listed = this.resolve(ref, 'readValue');
       const located = this.locate(listed.ref);
+      const box = this.choiceBoxes.get(listed.ref);
       const facts = await readElementFacts(located, undefined, {
-        asRadioGroup: listed.role === 'radiogroup',
+        asGroup: box === undefined ? null : GROUP_OPTIONS[box.kind],
       });
       if (facts === null) return null;
+      // A checkbox the page drew holds what one does: checked, or not.
+      if (box?.drawn === true) return facts.value === null ? 'unchecked' : 'checked';
       // A field holds what an observation reads it to hold: a control's value, the option a select or
       // a radio group has chosen — never every option's words, nor a checkbox's bare "on". Only a
       // drawn control, whose value no observation reads, is read by the words it shows.
@@ -215,6 +223,7 @@ export class PlaywrightBrowser implements BrowserPort {
     if (closing.length > 0) {
       this.known.clear();
       this.fileControls.clear();
+      this.choiceBoxes.clear();
       this.tree = [];
     }
     const front = this.page;
@@ -227,6 +236,7 @@ export class PlaywrightBrowser implements BrowserPort {
     this.context = null;
     this.known.clear();
     this.fileControls.clear();
+    this.choiceBoxes.clear();
     this.tree = [];
     this.kept.clear();
     if (context !== null) await context.close();

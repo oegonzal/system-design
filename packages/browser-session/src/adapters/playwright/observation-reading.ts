@@ -27,6 +27,7 @@ import {
 import { snapshotScopeOf } from '../../core/snapshot/snapshot-scope';
 import { hiddenTraitsOf, type ElementFacts } from './element-facts';
 import type { FileControlRef } from './file-controls';
+import type { ChoiceBox } from './name-groups';
 
 /**
  * One read of the page turned into the observation the contracts describe:
@@ -50,6 +51,8 @@ export interface PageReading {
   elements: ObservedElement[];
   /** The file controls the page hides, listed among the elements under refs of the adapter's own: how each resolves. */
   fileControls: readonly FileControlRef[];
+  /** The boxes listed in place of the choices they hold (`name-groups.ts`): how the browser acts on each. */
+  choiceBoxes: readonly ChoiceBox[];
   unreadElements: number;
   unreadSnapshotLines: number;
   /** The scope of the node the page marks active, when it marks one inside a scope. */
