@@ -18,6 +18,16 @@ export interface ObservePolicy {
    * it, and observed the tab only on the step after — twice in one unit.
    */
   pageOpenWaitMs: number;
+  /**
+   * How long a click inside a link that declares it opens a new page — its
+   * own `target="_blank"` — waits for that page to register, ending the
+   * moment it does. The page's own word, so the wait is long and costs
+   * nothing when the page comes at once. Measured 2026-11-05/06: three times
+   * in two live headed sessions the job tab a list's title link opened had
+   * not registered within `pageOpenWaitMs`, the unchanged list was planned
+   * on, and only the next step's plan found the tab — a step lost each time.
+   */
+  newPageWaitMs: number;
   /** How long the observer waits for the document to settle before each read of the page. */
   settleTimeoutMs: number;
   /**

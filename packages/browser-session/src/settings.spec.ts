@@ -56,6 +56,7 @@ describe('the session settings', () => {
     expect(shipped.observe).toEqual({
       actionTimeoutMs: 15000,
       pageOpenWaitMs: 1500,
+      newPageWaitMs: 10000,
       settleTimeoutMs: 10000,
       snapshotTimeoutMs: 2000,
       settleRetryMs: 400,

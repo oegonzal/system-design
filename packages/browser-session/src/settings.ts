@@ -54,6 +54,7 @@ const positive = z.number().int().positive();
 const observePolicySchema = z.strictObject({
   actionTimeoutMs: positive,
   pageOpenWaitMs: positive,
+  newPageWaitMs: positive,
   settleTimeoutMs: positive,
   snapshotTimeoutMs: positive,
   settleRetryMs: positive,

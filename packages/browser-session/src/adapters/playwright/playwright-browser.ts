@@ -127,7 +127,10 @@ export class PlaywrightBrowser implements BrowserPort {
   async act(action: BrowserAction): Promise<void> {
     const label = `${action.kind}${'ref' in action && action.ref !== null ? ` ${action.ref}` : ''}`;
     const targets = actionRefs(action).map((ref) => this.resolve(ref, label));
-    const opened = this.pageOpenedBy(action);
+    const opened = this.pageOpenedBy(
+      action,
+      await this.declaresNewPage(action, targets[0] ?? null),
+    );
     try {
       await performAction(
         {
@@ -154,16 +157,38 @@ export class PlaywrightBrowser implements BrowserPort {
    * a tab registers with Playwright some hundreds of milliseconds after the
    * click that opened it — waited for up to the declared wait, and read to
    * its document once it registers, so the next observation is of that page
-   * and never of the page the action was taken on. An action that opens
-   * nothing costs the wait; one that cannot open a page costs nothing.
+   * and never of the page the action was taken on. A click inside a link
+   * that declares a new page waits the longer `newPageWaitMs`; an action
+   * that opens nothing costs the wait; one that cannot open a page costs nothing.
    */
-  private pageOpenedBy(action: BrowserAction): Promise<void> {
+  private pageOpenedBy(action: BrowserAction, declared: boolean): Promise<void> {
     if (this.context === null || !ACTION_EFFECTS[action.kind].opens) return Promise.resolve();
-    const { pageOpenWaitMs, settleTimeoutMs } = this.options.observe;
+    const { pageOpenWaitMs, newPageWaitMs, settleTimeoutMs } = this.options.observe;
     return this.context
-      .waitForEvent('page', { timeout: pageOpenWaitMs })
+      .waitForEvent('page', { timeout: declared ? newPageWaitMs : pageOpenWaitMs })
       .then((page) => page.waitForLoadState('domcontentloaded', { timeout: settleTimeoutMs }))
       .catch(() => undefined);
+  }
+
+  /**
+   * Whether a click lands inside a link that declares it opens a new page —
+   * `target="_blank"` on the link — read from the element before the click;
+   * an element that cannot be read declares nothing.
+   */
+  private async declaresNewPage(
+    action: BrowserAction,
+    target: ObservedElement | null,
+  ): Promise<boolean> {
+    if (action.kind !== 'click' || target === null) return false;
+    return this.locate(target.ref)
+      .evaluate(
+        (el) =>
+          el.closest('a[href], area[href]')?.getAttribute('target')?.trim().toLowerCase() ===
+          '_blank',
+        undefined,
+        { timeout: this.options.observe.factsTimeoutMs },
+      )
+      .catch(() => false);
   }
 
   async highlight(ref: string): Promise<void> {

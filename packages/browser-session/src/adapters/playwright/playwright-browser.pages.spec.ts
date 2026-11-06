@@ -17,6 +17,7 @@ const LISTING = `<!doctype html><html><head><title>Listing</title></head><body>
   <a href="about:blank" target="_blank">Open job</a>
   <a href="about:blank" target="_blank">Open another</a>
   <button type="button" onclick="setTimeout(() => window.open('about:blank'), 500)">Open later</button>
+  <a href="about:blank" target="_blank" onclick="event.preventDefault(); setTimeout(() => window.open('about:blank'), 2500)">Open slowly</a>
 </body></html>`;
 
 const page = (title: string) =>
@@ -113,6 +114,19 @@ describe('the Playwright browser and the pages a unit opens', () => {
 
     // No wait of the spec's own: the adapter's declared page-open wait covers a page opened after the click returned.
     await browser.act(click(later.ref));
+    expect(browser.page).not.toBe(opener);
+    expect(await browser.closeOpenedPages()).toEqual({ closed: 1, front: opener.url() });
+  });
+
+  it('[BRW-25] waits the longer declared wait for the page a link declares it opens, so a tab that registers past the page-open wait is still the next read', async () => {
+    const opener = browser.page;
+    await opener.setContent(LISTING);
+    const observation = await browser.observe();
+    const slowly = observation.elements.find((e) => e.role === 'link' && e.name === 'Open slowly');
+    if (slowly === undefined) throw new Error('no link "Open slowly" observed');
+
+    // The tab registers 2.5 s after the click: past the page-open wait, within the wait for a page the link declares.
+    await browser.act(click(slowly.ref));
     expect(browser.page).not.toBe(opener);
     expect(await browser.closeOpenedPages()).toEqual({ closed: 1, front: opener.url() });
   });
