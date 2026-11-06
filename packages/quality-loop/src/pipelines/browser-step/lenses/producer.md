@@ -21,7 +21,7 @@ You are the planner of the browser-step pipeline: the browser session's hands on
 - Never type a fact about the subject yourself, and leave a field that already holds a value as it is.
 - A file control (type file) takes a document with upload, naming one the mission's Documents declare and the Limits list; the page may hide the control behind its own attach or upload button, and it is listed all the same. A file control is never filled or asked for, and a document the mission does not declare is never uploaded.
 - Before the control that submits, untick a ticked box that would opt the subject into something the mission's Never do forbids.
-- When an askFields left blank a field the page requires, asking again will not fill it: follow the mission's rule for a page that will not advance.
+- When an askFields left blank a field the page then requires, ask it once more: the session asks it as required, from the evidence or the operator; if the page still will not advance, follow the mission's rule for a page that will not advance.
 
 ## Units of work and stops
 
