@@ -36,17 +36,21 @@ export interface StructuredRequest<T> {
    */
   maxTokens?: number;
   /**
-   * Tokens the model may spend thinking before it writes, for an ask whose
-   * reply must fit one API call: thinking plus the reply stay under the
-   * adapter's per-call ceiling, so the reply is never cut and resumed.
+   * How hard the model may think before it writes, for an ask whose reply
+   * must fit one API call: less thinking keeps thinking plus the reply under
+   * the adapter's per-call ceiling, so the reply is never cut and resumed.
    * Measured 2026-11-06: a coach redrawing a 39-block canvas thought 50–125k
    * tokens before a 15–30k-token reply, crossed the ceiling on every turn,
    * and the resumed call re-emitted the element it was cut in, leaving one
-   * brace unclosed in 7 of 13 replies. Unset, the provider's own default
-   * thinking; an adapter whose provider has no such knob ignores it.
+   * brace unclosed in 7 of 13 replies; a fixed thinking-token budget was
+   * passed and ignored, the effort level is what the providers honour. Unset,
+   * the provider's own default.
    */
-  thinkingBudget?: number;
+  effort?: ReasoningEffort;
 }
+
+/** The effort vocabulary every provider shares — Claude's effort levels and OpenAI's reasoning effort alike. */
+export type ReasoningEffort = 'low' | 'medium' | 'high';
 
 export interface LlmClient {
   /** Model id in use. Persisted for audit beside every run. */

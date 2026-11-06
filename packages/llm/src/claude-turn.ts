@@ -2,6 +2,7 @@ import type { SDKAssistantMessage, SDKMessage } from '@anthropic-ai/claude-agent
 
 import { subscriptionEnv, type ClaudeQuery } from './claude-account';
 import type { LlmCall } from './exchange';
+import type { ReasoningEffort } from './llm-client';
 
 /**
  * One turn of the spawned agent: the options every structured call's turn
@@ -41,8 +42,8 @@ export interface TurnAsk {
   system: string;
   /** Only when the caller pinned one; otherwise the CLI's default rules. */
   model: string | undefined;
-  /** Only when the ask declared one; otherwise the CLI's own, adaptive thinking. */
-  thinkingBudget: number | undefined;
+  /** Only when the ask declared one; otherwise the CLI's own default effort. */
+  effort: ReasoningEffort | undefined;
   abort: AbortController;
 }
 
@@ -50,16 +51,14 @@ export interface TurnAsk {
 export const turnOptions = ({
   system,
   model,
-  thinkingBudget,
+  effort,
   abort,
 }: TurnAsk): NonNullable<Parameters<ClaudeQuery>[0]['options']> => ({
   systemPrompt: system,
   ...(model ? { model } : {}),
-  // A declared budget is the SDK's fixed-budget mode; undeclared, the CLI
-  // decides how much to think, as it does for every other ask.
-  ...(thinkingBudget === undefined
-    ? {}
-    : { thinking: { type: 'enabled' as const, budgetTokens: thinkingBudget } }),
+  // The CLI's own `--effort`; undeclared, it thinks as it does for every
+  // other ask. (A fixed thinking-token budget is a flag this CLI ignores.)
+  ...(effort === undefined ? {} : { effort }),
   maxTurns: 1,
   tools: NO_TOOLS,
   permissionMode: 'default',

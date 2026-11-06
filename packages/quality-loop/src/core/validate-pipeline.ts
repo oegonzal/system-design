@@ -42,12 +42,6 @@ type Definition = PipelineDefinition<unknown>;
 /** A model-facing stage — a lens, the producer, the deriver — has a persona to speak from and room to answer. */
 function checkStage(name: string, stage: StageSpec, fail: Fail): void {
   if (!(stage.maxTokens >= 1)) fail(`${name} needs maxTokens ≥ 1`);
-  if (stage.thinkingBudget !== undefined && !(stage.thinkingBudget >= 1)) {
-    fail(`${name} needs thinkingBudget ≥ 1`);
-  }
-  if (stage.thinkingBudget !== undefined && !(stage.thinkingBudget < stage.maxTokens)) {
-    fail(`${name} needs thinkingBudget below maxTokens, or the reply has no room`);
-  }
   if (stage.persona.trim().length === 0) fail(`${name} has an empty persona`);
 }
 

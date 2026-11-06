@@ -85,16 +85,6 @@ describe('validatePipeline', () => {
         /lens .* needs maxTokens/,
       ],
       [
-        'a lens whose thinking budget leaves its reply no room',
-        { evaluators: [{ ...base.evaluators[0], thinkingBudget: base.evaluators[0].maxTokens }] },
-        /lens .* needs thinkingBudget below maxTokens/,
-      ],
-      [
-        'a producer with a thinking budget of nothing',
-        { producer: { ...base.producer, thinkingBudget: 0 } },
-        /producer needs thinkingBudget ≥ 1/,
-      ],
-      [
         'an empty producer persona',
         { producer: { ...base.producer, persona: '' } },
         /producer has an empty persona/,

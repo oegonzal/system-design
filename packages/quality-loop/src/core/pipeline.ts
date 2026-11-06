@@ -19,6 +19,7 @@ import type {
   UpstreamEvidence,
 } from '@sysdesign/contracts';
 
+import type { ReasoningEffort } from '@sysdesign/llm';
 import type { TaskSpec } from './contracts';
 import type { Controller, Validator } from './ports';
 
@@ -75,12 +76,12 @@ export interface StageSpec {
   /** The most one ask is expected to write, thinking included; the call's time limit derives from it. */
   maxTokens: number;
   /**
-   * Tokens the model may think before it writes, declared only where a reply
-   * must fit one API call — a redraw of a whole artifact, say — so thinking
-   * plus the reply stay under the adapter's per-call ceiling and the reply is
-   * never cut and resumed. Below `maxTokens`, or boot refuses the pipeline.
+   * How hard the model may think before it writes, declared only where a
+   * reply must fit one API call — a redraw of a whole artifact, say — so
+   * thinking plus the reply stay under the adapter's per-call ceiling and the
+   * reply is never cut and resumed. Undeclared, the provider's default.
    */
-  thinkingBudget?: number;
+  effort?: ReasoningEffort;
 }
 
 export interface ProducerSpec extends StageSpec {

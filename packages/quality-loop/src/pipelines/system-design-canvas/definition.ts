@@ -246,9 +246,9 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
     // canvas: the coach thought 50–125k tokens before a 15–30k-token reply,
     // crossed the per-call ceiling on every turn, and the resumed call
     // re-emitted the element it was cut in — 7 of 13 replies lost at that
-    // seam, 3 more to the time limit. 24k of thinking keeps the largest
-    // reply measured (30k) under the 64k ceiling with room.
-    thinkingBudget: 24_000,
+    // seam, 3 more to the time limit. A fixed thinking budget was passed and
+    // ignored; the effort level is the knob the CLI documents and honours.
+    effort: 'medium',
     consumes: ['criteria', 'memories', 'setbacks'],
   },
 

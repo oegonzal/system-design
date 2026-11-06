@@ -10,6 +10,7 @@ import {
   type StructuredReply,
   type StructuredRequest,
 } from './llm-client';
+import type { ReasoningEffort } from './llm-client';
 import {
   backoffFor,
   classifyFailure,
@@ -68,6 +69,8 @@ export interface Ask {
   readonly maxTokens: number;
   /** Retain the exchange in the provider's own logs; undefined leaves its default. */
   readonly store: boolean | undefined;
+  /** The declared reasoning effort; undefined leaves the model's default and sends nothing. */
+  readonly effort: ReasoningEffort | undefined;
 }
 
 /** What one reply came back with, in the terms the recorder keeps. */
@@ -90,6 +93,13 @@ export interface ApiShape {
 const stored = (store: boolean | undefined): Record<string, boolean> =>
   store === undefined ? {} : { store };
 
+/** Chat completions name the effort flat; the responses API nests it. Sent only when declared. */
+const chatEffort = (effort: ReasoningEffort | undefined): Record<string, string> =>
+  effort === undefined ? {} : { reasoning_effort: effort };
+const responsesEffort = (
+  effort: ReasoningEffort | undefined,
+): Record<string, { effort: string }> => (effort === undefined ? {} : { reasoning: { effort } });
+
 export const API_SHAPES: Readonly<Record<LlmApi, ApiShape>> = {
   chat: {
     path: '/chat/completions',
@@ -105,6 +115,7 @@ export const API_SHAPES: Readonly<Record<LlmApi, ApiShape>> = {
         json_schema: { name: SCHEMA_NAME, schema: ask.schema, strict: ask.strict },
       },
       ...stored(ask.store),
+      ...chatEffort(ask.effort),
     }),
     read: (payload) => {
       const reply = payload as {
@@ -142,6 +153,7 @@ export const API_SHAPES: Readonly<Record<LlmApi, ApiShape>> = {
         },
       },
       ...stored(ask.store),
+      ...responsesEffort(ask.effort),
     }),
     read: (payload) => {
       const reply = payload as {
@@ -341,6 +353,7 @@ export class OpenAiCompatibleLlmClient implements LlmClient, LlmDetailed, LlmRec
       schema: strictSchema,
       strict: this.strict,
       maxTokens,
+      effort: request.effort,
       store: this.store,
     });
 

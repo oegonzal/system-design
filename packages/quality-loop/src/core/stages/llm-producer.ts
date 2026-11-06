@@ -108,7 +108,7 @@ export function createLlmProducer<T>(
         user: joinSections(...briefed.sections),
         schema: task.output.schema,
         maxTokens: spec.maxTokens,
-        thinkingBudget: spec.thinkingBudget,
+        effort: spec.effort,
       });
 
       if (reply.value === null) {

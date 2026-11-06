@@ -42,18 +42,19 @@ describe('the subscription client at its call site', () => {
     }
   });
 
-  it("[QL-22] spawns a declared thinking budget as the CLI's fixed budget, and leaves thinking to the CLI when none is declared", async () => {
+  it("[QL-22] spawns a declared effort as the CLI's own effort level, and leaves it to the CLI when none is declared", async () => {
     const ok = () => [
       { type: 'result', subtype: 'success', is_error: false, result: '{"answer":"ok"}' },
     ];
-    const budgeted = scripted(ok());
-    await new ClaudeAgentLlmClient({ query: budgeted.run }).completeStructured({
+    const eased = scripted(ok());
+    await new ClaudeAgentLlmClient({ query: eased.run }).completeStructured({
       system: 's',
       user: 'u',
       schema: answer,
-      thinkingBudget: 24_000,
+      effort: 'medium',
     });
-    expect(budgeted.seen.options?.['thinking']).toEqual({ type: 'enabled', budgetTokens: 24_000 });
+    expect(eased.seen.options?.['effort']).toBe('medium');
+    expect(eased.seen.options).not.toHaveProperty('thinking');
 
     const free = scripted(ok());
     await new ClaudeAgentLlmClient({ query: free.run }).completeStructured({
@@ -61,7 +62,7 @@ describe('the subscription client at its call site', () => {
       user: 'u',
       schema: answer,
     });
-    expect(free.seen.options).not.toHaveProperty('thinking');
+    expect(free.seen.options).not.toHaveProperty('effort');
   });
 
   it("[QL-22] a turn that ended on an API error is recorded as an error with the CLI's own reason", async () => {

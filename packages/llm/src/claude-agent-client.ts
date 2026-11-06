@@ -210,7 +210,7 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable, LlmDetail
           options: turnOptions({
             system: request.system,
             model: this.requestedModel,
-            thinkingBudget: request.thinkingBudget,
+            effort: request.effort,
             abort,
           }),
         });
