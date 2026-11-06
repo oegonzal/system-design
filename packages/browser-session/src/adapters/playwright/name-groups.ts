@@ -147,16 +147,62 @@ export async function readNameGroups(
       break;
     }
   }
-  return { groups, drawn };
+  const declared = await declaredGroups(page, nodes, ancestorsOf, drawn, timeout);
+  const gathered = new Set(declared.flatMap((group) => group.options));
+  return {
+    groups: [...groups, ...declared],
+    drawn: drawn.filter((checkbox) => !gathered.has(checkbox.option)),
+  };
+}
+
+/**
+ * Checkboxes its page drew, each alone in a box of its own, that a box the
+ * page declares a group by its role — a fieldset, `role="group"` — gathers
+ * with no other control: one question, chosen from as checkboxes sharing a
+ * name are, under the group's ref. Measured 2026-11-06: two application
+ * forms drew each answer of a question — "Yes" and "No", or a list to pick
+ * from — as a nameless checkbox beside its words, the question's answers
+ * alone in a group; each was listed as a checkbox apart with nothing to tell
+ * it by, the plan's askFields on them was refused, and both sessions ended
+ * on three failed steps.
+ */
+async function declaredGroups(
+  page: Page,
+  nodes: readonly SnapshotNode[],
+  ancestorsOf: (index: number) => number[],
+  drawn: readonly DrawnCheckbox[],
+  timeout: number,
+): Promise<NameGroup[]> {
+  const byGroup = new Map<number, number[]>();
+  for (const { option } of drawn) {
+    const group = ancestorsOf(option).find((at) => nodes[at]?.role === 'group');
+    if (group === undefined || nodes[group]?.ref === null) continue;
+    byGroup.set(group, [...(byGroup.get(group) ?? []), option]);
+  }
+  const groups: NameGroup[] = [];
+  for (const [box, options] of byGroup) {
+    if (options.length < 2) continue;
+    const reading = await readBox(
+      page.locator(`aria-ref=${nodes[box]?.ref}`),
+      'checkbox',
+      timeout,
+      true,
+    );
+    if (reading !== null && !reading.shared && reading.groupSize === options.length) {
+      groups.push({ kind: 'checkbox', box, options });
+    }
+  }
+  return groups;
 }
 
 const readBox = async (
   box: Locator,
   kind: GroupKind,
   timeout: number,
+  declared = false,
 ): Promise<BoxReading | null> => {
   try {
-    return await box.evaluate(choiceBoxInPage, kind, { timeout });
+    return await box.evaluate(choiceBoxInPage, { kind, declared }, { timeout });
   } catch {
     return null;
   }
@@ -167,10 +213,14 @@ const readBox = async (
  * first native option, the options sharing its name and form in its tree (an
  * option with no name is a group of its own), and whether it holds all of
  * it; and whether it holds what no box of their own may hold: another
- * control, or options of another group. One function on purpose — Playwright serialises it whole, so nothing
- * here reaches outside it.
+ * control, or options of another group. A box the page declares a group
+ * holds its options as one group whatever names they carry. One function on
+ * purpose — Playwright serialises it whole, so nothing here reaches outside it.
  */
-function choiceBoxInPage(box: Element, kind: 'radio' | 'checkbox'): BoxReading {
+function choiceBoxInPage(
+  box: Element,
+  { kind, declared }: { kind: 'radio' | 'checkbox'; declared: boolean },
+): BoxReading {
   const own = `input[type="${kind}"]`;
   const options = Array.from(box.querySelectorAll<HTMLInputElement>(own));
   const [first] = options;
@@ -185,9 +235,10 @@ function choiceBoxInPage(box: Element, kind: 'radio' | 'checkbox'): BoxReading {
   );
   const sameGroup = (option: HTMLInputElement): boolean =>
     first.name !== '' && option.name === first.name && option.form === first.form;
-  if (foreign || (options.length > 1 && !options.every(sameGroup))) {
+  if (foreign || (!declared && options.length > 1 && !options.every(sameGroup))) {
     return { groupSize: 0, holdsAll: false, shared: true };
   }
+  if (declared) return { groupSize: options.length, holdsAll: true, shared: false };
   const root = first.getRootNode() as Document | ShadowRoot;
   const group =
     first.name === ''
