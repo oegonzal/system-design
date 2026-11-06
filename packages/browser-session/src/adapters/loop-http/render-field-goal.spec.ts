@@ -64,7 +64,7 @@ describe('the form goal', () => {
     );
 
     // The ladder, over a statement at its bound — 300 nodes of 100 bytes, of which the capture keeps 297 —
-    // and the heaviest field list any recorded form goal carried.
+    // and a field list heavier than any form goal recorded by 2026-10-14 carried.
     const lines = Array.from({ length: 300 }, (_, at) => `${at} `.padEnd(100, 'x'));
     const atBound = unitContextOf(lines, 'main');
     expect(atBound).toMatchObject({ omitted: 3 });

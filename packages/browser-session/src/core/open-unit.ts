@@ -58,9 +58,12 @@ export interface FormTask {
  * node boundary, in document order, by this number alone, and the lines cut
  * are counted (`UnitContext.omitted`) so the goal never calls the beginning
  * the whole. What a statement at the bound costs the form goal is the goal
- * composer's to fit (`composeFieldGoalWithinBudget`): the recorded maximum,
- * 28.3 KB, beside the largest recorded form goal, 33.9 KB with its 7.0 KB of
- * evidence, composes to 62.2 of the 64 KB budget with nothing dropped.
+ * composer's to fit (`composeFieldGoalWithinBudget`): measured 2026-10-14,
+ * the recorded maximum, 28.3 KB, beside the largest form goal then recorded,
+ * 33.9 KB with its 7.0 KB of evidence, composed to 62.2 of the 64 KB budget
+ * with nothing dropped. A 29-field form recorded 2026-11-06 carried a goal
+ * of some 51 KB besides its statement, and there the statement is cut so
+ * the evidence fits (`judged-form.ts`).
  */
 export const UNIT_CONTEXT_MAX_BYTES = 30_000;
 

@@ -8,6 +8,7 @@ import {
   GOAL_BUDGET_BYTES,
   GoalBudgetExceeded,
   textBytes,
+  type FieldGoalInput,
   type FormPipeline,
   type PageObservation,
   type StepGoalInput,
@@ -178,9 +179,10 @@ export const OPEN_UNIT_HEADING = '## Open unit of work';
  * goal leaves, at a node boundary; no statement line at all. The mission and
  * the fields are never cut — a form page is answered on the fields it lists —
  * so a goal that does not fit even so is a refusal, as a step goal's is. The
- * recall then fills whatever room remains with evidence, lowest-ranked dropped
- * first: the statement yields to the fields and the evidence to the statement,
- * a declared order rather than a size that happens to fit one mission.
+ * ladder is measured with whatever evidence its composer brings: the
+ * statement yields to the fields and to that evidence, a declared order
+ * rather than a size that happens to fit one mission. A composer that brings
+ * none leaves the evidence to fill what room the statement leaves.
  */
 type FieldGoalRung = 'full' | 'statement-cut' | 'without-statement';
 
@@ -245,15 +247,25 @@ export function renderFieldProse(
   ].join('\n');
 }
 
+/** The evidence a field goal lists, under the legend of its kinds: none unless its composer brings it. */
+type FieldGoalEvidence = Pick<FieldGoalInput, 'evidence' | 'kinds'>;
+
+const NO_EVIDENCE: FieldGoalEvidence = { evidence: [], kinds: [] };
+
 /** The goal with the first `shown` statement lines (every one for null), composed without a budget: the ladder measures it. */
-const fieldGoalAt = (pipeline: FormPipeline, input: FieldsInput, shown: number | null): string =>
+const fieldGoalAt = (
+  pipeline: FormPipeline,
+  input: FieldsInput,
+  shown: number | null,
+  evidence: FieldGoalEvidence,
+): string =>
   composeFieldGoal(
     {
       pipeline,
       prose: renderFieldProse(input, shown),
       fields: input.fields,
-      evidence: [],
-      kinds: [],
+      evidence: evidence.evidence,
+      kinds: evidence.kinds,
       ...(input.task === null ? {} : { unitKey: input.task.unitKey }),
     },
     Number.MAX_SAFE_INTEGER,
@@ -263,6 +275,7 @@ export function composeFieldGoalWithinBudget(
   pipeline: FormPipeline,
   input: FieldsInput,
   budget = GOAL_BUDGET_BYTES,
+  evidence: FieldGoalEvidence = NO_EVIDENCE,
 ): ComposedFieldGoal {
   const composed = (goal: string, rung: FieldGoalRung): ComposedFieldGoal => ({
     goal,
@@ -270,7 +283,7 @@ export function composeFieldGoalWithinBudget(
     bytes: textBytes(goal),
     snapshotRung: null,
   });
-  const whole = fieldGoalAt(pipeline, input, null);
+  const whole = fieldGoalAt(pipeline, input, null, evidence);
   if (textBytes(whole) <= budget) return composed(whole, 'full');
   const context = input.task?.context ?? null;
   if (context === null) throw new GoalBudgetExceeded(textBytes(whole), budget);
@@ -278,10 +291,10 @@ export function composeFieldGoalWithinBudget(
   // the whole lines that fit it follow, in document order, after the blank line
   // before them. The title's counts move by a few bytes with the cut, so the
   // fit is checked and the cut deepened until it holds.
-  const bare = fieldGoalAt(pipeline, input, 0);
+  const bare = fieldGoalAt(pipeline, input, 0, evidence);
   let kept = firstThatFit(statementLines(context), budget - textBytes(bare) - 1).length;
   for (;;) {
-    const goal = fieldGoalAt(pipeline, input, kept);
+    const goal = fieldGoalAt(pipeline, input, kept, evidence);
     if (textBytes(goal) <= budget) {
       return composed(goal, kept === 0 ? 'without-statement' : 'statement-cut');
     }

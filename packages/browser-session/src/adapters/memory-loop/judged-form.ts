@@ -1,9 +1,6 @@
 import {
-  composeFieldGoal,
   GOAL_BUDGET_BYTES,
   GoalBudgetExceeded,
-  splitFieldGoal,
-  textBytes,
   type EvidenceItem,
   type FieldGoalInput,
   type FormPipeline,
@@ -28,8 +25,12 @@ import { composeFieldGoalWithinBudget } from '../loop-http/render-goal';
  * which the loop computes once and the session recomputes nowhere.
  */
 
-/** What a judged form reports beside the decision: everything a form report says but the recall, which the brain adds. */
-type JudgedFields<T> = Decided<T> & Omit<FormReport, 'recall'>;
+/**
+ * What a judged form reports beside the decision: everything a form report
+ * says but the recall, which the brain adds — and how many of the items it was
+ * given the goal lists, the best-ranked, as many as fit.
+ */
+type JudgedFields<T> = Decided<T> & Omit<FormReport, 'recall'> & { listed: number };
 
 interface ComposedEvidenceGoal {
   goal: string;
@@ -41,12 +42,22 @@ interface ComposedEvidenceGoal {
 }
 
 /**
- * The goal fitted to the budget by two declared ladders in order: the unit's
- * statement first, cut as the form goal's own ladder cuts it with no evidence
- * in the goal; then the evidence fills the room that leaves, lowest-ranked
- * items dropped first. Aliases are positional, so a prefix keeps every alias
- * the way it would have read; the fitted goal is taken apart with the codec's
- * own inverse and composed again, so it still names its unit of work.
+ * The goal fitted to the budget with the evidence first: the statement ladder
+ * measured with every item the recall dealt, so the unit's statement is cut
+ * to the room the fields and the evidence leave; only when the evidence does
+ * not fit even beside no statement at all are the lowest-ranked items
+ * dropped, and the ladder measured again. A question about the subject is
+ * answered from the evidence, while one about the unit rests on the
+ * statement too, and the statement, cut at a node boundary, keeps the
+ * page's first words — on a layout that lists other items before the
+ * unit's own description, the list. Aliases are positional, so a prefix
+ * keeps every alias the way it would have read. Measured 2026-11-06: a
+ * 29-field form with two long option lists, fitted the other way round, kept
+ * a 12.8 KB job page whole and dropped 10 of the 24 items recalled — the
+ * subject's email address and home city among them — and both were put to
+ * the operator as facts no evidence states; the other 48 form pages then
+ * recorded composed whole with every item, so the order changes that page
+ * alone, whose statement opens with the unit's own description.
  */
 function composeEvidenceGoal(
   pipeline: FormPipeline,
@@ -55,21 +66,17 @@ function composeEvidenceGoal(
   kinds: FieldGoalInput['kinds'],
   budget = GOAL_BUDGET_BYTES,
 ): ComposedEvidenceGoal {
-  const ladder = composeFieldGoalWithinBudget(pipeline, input, budget);
-  const split = splitFieldGoal(ladder.goal);
-  if (split === null) throw new Error('the form goal composed does not read back as one');
   for (let count = evidence.length; count > 0; count -= 1) {
     try {
-      const goal = composeFieldGoal(
-        { ...split, kinds, evidence: evidence.slice(0, count) },
-        budget,
-      );
-      return { goal, rung: ladder.rung, bytes: textBytes(goal), evidence: count };
+      const items = { evidence: evidence.slice(0, count), kinds };
+      const { goal, rung, bytes } = composeFieldGoalWithinBudget(pipeline, input, budget, items);
+      return { goal, rung, bytes, evidence: count };
     } catch (error) {
       if (!(error instanceof GoalBudgetExceeded)) throw error;
     }
   }
-  return { goal: ladder.goal, rung: ladder.rung, bytes: ladder.bytes, evidence: 0 };
+  const { goal, rung, bytes } = composeFieldGoalWithinBudget(pipeline, input, budget);
+  return { goal, rung, bytes, evidence: 0 };
 }
 
 /**
@@ -103,6 +110,7 @@ export function judgeFields<T>(
       orchestrationRunId: null,
       run,
       composition: { rung: composed.rung, bytes: composed.bytes, snapshotRung: null },
+      listed: composed.evidence,
       admission: run.readout?.admission ?? 'fell-short',
       withheld: run.readout?.withheld ?? [],
     };

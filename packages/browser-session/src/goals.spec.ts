@@ -81,9 +81,9 @@ describe('the goals', () => {
       expect(() =>
         composeStepGoal(stepGoalInput({ mission: text, observation: formObservation() })),
       ).not.toThrow();
-      // A statement at its bound beside the heaviest recorded field list composes whole with this goal: the
-      // form goal's ladder (`composeFieldGoalWithinBudget`) never cuts a shipped goal's statement at the
-      // recorded maximum, so the codec alone is asked here, with no ladder to catch it.
+      // A statement at its bound beside the heaviest field list of the 2026-10-14 measure composes whole with
+      // this goal and no evidence, so the codec alone is asked here, with no ladder to catch it; the room
+      // evidence takes is the brain's ladder's to make, cutting the statement first (`judged-form.spec.ts`).
       const landmark = unitContextLandmarkOf(text);
       if (landmark !== null) {
         const context = unitContextOf(['x'.repeat(UNIT_CONTEXT_MAX_BYTES)], landmark);

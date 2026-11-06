@@ -161,7 +161,9 @@ export class MemoryLoopBrain implements BrainPort {
         what,
         this.options,
       );
-      return { ...judged, recall: report };
+      // The report says how many items reached the goal: the budget may list fewer than were dealt.
+      const { listed, ...decided } = judged;
+      return { ...decided, recall: { ...report, evidence: listed } };
     }, MEMORY_FAULTS);
   }
 

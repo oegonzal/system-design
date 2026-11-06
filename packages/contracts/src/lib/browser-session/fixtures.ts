@@ -264,11 +264,12 @@ export const MISSION_WITH_CONTEXT = `${MISSION_WITH_IDENTITY}
 `;
 
 /**
- * A field list heavier than any a recorded form goal carried, for a budget
- * pin. Measured 2026-10-14 over 287 recorded form goals: the most fields any
- * listed was 18, and the largest fields section 4.1 KB over 11 fields — so 18
- * fields, each with a longer name and context than any recorded, outweigh
- * every recorded page.
+ * A field list heavier than any a form goal recorded by 2026-10-14 carried,
+ * for a budget pin. Measured then over 287 recorded form goals: the most
+ * fields any listed was 18, and the largest fields section 4.1 KB over 11
+ * fields — so 18 fields, each with a longer name and context than any
+ * recorded, outweighed every page recorded by then. A 29-field form recorded
+ * 2026-11-06, two of its lists 100 and 244 options long, is heavier.
  */
 export const heaviestRecordedFields = (): FieldSpec[] => {
   const field = fieldSpecOf(
