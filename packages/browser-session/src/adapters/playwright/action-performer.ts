@@ -8,7 +8,7 @@ import type { Locator, Page } from 'playwright';
 
 import type { BrowserAction } from '../../core/ports';
 import { GROUP_OPTIONS, type ChoiceBox } from './name-groups';
-import { chooseRadio, toggleCheckbox } from './radio-choice';
+import { chooseLoneRadio, chooseRadio, toggleCheckbox } from './radio-choice';
 import { chooseByTyping } from './typed-choice';
 
 /** What the performer acts through: the page in front, and the element under a ref. */
@@ -108,7 +108,7 @@ async function select(
     return;
   }
   if (target?.role === 'radio') {
-    await locator.check();
+    await chooseLoneRadio(locator, { optionWaitMs, settleRetryMs });
     return;
   }
   if (target !== null && choosesByTyping(target.role, target)) {

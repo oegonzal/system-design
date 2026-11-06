@@ -17,3 +17,11 @@ export const specBrowserOptions = (
   channel: undefined,
   observe: { ...readSessionSettings(PACKAGE_ROOT).observe, ...observe },
 });
+
+/** An input a page hides inside the box it draws: no size, no paint, no pointer — the tree gives it no ref. */
+export const HIDDEN_INPUT =
+  'position:absolute;width:0;height:0;margin:0;opacity:0;pointer-events:none';
+
+/** The box a page draws for a choice whose own input it hides. */
+export const DRAWN_BOX =
+  'display:inline-block;position:relative;width:16px;height:16px;border:1px solid #333';

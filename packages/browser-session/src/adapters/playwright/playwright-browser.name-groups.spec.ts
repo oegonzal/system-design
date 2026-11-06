@@ -6,7 +6,7 @@ import type { ObservedElement, PageObservation } from '@sysdesign/contracts';
 
 import type { BrowserAction } from '../../core/ports';
 import { PlaywrightBrowser } from './playwright-browser';
-import { specBrowserOptions } from './testing';
+import { DRAWN_BOX, HIDDEN_INPUT, specBrowserOptions } from './testing';
 
 /**
  * Choices a page groups by their name alone — the HTML standard's radio
@@ -20,7 +20,6 @@ import { specBrowserOptions } from './testing';
  * lists them: options laid out flat among other fields, a box another control
  * shares, and a radio alone in its group. Run with the `browser` project.
  */
-const HIDDEN_INPUT = 'position:absolute;width:0;height:0;margin:0;opacity:0;pointer-events:none';
 
 const LISTED = `<!doctype html><html><head><title>Apply</title></head><body><form>
   <ul>
@@ -66,9 +65,6 @@ const CHECKBOXES = `<!doctype html><html><head><title>Apply</title></head><body>
   </ul>
   <button type="button">Submit application</button>
 </form></body></html>`;
-
-const DRAWN_BOX =
-  'display:inline-block;position:relative;width:16px;height:16px;border:1px solid #333';
 
 const FOLLOW = `<!doctype html><html><head><title>Review your application</title></head><body>
   <div role="dialog" aria-modal="true" aria-label="Apply to Acme">

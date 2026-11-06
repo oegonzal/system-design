@@ -11,6 +11,17 @@ import {
   type RadioGroupReading,
 } from './radio-group';
 
+/**
+ * Whether the page answered a click by drawing what was clicked anew: the box
+ * read before the click has left the page. What it holds now is read by the
+ * next observation, and a further click would land on the new drawing — on a
+ * checkbox, turning it back. Measured 2026-11-06: an application form drew its
+ * "Yes" box again, ticked, under new refs; the session read the box it had
+ * clicked, saw it unticked, clicked the other points of it, and the step
+ * failed with the box left as the last click happened to leave it.
+ */
+const drawnAnew = async (box: Locator): Promise<boolean> => (await box.count()) === 0;
+
 /** How a select on a radio group waits on the page: for the choice to show, and between reads of it. */
 interface RadioWaits {
   optionWaitMs: number;
@@ -24,12 +35,13 @@ interface RadioWaits {
  * none at all when two read alike — clicked where a person's click on it
  * lands (`radio-group.ts`); one chosen already is left as it is, since a
  * click on a checkbox would take it back out. A radio that takes the click itself
- * is Playwright's check, which reads the choice back itself. Otherwise each
+ * is clicked there, and the group read back. Otherwise each
  * point a person tries — its labels, the box drawn around it, the marks
  * beside it, its row, its words — is clicked in turn until the group reads
  * the option as chosen; then the group is read again until the declared wait
  * ends. Each read is of the option at the place the words were read at, and
- * still of those words. Measured 2026-10-31: a job site's native radios were
+ * still of those words; a group the page drew anew after a click is left to
+ * the next observation (`drawnAnew`). Measured 2026-10-31: a job site's native radios were
  * named after their question and took no click of their own, so checking the
  * one asked for waited out the action timeout, and the operator chose in the
  * browser.
@@ -73,11 +85,13 @@ export async function chooseRadio(
     );
   }
   if (first.self) {
-    await group.locator(options).nth(at).check();
+    await group.locator(options).nth(at).click();
+    await readBack(group, at, words, waits, options);
     return;
   }
   for (const aim of aimed.aims) {
     await group.page().mouse.click(aim.x, aim.y);
+    if (await drawnAnew(group)) return;
     if (chosen(await readRadioGroup(group, undefined, options), at, words)) return;
   }
   await readBack(group, at, words, waits, options);
@@ -96,9 +110,11 @@ async function readBack(
   options: GroupOptions,
 ): Promise<void> {
   const until = Date.now() + optionWaitMs;
+  if (await drawnAnew(group)) return;
   let reading = await readRadioGroup(group, undefined, options);
   while (!chosen(reading, at, words) && Date.now() < until) {
     await group.page().waitForTimeout(settleRetryMs);
+    if (await drawnAnew(group)) return;
     reading = await readRadioGroup(group, undefined, options);
   }
   if (chosen(reading, at, words)) return;
@@ -117,8 +133,9 @@ async function readBack(
  * it takes the click, else its labels, the box drawn around it, the marks
  * beside it, its box, its words (`radio-group.ts`) — one point at a time,
  * each given the declared settle to show the change before the next is
- * tried, so a click that took is never undone by another. Fails, naming what
- * it holds, when no point shows or none turns it.
+ * tried, so a click that took is never undone by another; one the page drew
+ * anew after a click is left to the next observation (`drawnAnew`). Fails,
+ * naming what it holds, when no point shows or none turns it.
  */
 export async function toggleCheckbox(
   box: Locator,
@@ -135,23 +152,46 @@ export async function toggleCheckbox(
   if (first === undefined) {
     throw new ActionFailed('click', 'the checkbox shows nowhere a click would reach it');
   }
-  if (first.self) {
-    await box.locator(CHECKBOX_OPTIONS).first().setChecked(!was);
-    return;
-  }
-  for (const aim of aimed?.aims ?? []) {
+  // Clicked, then read: done once it reads turned or the page drew it anew.
+  const settled = async (): Promise<boolean> => (await drawnAnew(box)) || (await turned());
+  const aims = first.self ? [] : (aimed?.aims ?? []);
+  if (first.self) await box.locator(CHECKBOX_OPTIONS).first().click();
+  for (const aim of aims) {
     await box.page().mouse.click(aim.x, aim.y);
-    if (await turned()) return;
+    if (await settled()) return;
     await box.page().waitForTimeout(settleRetryMs);
-    if (await turned()) return;
+    if (await settled()) return;
   }
   const until = Date.now() + optionWaitMs;
   while (Date.now() < until) {
+    if (await settled()) return;
     await box.page().waitForTimeout(settleRetryMs);
-    if (await turned()) return;
   }
   throw new ActionFailed(
     'click',
     `clicked the checkbox, and it still reads ${was ? 'checked' : 'unchecked'}`,
   );
+}
+
+/**
+ * A radio no group holds, chosen by its click and read back as a group's
+ * options are — chosen once it reads checked within the declared wait, left
+ * to the next observation when the page drew it anew (`drawnAnew`), and a
+ * failure naming what it reads otherwise. One that reads checked already is
+ * left as it is.
+ */
+export async function chooseLoneRadio(
+  radio: Locator,
+  { optionWaitMs, settleRetryMs }: RadioWaits,
+): Promise<void> {
+  const checked = (): Promise<boolean> =>
+    radio.isChecked({ timeout: settleRetryMs }).catch(() => false);
+  if (await checked()) return;
+  await radio.click();
+  const until = Date.now() + optionWaitMs;
+  while (Date.now() < until) {
+    if ((await drawnAnew(radio)) || (await checked())) return;
+    await radio.page().waitForTimeout(settleRetryMs);
+  }
+  throw new ActionFailed('select', 'clicked the radio, and it still reads unchosen');
 }
