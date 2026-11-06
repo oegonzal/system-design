@@ -57,6 +57,13 @@ export interface BrowserPort {
   /** What the field holds now — what the operator typed into the page — or null when unreadable. */
   readValue(ref: string): Promise<string | null>;
   /**
+   * The options a control typed into and chosen from offers with nothing
+   * typed: its list opened where a person opens it and read, then closed,
+   * the control left as it was; null when it opens no list of its own or the
+   * list shows no option.
+   */
+  readChoices(ref: string): Promise<readonly string[] | null>;
+  /**
    * The page as an image, with the element `outline` names marked while it is
    * taken and unmarked after; null marks nothing, and an element that is gone
    * leaves the image unmarked rather than failing it.

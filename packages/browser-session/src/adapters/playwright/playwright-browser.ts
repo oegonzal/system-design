@@ -23,6 +23,7 @@ import { readElementFacts } from './element-facts';
 import { FILE_CONTROLS } from './file-controls';
 import { GROUP_OPTIONS, type ChoiceBox } from './name-groups';
 import { readRadioGroup } from './radio-group';
+import { readTypedChoices } from './typed-choice';
 import type { ObservePolicy } from './observe-policy';
 import { PageReader } from './page-reader';
 import { markedScreenshot } from './page-marker';
@@ -222,6 +223,15 @@ export class PlaywrightBrowser implements BrowserPort {
         return facts.value;
       }
       return await located.evaluate((el) => el.textContent?.trim() ?? null);
+    } catch {
+      return null;
+    }
+  }
+
+  async readChoices(ref: string): Promise<readonly string[] | null> {
+    try {
+      const listed = this.resolve(ref, 'readChoices');
+      return await readTypedChoices(this.locate(listed.ref), this.options.observe.optionWaitMs);
     } catch {
       return null;
     }

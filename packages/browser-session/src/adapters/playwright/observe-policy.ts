@@ -88,9 +88,10 @@ export interface ObservePolicy {
    * How long a select waits for the page to show its choice: on a control
    * both typed into and chosen from, for the option whose words it typed to
    * show in the lists the control names; on a radio group whose radio takes
-   * no click of its own, for the radio clicked beside it to read as chosen. It
-   * ends the moment the choice shows, so only a choice that fails waits it
-   * out. Provisional (2026-10-30): a typing debounce plus one lookup, twice
+   * no click of its own, for the radio clicked beside it to read as chosen —
+   * and how long a typed control's list, opened to read its options before
+   * its field is answered, has to show them. It ends the moment the choice or
+   * the options show, so only a list that never shows waits it out. Provisional (2026-10-30): a typing debounce plus one lookup, twice
    * over; measured live and resized as `pageOpenWaitMs` was.
    */
   optionWaitMs: number;

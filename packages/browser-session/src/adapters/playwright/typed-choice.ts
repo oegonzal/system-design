@@ -5,6 +5,13 @@ import { ActionFailed } from '../../core/ports';
 import { readElementFacts } from './element-facts';
 import { offeredNote } from './playwright-errors';
 
+/**
+ * How often a wait in the page looks again. An interval, never animation
+ * frames: a headed window another window covers gets its frames throttled,
+ * and a wait polled on them would see no list at all.
+ */
+const POLL_MS = 50;
+
 /** Words an element shows whole, around its own whitespace — never a longer text they begin. */
 const wholeText = (words: string): RegExp => new RegExp(`^\\s*${escapeRegExp(words)}\\s*$`);
 
@@ -39,7 +46,7 @@ export async function chooseByTyping(
       .waitForFunction(
         listWithExactOptionInPage,
         { control, words },
-        { timeout: waitMs, polling: 'raf' },
+        { timeout: waitMs, polling: POLL_MS },
       );
     list = await handle.jsonValue();
   } catch {
@@ -94,4 +101,47 @@ function listWithExactOptionInPage({
     if (found) return id;
   }
   return false;
+}
+
+/**
+ * The options a control typed into and chosen from offers with nothing
+ * typed: its list opened the way a person opens it — a click into the
+ * control — its enabled options read from the lists the control names once
+ * open, then the list closed with Escape, leaving the control as it was.
+ * Measured 2026-11-06 on two forms' widgets: a click opened each such list
+ * whole (244, 78 and 254 options, the one a form's answer named among them)
+ * and Escape closed each with the control still empty. Null when the control
+ * opens no list of its own within the wait, or its list shows no option.
+ */
+export async function readTypedChoices(locator: Locator, waitMs: number): Promise<string[] | null> {
+  await locator.click();
+  const control = await locator.elementHandle();
+  try {
+    const handle = await locator
+      .page()
+      .waitForFunction(optionsInPage, control, { timeout: waitMs, polling: POLL_MS });
+    const options = await handle.jsonValue();
+    return options === false ? null : options;
+  } catch {
+    return null;
+  } finally {
+    await control.dispose();
+    await locator.press('Escape').catch(() => undefined);
+  }
+}
+
+/** In the page: the words of the enabled options in the lists the control names, or false while there are none. */
+function optionsInPage(control: Element): string[] | false {
+  const tidy = (text: string | null): string => (text ?? '').replace(/\s+/g, ' ').trim();
+  const words = (control.getAttribute('aria-controls') ?? control.getAttribute('aria-owns') ?? '')
+    .split(/\s+/)
+    .filter((id) => id.length > 0)
+    .flatMap((id) => {
+      const list = control.ownerDocument.getElementById(id);
+      return list === null ? [] : Array.from(list.querySelectorAll('[role="option"]'));
+    })
+    .filter((option) => option.getAttribute('aria-disabled') !== 'true')
+    .map((option) => tidy(option.textContent))
+    .filter((text) => text !== '');
+  return words.length > 0 ? words : false;
 }

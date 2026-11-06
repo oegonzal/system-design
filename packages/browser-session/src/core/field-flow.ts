@@ -13,6 +13,7 @@ import {
 
 import { captureAfter } from './capture';
 import type { DecisionInput, EngineContext } from './engine-context';
+import { withTypedChoices } from './field-choices';
 import { routeFieldsInSession, type RoutedField } from './field-routing';
 import { entryOf, fill, fillActionOf, result, settled, type FieldResult } from './field-fill';
 import { recordTeaching, remember, teach, type Taught } from './field-teach';
@@ -395,7 +396,7 @@ export async function askFields(
   const fields = neededAgain(fieldsOf(refs, observation), openUnitLeftBlank(ctx.state));
   if (fields.length === 0)
     return { stopped: false, failed: false, note: 'no listed field matched' };
-  const open = openOf(fields, openUnitFilled(ctx.state));
+  const open = await withTypedChoices(ctx.deps.browser, openOf(fields, openUnitFilled(ctx.state)));
   const { decided, fault, durationMs } = await decideFields(ctx, open);
   const routed = routedOf(
     fields,

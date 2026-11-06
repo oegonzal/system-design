@@ -99,6 +99,8 @@ export class FakeBrowser implements BrowserPort {
   /** What each screenshot was asked to mark, in order — apart from `calls`, which the step specs pin. */
   readonly shots: (string | null)[] = [];
   readonly values = new Map<string, string>();
+  /** What each typed control's list offers when opened, by ref: what `readChoices` reads. */
+  readonly choices = new Map<string, readonly string[]>();
   opened: { profile: string; headed: boolean; documents: readonly SuppliedDocument[] } | null =
     null;
   closed = false;
@@ -195,6 +197,11 @@ export class FakeBrowser implements BrowserPort {
     const typed = this.values.get(ref);
     if (typed !== undefined) return typed;
     return elementByRef(this.current.observation.elements, ref)?.value ?? null;
+  }
+
+  async readChoices(ref: string): Promise<readonly string[] | null> {
+    this.calls.push(`readChoices ${ref}`);
+    return this.choices.get(ref) ?? null;
   }
 
   async screenshot(outline: string | null): Promise<Uint8Array> {

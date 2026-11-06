@@ -150,7 +150,9 @@ const KEYED_FORM = `<!doctype html><html><head><title>Apply — residence</title
         list.appendChild(item);
       }
     };
-    input.addEventListener('keydown', () => setTimeout(render, 0));
+    input.addEventListener('keydown', (event) =>
+      event.key === 'Escape' ? close() : setTimeout(render, 0),
+    );
     input.addEventListener('mousedown', () => setTimeout(render, 0));
     input.addEventListener('input', () => {
       if (list !== null) render();
@@ -268,6 +270,23 @@ describe('the Playwright browser and a field typed into and chosen from', () => 
     const chosen = byName(await browser.observe(), 'combobox', 'Country of residence');
     expect(chosen.value).toBe('United States');
     expect(await browser.page.locator('#residence-list').count()).toBe(0);
+  });
+
+  it('[BRW-27] reads the options a typed control offers by opening its list with nothing typed, then closes it and leaves the control as it was; a list that opens on no click reads none', async () => {
+    await browser.page.setContent(KEYED_FORM);
+    const residence = byName(await browser.observe(), 'combobox', 'Country of residence');
+    expect(await browser.readChoices(residence.ref)).toEqual([
+      'United Arab Emirates',
+      'United Kingdom',
+      'United States',
+    ]);
+    expect(await browser.page.locator('#residence-list').count()).toBe(0);
+    expect(await browser.page.locator('#residence').inputValue()).toBe('');
+    // A list that renders only for words typed opens on no click: nothing to read, and nothing typed.
+    await browser.page.setContent(FORM);
+    const country = byName(await browser.observe(), 'combobox', 'Country *');
+    expect(await browser.readChoices(country.ref)).toBeNull();
+    expect(await browser.page.locator('#country').inputValue()).toBe('');
   });
 
   it('[BRW-27] says the field offered nothing when its list never shows, and leaves a combobox no one types into to open and pick', async () => {
