@@ -18,7 +18,11 @@ import {
   type SuppliedDocument,
 } from '../../core/ports';
 import { performAction } from './action-performer';
-import { landmarkWords, type SnapshotNode } from '../../core/snapshot/aria-snapshot';
+import {
+  decodeAriaSnapshot,
+  landmarkWords,
+  type SnapshotNode,
+} from '../../core/snapshot/aria-snapshot';
 import { readElementFacts } from './element-facts';
 import { FILE_CONTROLS } from './file-controls';
 import { GROUP_OPTIONS, type ChoiceBox } from './name-groups';
@@ -127,7 +131,14 @@ export class PlaywrightBrowser implements BrowserPort {
 
   async act(action: BrowserAction): Promise<void> {
     const label = `${action.kind}${'ref' in action && action.ref !== null ? ` ${action.ref}` : ''}`;
-    const targets = actionRefs(action).map((ref) => this.resolve(ref, label));
+    const listed = actionRefs(action).map((ref) => this.resolve(ref, label));
+    // Each target as it is on the page now: a field the page drew again since the observation is aimed at anew.
+    const live = new Map<string, string>();
+    for (const target of listed) live.set(target.ref, await this.liveRef(target));
+    const targets = listed.map((target) => ({
+      ...target,
+      ref: live.get(target.ref) ?? target.ref,
+    }));
     const opened = this.pageOpenedBy(
       action,
       await this.declaresNewPage(action, targets[0] ?? null),
@@ -136,7 +147,7 @@ export class PlaywrightBrowser implements BrowserPort {
       await performAction(
         {
           page: this.page,
-          locate: (ref) => this.locate(ref),
+          locate: (ref) => this.locate(live.get(ref) ?? ref),
           documentPath: (name) => this.documentPath(name),
           scrollPx: this.options.observe.scrollPx,
           optionWaitMs: this.options.observe.optionWaitMs,
@@ -279,6 +290,31 @@ export class PlaywrightBrowser implements BrowserPort {
     this.tree = [];
     this.kept.clear();
     if (context !== null) await context.close();
+  }
+
+  /**
+   * The ref an action on a listed element is aimed at: its own while the
+   * element is still on the page, else the one element a fresh read of the
+   * page names with the same role and name — a field the page drew again
+   * between the observation and the action. Measured 2026-11-06: a field
+   * redrawn while the operator was asked, and one its form's own section
+   * redrew, each failed a fill after the whole action timeout. With none, or
+   * more than one, the action goes to the listed ref and fails as before.
+   */
+  private async liveRef(listed: ObservedElement): Promise<string> {
+    if (this.fileControls.has(listed.ref) || this.choiceBoxes.has(listed.ref)) return listed.ref;
+    if ((await this.page.locator(`aria-ref=${listed.ref}`).count()) > 0) return listed.ref;
+    const snapshot = await this.page
+      .locator('body')
+      .ariaSnapshot({ mode: 'ai', timeout: this.options.observe.snapshotTimeoutMs })
+      .catch(() => '');
+    const same = decodeAriaSnapshot(snapshot).filter(
+      (node) => node.ref !== null && node.role === listed.role && (node.name ?? '') === listed.name,
+    );
+    const ref = same.length === 1 ? same[0]?.ref : null;
+    if (ref === null || ref === undefined) return listed.ref;
+    this.known.set(ref, { ...listed, ref });
+    return ref;
   }
 
   /** The element under a ref: a hidden file control by its place among the page's file controls, anything else by the tree's ref. */
