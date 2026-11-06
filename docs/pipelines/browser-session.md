@@ -202,9 +202,12 @@ apply control a third page on another site, runs on the same engine: the
 session follows the newest tab, and a unit's pages close with it. A click or
 a key press is followed by the observe settings' `pageOpenWaitMs` wait for a
 page it opened to register (measured 2026-10-30: 195 to 735 ms after the
-click), so the step after a card click or an apply link reads the opened tab;
-a tab that registers later still is read on the step after, at the cost of
-one plan on the unchanged page. Then:
+click), and a click inside a link that declares a new page — its own
+`target="_blank"` — by the longer `newPageWaitMs`, each wait ending the
+moment the page registers (measured 2026-11-05/06: three title-link tabs past
+the short wait in live headed sessions), so the step after a card click or an
+apply link reads the opened tab; a tab that registers later still is read on
+the step after, at the cost of one plan on the unchanged page. Then:
 
 ```bash
 jq -r '.url' static/sessions/<id>/01-steps/NN/observation.json                   # the step after a card click reads the job page — never about:blank, never the listing still

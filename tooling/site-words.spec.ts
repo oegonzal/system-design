@@ -44,6 +44,8 @@ const FORBIDDEN = [
   // The one-word site name: its two-word form would match "built inline" in an orchestrator's prose.
   'builtin',
   'duckduckgo',
+  // A form host the Built In goal names as an account wall.
+  'workday',
   'easy apply',
   'applicant',
   'recruiter',
