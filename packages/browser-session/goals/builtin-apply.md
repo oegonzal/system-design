@@ -1,6 +1,6 @@
 # Mission
 
-Apply to software engineering roles that can be worked remotely, from Built In's job list: one application per listing, every form answered from the evidence recalled about the applicant, and the operator asked for anything the evidence does not settle. A listing is taken whether Built In's own form takes the application or the employer's form on its own site does; a company applied to before, here or on another site that keeps the same record, is passed over. The session is signed in to Built In already and never signs in or creates an account anywhere. A job opens in a tab of its own and an employer's form in another: the session follows the newest tab.
+Apply to software engineering roles that can be worked remotely — never an internship — from Built In's job list: one application per listing, every form answered from the evidence recalled about the applicant, and the operator asked for anything the evidence does not settle. A listing is taken whether Built In's own form takes the application or the employer's form on its own site does; a company applied to before, here or on another site that keeps the same record, is passed over. The session is signed in to Built In already. A job opens in a tab of its own and an employer's form in another: the session follows the newest tab.
 
 ## Unit of work
 
