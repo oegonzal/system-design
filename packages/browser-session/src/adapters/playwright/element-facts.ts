@@ -335,12 +335,30 @@ function elementFactsInPage(
       traits.push('autocomplete-off-bait');
     }
 
+    // A choice box the page draws: its own input made invisible over the box it
+    // draws, where a click at its centre still lands on it, beside a label a
+    // person reads. Seen, since the box and the label are. Measured 2026-11-06:
+    // a design system's every checkbox and radio is built so — a consent box,
+    // "I agree to the Privacy Statement", gated a whole form — and a field made
+    // invisible to trap a bot has no label it shows, nor a click landing on it.
+    const shown = (node: Element): boolean => {
+      const box = node.getBoundingClientRect();
+      const css = getComputedStyle(node);
+      return box.width > 0 && box.height > 0 && css.visibility !== 'hidden' && css.opacity !== '0';
+    };
+    const kind = (attr('type') ?? '').toLowerCase();
+    const drawnChoice =
+      tag === 'input' &&
+      (kind === 'checkbox' || kind === 'radio') &&
+      Array.from((el as HTMLInputElement).labels ?? []).some(shown) &&
+      el.ownerDocument.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2) ===
+        el;
     const visible =
       rect.width > 0 &&
       rect.height > 0 &&
       style.visibility !== 'hidden' &&
       style.display !== 'none' &&
-      style.opacity !== '0' &&
+      (style.opacity !== '0' || drawnChoice) &&
       !offscreen &&
       !clipped &&
       el.closest('[aria-hidden="true"]') === null;
