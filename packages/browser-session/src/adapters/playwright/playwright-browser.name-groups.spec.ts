@@ -82,6 +82,21 @@ const FOLLOW = `<!doctype html><html><head><title>Review your application</title
   </div>
 </body></html>`;
 
+/** Two more drawn checkboxes: one named by `aria-labelledby` with no label, its box taking the click by script; one whose label's centre is a link. */
+const DRAWN_MORE = `<!doctype html><html><head><title>Review</title></head><body>
+  <div><div id="news-box" style="${DRAWN_BOX}"><input type="checkbox" aria-labelledby="news-words" style="${HIDDEN_INPUT}"></div>
+    <span id="news-words">Send me product news</span></div>
+  <div><div style="${DRAWN_BOX}"><input type="checkbox" id="privacy" style="${HIDDEN_INPUT}"></div>
+    <label for="privacy">I accept the <a href="#privacy-page">privacy notice of the hiring company and its partners</a></label></div>
+  <script>
+    document.getElementById('news-box').addEventListener('click', () => {
+      const box = document.querySelector('#news-box input');
+      box.checked = !box.checked;
+      box.dispatchEvent(new Event('change', { bubbles: true }));
+    });
+  </script>
+</body></html>`;
+
 const choose = (ref: string, option: string): BrowserAction => ({
   kind: 'select',
   ref,
@@ -202,6 +217,28 @@ describe('the Playwright browser, on radios a page groups by name alone', () => 
     expect(await browser.readValue(followAfter?.ref ?? '')).toBe('unchecked');
     // The link in the consent's label was never followed.
     expect(browser.page.url()).not.toContain('#terms-page');
+  });
+
+  it('[BRW-2] turns a drawn checkbox no label names by clicking the box drawn for it, and one whose label centres on a link by its own words, never the link', async () => {
+    await browser.page.setContent(DRAWN_MORE);
+    const [news, privacy] = (await browser.observe()).elements.filter((e) => e.role === 'checkbox');
+    expect([news?.name, news?.value, privacy?.value]).toEqual([
+      'Send me product news',
+      'unchecked',
+      'unchecked',
+    ]);
+    for (const box of [news, privacy]) {
+      await browser.act({
+        kind: 'click',
+        ref: box?.ref ?? '',
+        reason: 'tick',
+        expect: null,
+        serves: [],
+      });
+    }
+    const after = (await browser.observe()).elements.filter((e) => e.role === 'checkbox');
+    expect(after.map((box) => box.value)).toEqual(['checked', 'checked']);
+    expect(browser.page.url()).not.toContain('#privacy-page');
   });
 
   it('[BRW-2] leaves radios as the tree lists them where no box holds their group alone: a flat layout, a box another control shares, a radio alone', async () => {

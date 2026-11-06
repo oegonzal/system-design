@@ -128,6 +128,8 @@ export async function toggleCheckbox(
     (await readRadioGroup(box, undefined, CHECKBOX_OPTIONS))?.options[0]?.checked ?? null;
   const was = await holds();
   if (was === null) throw new ActionFailed('click', 'the checkbox could not be read');
+  // Turned only when it reads the other way: a read that fails says nothing turned.
+  const turned = async (): Promise<boolean> => (await holds()) === !was;
   const aimed = await aimAtOption(box, 0, CHECKBOX_OPTIONS);
   const [first] = aimed?.aims ?? [];
   if (first === undefined) {
@@ -139,14 +141,14 @@ export async function toggleCheckbox(
   }
   for (const aim of aimed?.aims ?? []) {
     await box.page().mouse.click(aim.x, aim.y);
-    if ((await holds()) !== was) return;
+    if (await turned()) return;
     await box.page().waitForTimeout(settleRetryMs);
-    if ((await holds()) !== was) return;
+    if (await turned()) return;
   }
   const until = Date.now() + optionWaitMs;
   while (Date.now() < until) {
     await box.page().waitForTimeout(settleRetryMs);
-    if ((await holds()) !== was) return;
+    if (await turned()) return;
   }
   throw new ActionFailed(
     'click',

@@ -200,10 +200,12 @@ function radioGroupInPage(
     let row = option;
     for (
       let node = option.parentElement;
-      node !== null && node !== group && !holdsAnother(node);
+      node !== null && !holdsAnother(node);
       node = node.parentElement
     ) {
       row = node;
+      // An option alone in its group has the whole group for its row: the box drawn for it.
+      if (node === group) break;
     }
     return row;
   };
@@ -289,10 +291,15 @@ function radioGroupInPage(
       centre(element.getBoundingClientRect());
     const inside = (landing: Element): boolean =>
       row.contains(landing) || labels.some((label) => label.contains(landing));
+    // Another control a click would land on — a link in the option's own label included — is
+    // never clicked; a control the option holds, or one drawn around it, is the option's own.
     const foreign = (landing: Element): boolean => {
       const control = landing.closest(controls);
       return (
-        control !== null && control !== option && !labels.some((label) => label.contains(control))
+        control !== null &&
+        control !== option &&
+        !option.contains(control) &&
+        !control.contains(option)
       );
     };
     // The box drawn around it, and the marks drawn beside it: boxes in its row with no words and no control.
@@ -319,23 +326,27 @@ function radioGroupInPage(
               middle(node) !== null &&
               tidy(wordsIn(node, nothing)) === '',
           );
-    const aside = asideFrom(option);
-    const walker = doc.createTreeWalker(row, NodeFilter.SHOW_TEXT);
-    const words = doc.createRange();
-    let wordsAt: [number, number] | null = null;
-    for (
-      let text = walker.nextNode();
-      text !== null && wordsAt === null;
-      text = walker.nextNode()
-    ) {
-      if (tidy(text.textContent) === '' || !readsWithin(text, row, aside)) continue;
-      words.selectNodeContents(text);
-      const line = words.getClientRects()[0];
-      wordsAt = line === undefined ? null : centre(line);
-    }
+    /** The middle of the first line of words a person reads in a container, never words in another control. */
+    const wordsAt = (
+      container: Element,
+      skip: (element: Element) => boolean,
+    ): [number, number] | null => {
+      const walker = doc.createTreeWalker(container, NodeFilter.SHOW_TEXT);
+      const words = doc.createRange();
+      for (let text = walker.nextNode(); text !== null; text = walker.nextNode()) {
+        const holder = text.parentElement;
+        if (tidy(text.textContent) === '' || holder === null || foreign(holder)) continue;
+        if (!readsWithin(text, container, skip)) continue;
+        words.selectNodeContents(text);
+        const line = words.getClientRects()[0];
+        if (line !== undefined) return centre(line);
+      }
+      return null;
+    };
+    // Its row's words, and its labels' own: a label is the option's wherever a person clicks it.
     const points = [option, ...labels, ...around, ...beside, row]
       .map((element) => middle(element))
-      .concat([wordsAt]);
+      .concat([wordsAt(row, asideFrom(option)), ...labels.map((label) => wordsAt(label, nothing))]);
     const aims: RadioAim[] = [];
     const landed = new Set<Element>();
     for (const point of points) {

@@ -28,6 +28,7 @@ import { busyCheck } from './busy-check';
 import { readElementFacts } from './element-facts';
 import { readFileControls } from './file-controls';
 import { GROUP_OPTIONS, readNameGroups, type ChoiceBox } from './name-groups';
+import { readRadioGroup } from './radio-group';
 import type { ObservePolicy } from './observe-policy';
 import {
   failedWholesale,
@@ -216,15 +217,18 @@ export class PageReader {
       if (holder?.ref === null || holder === undefined || checkbox === undefined) return null;
       const located = page.locator(`aria-ref=${holder.ref}`);
       const seen = await readElementFacts(located, timeout);
-      const held = await readElementFacts(located, timeout, { asGroup: GROUP_OPTIONS.checkbox });
-      if (seen === null || held === null) return null;
+      // What it holds is its checkbox's own state, never the words beside it.
+      const held = await readRadioGroup(located, timeout, GROUP_OPTIONS.checkbox);
+      const own = held?.options[0];
+      if (seen === null || held === null || own === undefined) return null;
       const facts = {
         ...seen,
         inputType: 'checkbox',
-        value: held.value === null ? 'unchecked' : 'checked',
+        value: own.checked ? 'checked' : 'unchecked',
         options: null,
         required: held.required,
         invalid: held.invalid,
+        disabled: seen.disabled || own.disabled,
         // A checkbox its label names says what it is; the words before its box are its question only when nothing names it.
         context: (checkbox.name ?? '') === '' ? seen.context : null,
       };

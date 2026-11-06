@@ -22,6 +22,7 @@ import { landmarkWords, type SnapshotNode } from '../../core/snapshot/aria-snaps
 import { readElementFacts } from './element-facts';
 import { FILE_CONTROLS } from './file-controls';
 import { GROUP_OPTIONS, type ChoiceBox } from './name-groups';
+import { readRadioGroup } from './radio-group';
 import type { ObservePolicy } from './observe-policy';
 import { PageReader } from './page-reader';
 import { markedScreenshot } from './page-marker';
@@ -180,12 +181,15 @@ export class PlaywrightBrowser implements BrowserPort {
       const listed = this.resolve(ref, 'readValue');
       const located = this.locate(listed.ref);
       const box = this.choiceBoxes.get(listed.ref);
+      // A checkbox the page drew holds what its checkbox holds — checked, or not — never the words beside it.
+      if (box?.drawn === true) {
+        const own = (await readRadioGroup(located, undefined, GROUP_OPTIONS.checkbox))?.options[0];
+        return own === undefined ? null : own.checked ? 'checked' : 'unchecked';
+      }
       const facts = await readElementFacts(located, undefined, {
         asGroup: box === undefined ? null : GROUP_OPTIONS[box.kind],
       });
       if (facts === null) return null;
-      // A checkbox the page drew holds what one does: checked, or not.
-      if (box?.drawn === true) return facts.value === null ? 'unchecked' : 'checked';
       // A field holds what an observation reads it to hold: a control's value, the option a select or
       // a radio group has chosen — never every option's words, nor a checkbox's bare "on". Only a
       // drawn control, whose value no observation reads, is read by the words it shows.
