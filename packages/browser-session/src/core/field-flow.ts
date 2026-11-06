@@ -14,6 +14,7 @@ import {
 import { captureAfter } from './capture';
 import type { DecisionInput, EngineContext } from './engine-context';
 import { withTypedChoices } from './field-choices';
+import { leftBlankKeyOf, neededAgain, remembersBlank } from './left-blank';
 import { routeFieldsInSession, type RoutedField } from './field-routing';
 import { entryOf, fill, fillActionOf, result, settled, type FieldResult } from './field-fill';
 import { recordTeaching, remember, teach, type Taught } from './field-teach';
@@ -184,9 +185,8 @@ const settle = (
 ): Promise<FieldResult> => {
   switch (field.route) {
     case 'leave-blank':
-      // A field the page hides stays blank however often it is asked; any other is remembered, so asking it again asks it as required.
-      if (field.field.hiddenTraits.length === 0)
-        settled(openUnitLeftBlank(ctx.state), field.field, '');
+      // Remembered, unless the page hides it or the answer chose the blank: asked again, it is asked as required.
+      if (remembersBlank(field)) openUnitLeftBlank(ctx.state).set(leftBlankKeyOf(field.field), '');
       return Promise.resolve(result(field, 'leave-blank', field.source, null, null));
     case 'keep':
       if (field.value !== null) settled(openUnitFilled(ctx.state), field.field, field.value);
@@ -271,23 +271,6 @@ const fieldsOf = (refs: readonly string[], observation: PageObservation): FieldS
   refs.flatMap((ref) => {
     const element = elementByRef(observation.elements, ref);
     return element === undefined ? [] : [fieldSpecOf(element)];
-  });
-
-/**
- * A field this session left blank in this unit of work and the plan asks
- * again is needed: the page would not go on without it, whatever its markup
- * says, so it is asked as required — answered from the evidence, else put to
- * the operator.
- */
-const neededAgain = (
-  fields: readonly FieldSpec[],
-  leftBlank: ReadonlyMap<string, string>,
-): FieldSpec[] =>
-  fields.map((field) => {
-    const key = fieldQuestionOf(field);
-    return key !== null && !field.required && leftBlank.has(key)
-      ? { ...field, required: true }
-      : field;
   });
 
 /** The fields still open: one that holds what this session settled for it in this unit of work is not a question. */

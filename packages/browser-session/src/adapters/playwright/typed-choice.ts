@@ -19,10 +19,8 @@ const wholeText = (words: string): RegExp => new RegExp(`^\\s*${escapeRegExp(wor
  * A control both typed into and chosen from — an input with the combobox
  * role — commits the way a person commits it: the option's words typed key by
  * key, then the option whose words are exactly those chosen, from the lists
- * the control itself names. Keys, never words set whole: measured 2026-11-06,
- * one form's lists stayed shut for words set whole and opened for the same
- * words typed. The words the control holds — an earlier attempt's among
- * them — are cleared first, so the list filters by these words alone. Never a list elsewhere on the page: a form
+ * the control itself names (`typeWords`): measured 2026-11-06, one form's
+ * lists stayed shut for words set whole and opened for the same words typed. Never a list elsewhere on the page: a form
  * measured on 2026-10-30 carried fifteen such controls. The option is clicked by its
  * words, never by its place, so a list that renders again between the find
  * and the click still gets the option asked for. A control naming no list of
@@ -36,8 +34,7 @@ export async function chooseByTyping(
   words: string,
   waitMs: number,
 ): Promise<void> {
-  await locator.fill('');
-  await locator.pressSequentially(words);
+  await typeWords(locator, words, waitMs);
   const control = await locator.elementHandle();
   let list: string | false = false;
   try {
@@ -65,6 +62,24 @@ export async function chooseByTyping(
     .filter({ hasText: wholeText(words) })
     .first()
     .click();
+}
+
+/**
+ * The words typed as a person types them into the control: a click into it
+ * first, which opens a list that opens on a click; the words it already holds
+ * selected, so the first key replaces them — an empty control is sent no key
+ * that clears it, since a Delete there removes the choices some widgets hold
+ * beside their input or clears the one they show (a review reproduced both,
+ * 2026-11-06); the first character pressed as a key, which opens a list that
+ * opens only on a key; and the rest inserted as text, which no key handler
+ * reads as a separator or a submit.
+ */
+async function typeWords(locator: Locator, words: string, waitMs: number): Promise<void> {
+  await locator.click({ timeout: waitMs }).catch(() => locator.focus());
+  if ((await locator.inputValue()) !== '') await locator.selectText();
+  const [first = '', ...rest] = Array.from(words);
+  if (first !== '') await locator.pressSequentially(first);
+  if (rest.length > 0) await locator.page().keyboard.insertText(rest.join(''));
 }
 
 /** Whether the control names a list of its own — `aria-controls`, else `aria-owns` — as one whose choices commit does. */

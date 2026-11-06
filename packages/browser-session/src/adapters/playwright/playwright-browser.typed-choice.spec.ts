@@ -161,6 +161,66 @@ const KEYED_FORM = `<!doctype html><html><head><title>Apply — residence</title
   </script>
 </body></html>`;
 
+/**
+ * A control holding its choices beside its input, as chips, whose Delete or
+ * Backspace on an empty input removes the last chip — the way widgets that
+ * hold several choices do — with a list that opens on a click or a key.
+ */
+const TAGS_FORM = `<!doctype html><html><head><title>Apply — places</title></head>
+<body>
+  <main>
+    <form>
+      <label for="places">Places</label>
+      <span id="chips"><span class="chip">New York</span><span class="chip">Boston</span></span>
+      <input id="places" type="text" role="combobox" aria-expanded="false" aria-controls="places-list">
+    </form>
+  </main>
+  <script>
+    (() => {
+    const NAMES = ['Austin', 'Remote', 'Seattle'];
+    const input = document.getElementById('places');
+    const chips = document.getElementById('chips');
+    let list = null;
+    const close = () => {
+      list?.remove();
+      list = null;
+    };
+    const render = () => {
+      if (list === null) {
+        list = document.createElement('ul');
+        list.id = 'places-list';
+        list.setAttribute('role', 'listbox');
+        input.after(list);
+      }
+      list.innerHTML = '';
+      for (const name of NAMES.filter((n) => n.toLowerCase().includes(input.value.toLowerCase()))) {
+        const option = document.createElement('li');
+        option.setAttribute('role', 'option');
+        option.textContent = name;
+        option.addEventListener('mousedown', (event) => {
+          event.preventDefault();
+          const chip = document.createElement('span');
+          chip.className = 'chip';
+          chip.textContent = name;
+          chips.appendChild(chip);
+          input.value = '';
+          close();
+        });
+        list.appendChild(option);
+      }
+    };
+    input.addEventListener('keydown', (event) => {
+      if ((event.key === 'Delete' || event.key === 'Backspace') && input.value === '') chips.lastElementChild?.remove();
+      setTimeout(render, 0);
+    });
+    input.addEventListener('mousedown', () => setTimeout(render, 0));
+    input.addEventListener('input', () => {
+      if (list !== null) render();
+    });
+    })();
+  </script>
+</body></html>`;
+
 const common = { reason: 'the procedure says so', expect: null, serves: [] };
 const select = (ref: string, option: string): Extract<StepAction, { kind: 'select' }> => ({
   kind: 'select',
@@ -287,6 +347,17 @@ describe('the Playwright browser and a field typed into and chosen from', () => 
     const country = byName(await browser.observe(), 'combobox', 'Country *');
     expect(await browser.readChoices(country.ref)).toBeNull();
     expect(await browser.page.locator('#country').inputValue()).toBe('');
+  });
+
+  it('[BRW-27] never sends an empty control a key that clears it: the choices a control holds beside its input stay when another is chosen', async () => {
+    await browser.page.setContent(TAGS_FORM);
+    const places = byName(await browser.observe(), 'combobox', 'Places');
+    await browser.act(select(places.ref, 'Remote'));
+    expect(await browser.page.locator('.chip').allTextContents()).toEqual([
+      'New York',
+      'Boston',
+      'Remote',
+    ]);
   });
 
   it('[BRW-27] says the field offered nothing when its list never shows, and leaves a combobox no one types into to open and pick', async () => {
