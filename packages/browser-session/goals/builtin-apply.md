@@ -1,6 +1,6 @@
 # Mission
 
-Apply to software engineering roles that can be worked remotely, from Built In's job list: one application per listing, every form answered from the evidence recalled about the applicant, and the operator asked for anything the evidence does not settle. A listing is taken whether Built In's own form takes the application or the employer's form on its own site does; a company applied to before, here or on another site that keeps the same record, is passed over. The session is signed in to Built In already and never signs in or creates an account anywhere. A job opens in a tab of its own and an employer's form in another: the session follows the newest tab, and when a unit closes it closes every tab the unit opened, so the list is in front again.
+Apply to software engineering roles that can be worked remotely, from Built In's job list: one application per listing, every form answered from the evidence recalled about the applicant, and the operator asked for anything the evidence does not settle. A listing is taken whether Built In's own form takes the application or the employer's form on its own site does; a company applied to before, here or on another site that keeps the same record, is passed over. The session is signed in to Built In already and never signs in or creates an account anywhere. A job opens in a tab of its own and an employer's form in another: the session follows the newest tab.
 
 ## Unit of work
 
@@ -41,7 +41,7 @@ One application: from opening a listing's card to the confirmation that the appl
 
 - An employer's form is one page or a few: contact fields, a résumé file control — listed whether or not the page shows it, often behind a button "Attach" or "Upload", beside buttons "Dropbox", "Google Drive" or "Enter manually" that are never clicked — questions, equal-opportunity selects, consent checkboxes, and one button that sends it — "Submit application", "Submit" or "Apply". The page after it confirms: "Thank you for applying", "Your application has been submitted", or words to that effect. Before it, a form may ask for a code it emailed to the applicant — "We have emailed you a code to verify your identity", a code field and a button "Verify": the code is a field for the operator, who has the email, and "Verify" is clicked once it is answered. A page listing only its banner — "Sign In", a logo, a search — has not rendered yet: wait, once, for its first field, its apply control or its sign-in.
 - A required question is marked "*", or named by the page after a refused advance.
-- A form that demands an account before its fields — "Create Account" or "Sign In" where the fields should be — is an account wall.
+- A form that demands an account before its fields — "Create Account" or "Sign In" where the fields should be — is an account wall. Workday's, on a host under myworkdayjobs.com, always is: set it aside on arrival.
 - Built In's own form is one page. Its résumé control takes the document resume by upload even when the page names a résumé attached from the profile — the application carries the résumé supplied to the run, never the profile's copy — and "Submit Application" sends it. Its box "Save this resume to my Built In Profile" is left as the page shows it: the résumé supplied to the run is the one the profile should hold.
 
 ## Per-unit procedure
