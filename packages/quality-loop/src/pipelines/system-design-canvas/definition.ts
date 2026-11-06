@@ -248,7 +248,9 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
     // re-emitted the element it was cut in — 7 of 13 replies lost at that
     // seam, 3 more to the time limit. A fixed thinking budget was passed and
     // ignored; the effort level is the knob the CLI documents and honours.
-    effort: 'medium',
+    // Measured on the same redraw: medium thought ~45k and still crossed the
+    // ceiling once (65.6k tokens, 2 calls, 573 s); low fit one call (336 s).
+    effort: 'low',
     consumes: ['criteria', 'memories', 'setbacks'],
   },
 
