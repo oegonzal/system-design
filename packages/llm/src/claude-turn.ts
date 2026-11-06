@@ -16,10 +16,14 @@ import type { LlmCall } from './exchange';
  * 2026-09-23) and 21,122 (a canvas coach, 2026-10-01) output tokens, and at
  * the old 16,000 each was cut and resumed in a second message. A cut is not
  * lossy — the turn's text is read whole, see `TurnTranscript`, and the
- * record counts the calls in `apiCalls` — but every resume is another model
- * round trip, so a turn that routinely resumes is a declaration to revisit.
+ * record counts the calls in `apiCalls` — but the CLI resumes a turn only so
+ * many times: on 2026-11-06 a canvas coach redrawing a 33-block design wrote
+ * past 32,000 on every call, reached five calls and ended `max_output_tokens`
+ * four times running, with nothing judged. Raised to the current models'
+ * own output limit so one call carries what the canvas producer declares
+ * (`maxTokens: 50000`); a turn that still resumes is a declaration to revisit.
  */
-export const OUTPUT_TOKEN_CEILING = 32_000;
+export const OUTPUT_TOKEN_CEILING = 64_000;
 
 /**
  * No tools at all. `tools: []` is the SDK's own "disable every built-in
