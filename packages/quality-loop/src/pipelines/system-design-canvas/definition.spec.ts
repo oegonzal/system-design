@@ -130,6 +130,7 @@ describe('the system-design-canvas pipeline', () => {
       'failure_path_missing',
       'integration_misfit',
       'service_misfit',
+      'tracing_gap',
     ]) {
       expect(owners.get(type)).toEqual(['critic.communication']);
       expect(SYSTEM_DESIGN_CANVAS.policy.findingTypes[type].dimension).toBe('design');
@@ -184,7 +185,7 @@ describe('the system-design-canvas pipeline', () => {
       ...submission.graph.edges.map((_, index) => `edge.${index + 1}`),
       'entity.1',
       'entity.2',
-      ...Array.from({ length: 6 }, (_, index) => `binding.${index + 1}`),
+      ...Array.from({ length: 7 }, (_, index) => `binding.${index + 1}`),
       'overview',
       'assumption.1',
       ...Array.from({ length: 4 }, (_, index) => `rationale.${index + 1}`),
@@ -206,7 +207,17 @@ describe('the system-design-canvas pipeline', () => {
       '[binding.1] c1 ← gateway-1 (node.2), service-1 (node.3), database-1 (node.11), order (entity.1): ',
     );
     expect(rendered).toContain(
-      '    path, 3 edges, client-1 (node.1) to database-1 (node.11): edge.1 (edge-1: client-1 -> gateway-1, sync) → edge.2 (edge-2: gateway-1 -> service-1, sync) → edge.3 (edge-3: service-1 -> database-1, sync)',
+      '    path, 4 edges, client-1 (node.1) to database-1 (node.11): edge.1 (edge-1: client-1 -> dns-1, sync) → edge.14 (edge-14: dns-1 -> gateway-1, sync) → edge.2 (edge-2: gateway-1 -> service-1, sync) → edge.3 (edge-3: service-1 -> database-1, sync)',
+    );
+    // [EVAL-7] Under the path, the lifecycle's facts: where it enters, what serves each stage, where it rests.
+    expect(rendered).toContain(
+      '    way in, as a client from client-1 (node.1): name resolution — dns-1 (node.14); transport security — edge.14 (edge-14, tls); edge delivery — none (where the response is static or media); edge protection — waf-1 (node.15), beside gateway-1 (node.2); the access layer — gateway-1 (node.2); identity — edge.14 (edge-14, auth); comes to rest at database-1 (node.11)',
+    );
+    expect(rendered).toContain(
+      '    way in: begins inside the system at batch-job-1 (node.5); no way in to show; comes to rest at database-1 (node.11)',
+    );
+    expect(rendered).toContain(
+      '    tracing: 12 of 15 components on a traced path, 3 beside one, none untraced',
     );
     expect(rendered).toContain('[rationale.1] service-1 (node.3):');
     expect(rendered).toContain('[narration.1] c1:');

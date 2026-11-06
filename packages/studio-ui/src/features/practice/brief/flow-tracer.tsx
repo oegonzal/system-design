@@ -4,6 +4,7 @@ import type { CanvasGraph } from '@sysdesign/contracts';
 import { Badge, Button, Stack, Text } from '@sysdesign/design-system';
 
 import { nextHops, walkNodes } from '../../canvas/brief-draft';
+import { FlowStages } from './flow-stages';
 
 export interface FlowTracerProps {
   criterionId: string;
@@ -22,7 +23,8 @@ export interface FlowTracerProps {
  * rejects and which is the easy mistake to make by hand — cannot be built at
  * all. The rule stops being something to remember and becomes the shape of the
  * control. Where a walk should start or end is the evaluators' judgement, not
- * a form rule.
+ * a form rule — but what the request lifecycle declares for the walk so far
+ * is shown under it, as the graders will read it.
  */
 export function FlowTracer({
   criterionId,
@@ -75,6 +77,8 @@ export function FlowTracer({
           </Badge>
         </Stack>
       ) : null}
+
+      {path.length > 0 ? <FlowStages criterionId={criterionId} graph={graph} path={path} /> : null}
 
       {hops.length > 0 ? (
         <Stack gap={2} role="group" aria-label="Next hop">

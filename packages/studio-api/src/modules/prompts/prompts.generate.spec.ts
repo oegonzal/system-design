@@ -107,6 +107,7 @@ describe('prompts', () => {
         'c8:tradeoff',
         'c9:communication',
         'c10:communication',
+        'c11:communication',
       ]);
       expect(h.loop.criteriaRequests).toEqual([]);
 
@@ -273,6 +274,7 @@ describe('prompts', () => {
         'c5',
         'c6',
         'c7',
+        'c8',
       ]);
       expect(h.loop.criteriaRequests).toHaveLength(1);
       // Authored now: it can be re-derived like any written prompt.

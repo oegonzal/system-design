@@ -26,6 +26,7 @@ export const NODE_KINDS = [
   'client',
   'cdn',
   'dns',
+  'static-site-host',
   // ── Traffic & Routing
   'gateway',
   'load-balancer',
@@ -69,6 +70,8 @@ export const NODE_KINDS = [
   'auth-service',
   'secrets-manager',
   'waf',
+  'certificate-manager',
+  'authorization-service',
   // ── Observability
   'monitoring',
   'logging',
@@ -117,6 +120,7 @@ export const NODE_KIND_CATEGORY = {
   client: 'clients-edge',
   cdn: 'clients-edge',
   dns: 'clients-edge',
+  'static-site-host': 'clients-edge',
   gateway: 'traffic',
   'load-balancer': 'traffic',
   'websocket-gateway': 'traffic',
@@ -152,6 +156,8 @@ export const NODE_KIND_CATEGORY = {
   'auth-service': 'security',
   'secrets-manager': 'security',
   waf: 'security',
+  'certificate-manager': 'security',
+  'authorization-service': 'security',
   monitoring: 'observability',
   logging: 'observability',
   tracing: 'observability',
@@ -176,6 +182,7 @@ export const DEFAULT_NODE_LABELS = {
   client: 'Client',
   cdn: 'CDN',
   dns: 'DNS',
+  'static-site-host': 'Static Web Host',
   gateway: 'API Gateway',
   'load-balancer': 'Load Balancer',
   'websocket-gateway': 'Realtime Gateway',
@@ -211,6 +218,8 @@ export const DEFAULT_NODE_LABELS = {
   'auth-service': 'Auth Service',
   'secrets-manager': 'Secrets Manager',
   waf: 'WAF',
+  'certificate-manager': 'Certificate Manager',
+  'authorization-service': 'Authorization Service',
   monitoring: 'Monitoring',
   logging: 'Log Aggregation',
   tracing: 'Tracing',
@@ -266,11 +275,14 @@ export const CONFIG_STRING_VALUE_BOUND = bound(120);
 /**
  * The keys a connection's config is offered as suggestions: how a hop is made
  * and what happens when it fails. Suggestions only — any key is accepted, as
- * on a node (UX-9) — read by the panel and never by a grader.
+ * on a node (UX-9). The panel offers them; the request lifecycle names two of
+ * them (`tls`, `auth`) as the hop facts that serve a stage of the way in, and
+ * reads those by key wherever a path is traced.
  */
 export const EDGE_CONFIG_HINTS = [
   'protocol',
   'auth',
+  'tls',
   'timeoutMs',
   'retries',
   'dlq',

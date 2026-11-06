@@ -14,9 +14,9 @@ describe('the trade-offs in an export', () => {
     brief.bindings[0] = { ...brief.bindings[0], tradeoff: 'a table rather than a cache' };
     const md = briefMarkdown(brief, graph, criteria);
     expect(md).toMatch(
-      /Client → Order Service \(sync\), then Order Service → Orders DB \(sync\) \| a table rather than a cache \|/,
+      /Client → Order Service \(sync\), then Order Service → Orders DB \(sync\) \| [^|]+ \| a table rather than a cache \|/,
     );
-    expect(md).toMatch(/Orders DB \| — \| — \|/);
+    expect(md).toMatch(/Orders DB \| — \| — \| — \|/);
   });
 
   it('[UX-23] prints a rationale’s “instead of” under it and the decisions as their own section, dashes where a slot is empty', () => {

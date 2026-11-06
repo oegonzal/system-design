@@ -43,6 +43,11 @@ export const NODE_KIND_GUIDE = {
     whenToUse:
       'Multi-region designs steering users to the nearest healthy region, or failing over between regions.',
   },
+  'static-site-host': {
+    what: "Serves a web application's pages and assets to browsers — built once, hosted at the edge, with routing rules and a custom domain.",
+    whenToUse:
+      'Any browser front end: host the built app here and keep the API behind the gateway, so the two deploy and scale apart.',
+  },
   // ── Traffic & Routing
   gateway: {
     what: "The system's front door for API calls: authentication, rate limiting, admission control and routing in one place.",
@@ -216,6 +221,16 @@ export const NODE_KIND_GUIDE = {
     what: 'A web application firewall filtering hostile traffic — injection, bots, floods — before it reaches the gateway.',
     whenToUse:
       'Internet-facing systems under abuse pressure; pairs with rate limiting at the front door.',
+  },
+  'certificate-manager': {
+    what: 'Issues, renews and stores the TLS certificates the edge, the load balancers and the gateways present to callers.',
+    whenToUse:
+      'Every public endpoint: terminate TLS with a managed certificate and let renewal happen without a deploy.',
+  },
+  'authorization-service': {
+    what: 'Decides what an authenticated caller may do — policies evaluated per request, apart from the code that serves it.',
+    whenToUse:
+      'Permissions shared across services or varying by tenant and resource; keep the rules in one place, not in every handler.',
   },
   // ── Observability
   monitoring: {

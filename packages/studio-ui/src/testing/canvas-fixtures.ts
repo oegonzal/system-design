@@ -157,6 +157,43 @@ export function makeInterfaceGraph(overrides: Partial<CanvasGraph> = {}): Canvas
   };
 }
 
+/**
+ * The way in drawn whole: client → DNS → edge cache → front door (TLS ends and
+ * the token is checked on that hop) → service → database, a firewall beside
+ * the front door — every stage of the lifecycle served, the request at rest.
+ */
+export function makeLifecycleGraph(overrides: Partial<CanvasGraph> = {}): CanvasGraph {
+  return {
+    nodes: [
+      { id: 'n-1', kind: 'client', label: 'Shopper', position: { x: 40, y: 40 } },
+      { id: 'n-2', kind: 'dns', label: 'Shop DNS', position: { x: 240, y: 40 } },
+      { id: 'n-3', kind: 'cdn', label: 'Edge cache', position: { x: 440, y: 40 } },
+      { id: 'n-4', kind: 'gateway', label: 'Front door', position: { x: 640, y: 40 } },
+      { id: 'n-5', kind: 'service', label: 'Catalog', position: { x: 640, y: 200 } },
+      { id: 'n-6', kind: 'database', label: 'Catalog DB', position: { x: 640, y: 360 } },
+      { id: 'n-7', kind: 'waf', label: 'Firewall', position: { x: 840, y: 40 } },
+    ],
+    edges: [
+      { id: 'e-1', source: 'n-1', target: 'n-2', kind: 'sync', label: 'resolve' },
+      { id: 'e-2', source: 'n-2', target: 'n-3', kind: 'sync' },
+      {
+        id: 'e-3',
+        source: 'n-3',
+        target: 'n-4',
+        kind: 'sync',
+        config: [
+          { key: 'tls', value: '1.3, managed certificate' },
+          { key: 'auth', value: 'jwt' },
+        ],
+      },
+      { id: 'e-4', source: 'n-4', target: 'n-5', kind: 'sync' },
+      { id: 'e-5', source: 'n-5', target: 'n-6', kind: 'sync', label: 'reads' },
+      { id: 'e-6', source: 'n-7', target: 'n-4', kind: 'sync', label: 'filters' },
+    ],
+    ...overrides,
+  };
+}
+
 export function makeBinding(overrides: Partial<Binding> = {}): Binding {
   return {
     criterionId: 'c1',

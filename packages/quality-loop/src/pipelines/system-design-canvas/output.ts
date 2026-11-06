@@ -17,16 +17,26 @@
  * printed on a line of its own, every hop led by the id to cite with the
  * author's id and the two nodes it joins beside it, and the line says where
  * the walk starts and ends — nothing about a path is left to be counted or
- * joined by eye.
+ * joined by eye. Under the path, a second line states what the lifecycle
+ * declares for it — where the request enters, which block or hop serves each
+ * stage of its way in, and where it comes to rest — and the brief closes
+ * with how every component is reached by the traced paths; both are read
+ * from the contract's tables, so every lens reads the same facts the
+ * studio's tracer showed the author.
  */
 import {
   designSubmissionSchema,
+  nodeReach,
+  pathStages,
   renderEdgeLine,
   renderNodeLine,
   repairSubmission,
+  roleNames,
   submissionLocations,
   type CanvasGraph,
   type DesignSubmission,
+  type PathTracing,
+  type TracedStage,
 } from '@sysdesign/contracts';
 
 import { readArtifact, type OutputShape } from '../../core/contracts';
@@ -76,6 +86,68 @@ function renderPath(
       : `${hop.ref} (${id}: ${hop.edge.source} -> ${hop.edge.target}, ${hop.edge.kind})`;
   });
   return `    path, ${path.length} ${path.length === 1 ? 'edge' : 'edges'}${span}: ${walk.join(' → ')}`;
+}
+
+/** What serves one stage of the way in, by the ids a lens cites — or `none`. */
+function renderStage(
+  item: TracedStage,
+  edges: ReturnType<typeof edgeIndex>,
+  node: (id: string) => string,
+): string {
+  const { covered } = item;
+  const served =
+    covered === null
+      ? item.conditional
+        ? 'none (where the response is static or media)'
+        : 'none'
+      : covered.by === 'hop'
+        ? `${edges.get(covered.edgeId)?.ref ?? covered.edgeId} (${covered.edgeId}, ${covered.key})`
+        : covered.beside === null
+          ? node(covered.nodeId)
+          : `${node(covered.nodeId)}, beside ${node(covered.beside)}`;
+  return `${item.stage.label} — ${served}`;
+}
+
+/**
+ * The line under a path: where it enters and, for a request from outside,
+ * which block or hop serves each stage of its way in; then where it comes to
+ * rest, or that it ends where the request is still in flight.
+ */
+function renderWayIn(
+  tracing: PathTracing,
+  edges: ReturnType<typeof edgeIndex>,
+  node: (id: string) => string,
+): string {
+  const { entry, firstNodeId, rest } = tracing;
+  const begins =
+    firstNodeId === null
+      ? 'way in: (no walk to trace)'
+      : entry === null
+        ? `way in: begins at ${node(firstNodeId)}, which is not where a request enters`
+        : tracing.stages.length === 0
+          ? `way in: begins ${entry.label} at ${node(firstNodeId)}; no way in to show`
+          : `way in, as ${entry.label} from ${node(firstNodeId)}: ${tracing.stages
+              .map((item) => renderStage(item, edges, node))
+              .join('; ')}`;
+  const ends =
+    rest === null
+      ? ''
+      : rest.atRest
+        ? `; comes to rest at ${node(rest.nodeId)}`
+        : `; ends at ${node(rest.nodeId)} (${roleNames([rest.kind])}), which is not where a request comes to rest`;
+  return `    ${begins}${ends}`;
+}
+
+/** How every component is reached by the brief's traced paths, the untraced ones named. */
+function renderTracing(reach: ReturnType<typeof nodeReach>, node: (id: string) => string): string {
+  const onPath = reach.filter((item) => item.reach === 'on-path').length;
+  const beside = reach.filter((item) => item.reach === 'beside-path').length;
+  const untraced = reach.filter((item) => item.reach === 'untraced');
+  const named =
+    untraced.length === 0
+      ? 'none untraced'
+      : `${untraced.length} untraced: ${untraced.map((item) => node(item.nodeId)).join(', ')}`;
+  return `    tracing: ${onPath} of ${reach.length} components on a traced path, ${beside} beside one, ${named}`;
 }
 
 /**
@@ -162,7 +234,7 @@ export const canvasOutput: OutputShape<CanvasSubmission> = {
     const edges = edgeIndex(graph);
     const overview = narrative?.overview?.trim() ?? '';
     const lines: string[] = [
-      'Cite parts by the bracketed ids. The token after each bracket is the author’s own canvas id; the model, brief and narrative refer to those. An author’s id is a name, not a position: `e-4` need not be `edge.4`. A binding’s path is the line under it, each hop led by the id to cite, with its call style.',
+      'Cite parts by the bracketed ids. The token after each bracket is the author’s own canvas id; the model, brief and narrative refer to those. An author’s id is a name, not a position: `e-4` need not be `edge.4`. A binding’s path is the line under it, each hop led by the id to cite, with its call style; the line under that states where the path enters, what serves each stage of its way in, and where it comes to rest. The brief closes with how every component is reached by the traced paths.',
       '',
       '## Nodes',
       ...graph.nodes.map((item, index) => `[node.${index + 1}] ${renderNodeLine(item).trim()}`),
@@ -190,10 +262,14 @@ export const canvasOutput: OutputShape<CanvasSubmission> = {
         ...brief.bindings.flatMap((binding, index) => [
           `[binding.${index + 1}] ${binding.criterionId} ← ${[...binding.nodeIds.map(node), ...(binding.entityIds ?? []).map(entity)].join(', ')}: ${JSON.stringify(binding.claim)}`,
           ...(binding.path !== undefined && binding.path.length > 0
-            ? [renderPath(binding.path, edges, node)]
+            ? [
+                renderPath(binding.path, edges, node),
+                renderWayIn(pathStages(graph, binding.path), edges, node),
+              ]
             : []),
           `    why this, not another: ${binding.tradeoff ?? '(none given)'}`,
         ]),
+        renderTracing(nodeReach(graph, brief.bindings), node),
       );
     }
     lines.push('', '## Narrative');

@@ -34,7 +34,7 @@ import { E2E_PORTS, GRADER_HOST } from './stack';
  * only the HTTP: plain `node:http`, because it is a fixture, not a service.
  *
  * A test scripts its own run through the control routes, keyed by the run's
- * goal (a prompt's markdown, unique per test by its title):
+ * goal (the prompt as the studio composes it, unique per test by its title):
  *
  *     POST   /__stub/scenarios { goal, scenario }   one run's fate: complete | fail | refuse
  *     DELETE /__stub/scenarios                       forget every scenario

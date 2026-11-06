@@ -104,7 +104,9 @@ describe('narrativeMarkdown', () => {
 describe('briefMarkdown', () => {
   it('renders one table row per binding with its claim, components and resolved path', () => {
     const md = briefMarkdown(makeBrief(), graph, criteria);
-    expect(md).toContain('| Criterion | Claim | Components | Path | Why this, not another |');
+    expect(md).toContain(
+      '| Criterion | Claim | Components | Path | Tracing | Why this, not another |',
+    );
     expect(md).toContain('c1 — A shopper reads their merged order history');
     expect(md).toContain('The service reads the history from the orders database');
     expect(md).toContain('Order Service, Orders DB');

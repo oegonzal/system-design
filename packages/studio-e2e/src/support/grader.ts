@@ -1,5 +1,5 @@
 import type { APIRequestContext } from '@playwright/test';
-import type { PromptDto } from '@sysdesign/contracts';
+import { renderCanvasGoal, type PromptDto } from '@sysdesign/contracts';
 import type { RunScenario } from '@sysdesign/studio-testing';
 
 import { authorPrompt, AUTHORED_MARKDOWN, AUTHORED_TITLE } from './backend';
@@ -8,9 +8,10 @@ import { uniqueName } from './unique';
 
 /**
  * Typed helpers over the stub grader's control routes. A run's scenario is
- * keyed by its goal — the prompt's markdown — so a test that wants its own
- * run to fail authors a prompt whose title is unique to it (`keyedPrompt`)
- * and scripts that goal; every other test's runs are untouched. The health
+ * keyed by its goal — the prompt as the studio composes it for the loop
+ * (`goalOf`) — so a test that wants its own run to fail authors a prompt
+ * whose title is unique to it (`keyedPrompt`) and scripts that goal; every
+ * other test's runs are untouched. The health
  * switch has no such key: it is global, and only the serial `grader-down`
  * project may flip it.
  */
@@ -21,6 +22,10 @@ async function ok(
   const answer = await response;
   if (!answer.ok()) throw new Error(`${answer.url()} → ${answer.status()}`);
 }
+
+/** The goal the studio sends the loop for a prompt — what a scripted scenario is keyed by. */
+export const goalOf = (prompt: PromptDto): string =>
+  renderCanvasGoal({ markdown: prompt.markdown, platform: prompt.platform });
 
 export const scenarioFor = (
   request: APIRequestContext,

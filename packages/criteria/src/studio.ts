@@ -201,12 +201,27 @@ export const STUDIO_CRITERIA: readonly Criterion[] = [
   {
     id: 'EVAL-6',
     statement:
-      'Communication is a graded competency: a connection carries free-form config the graders read beside its call style and the operations it carries, two standing criteria on every rubric ask that every hop declare its call style, mechanism and failure handling and that every request path be traced from where it enters to where it comes to rest, a communication critic owns the hop and flow defects and the design evaluator judges the kind, and a prompt that declares a platform adds one constraint that every component the platform offers a service for names it and every hop is an integration the platform offers.',
+      'Communication is a graded competency: a connection carries free-form config the graders read beside its call style and the operations it carries, three standing criteria on every rubric ask that every hop declare its call style, mechanism and failure handling, that every request path be traced from where it enters to where it comes to rest, and that the whole be traced, a communication critic owns the hop, flow and tracing defects and the design evaluator judges the kind, and a prompt that declares a platform adds one constraint that every component the platform offers a service for names it and every hop is an integration the platform offers.',
   },
   {
     id: 'GEN-7',
     statement:
-      'A prompt carries the platform its design is drawn on from compose, import or generate — never in its text, so the writer’s brand gate holds and the criteria are derived from the text alone — fixed with the text once a session exists; the grading goal is the prompt closed by the platform’s catalogue section, the interviewer’s notes state the platform in one line, the generator drafts a Request paths section whose rows are communication criteria, and a platform-neutral prompt grades exactly as before.',
+      'A prompt carries the platform its design is drawn on from compose, import or generate — never in its text, so the writer’s brand gate holds and the criteria are derived from the text alone — fixed with the text once a session exists; the grading goal is the prompt closed by the platform’s catalogue section, the interviewer’s notes state the platform in one line, the generator drafts a Request paths section whose rows are communication criteria, and a platform-neutral prompt’s goal is its text closed by the request lifecycle alone.',
+  },
+  {
+    id: 'UX-32',
+    statement:
+      'The way in can be drawn and seen: a certificate manager, an authorization service and a static web host are roles the palette offers and a platform shelves as services, a connection may declare how its transport is secured, and under a traced path the brief shows what the request lifecycle declares for it — where it enters, which block or hop serves each stage of its way in or that none does, and where it comes to rest — the same facts the export’s Tracing column carries.',
+  },
+  {
+    id: 'EVAL-7',
+    statement:
+      'Tracing is graded from declared data: the request lifecycle in contracts names the stages a request from outside passes, the roles and hop keys that serve each and whether a block must lie on the path, the roles a request comes to rest at, and the entries a path may begin at; the canvas pipeline renders those facts under every path and closes the brief with how every component is reached, a warn validator lists each absence by binding and node, the communication critic owns the tracing defect, the design evaluator judges the third standing communication row that every rubric carries, and the migration that appended it holds the contract’s statement byte for byte.',
+  },
+  {
+    id: 'GEN-8',
+    statement:
+      'Every canvas goal closes with the request lifecycle section — the entries, the stages with the blocks, hop keys and, on a platform, the catalogue services that serve each, and the resting roles — after the platform section where there is one; the generator and the deriver word each request-path row from where the request enters to where it comes to rest; and a scripted run is keyed by the goal as the studio composes it.',
   },
   // STAR repository
   {

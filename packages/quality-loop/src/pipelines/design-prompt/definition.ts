@@ -31,7 +31,7 @@ export const DESIGN_PROMPT: PipelineDefinition<ReturnType<typeof designPromptOut
   {
     id: PROMPT_PIPELINE_ID,
 
-    version: '2.1.0',
+    version: '2.2.0',
 
     // A goal another program composes; never a route, a target, or a choice in the UI.
 

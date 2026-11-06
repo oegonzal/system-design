@@ -128,6 +128,32 @@ describe('DesignBriefEditor', () => {
     expect(screen.queryByTestId('flow-hop-c1-e-3')).toBeNull();
   });
 
+  it('[UX-32] shows what the lifecycle declares for the traced path: where it enters, each stage served or missing, and where it rests', async () => {
+    renderEditor();
+    await userEvent.click(screen.getByTestId('flow-open-c1'));
+    await userEvent.click(screen.getByTestId('flow-hop-c1-e-1'));
+    await userEvent.click(screen.getByTestId('flow-hop-c1-e-2'));
+
+    expect(screen.getByTestId('flow-stages-c1').textContent).toContain(
+      'Enters as a client at Buyer',
+    );
+    expect(screen.getByTestId('flow-stage-c1-ingress').textContent).toBe(
+      'The access layer · Gateway',
+    );
+    expect(screen.getByTestId('flow-stage-c1-name-resolution').textContent).toBe(
+      'Name resolution · missing',
+    );
+    expect(screen.getByTestId('flow-stage-c1-edge-delivery').textContent).toBe(
+      'Edge delivery · where needed',
+    );
+    expect(screen.getByTestId('flow-rest-c1').textContent).toBe(
+      'Ends at Checkout (service), which is not where a request comes to rest.',
+    );
+
+    await userEvent.click(screen.getByTestId('flow-hop-c1-e-3'));
+    expect(screen.getByTestId('flow-rest-c1').textContent).toBe('Comes to rest at Orders.');
+  });
+
   it('undoes a hop and clears a path', async () => {
     const store = renderEditor();
     await userEvent.click(screen.getByTestId('flow-open-c1'));

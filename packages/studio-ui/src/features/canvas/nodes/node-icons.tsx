@@ -57,6 +57,14 @@ export const NODE_ICONS = {
       <path d="M5 10V6l3 4V6M11 6v4" />
     </svg>
   ),
+  /* A browser window with a page laid out in it. */
+  'static-site-host': (
+    <svg {...svgProps}>
+      <rect x="2" y="2.5" width="12" height="11" rx="1.3" />
+      <path d="M2 5.5h12" />
+      <path d="M4.5 8.5h4M4.5 11h6.5" />
+    </svg>
+  ),
   gateway: (
     <svg {...svgProps}>
       <path d="M3 13V7a5 5 0 0 1 10 0v6" />
@@ -311,6 +319,22 @@ export const NODE_ICONS = {
       <path d="M8 1.5l5 1.8v4.2c0 3.3-2.2 5.3-5 6.3-2.8-1-5-3-5-6.3V3.3z" />
       <path d="M3.2 6.2h9.6M3.6 9.4h8.8" />
       <path d="M8 3.4v2.8M5.7 6.2v3.2M10.3 6.2v3.2M8 9.4v3.4" />
+    </svg>
+  ),
+  /* A certificate: ruled lines and the seal at its foot. */
+  'certificate-manager': (
+    <svg {...svgProps}>
+      <rect x="2.5" y="2.5" width="11" height="8.5" rx="1.2" />
+      <path d="M5 5.5h6M5 8h4" />
+      <circle cx="11.5" cy="12" r="1.8" />
+    </svg>
+  ),
+  /* A lock, open to a check: the caller may. */
+  'authorization-service': (
+    <svg {...svgProps}>
+      <rect x="3" y="7" width="10" height="7" rx="1.3" />
+      <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
+      <path d="m6.3 10.5 1.3 1.3 2.3-2.3" />
     </svg>
   ),
   /* A speedometer: the dial the operators watch. */

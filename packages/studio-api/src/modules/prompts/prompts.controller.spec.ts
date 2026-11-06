@@ -41,6 +41,7 @@ describe('prompts', () => {
         'c8:tradeoff',
         'c9:communication',
         'c10:communication',
+        'c11:communication',
       ]);
       expect(h.loop.criteriaRequests).toEqual([
         { pipeline: 'system-design-canvas', goal: AUTHORED_MARKDOWN },
@@ -64,9 +65,10 @@ describe('prompts', () => {
         'c8:tradeoff',
         'c9:communication',
         'c10:communication',
-        'c11:constraint',
+        'c11:communication',
+        'c12:constraint',
       ]);
-      expect(body.data.criteria[10]?.statement).toBe(PLATFORM_STANDING_CRITERIA[0].statement);
+      expect(body.data.criteria[11]?.statement).toBe(PLATFORM_STANDING_CRITERIA[0].statement);
       // The derivation read the markdown and nothing of the platform.
       expect(h.loop.criteriaRequests).toEqual([
         { pipeline: 'system-design-canvas', goal: AUTHORED_MARKDOWN },
@@ -142,6 +144,7 @@ describe('prompts', () => {
         'tradeoff',
         'communication',
         'communication',
+        'communication',
       ]);
     });
 
@@ -158,6 +161,7 @@ describe('prompts', () => {
         'tradeoff',
         'tradeoff',
         'tradeoff',
+        'communication',
         'communication',
         'communication',
       ]);
@@ -247,6 +251,7 @@ describe('prompts', () => {
         'c5',
         'c6',
         'c7',
+        'c8',
       ]);
       expect(h.loop.criteriaRequests).toHaveLength(2);
     });

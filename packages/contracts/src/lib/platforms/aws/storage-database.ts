@@ -7,7 +7,7 @@ export const STORAGE_AND_DATABASE = [
     id: 'aws.s3',
     label: 'S3',
     category: 'storage',
-    roles: ['object-store', 'data-lake'],
+    roles: ['object-store', 'data-lake', 'static-site-host'],
     what: 'Durable object storage behind an HTTP API: versioned, lifecycle-tiered, encrypted, and able to notify on every write.',
     whenToUse:
       'Files, media, backups, exports, the lake under your analytics; anything written once and read by key or prefix.',
@@ -21,7 +21,7 @@ export const STORAGE_AND_DATABASE = [
       'presignedUrls',
       'multipart',
     ],
-    aliases: ['bucket', 'blob', 'object', 'files'],
+    aliases: ['bucket', 'blob', 'object', 'files', 'static site'],
   },
   {
     id: 'aws.efs',

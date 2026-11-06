@@ -94,6 +94,17 @@ export const COMPUTE_AND_NETWORKING = [
     aliases: ['dns', 'domain', 'failover'],
   },
   {
+    id: 'aws.amplify-hosting',
+    label: 'Amplify Hosting',
+    category: 'networking',
+    roles: ['static-site-host'],
+    what: 'Git-connected hosting for web apps: build on push, serve from the edge, branch previews, rewrites and custom domains with certificates.',
+    whenToUse:
+      'A browser front end deployed apart from its API, static or server-rendered, without web servers to run.',
+    knobs: ['branchDeploys', 'buildSpec', 'customDomain', 'rewrites', 'ssr'],
+    aliases: ['amplify', 'static site', 'web hosting', 'frontend'],
+  },
+  {
     id: 'aws.cloudfront',
     label: 'CloudFront',
     category: 'networking',

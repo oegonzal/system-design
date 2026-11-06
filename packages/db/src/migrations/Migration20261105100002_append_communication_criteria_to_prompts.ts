@@ -8,7 +8,7 @@ import { Migration } from '@mikro-orm/migrations';
  * binding keeps the id it names. A prompt whose rubric is still empty gets
  * them when its rubric is derived. Idempotent: a prompt already carrying the
  * first statement is left alone. The literals are the contract's, byte for
- * byte — `studio-pipelines.spec.ts` reads this file and says so.
+ * byte — `src/standing-criteria.spec.ts` reads this file and says so.
  */
 const STANDING = [
   'Every hop between two components states its call style (sync or async) and the mechanism that carries it, and every request path is traced from where it enters to where it comes to rest.',

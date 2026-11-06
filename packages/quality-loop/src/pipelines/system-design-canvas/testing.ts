@@ -80,7 +80,7 @@ export const sampleBrief = (): DesignBrief => ({
     {
       criterionId: 'c1',
       nodeIds: ['gateway-1', 'service-1', 'database-1'],
-      path: ['edge-1', 'edge-2', 'edge-3'],
+      path: ['edge-1', 'edge-14', 'edge-2', 'edge-3'],
       claim: "the history service reads the customer's own shard; no fan-out",
       entityIds: ['order'],
       tradeoff:
@@ -89,7 +89,7 @@ export const sampleBrief = (): DesignBrief => ({
     {
       criterionId: 'c2',
       nodeIds: ['service-2', 'queue-1', 'worker-1'],
-      path: ['edge-4', 'edge-5', 'edge-8', 'edge-9'],
+      path: ['edge-4', 'edge-14', 'edge-16', 'edge-5', 'edge-8', 'edge-9'],
       claim: 'a webhook is acknowledged once queued and indexed by an idempotent worker',
     },
     {
@@ -112,6 +112,13 @@ export const sampleBrief = (): DesignBrief => ({
       criterionId: 'c6',
       nodeIds: ['batch-job-1'],
       claim: 'only the importer talks to the POS, on its own schedule',
+    },
+    {
+      criterionId: 'c9',
+      nodeIds: ['batch-job-1', 'worker-1', 'stream-processor-1', 'database-1'],
+      path: ['edge-7', 'edge-8', 'edge-10', 'edge-11', 'edge-13'],
+      claim:
+        'a refund imported from the POS is indexed, then re-aggregated into the spend summary shown on the order',
     },
   ],
 });
@@ -146,12 +153,12 @@ export const sampleNarrative = (): DesignNarrative => ({
     {
       criterionId: 'c1',
       prose:
-        'Shopper → gateway → history service → the customer shard; newest first is an index order.',
+        'Shopper → DNS → gateway (TLS ends and the token is checked there, the firewall beside it) → history service → the customer shard; newest first is an index order.',
     },
     {
       criterionId: 'c2',
       prose:
-        'The storefront posts a webhook; the receiver enqueues and acknowledges; the indexer writes once.',
+        'The storefront posts a webhook through the same front door; the receiver enqueues and acknowledges; the indexer writes once.',
     },
     {
       criterionId: 'c6',

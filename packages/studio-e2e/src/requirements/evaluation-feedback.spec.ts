@@ -8,7 +8,7 @@ import {
   NAIVE_DESIGN_SCORE,
   openPracticeSession,
 } from '../support/canvas.page';
-import { keyedPrompt, scenarioFor } from '../support/grader';
+import { goalOf, keyedPrompt, scenarioFor } from '../support/grader';
 import { PromptsPage } from '../support/prompts.page';
 
 /**
@@ -128,7 +128,7 @@ test.describe('the grading feedback', () => {
     // The stub fails exactly this test's first run: the scenario is keyed by
     // the prompt's markdown, unique to the test through its title.
     const prompt = await keyedPrompt(request, 'grade fails');
-    await scenarioFor(request, prompt.markdown, {
+    await scenarioFor(request, goalOf(prompt), {
       outcome: 'fail',
       message: 'the model went away',
       once: true,
@@ -160,7 +160,7 @@ test.describe('the grading feedback', () => {
     // The loop's evidence gate escalates with nothing assessed, as during a
     // provider outage: the controller still prices the empty ledger at 0.
     const prompt = await keyedPrompt(request, 'grade unassessed');
-    await scenarioFor(request, prompt.markdown, {
+    await scenarioFor(request, goalOf(prompt), {
       outcome: 'complete',
       once: true,
       iterations: [

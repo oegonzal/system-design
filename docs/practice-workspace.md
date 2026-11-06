@@ -27,12 +27,17 @@ generated. It is data on the prompt; nothing in the studio branches on it.
   functional, domain model, interface, boundary, workflow, non-functional,
   scale, evolution, trade-off, constraint — each with an id (`c1`, `c2`, …)
   and its statement — communication among them: how the parts talk, hop by
-  hop. Five standing criteria close every rubric: three on trade-offs (every
+  hop. Six standing criteria close every rubric: three on trade-offs (every
   load-bearing decision records an alternative and its cost, every binding
-  that had a choice says why, the design's assumptions are stated) and two on
-  communication (every hop declares its call style and mechanism and every
+  that had a choice says why, the design's assumptions are stated) and three
+  on communication (every hop declares its call style and mechanism and every
   request path is traced from where it enters to where it comes to rest; every
-  async hop names its failure handling and every sync hop its timeout). A
+  async hop names its failure handling and every sync hop its timeout; every
+  request from outside shows its way in — name resolution, transport security,
+  edge protection, the access layer, identity — every traced path comes to
+  rest, and every component lies on or beside a traced path, as the goal's
+  request lifecycle section declares and the Brief tab shows under each traced
+  path). A
   prompt that declares a **platform** adds one constraint: every component the
   platform offers a managed service for names it, and every hop between two
   services is an integration the platform offers. The platform shows beside

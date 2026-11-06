@@ -281,7 +281,7 @@ describe('the system-design-canvas loop', () => {
     expect(added.length).toBeGreaterThan(0);
     for (const part of added) expect(part.id.startsWith('ai-')).toBe(true);
     // The added replica is one more location the panel can cite.
-    expect(trace.iterations[1].locations.map((location) => location.id)).toContain('node.14');
+    expect(trace.iterations[1].locations.map((location) => location.id)).toContain('node.16');
   });
 
   it('[QL-25] a coach revision that binds an unlisted criterion, binds one twice or breaks a path is repaired before judging — the author’s own submission never is', async () => {
@@ -307,6 +307,8 @@ describe('the system-design-canvas loop', () => {
     expect(bound.filter((id) => id === 'c1')).toHaveLength(1);
     expect(artifact.brief.bindings.find((b) => b.criterionId === 'c2')?.path).toEqual([
       'edge-4',
+      'edge-14',
+      'edge-16',
       'edge-5',
       'edge-8',
       'edge-9',

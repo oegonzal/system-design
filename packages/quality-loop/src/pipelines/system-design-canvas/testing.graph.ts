@@ -1,7 +1,10 @@
 /**
  * The sample canvas the order-history fixture draws: a storefront pushing
  * webhooks, a point-of-sale system polled on a schedule, an owned read model
- * behind a queue and an idempotent indexer. Pure data — no vitest imports —
+ * behind a queue and an idempotent indexer, with the way in drawn — name
+ * resolution, TLS and a token check at the gateway, a firewall beside it — so
+ * every traced path is complete and every block lies on or beside one. Pure
+ * data — no vitest imports —
  * so it compiles under the app tsconfig beside `testing.ts`, which binds and
  * narrates it.
  */
@@ -155,9 +158,17 @@ export const sampleGraph = (): CanvasGraph => ({
       ],
       position: { x: 0, y: 440 },
     },
+    { id: 'dns-1', kind: 'dns', label: 'Shop DNS', position: { x: 120, y: 80 } },
+    {
+      id: 'waf-1',
+      kind: 'waf',
+      label: 'Edge firewall',
+      config: [{ key: 'rateBasedRules', value: true }],
+      position: { x: 240, y: 320 },
+    },
   ],
   edges: [
-    { id: 'edge-1', source: 'client-1', target: 'gateway-1', kind: 'sync' },
+    { id: 'edge-1', source: 'client-1', target: 'dns-1', kind: 'sync', label: 'resolve' },
     {
       id: 'edge-2',
       source: 'gateway-1',
@@ -166,13 +177,7 @@ export const sampleGraph = (): CanvasGraph => ({
       carries: ['listOrders', 'getOrder', 'getSpendSummary', 'resyncCustomer'],
     },
     { id: 'edge-3', source: 'service-1', target: 'database-1', kind: 'sync', label: 'read' },
-    {
-      id: 'edge-4',
-      source: 'external-1',
-      target: 'service-2',
-      kind: 'async',
-      carries: ['receiveStorefrontWebhook'],
-    },
+    { id: 'edge-4', source: 'external-1', target: 'dns-1', kind: 'async', label: 'resolve' },
     {
       id: 'edge-5',
       source: 'service-2',
@@ -223,6 +228,24 @@ export const sampleGraph = (): CanvasGraph => ({
       target: 'database-1',
       kind: 'sync',
       label: 'write',
+    },
+    {
+      id: 'edge-14',
+      source: 'dns-1',
+      target: 'gateway-1',
+      kind: 'sync',
+      config: [
+        { key: 'tls', value: 'ends at the gateway' },
+        { key: 'auth', value: 'jwt checked at the gateway' },
+      ],
+    },
+    { id: 'edge-15', source: 'waf-1', target: 'gateway-1', kind: 'sync', label: 'filters' },
+    {
+      id: 'edge-16',
+      source: 'gateway-1',
+      target: 'service-2',
+      kind: 'async',
+      carries: ['receiveStorefrontWebhook'],
     },
   ],
 });

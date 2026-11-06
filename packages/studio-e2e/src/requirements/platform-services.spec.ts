@@ -48,6 +48,18 @@ test.describe('platform services on the canvas', () => {
     await expect(canvas.paletteItem('client')).toHaveCount(0);
   });
 
+  test('[UX-32] the way in can be drawn: a certificate manager is a service on the shelf, drawn as its role', async ({
+    page,
+    request,
+  }) => {
+    const prompt = await authorPrompt(request, { platform: PLATFORM });
+    const { canvas } = await openPracticeSession(page, request, prompt);
+
+    await canvas.addServiceFromPalette('aws.acm'); // n-1, selected on add
+    await expect(canvas.node('n-1')).toHaveAttribute('data-kind', 'certificate-manager');
+    await canvas.expectNodeMeta('n-1', 'ACM · certificate-manager');
+  });
+
   test('[UX-31] a block drawn as a service shows the service beside its role, offers only the roles it plays, and is a plain role again once the service is taken off', async ({
     page,
     request,

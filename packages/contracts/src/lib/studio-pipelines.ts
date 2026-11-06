@@ -94,6 +94,7 @@ export const CANVAS_FINDING_TYPES = [
   'failure_path_missing',
   'integration_misfit',
   'service_misfit',
+  'tracing_gap',
 ] as const;
 export type CanvasFindingType = (typeof CANVAS_FINDING_TYPES)[number];
 
@@ -103,14 +104,16 @@ export type CanvasFindingType = (typeof CANVAS_FINDING_TYPES)[number];
  * no decision of its own — why this and not that, at every load-bearing
  * choice and at every binding that had a choice, with the assumptions said —
  * and the communication a design is graded on even when the prompt names no
- * request: how every hop is made and what each does when it fails. They
- * close the rubric, after the prompt's own rows, so a prompt's ids never
- * move; the studio appends them to every rubric it stores — derived, drafted
- * or migrated — and the pipeline's `reasoning` dimension is earned through
- * the first three. The loop uses a supplied rubric verbatim, which is why
- * these are the studio's to add and not the deriver's. The trade-off rows
- * stay first: a rubric migrated before the communication rows existed and a
- * rubric written after read alike.
+ * request: how every hop is made and what each does when it fails, and the
+ * tracing of the whole — a request from outside shown from where it enters
+ * through every stage of its way in, every traced path at rest, every
+ * component on or beside a traced path. They close the rubric, after the
+ * prompt's own rows, so a prompt's ids never move; the studio appends them
+ * to every rubric it stores — derived, drafted or migrated — and the
+ * pipeline's `reasoning` dimension is earned through the first three. The
+ * loop uses a supplied rubric verbatim, which is why these are the studio's
+ * to add and not the deriver's. The rows keep their order: a rubric migrated
+ * before a later row existed and a rubric written after read alike.
  */
 export const CANVAS_STANDING_CRITERIA: readonly Pick<SuccessCriterion, 'kind' | 'statement'>[] = [
   {
@@ -136,6 +139,11 @@ export const CANVAS_STANDING_CRITERIA: readonly Pick<SuccessCriterion, 'kind' | 
     kind: 'communication',
     statement:
       'Every asynchronous hop names how a failed or repeated message is handled, and every synchronous hop its timeout and what the caller does when the callee does not answer.',
+  },
+  {
+    kind: 'communication',
+    statement:
+      "Where a request enters from outside the system, its path shows every stage the goal's request lifecycle lists for that entry — name resolution, transport security, edge protection, the access layer and identity — or says why a stage is absent; every traced path comes to rest; and every component drawn lies on or beside a traced path.",
   },
 ];
 
@@ -164,9 +172,9 @@ export const standingCriteriaFor = (
 /**
  * The canvas pipeline's `maxCriteria`; a rubric above it is refused by the
  * loop. The generator's row targets (26) plus every standing criterion a
- * rubric can carry (6).
+ * rubric can carry (7).
  */
-export const CANVAS_MAX_CRITERIA = 32;
+export const CANVAS_MAX_CRITERIA = 33;
 
 /**
  * A prompt's own criteria, as derived or drafted, closed by the standing

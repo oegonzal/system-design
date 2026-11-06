@@ -9,7 +9,7 @@ import {
   NAIVE_DESIGN_SCORE,
   openPracticeSession,
 } from '../support/canvas.page';
-import { graderRequests, keyedPrompt, scenarioFor } from '../support/grader';
+import { goalOf, graderRequests, keyedPrompt, scenarioFor } from '../support/grader';
 
 /** Five boxes: the stub accepts. */
 const ACCEPTED_SCORE = 80;
@@ -192,7 +192,7 @@ test.describe('the AI coach', () => {
     const pastCeiling = 45;
     const overCeiling = prose(ceiling + pastCeiling);
     const prompt = await keyedPrompt(request, 'coach writes long');
-    await scenarioFor(request, prompt.markdown, {
+    await scenarioFor(request, goalOf(prompt), {
       outcome: 'complete',
       coach: { claims: { c1: overAsk, c2: overCeiling } },
       once: true,
@@ -234,9 +234,9 @@ test.describe('the AI coach', () => {
     request,
   }) => {
     // The stub fails exactly this test's run: the scenario is keyed by the
-    // prompt's markdown, unique to the test through its title.
+    // prompt's goal as the studio composes it, unique to the test through its title.
     const prompt = await keyedPrompt(request, 'coach fails');
-    await scenarioFor(request, prompt.markdown, {
+    await scenarioFor(request, goalOf(prompt), {
       outcome: 'fail',
       message: 'the model went away',
       once: true,

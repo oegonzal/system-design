@@ -31,6 +31,10 @@ test.describe('the design brief', () => {
     await canvas.brief.openTracer('c1');
     await canvas.brief.trace('c1', ['e-1', 'e-2']);
     await canvas.brief.expectTraced('c1', 2);
+    // [UX-32] Under the walk, what the lifecycle declares for it: the way in and where it rests.
+    await expect(page.getByTestId('flow-stages-c1')).toContainText('Enters as a client');
+    await expect(page.getByTestId('flow-stage-c1-ingress')).toContainText('missing');
+    await expect(page.getByTestId('flow-rest-c1')).toContainText('Comes to rest at');
 
     await canvas.submit();
     await canvas.feedback.expectComplete(1);

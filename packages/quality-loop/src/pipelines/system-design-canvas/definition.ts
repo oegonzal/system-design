@@ -35,8 +35,13 @@
  *    and over-building where the goal states no load is a defect too.
  * 4. Communication is a competency of design: how the parts talk, hop by hop,
  *    and whether a request can be walked from where it enters to where it
- *    comes to rest — earned by the two standing communication criteria and
+ *    comes to rest — earned by the three standing communication criteria and
  *    the request paths a prompt names, and charged by a critic of its own.
+ *    The goal's request lifecycle declares what a request from outside passes
+ *    on its way in, where a request comes to rest and that every component
+ *    lies on or beside a traced path; the render states those facts under
+ *    every path and a warn validator lists what is absent, so a lens judges
+ *    whether an absence is a defect here and never whether it is there.
  *    Where the goal declares a platform and its catalogue, every lens reads a
  *    component as the service it names and a hop as an integration that
  *    platform offers: one shared paragraph (`lenses/platform.md`) says so in
@@ -72,7 +77,7 @@ import platform from './lenses/platform.md?raw';
 import producer from './lenses/producer.md?raw';
 import { REVISE_ONLY } from './controller';
 import { canvasOutput, type CanvasSubmission } from './output';
-import { referencesValidator, structureValidator } from './validators';
+import { referencesValidator, structureValidator, tracingValidator } from './validators';
 
 /** A judge's persona closed by the one paragraph on reading a declared platform — the same words for every critic and evaluator. */
 const onPlatform = (persona: string): string => `${persona.trim()}\n\n${platform.trim()}\n`;
@@ -80,7 +85,7 @@ const onPlatform = (persona: string): string => `${persona.trim()}\n\n${platform
 export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   id: CANVAS_PIPELINE_ID,
 
-  version: '2.1.0',
+  version: '2.2.0',
 
   // A goal another program composes; never a route, a target, or a choice in the UI.
 
@@ -190,6 +195,9 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
 
       service_misfit:
         'A component used for work it is not built for, a service named for a role other than the one the component plays, or a platform-neutral role where the goal’s declared catalogue offers a managed service for exactly that work.',
+
+      tracing_gap:
+        'A request from outside whose path shows no block or hop for a stage of its way in — name resolution, transport security, edge protection, the access layer, identity — where the goal’s scenario needs it; a traced path that ends where the request is still in flight; or a component a request reaches that no traced path lands on; and nothing says why.',
     } satisfies Record<CanvasFindingType, string>,
     maxCriteria: CANVAS_MAX_CRITERIA,
     // The transcript is the host's record of the interview — composed by the
@@ -228,7 +236,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
     consumes: ['criteria', 'memories', 'setbacks'],
   },
 
-  validators: [referencesValidator, structureValidator],
+  validators: [referencesValidator, structureValidator, tracingValidator],
   controller: REVISE_ONLY,
 
   // Each critic owns the finding types it may raise, so its reply schema
@@ -271,6 +279,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
         'failure_path_missing',
         'integration_misfit',
         'service_misfit',
+        'tracing_gap',
       ],
     },
     {
@@ -394,6 +403,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       failure_path_missing: { dimension: 'design', gate: false },
       integration_misfit: { dimension: 'design', gate: false },
       service_misfit: { dimension: 'design', gate: false },
+      tracing_gap: { dimension: 'design', gate: false },
     } satisfies Record<CanvasFindingType, { dimension: string; gate: boolean }>,
 
     ...STANDARD_SCORING,

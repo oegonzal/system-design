@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
-import { CANVAS_NODES_BOUND, CANVAS_MAX_TOTAL_OPERATIONS, NODE_CONFIG_KEYS_BOUND } from './canvas';
+import {
+  CANVAS_NODES_BOUND,
+  CANVAS_MAX_TOTAL_OPERATIONS,
+  EDGE_CONFIG_HINTS,
+  NODE_CONFIG_KEYS_BOUND,
+} from './canvas';
 import { designSubmissionSchema, sessionDraftSchema, type DesignSubmission } from './canvas.schema';
 import { boundsAgainstMeasured } from './measured-bounds';
 import measured from './measured/canvas.json';
@@ -288,7 +293,7 @@ describe('designSubmissionSchema', () => {
       'each declared on its source or its target, and none repeated',
       // A node's service and a connection's config, since 2.1.0.
       'its kind must be one of the roles that section states for the service',
-      'Suggested keys: protocol, auth, timeoutMs, retries, dlq, delivery, ordering, batchSize, idempotencyKey — any key is accepted.',
+      `Suggested keys: ${EDGE_CONFIG_HINTS.join(', ')} — any key is accepted.`,
       // The rules that were already stated, kept here so one list is the record.
       "The author's id; keep it.",
       'One connected walk of existing edge ids',

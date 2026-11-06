@@ -101,7 +101,7 @@ export const designPromptDraftSchema = z.strictObject({
     bounded.text(CRITERION_STATEMENT_BOUND, { min: 1 }),
     {
       description:
-        'A request or message the design must carry from where it enters to where it comes to rest — who calls whom, sync or async — and what must hold on the way: a timeout, a retry, an ordering, a delivery guarantee, a failure handled. Never the mechanism the candidate should choose.',
+        'A request or message the design must carry from where it enters — a client, a partner system, a schedule, or a message already inside — to where it comes to rest — who calls whom, sync or async — and what must hold on the way: a timeout, a retry, an ordering, a delivery guarantee, a failure handled. Never the mechanism the candidate should choose.',
     },
   ),
   nonFunctionalRequirements: bounded.list(

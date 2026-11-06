@@ -8,7 +8,7 @@ import type {
   QualityRunStatus,
   SuccessCriterion,
 } from '@sysdesign/contracts';
-import { markdownCell, nodeLabel, proseLocations } from '@sysdesign/contracts';
+import { markdownCell, nodeLabel, pathStages, proseLocations } from '@sysdesign/contracts';
 
 import { decisionInWords } from '../evaluation/decision-reason';
 import { degradedNote } from '../evaluation/degraded';
@@ -109,6 +109,36 @@ export function promptMarkdown(prompt: PromptDto, criteria: readonly SuccessCrit
   return joinLines(lines);
 }
 
+/** What the lifecycle declares for a traced path, in a cell: its way in and whether it rests. */
+function tracingCell(
+  graph: CanvasGraph,
+  path: readonly string[],
+  labels: ReadonlyMap<string, string>,
+): string {
+  if (path.length === 0) return '—';
+  const tracing = pathStages(graph, path);
+  if (tracing.firstNodeId === null) return '—';
+  const name = (id: string) => labels.get(id) ?? id;
+  if (tracing.entry === null)
+    return `begins at ${name(tracing.firstNodeId)}, not where a request enters`;
+  const missing = tracing.stages
+    .filter((item) => !item.conditional && item.covered === null)
+    .map((item) => item.stage.label);
+  const wayIn =
+    tracing.stages.length === 0
+      ? 'begins inside'
+      : missing.length === 0
+        ? 'complete way in'
+        : `missing: ${missing.join(', ')}`;
+  const rest =
+    tracing.rest === null
+      ? ''
+      : tracing.rest.atRest
+        ? '; at rest'
+        : `; ends at ${name(tracing.rest.nodeId)}, not at rest`;
+  return `${wayIn}${rest}`;
+}
+
 export function briefMarkdown(
   brief: DesignBrief | null,
   graph: CanvasGraph,
@@ -124,8 +154,8 @@ export function briefMarkdown(
   const statements = criterionStatements(criteria);
 
   lines.push(
-    `| Criterion | Claim | Components | Path | Why this, not another |`,
-    `| --- | --- | --- | --- | --- |`,
+    `| Criterion | Claim | Components | Path | Tracing | Why this, not another |`,
+    `| --- | --- | --- | --- | --- | --- |`,
   );
   for (const binding of brief.bindings) {
     const statement = statements.get(binding.criterionId);
@@ -137,7 +167,9 @@ export function briefMarkdown(
     lines.push(
       `| ${criterion} | ${markdownCell(binding.claim)} | ${markdownCell(components)} | ${
         markdownCell(path) || '—'
-      } | ${markdownCell(binding.tradeoff ?? '') || '—'} |`,
+      } | ${markdownCell(tracingCell(graph, binding.path ?? [], labels))} | ${
+        markdownCell(binding.tradeoff ?? '') || '—'
+      } |`,
     );
   }
   return joinLines(lines);

@@ -34,6 +34,28 @@ export const SECURITY_MANAGEMENT_AND_ML = [
     aliases: ['keys', 'encryption', 'kms'],
   },
   {
+    id: 'aws.acm',
+    label: 'ACM',
+    category: 'security',
+    roles: ['certificate-manager'],
+    what: 'Public and private TLS certificates issued and renewed automatically, attached to CloudFront, the load balancers and API Gateway.',
+    whenToUse:
+      'Every public endpoint: a DNS-validated certificate that renews itself, so TLS never lapses and no deploy carries a key.',
+    knobs: ['validation', 'renewal', 'domains', 'keyAlgorithm', 'attachedTo'],
+    aliases: ['certificate', 'tls', 'ssl', 'acm'],
+  },
+  {
+    id: 'aws.verified-permissions',
+    label: 'Verified Permissions',
+    category: 'security',
+    roles: ['authorization-service'],
+    what: 'A managed policy store that evaluates fine-grained authorization per request in a policy language, apart from the code that serves it.',
+    whenToUse:
+      'Permissions that span services or vary by tenant, role and resource; ask it from the authorizer instead of inside every handler.',
+    knobs: ['policyStore', 'schema', 'policies', 'identitySource', 'cacheTtlSeconds'],
+    aliases: ['authorization', 'permissions', 'policy', 'cedar'],
+  },
+  {
     id: 'aws.secrets-manager',
     label: 'Secrets Manager',
     category: 'security',
