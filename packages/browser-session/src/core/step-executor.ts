@@ -56,8 +56,8 @@ import {
  * was held for.
  */
 
-/** What a taskStart did: opened a unit or met one open (the plan goes on), was refused by the record, or came once the session's time was up. */
-type UnitOpening = 'go-on' | 'refused' | 'out-of-time';
+/** What a taskStart did: opened a unit or met one open (the plan goes on), was refused by the record, or came once the session's time was up or its stop was asked for. */
+type UnitOpening = 'go-on' | 'refused' | 'out-of-time' | 'stopping';
 
 /**
  * A unit opens for the item the plan names — unless the session's time is up
@@ -88,6 +88,16 @@ function openTaskUnlessRefused(
     pushHistory(state, label, 'not-executed', "the session's time is up: no unit of work starts");
     deps.log(`step ${state.step}: no unit of work starts — the session's time is up`);
     return 'out-of-time';
+  }
+  // Nor once the session is told to stop: it ends after the step in flight,
+  // and a unit opened in that step is left open, abandoned on the record with
+  // nothing sent. Measured 2026-11-05: a stop sent while a plan was composed
+  // on a job page let the plan open the unit and click its apply link, and
+  // the company went on the record to avoid for 90 days.
+  if (ctx.stopping.aborted) {
+    pushHistory(state, label, 'not-executed', 'the session is stopping: no unit of work starts');
+    deps.log(`step ${state.step}: no unit of work starts — the session is stopping`);
+    return 'stopping';
   }
   // The stances the mission's exception names are the only ones a declaration lifts a refusal for.
   const declared = takenStancesOf(ctx.mission);
@@ -224,10 +234,11 @@ async function perform(
     case 'taskStart': {
       // The actions after a refused taskStart were planned for a unit that
       // never opened: they do not run, as nothing runs past a refused click.
-      // One after the session's time is up ends the plan as a stop does: no
-      // failure, and the rails end the session after it.
+      // One after the session's time is up, or after its stop, ends the plan as
+      // a stop does: no failure, and the session ends after it.
       const opening = openTaskUnlessRefused(ctx, action, label, position, onRecord);
-      if (opening === 'out-of-time') return { failure: null, stopped: true };
+      if (opening === 'out-of-time' || opening === 'stopping')
+        return { failure: null, stopped: true };
       return { failure: opening === 'refused' ? 'unit-refused' : null, stopped: false };
     }
     case 'taskDone':

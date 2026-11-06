@@ -24,7 +24,7 @@ export const BROWSER_SESSION_CRITERIA: readonly Criterion[] = [
   {
     id: 'BRW-4',
     statement:
-      "A session ends only by a plan's declared cause, a declared rail, the operator or a fault; its status follows the termination table, and the browser, the write queue and the session row are closed on every path. The operator's stop — a reply, the process signal, or Ctrl-C at an open terminal question — withdraws a question waiting on them as abandoned, asks nothing after it, and ends the session the same way; and the time limit reaches a step waiting on the operator, withdrawing the open question as the session's time being up and ending the session by its limit rather than as the operator's stop.",
+      "A session ends only by a plan's declared cause, a declared rail, the operator or a fault; its status follows the termination table, and the browser, the write queue and the session row are closed on every path. The operator's stop — a reply, the process signal, or Ctrl-C at an open terminal question — withdraws a question waiting on them as abandoned, asks nothing after it, starts no unit of work after it — a taskStart in the plan in flight is not run, nor anything after it in that plan — and ends the session the same way; and the time limit reaches a step waiting on the operator, withdrawing the open question as the session's time being up and ending the session by its limit rather than as the operator's stop.",
   },
   {
     id: 'BRW-5',

@@ -1,7 +1,9 @@
+import { SESSION_TOPICS } from '@sysdesign/contracts';
+
 import type { NewSession } from './ports';
-import { decidedAnswers, decidedPlan, InMemoryLedger } from './testing';
+import { decidedAnswers, decidedPlan, InMemoryLedger, ScriptedBrain } from './testing';
 import { JOURNEY_ANSWERS as ANSWERS, JOURNEY_PLANS as PLANS } from './testing-journey';
-import { runScripted as run, SPEC_RAILS, SPEC_SUBJECT } from './testing-session';
+import { FakeStopSignal, runScripted as run, SPEC_RAILS, SPEC_SUBJECT } from './testing-session';
 
 /** Where the spec clock starts: the instant the session under test opens. */
 const START = new Date('2026-10-03T10:00:00.000Z');
@@ -66,5 +68,36 @@ describe('a session that starts', () => {
     const { outcome, warnings } = await run({ ...JOURNEY, ledger });
     expect(outcome.status).toBe('complete');
     expect(warnings).toContain('sessions that stopped beating were not closed — pool exhausted');
+  });
+});
+
+describe('a session told to stop', () => {
+  it('[BRW-4] starts no unit of work in the step in flight: a taskStart planned while the stop came is not run, nor anything after it, and the session ends operator-stop with no unit left open', async () => {
+    const stop = new FakeStopSignal();
+    // Ctrl-C while the results page's plan is composed: the plan comes back after the stop.
+    const planStep = ScriptedBrain.prototype.planStep;
+    vi.spyOn(ScriptedBrain.prototype, 'planStep').mockImplementation(async function (
+      this: ScriptedBrain,
+      input,
+    ) {
+      const plan = await planStep.call(this, input);
+      if (this.planInputs.length === 2) stop.press();
+      return plan;
+    });
+    const { outcome, detail, events, browser, logs } = await run({
+      script: { plans: [PLANS.search, PLANS.results].map((p) => decidedPlan(p)) },
+      stop,
+    });
+    expect(outcome.termination.reason).toBe('operator-stop');
+    expect(detail.tasks).toEqual([]);
+    expect(events.published.map((event) => event.topic)).toEqual([
+      SESSION_TOPICS.started,
+      SESSION_TOPICS.ended,
+    ]);
+    // The search ran; the click that would have followed the taskStart never did.
+    expect(browser.calls.filter((call) => call.startsWith('click'))).toEqual(['click e2']);
+    expect(logs).toContainEqual(
+      expect.stringContaining('no unit of work starts — the session is stopping'),
+    );
   });
 });
