@@ -23,7 +23,7 @@ import type { BrainFaulted } from './ports';
  * because the cache only ever stands in for an ask.
  */
 export interface RoutedField extends FieldReadout {
-  /** True when the operator's earlier answer filled the field. */
+  /** True when the operator's earlier answer filled the field, or their earlier blank in the unit left it blank. */
   cached: boolean;
 }
 

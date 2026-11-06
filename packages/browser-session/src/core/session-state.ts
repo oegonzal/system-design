@@ -25,6 +25,7 @@ import {
 } from '@sysdesign/contracts';
 
 import type { PendingExpectation } from './expectations';
+import type { LeftBlank } from './left-blank';
 import type { UnitContext } from './open-unit';
 import type { TeachReceipt } from './ports';
 import { remainingTasks, type RailState } from './rails';
@@ -47,8 +48,8 @@ export interface OpenTask {
   startStep: number;
 }
 
-/** A record kept per unit of work (`unitKeyOf`; null outside any), then by what each field asks (`fieldQuestionOf`). */
-type ByUnit = Map<string | null, Map<string, string>>;
+/** A record kept per unit of work (`unitKeyOf`; null outside any), then by a key it declares: what each field asks (`fieldQuestionOf`), or for a blank its page, ref, role and name (`left-blank.ts`). */
+type ByUnit<Value = string> = Map<string | null, Map<string, Value>>;
 
 /**
  * One operator answer handed to the memory, as the step's dump records it:
@@ -146,15 +147,17 @@ export interface SessionState {
    */
   filled: ByUnit;
   /**
-   * The fields this session left blank, by what each asks, in the unit of
-   * work they were left in: one the plan asks again in that unit is one the
-   * page would not go on without, whatever its markup says, so it is asked as
-   * required (`openUnitLeftBlank`). Measured 2026-11-06: an employer's form
+   * The fields left blank in the unit of work they were left in, by the page,
+   * ref, role and name, each marked by who left it (`left-blank.ts`): one the session's
+   * routing left blank and the plan asks again in that unit is one the page
+   * would not go on without, whatever its markup says, so it is asked as
+   * required; one the operator chose to leave blank is their answer for the
+   * unit (`openUnitLeftBlank`). Measured 2026-11-06: an employer's form
    * refused to go on, "Mobile Number is required", over a field its markup
    * left optional; the session left it blank twice, never asked the
    * operator, and the application failed.
    */
-  leftBlank: ByUnit;
+  leftBlank: ByUnit<LeftBlank>;
   /** What this step taught the memory, one record per operator answer, for the step's dump. */
   teachings: Teaching[];
   /** What this step captured after its actions, in order, for the step's dump. */
@@ -272,9 +275,9 @@ export const openUnitKeyOf = (state: SessionState): string | null =>
   state.tasks.open === null ? null : unitKeyOf(state.tasks.open);
 
 /** The open unit of work's own entries of a per-unit record, made on first use. */
-function openUnitEntries(state: SessionState, byUnit: ByUnit): Map<string, string> {
+function openUnitEntries<Value>(state: SessionState, byUnit: ByUnit<Value>): Map<string, Value> {
   const unit = openUnitKeyOf(state);
-  const entries = byUnit.get(unit) ?? new Map<string, string>();
+  const entries = byUnit.get(unit) ?? new Map<string, Value>();
   byUnit.set(unit, entries);
   return entries;
 }
@@ -287,8 +290,8 @@ export const openUnitAnswers = (state: SessionState): Map<string, string> =>
 export const openUnitFilled = (state: SessionState): Map<string, string> =>
   openUnitEntries(state, state.filled);
 
-/** The fields this session left blank in the unit of work open now, by what each asks: asked again, each is asked as required. */
-export const openUnitLeftBlank = (state: SessionState): Map<string, string> =>
+/** The fields left blank in the unit of work open now, by the page, ref, role and name, each with who left it and what it read. */
+export const openUnitLeftBlank = (state: SessionState): Map<string, LeftBlank> =>
   openUnitEntries(state, state.leftBlank);
 
 /** The units of work as the next goal is told them. */

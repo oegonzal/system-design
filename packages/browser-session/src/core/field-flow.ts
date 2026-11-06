@@ -14,7 +14,7 @@ import {
 import { captureAfter } from './capture';
 import type { DecisionInput, EngineContext } from './engine-context';
 import { withTypedChoices } from './field-choices';
-import { leftBlankKeyOf, neededAgain, remembersBlank } from './left-blank';
+import { blanksOnPage, remembersBlank, type PageBlanks } from './left-blank';
 import { routeFieldsInSession, type RoutedField } from './field-routing';
 import { entryOf, fill, fillActionOf, result, settled, type FieldResult } from './field-fill';
 import { recordTeaching, remember, teach, type Taught } from './field-teach';
@@ -27,7 +27,8 @@ import { openUnitAnswers, openUnitFilled, openUnitLeftBlank } from './session-st
 /**
  * A plan's `askFields`: the fields go to the form-memory orchestration as
  * one goal — except those that still hold what this session settled for
- * them, which are kept without a run — the answers come back as one run, and
+ * them, which are kept without a run, and those the operator chose to leave
+ * blank in the unit, which stay blank without one — the answers come back as one run, and
  * each field is routed by the declared table: filled, kept, left blank, or
  * put to the operator with the model's value as a suggestion and the reason
  * it was not trusted. The operator's answers are cached for the unit of work
@@ -177,16 +178,30 @@ const keptReadout = (field: FieldSpec, position: number): RoutedField => ({
   cached: true,
 });
 
+/** A field the operator chose to leave blank earlier in this unit of work, still holding nothing: blank again, with no run and no ask. */
+const operatorBlankReadout = (field: FieldSpec, position: number): RoutedField => ({
+  position,
+  field,
+  answer: null,
+  route: 'leave-blank',
+  value: null,
+  source: 'operator',
+  reason: 'the operator chose to leave it blank earlier in this unit of work',
+  withheld: [],
+  cached: true,
+});
+
 const settle = (
   ctx: EngineContext,
   field: RoutedField,
   observation: PageObservation,
   prefetch: SuggestionsPrefetch | null,
+  blanks: PageBlanks,
 ): Promise<FieldResult> => {
   switch (field.route) {
     case 'leave-blank':
       // Remembered, unless the page hides it or the answer chose the blank: asked again, it is asked as required.
-      if (remembersBlank(field)) openUnitLeftBlank(ctx.state).set(leftBlankKeyOf(field.field), '');
+      if (remembersBlank(field)) blanks.remember(field.field, 'session');
       return Promise.resolve(result(field, 'leave-blank', field.source, null, null));
     case 'keep':
       if (field.value !== null) settled(openUnitFilled(ctx.state), field.field, field.value);
@@ -194,7 +209,11 @@ const settle = (
     case 'fill':
       return fill(ctx, field, field.value ?? '', field.source, null, observation);
     case 'ask-operator':
-      return ask(ctx, field, observation, prefetch);
+      return ask(ctx, field, observation, prefetch).then((outcome) => {
+        // The operator's own blank is their answer for the unit: the field is not put to them again.
+        if (outcome.reply === 'blank') blanks.remember(field.field, 'operator');
+        return outcome;
+      });
   }
 };
 
@@ -254,6 +273,10 @@ const summarize = (results: readonly FieldResult[], routed: readonly RoutedField
   const count = (route: FieldRoute): number =>
     results.filter((r) => r.reply === null && r.route === route && r.outcome === 'ok').length;
   const failed = results.filter((r) => r.outcome === 'failed').length;
+  // A blank the operator chose earlier in the unit is said as theirs: the next plan does not ask it again.
+  const operatorBlanks = results.filter(
+    (settled) => settled.route === 'leave-blank' && settled.cached && settled.source === 'operator',
+  ).length;
   // The field the page refused, as a person would name it, and why: the next plan answers it, never repeats it.
   const refusal = results.find((r) => r.outcome === 'failed');
   const refused = routed.find((r) => r.field.ref === refusal?.ref);
@@ -261,7 +284,11 @@ const summarize = (results: readonly FieldResult[], routed: readonly RoutedField
   const unattempted = listed - results.length;
   return `${listed} field(s): ${count('fill')} filled, ${count('keep')} kept, ${asked.length} asked${
     asked.length > 0 ? ` (${answered} answered by the operator)` : ''
-  }, ${count('leave-blank')} blank${failed > 0 ? `, ${failed} failed` : ''}${
+  }, ${count('leave-blank')} blank${
+    operatorBlanks > 0
+      ? ` (${operatorBlanks} as the operator chose earlier in this unit of work)`
+      : ''
+  }${failed > 0 ? `, ${failed} failed` : ''}${
     unattempted > 0 ? `, ${unattempted} not attempted` : ''
   }${refusal === undefined ? '' : ` — ${refusedName}: ${refusal.detail ?? 'refused'}`}`;
 };
@@ -313,11 +340,21 @@ async function decideFields(
   return { decided, fault, durationMs: deps.clock.now().getTime() - startedAt.getTime() };
 }
 
-/** Every listed field with its route: the one the answers routed, or a keep for one that was never a question. */
-const routedOf = (fields: readonly FieldSpec[], answered: readonly RoutedField[]): RoutedField[] =>
+/**
+ * Every listed field with its route: the one the answers routed, else the
+ * operator's earlier blank, else a keep for one that was never a question.
+ */
+const routedOf = (
+  fields: readonly FieldSpec[],
+  answered: readonly RoutedField[],
+  blanks: PageBlanks,
+): RoutedField[] =>
   fields.map((field, position) => {
     const found = answered.find((candidate) => candidate.field.ref === field.ref);
-    return found === undefined ? keptReadout(field, position) : { ...found, position };
+    if (found !== undefined) return { ...found, position };
+    return blanks.blankedByOperator(field)
+      ? operatorBlankReadout(field, position)
+      : keptReadout(field, position);
   });
 
 /** Each routed field settled in order and recorded, the operator's guidance taught; a stop or a failure ends the page. */
@@ -328,11 +365,13 @@ async function settleAll(
   decided: FieldsDecided | null,
   durationMs: number,
   prefetch: SuggestionsPrefetch | null,
+  blanks: PageBlanks,
 ): Promise<{ results: FieldResult[]; stopped: boolean }> {
   const results: FieldResult[] = [];
   for (const field of routed) {
-    const outcome = await settle(ctx, field, observation, prefetch);
+    const outcome = await settle(ctx, field, observation, prefetch, blanks);
     results.push(outcome);
+    if (outcome.outcome === 'ok' && (outcome.value ?? '') !== '') blanks.answered(field.field);
     // The answer is taught before its row is written, so the row carries what the memory did with it.
     const taught = outcome.guidance === null ? null : await teach(ctx, outcome.guidance);
     const decisionId = ctx.record(decisionOf(field, outcome, decided, durationMs, taught));
@@ -376,14 +415,19 @@ export async function askFields(
   refs: readonly string[],
   observation: PageObservation,
 ): Promise<FieldsOutcome> {
-  const fields = neededAgain(fieldsOf(refs, observation), openUnitLeftBlank(ctx.state));
+  const blanks = blanksOnPage(openUnitLeftBlank(ctx.state), observation.url);
+  const fields = blanks.neededAgain(fieldsOf(refs, observation));
   if (fields.length === 0)
     return { stopped: false, failed: false, note: 'no listed field matched' };
-  const open = await withTypedChoices(ctx.deps.browser, openOf(fields, openUnitFilled(ctx.state)));
+  const unanswered = openOf(fields, openUnitFilled(ctx.state)).filter(
+    (field) => !blanks.blankedByOperator(field),
+  );
+  const open = await withTypedChoices(ctx.deps.browser, unanswered);
   const { decided, fault, durationMs } = await decideFields(ctx, open);
   const routed = routedOf(
     fields,
     routeFieldsInSession(decided, fault, open, openUnitAnswers(ctx.state), ctx.options.answering),
+    blanks,
   );
   const prefetch = SuggestionsPrefetch.for(ctx, routed);
   const { results, stopped } = await settleAll(
@@ -393,6 +437,7 @@ export async function askFields(
     decided,
     durationMs,
     prefetch,
+    blanks,
   );
   dumpFields(ctx, routed, results, decided, fault, prefetch?.record() ?? null);
   return {

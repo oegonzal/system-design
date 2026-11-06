@@ -17,13 +17,13 @@ Conventions: a status column is `text` with a `@Check` built from an `as const s
 
 `browser_session` (the goal as run, the profile, the rails, how it ended, a heartbeat), `browser_task` (one unit of work per `taskStart` … `taskDone`) and `browser_decision` (one row per plan, field answer or termination, naming the loop run that took it). `question` on a decision is the field's label — the join key the learning queries below rest on.
 
-Ask rate per session over time — how often a field had to go to the operator, against everything decided about a field:
+Ask rate per session over time — how often a field had to go to the operator, against everything decided about a field. A row the operator's earlier answer or blank in the unit settled carries `cached` in its payload, and was no ask:
 
 ```sql
 select s.started_at::date as day, s.id as session,
-       count(*) filter (where d.source = 'operator') as asked,
+       count(*) filter (where d.source = 'operator' and not coalesce((d.payload->>'cached')::boolean, false)) as asked,
        count(*) as fields,
-       round(100.0 * count(*) filter (where d.source = 'operator') / count(*), 1) as ask_pct
+       round(100.0 * count(*) filter (where d.source = 'operator' and not coalesce((d.payload->>'cached')::boolean, false)) / count(*), 1) as ask_pct
 from browser_decision d
 join browser_session s on s.id = d.session_id
 where d.kind = 'field-answer'
@@ -38,6 +38,7 @@ with asked as (
   select question, min(created_at) as first_asked
   from browser_decision
   where kind = 'field-answer' and source = 'operator'
+    and not coalesce((payload->>'cached')::boolean, false)
   group by question
 ),
 recalled as (

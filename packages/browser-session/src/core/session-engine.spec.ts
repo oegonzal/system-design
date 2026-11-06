@@ -1,9 +1,9 @@
 import { BROWSER_SESSION_PIPELINES, FAKE_RUBRIC, type StepPlan } from '@sysdesign/contracts';
 
 import { decidedAnswers, decidedPlan, FakeBrowser, InMemoryLedger, refusing } from './testing';
-import { fieldAnswer } from './testing-runs';
 import {
   JOURNEY_ANSWERS as ANSWERS,
+  JOURNEY_ANSWERS_UNSETTLED as UNSETTLED,
   JOURNEY_PLANS as PLANS,
   journeyPages as pages,
   JOURNEY_URLS,
@@ -283,18 +283,6 @@ describe('the session engine', () => {
             },
           },
     );
-    const unsettled = {
-      ...ANSWERS,
-      fields: ANSWERS.fields.map((field) =>
-        field.ref === 'e2'
-          ? fieldAnswer('e2', {
-              decision: 'ask-operator',
-              rests: 'none',
-              reason: 'nothing on record',
-            })
-          : field,
-      ),
-    };
     const { detail, operator } = await run({
       browser: new FakeBrowser(optional),
       script: {
@@ -306,7 +294,7 @@ describe('the session engine', () => {
           PLANS.done,
           PLANS.end,
         ].map((p) => decidedPlan(p)),
-        answers: [decidedAnswers(unsettled), decidedAnswers(unsettled)],
+        answers: [decidedAnswers(UNSETTLED), decidedAnswers(UNSETTLED)],
       },
       lines: ['Yes'],
     });

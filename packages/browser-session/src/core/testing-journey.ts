@@ -153,3 +153,13 @@ export const JOURNEY_ANSWERS: FieldAnswers = {
     fieldAnswer('e3', { value: 'x', reason: 'oops' }),
   ],
 };
+
+/** The journey's answers with the work-authorisation select (e2) settled by nothing on record: the operator is asked it. */
+export const JOURNEY_ANSWERS_UNSETTLED: FieldAnswers = {
+  ...JOURNEY_ANSWERS,
+  fields: JOURNEY_ANSWERS.fields.map((field) =>
+    field.ref === 'e2'
+      ? fieldAnswer('e2', { decision: 'ask-operator', rests: 'none', reason: 'nothing on record' })
+      : field,
+  ),
+};
