@@ -40,6 +40,17 @@ const ledgerLines = (ledger: TaskLedgerSummary): string[] => [
         ...ledger.closed.map((unit) => `  - ${describeUnit(unit)} — ${unit.outcome}`),
         ...(ledger.closedOmitted > 0 ? [`  (${ledger.closedOmitted} older not listed)`] : []),
       ]),
+  // What the session refused stays said: the refusal's own objection is in one goal only.
+  ...(ledger.refused.length === 0
+    ? []
+    : [
+        '- Refused this session, on record — never taken up again:',
+        ...ledger.refused.map(
+          (unit) =>
+            `  - ${describeIdentity(unit.facets)}${unit.note === '' ? '' : ` — ${unit.note}`}`,
+        ),
+        ...(ledger.refusedOmitted > 0 ? [`  (${ledger.refusedOmitted} older not listed)`] : []),
+      ]),
   `- Closed so far: ${TASK_OUTCOMES.map((outcome) => `${outcome} ${ledger.counts[outcome]}`).join(' · ')}.${
     ledger.remainingTasks === null
       ? ''

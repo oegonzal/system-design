@@ -3,12 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { UNITS_ON_RECORD_BOUND } from '../units/vocab';
 import type { UnitOnRecord } from '../units/record';
 import {
+  emptyLedger,
   listingObservation,
   MISSION_WITH_IDENTITY,
   MISSION_WITH_TAKEN,
   openTaskLedger,
   stepGoalInput,
 } from './fixtures';
+import { REFUSED_UNITS_BOUND, type TaskLedgerSummary } from './observation.schema';
 import { composeStepGoal } from './step-goal';
 import { readStepIndex } from './step-index';
 
@@ -128,5 +130,59 @@ describe('the Units of work section with a record beyond this session', () => {
       '- Open unit of work: "Senior Engineer at Acme" · company "Acme" at https://jobs.example.test/apply/42',
     );
     expect(goal).toContain('  - "Staff Engineer at Globex" · company "Globex" — done');
+  });
+});
+
+/** The step goal of a listing page under a ledger, as the Units of work section renders it. */
+const goalUnder = (ledger: TaskLedgerSummary): string =>
+  composeStepGoal(
+    stepGoalInput({
+      observation: listingObservation(),
+      history: [],
+      ledger,
+      objections: [],
+      progress: { criteria: [], settled: [], done: [] },
+    }),
+  );
+
+describe('the Units of work section with this session alone', () => {
+  it('[QL-39] tells the planner no unit is open, that an item passed over needs none, and that nothing has closed yet', () => {
+    const goal = goalUnder(emptyLedger());
+    expect(goal).toContain(
+      '- No unit of work is open: taskStart opens one when the procedure takes an item up; an item the mission says to pass over gets no taskStart.',
+    );
+    expect(goal).toContain('- Closed this session: none yet.');
+    expect(goal).toContain('- Closed so far: done 0 · already-done 0 · skipped 0 · failed 0.');
+    expect(goal).not.toContain('may still be started');
+    // No target was set, so none is told.
+    expect(goal).not.toContain('- Target:');
+  });
+
+  it('[QL-39] tells the planner how far the session is toward its target, counted on done units alone, and that reaching it ends the session', () => {
+    const ledger = { ...openTaskLedger(), targetDone: 3 };
+    expect(goalUnder(ledger)).toContain(
+      '- Target: 1 of 3 closed done — the session ends complete when it is reached.',
+    );
+  });
+
+  it('[BRW-13] names every unit the session refused on record, newest first with the record’s note, counting the older ones, so no later goal reads as if it had not met them', () => {
+    const refused = (value: string, note: string) => ({
+      facets: [{ name: 'company', value }],
+      note,
+    });
+    const goal = goalUnder({
+      ...openTaskLedger(),
+      refused: [refused('Globex', 'applied 2026-11-01'), refused('Acme', '')],
+      refusedOmitted: REFUSED_UNITS_BOUND.target,
+    });
+    expect(goal).toContain(
+      [
+        '- Refused this session, on record — never taken up again:',
+        '  - company "Globex" — applied 2026-11-01',
+        '  - company "Acme"',
+        `  (${REFUSED_UNITS_BOUND.target} older not listed)`,
+      ].join('\n'),
+    );
+    expect(goalUnder(openTaskLedger())).not.toContain('Refused this session');
   });
 });

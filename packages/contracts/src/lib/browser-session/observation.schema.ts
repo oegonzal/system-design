@@ -11,6 +11,7 @@ import { z } from 'zod';
 import { bound, bounded, exact } from '../bounds';
 import { GOAL_BUDGET_BYTES } from '../quality-loop/goal-index';
 import { unitFacetsSchema } from '../units/identity';
+import { UNIT_NOTE_BOUND } from '../units/vocab';
 import { STEP_OUTCOMES } from './action-effects';
 import { ELEMENT_KINDS } from './element-kind';
 import { HIDDEN_TRAITS, LANDMARK_ROLES, SCOPE_ROLES, SNAPSHOT_RUNGS, TASK_OUTCOMES } from './vocab';
@@ -55,6 +56,14 @@ export const TASK_LABEL_BOUND = bound(200);
  * the listing it had already handled, because nothing told it which it had.
  */
 export const CLOSED_TASKS_BOUND = bound(10, 'list');
+/**
+ * The units on record the session refused a taskStart for, which every later
+ * goal of the session lists, newest first; older ones are counted. Measured
+ * 2026-10-19 → 10-31: 86 of 160 refused taskStarts named a unit the same
+ * session had refused already, the refusal's objection gone from the goal
+ * and the unit itself past the record's rendered bound.
+ */
+export const REFUSED_UNITS_BOUND = bound(10, 'list');
 
 /**
  * A ref exactly as Playwright's snapshot minted it, with nothing read into its
@@ -340,6 +349,18 @@ export const taskLedgerSummarySchema = z.strictObject({
   ),
   /** Closed units older than the bound keeps: counted, so the list never reads as the whole. */
   closedOmitted: z.number().int().min(0),
+  /**
+   * The units on record a taskStart named this session and the session
+   * refused, newest first, within the bound: by identity, with the record's
+   * note, so a later plan keeps off an item the session met on record however
+   * far the record's own list is cut.
+   */
+  refused: bounded.list(
+    REFUSED_UNITS_BOUND,
+    z.strictObject({ facets: unitFacetsSchema, note: bounded.text(UNIT_NOTE_BOUND) }),
+  ),
+  /** Refused units older than the bound keeps: counted, so the list never reads as the whole. */
+  refusedOmitted: z.number().int().min(0),
   /** Units of work closed so far, by outcome — every outcome the vocabulary declares, zero included. */
   counts: z.record(z.enum(TASK_OUTCOMES), z.number().int().min(0)),
   /** Units of work the session may still spend under its rail; null when the rail is not set. */

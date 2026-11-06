@@ -54,6 +54,8 @@ const goalOf = (recorded: RecordedStep): string =>
         : null,
       closed: [],
       closedOmitted: 0,
+      refused: [],
+      refusedOmitted: 0,
       counts: { done: 0, 'already-done': 0, skipped: 0, failed: 0 },
       remainingTasks: 1,
       targetDone: null,

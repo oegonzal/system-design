@@ -7,6 +7,7 @@ import {
   OBJECTION_DETAIL_BOUND,
   OBJECTION_FROM_MAX_LENGTH,
   OBJECTIONS_MAX,
+  REFUSED_UNITS_BOUND,
   SPENDING_TASK_OUTCOMES,
   TASK_OUTCOMES,
   type LastStep,
@@ -17,7 +18,9 @@ import {
   type TaskLedgerSummary,
   type TaskOutcome,
   type UnitFacet,
+  type UnitOnRecord,
   excerpt,
+  identityKey,
   unitKeyOf,
 } from '@sysdesign/contracts';
 
@@ -90,6 +93,9 @@ export interface SessionState {
     counts: Record<TaskOutcome, number>;
     closed: TaskLedgerSummary['closed'];
     closedOmitted: number;
+    /** The units on record the session refused a taskStart for, newest first, the rest counted (`rememberRefused`). */
+    refused: TaskLedgerSummary['refused'];
+    refusedOmitted: number;
     /**
      * What the page stated about each unit when it opened, by the unit's row
      * id — the one store of it: the open unit's form goals read it here, and
@@ -165,6 +171,8 @@ export function createState(ids: {
       counts: zeroCounts(),
       closed: [],
       closedOmitted: 0,
+      refused: [],
+      refusedOmitted: 0,
       contexts: new Map(),
     },
     consecutiveFailures: 0,
@@ -283,10 +291,25 @@ export const ledgerSummaryOf = (
         },
   closed: [...state.tasks.closed],
   closedOmitted: state.tasks.closedOmitted,
+  refused: [...state.tasks.refused],
+  refusedOmitted: state.tasks.refusedOmitted,
   counts: { ...state.tasks.counts },
   remainingTasks: remainingTasks(railStateOf(state), rails),
   targetDone: rails.targetDone,
 });
+
+/**
+ * A unit on record the session refused a taskStart for, remembered for every
+ * later goal of the session, newest first: one refused again moves to the
+ * front, and one past the bound is counted rather than dropped silently.
+ */
+export function rememberRefused(state: SessionState, unit: UnitOnRecord): void {
+  const key = identityKey(unit.identity);
+  const others = state.tasks.refused.filter((each) => identityKey(each.facets) !== key);
+  const remembered = [{ facets: [...unit.identity], note: unit.note }, ...others];
+  state.tasks.refused = remembered.slice(0, REFUSED_UNITS_BOUND.target);
+  state.tasks.refusedOmitted += Math.max(0, remembered.length - REFUSED_UNITS_BOUND.target);
+}
 
 /**
  * The objections recorded once each, newest first, clipped to their declared

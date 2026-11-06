@@ -72,6 +72,8 @@ describe('the session engine', () => {
       openTask: null,
       closed: [{ label: 'Senior Engineer at Acme', outcome: 'done', facets: [] }],
       closedOmitted: 0,
+      refused: [],
+      refusedOmitted: 0,
       counts: { done: 1, 'already-done': 0, skipped: 0, failed: 0 },
     });
     expect(browser.calls).toEqual(

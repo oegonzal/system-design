@@ -8,6 +8,7 @@ import {
   type Objection,
 } from '../quality-loop/read-back';
 import { NO_UNITS_ON_RECORD } from '../units/record';
+import { UNIT_FACET_VALUE_MAX_LENGTH, UNIT_NOTE_BOUND } from '../units/vocab';
 import {
   dialogObservation,
   emptyLedger,
@@ -25,6 +26,7 @@ import {
   OPTIONS_SHOWN,
   type PageObservation,
   pageObservationSchema,
+  REFUSED_UNITS_BOUND,
   type StepHistoryEntry,
   TASK_LABEL_BOUND,
 } from './observation.schema';
@@ -146,6 +148,17 @@ describe('composeStepGoal', () => {
           facets: [],
         })),
         closedOmitted: 3,
+        // The units refused this session at their bound, each identity and note at its ceiling, plus older ones counted.
+        refused: Array.from({ length: REFUSED_UNITS_BOUND.target }, (_, i) => ({
+          facets: [
+            {
+              name: 'company',
+              value: `${'r'.repeat(UNIT_FACET_VALUE_MAX_LENGTH - 2)}${String(i).padStart(2, '0')}`,
+            },
+          ],
+          note: 'n'.repeat(UNIT_NOTE_BOUND.target),
+        })),
+        refusedOmitted: 2,
       },
       // Every objection the goal will carry, each at its ceiling, plus more
       // than it carries — the budget has to hold the worst case, not the mean.
@@ -188,27 +201,9 @@ describe('composeStepGoal', () => {
     expect(goal).toContain('- Closed this session, oldest first:');
     expect(goal.match(/^ {2}- "l+\d\d" — done$/gm)).toHaveLength(CLOSED_TASKS_BOUND.target);
     expect(goal).toContain('  (3 older not listed)');
+    expect(goal.match(/^ {2}- company "r+\d\d" — n+$/gm)).toHaveLength(REFUSED_UNITS_BOUND.target);
     expect(goal).toContain(
       '- Closed so far: done 1 · already-done 0 · skipped 0 · failed 0. Units that may still be started: 8 — one closed already-done or skipped does not count.',
-    );
-  });
-
-  it('[QL-39] tells the planner no unit is open, that an item passed over needs none, and that nothing has closed yet', () => {
-    const goal = goalOf(listingObservation(), [], emptyLedger());
-    expect(goal).toContain(
-      '- No unit of work is open: taskStart opens one when the procedure takes an item up; an item the mission says to pass over gets no taskStart.',
-    );
-    expect(goal).toContain('- Closed this session: none yet.');
-    expect(goal).toContain('- Closed so far: done 0 · already-done 0 · skipped 0 · failed 0.');
-    expect(goal).not.toContain('may still be started');
-    // No target was set, so none is told.
-    expect(goal).not.toContain('- Target:');
-  });
-
-  it('[QL-39] tells the planner how far the session is toward its target, counted on done units alone, and that reaching it ends the session', () => {
-    const ledger = { ...openTaskLedger(), targetDone: 3 };
-    expect(goalOf(listingObservation(), [], ledger)).toContain(
-      '- Target: 1 of 3 closed done — the session ends complete when it is reached.',
     );
   });
 

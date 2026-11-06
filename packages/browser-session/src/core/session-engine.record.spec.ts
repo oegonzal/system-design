@@ -79,7 +79,7 @@ const session = (plans: StepPlan[], scenario: Partial<Scenario> = {}) =>
   });
 
 describe('a taskStart at a unit on record', () => {
-  it('[BRW-13] to avoid is refused unless the plan declares it takes it under the mission’s exception: no unit opens, the actions after it do not run, the step counts one failure, and the next goal carries the fact in the history and the reason once as an objection', async () => {
+  it('[BRW-13] to avoid is refused unless the plan declares it takes it under the mission’s exception: no unit opens, the actions after it do not run, the step counts one failure, and the next goal carries the fact in the history and the reason once as an objection, every later goal the unit refused', async () => {
     const { brain, browser, detail, logs, outcome } = await session([
       PLANS.search,
       opening('Acme'),
@@ -106,6 +106,13 @@ describe('a taskStart at a unit on record', () => {
     expect(third?.objections).toEqual([
       { step: 2, from: 'session', at: ['action.1'], detail: REFUSED },
     ]);
+    // The unit refused stays named in every later goal of the session, past its objection's one goal.
+    const refusedAcme = [
+      { facets: [{ name: 'company', value: 'Acme' }], note: 'applied 2026-10-03' },
+    ];
+    expect(third?.ledger.refused).toEqual(refusedAcme);
+    expect(brain.planInputs.at(-1)?.ledger.refused).toEqual(refusedAcme);
+    expect(brain.planInputs[1]?.ledger.refused).toEqual([]);
     // The declared plan ran whole and moved the page: nothing is carried, what it took is on the record, and the session reaches its end.
     expect(brain.planInputs[3]?.objections).toEqual([]);
     expect(brain.planInputs[3]?.history).toContainEqual({

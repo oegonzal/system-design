@@ -41,6 +41,7 @@ import {
   pushHistory,
   pushObjections,
   railStateOf,
+  rememberRefused,
   type OpenTask,
 } from './session-state';
 
@@ -104,6 +105,7 @@ function openTaskUnlessRefused(
   const refused = refusedOnRecord(action, onRecord, declared);
   if (refused !== null) {
     pushHistory(state, label, 'not-executed', noteOnRecordRefusal(refused));
+    rememberRefused(state, refused);
     pushObjections(state, [
       {
         step: state.step,
