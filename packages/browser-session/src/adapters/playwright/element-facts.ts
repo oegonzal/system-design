@@ -341,18 +341,25 @@ function elementFactsInPage(
     // a design system's every checkbox and radio is built so — a consent box,
     // "I agree to the Privacy Statement", gated a whole form — and a field made
     // invisible to trap a bot has no label it shows, nor a click landing on it.
+    // A box outside the window is not hit-tested — the test reads only what
+    // the window shows — and rests on its label, the trap traits still read.
     const shown = (node: Element): boolean => {
       const box = node.getBoundingClientRect();
       const css = getComputedStyle(node);
       return box.width > 0 && box.height > 0 && css.visibility !== 'hidden' && css.opacity !== '0';
     };
     const kind = (attr('type') ?? '').toLowerCase();
+    const landsOnIt = (): boolean => {
+      const x = rect.left + rect.width / 2;
+      const y = rect.top + rect.height / 2;
+      const inWindow = x >= 0 && y >= 0 && x < window.innerWidth && y < window.innerHeight;
+      return !inWindow || el.ownerDocument.elementFromPoint(x, y) === el;
+    };
     const drawnChoice =
       tag === 'input' &&
       (kind === 'checkbox' || kind === 'radio') &&
       Array.from((el as HTMLInputElement).labels ?? []).some(shown) &&
-      el.ownerDocument.elementFromPoint(rect.left + rect.width / 2, rect.top + rect.height / 2) ===
-        el;
+      landsOnIt();
     const visible =
       rect.width > 0 &&
       rect.height > 0 &&

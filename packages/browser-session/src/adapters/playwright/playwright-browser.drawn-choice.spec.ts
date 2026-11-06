@@ -25,6 +25,8 @@ const CONSENT = `<!doctype html><html><head><title>Apply — consent</title>
     <label><span class="box"><input type="checkbox" name="agree"><span class="drawn"></span></span><span>I agree to the Privacy Statement</span></label>
     <span class="box"><input type="checkbox" name="bait" aria-label="Leave this empty"><span class="drawn"></span></span>
     <label><span class="box"><input type="checkbox" name="covered"><span class="cover"></span></span><span>Covered option</span></label>
+    <div style="height: 3000px"></div>
+    <label><span class="box"><input type="checkbox" name="current"><span class="drawn"></span></span><span>Current Job</span></label>
   </form>
 </body></html>`;
 
@@ -57,7 +59,7 @@ describe('the Playwright browser and a checkbox the page draws over its own invi
     rmSync(profiles, { recursive: true, force: true });
   });
 
-  it('[BRW-2] sees the invisible input a click at its centre lands on beside its shown label, and a click ticks it; an invisible box with no label shown, or under a cover, stays unseen', async () => {
+  it('[BRW-2] sees the invisible input a click at its centre lands on beside its shown label — below the window, by its label alone — and a click ticks it; an invisible box with no label shown, or under a cover, stays unseen', async () => {
     await browser.page.setContent(CONSENT);
     const observation = await browser.observe();
     const consent = byName(observation, 'I agree to the Privacy Statement');
@@ -70,5 +72,7 @@ describe('the Playwright browser and a checkbox the page draws over its own invi
     );
     await browser.act(click(consent.ref));
     expect(await browser.page.locator('input[name="agree"]').isChecked()).toBe(true);
+    // Below the window it is not hit-tested, and rests on its shown label.
+    expect(byName(observation, 'Current Job')).toMatchObject({ visible: true, hiddenTraits: [] });
   });
 });
