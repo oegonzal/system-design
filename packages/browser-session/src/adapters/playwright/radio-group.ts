@@ -1,4 +1,4 @@
-import type { Locator } from 'playwright';
+import type { Frame, Locator } from 'playwright';
 
 import { CHECKBOX_OPTIONS, RADIO_OPTIONS } from './dom-selectors';
 
@@ -62,6 +62,48 @@ export const aimAtOption = (
   index: number,
   options: GroupOptions = RADIO_OPTIONS,
 ): Promise<RadioGroupReading | null> => readInPage(group, index, options);
+
+/**
+ * Whether the choice drawn at a point of a frame reads chosen — the one option
+ * the smallest box around the point holds — for a click whose own option the
+ * page drew anew; null when no box there holds just one option, or the frame
+ * cannot be read there.
+ */
+export const readChoiceAt = (
+  frame: Frame,
+  at: { x: number; y: number },
+  options: GroupOptions,
+): Promise<boolean | null> =>
+  frame.evaluate(choiceAtInPage, { x: at.x, y: at.y, options }).catch(() => null);
+
+/**
+ * In the page: the option at a point read as the group's reader reads one —
+ * checked by its own state, its ARIA state, or the native input it draws.
+ * One function on purpose — Playwright serialises it whole.
+ */
+function choiceAtInPage({
+  x,
+  y,
+  options,
+}: {
+  x: number;
+  y: number;
+  options: string;
+}): boolean | null {
+  for (let node = document.elementFromPoint(x, y); node !== null; node = node.parentElement) {
+    const held = node.matches(options) ? [node] : Array.from(node.querySelectorAll(options));
+    if (held.length > 1) return null;
+    const [option] = held;
+    if (option !== undefined) {
+      return (
+        option.getAttribute('aria-checked') === 'true' ||
+        (option as HTMLInputElement).checked === true ||
+        option.querySelector('input[type="radio"]:checked, input[type="checkbox"]:checked') !== null
+      );
+    }
+  }
+  return null;
+}
 
 /** The options a person can answer with: words to answer by, on an option the page does not disable. */
 export const answerable = (reading: RadioGroupReading): RadioOption[] =>

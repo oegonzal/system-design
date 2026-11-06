@@ -60,6 +60,7 @@ Questions still unanswered by memory — what the next ingest should cover:
 select question, count(*) as times_asked, max(created_at) as last_asked
 from browser_decision
 where kind = 'field-answer' and source = 'operator'
+  and not coalesce((payload->>'cached')::boolean, false)
   and question not in (
     select question from browser_decision
     where kind = 'field-answer' and source = 'memory' and question is not null
