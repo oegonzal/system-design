@@ -335,8 +335,8 @@ function elementFactsInPage(
       traits.push('autocomplete-off-bait');
     }
 
-    // A choice box the page draws: its own input made invisible over the box it
-    // draws, where a click at its centre still lands on it, beside a label a
+    // A choice the page draws — a checkbox, a radio, or a list's box — its own
+    // input made invisible over the box it draws, where a click at its centre still lands on it, beside a label a
     // person reads. Seen, since the box and the label are. Measured 2026-11-06:
     // a design system's every checkbox and radio is built so — a consent box,
     // "I agree to the Privacy Statement", gated a whole form — and a field made
@@ -357,7 +357,7 @@ function elementFactsInPage(
     };
     const drawnChoice =
       tag === 'input' &&
-      (kind === 'checkbox' || kind === 'radio') &&
+      (kind === 'checkbox' || kind === 'radio' || attr('role') === 'combobox') &&
       Array.from((el as HTMLInputElement).labels ?? []).some(shown) &&
       landsOnIt();
     const visible =
