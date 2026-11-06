@@ -105,6 +105,7 @@ export const CATEGORY_COLORS = {
   messaging: { bg: '#f19a3f', fg: INK },
   analytics: { bg: '#0f6b74', fg: PAPER },
   coordination: { bg: '#8b5fc2', fg: PAPER },
+  delivery: { bg: '#5a6b2f', fg: PAPER },
   security: { bg: '#a63a50', fg: PAPER },
   observability: { bg: '#8f4b8f', fg: PAPER },
   external: { bg: '#5d6b7d', fg: PAPER },

@@ -219,6 +219,9 @@ describe('designSubmissionSchema', () => {
     // first finds a coach writing one.
     const hopConfig =
       'added with the canvas pipeline’s 2.1.0 (2026-11-05); no coach has written one yet';
+    // A block's boundary arrived with 2.3.0; the exemption goes when a coach writes one.
+    const placement =
+      'added with the canvas pipeline’s 2.3.0 (2026-11-06); no coach has written one yet';
     // The transcript is composed by the studio from stored turns, never
     // written by a model; its bounds hold what the interviewer pipeline's
     // own schema allows a reply, and are measured where that is measured.
@@ -227,6 +230,7 @@ describe('designSubmissionSchema', () => {
     expect(
       boundsAgainstMeasured(designSubmissionSchema, measured.fields, {
         exempt: {
+          'graph.nodes[].boundary': placement,
           'brief.bindings[].tradeoff': unwritten,
           'narrative.componentRationales[].tradeoff': unwritten,
           'narrative.decisions': unwritten,

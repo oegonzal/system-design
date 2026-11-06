@@ -11,7 +11,8 @@ export const PLATFORM_SECTION_HEADING = '## Platform';
  * the two facts a design is held to — a component names the service it is,
  * a hop is an integration the platform offers — and leaves the judgement to
  * the lenses, who know the platform; `whenToUse` and `aliases` are the
- * palette's and stay out of the budget.
+ * palette's and stay out of the budget. The boundaries close the section: a
+ * block's `boundary` names where it sits, in the platform's own words.
  */
 export function renderPlatformSection(catalogue: PlatformCatalogue): string {
   const lines = [
@@ -29,6 +30,15 @@ export function renderPlatformSection(catalogue: PlatformCatalogue): string {
         `- \`${service.id}\` — ${service.label} (${roles}): ${service.what} Knobs: ${service.knobs.join(', ')}.`,
       );
     }
+  }
+  lines.push(
+    '',
+    '### Boundaries',
+    '',
+    `A block's \`boundary\` names where it sits, as ${catalogue.label} draws it — a store or a worker reachable from outside, or an entry point with nothing protecting it, is a placement to judge:`,
+  );
+  for (const boundary of catalogue.boundaries) {
+    lines.push(`- ${boundary.label} — ${boundary.what}`);
   }
   return lines.join('\n');
 }

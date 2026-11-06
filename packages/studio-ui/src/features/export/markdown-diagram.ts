@@ -20,7 +20,7 @@ const configCell = (entries: readonly ConfigEntry[] | undefined): string =>
 
 /**
  * The diagram as text: one table of blocks — label, role, the platform
- * service it names, its config — and one of connections — the blocks it
+ * service it names, where it sits, its config — and one of connections — the blocks it
  * joins, its call style, what it carries, its config — so a reader of the
  * export sees the same declared facts the graders were shown, without the
  * picture.
@@ -32,13 +32,18 @@ export function diagramMarkdown(graph: CanvasGraph): string {
     return `${lines.join('\n')}\n`;
   }
   const labels = new Map(graph.nodes.map((node) => [node.id, nodeLabel(node)]));
-  lines.push('## Blocks', '', '| Block | Role | Service | Config |', '| --- | --- | --- | --- |');
+  lines.push(
+    '## Blocks',
+    '',
+    '| Block | Role | Service | Boundary | Config |',
+    '| --- | --- | --- | --- | --- |',
+  );
   for (const node of graph.nodes) {
     const service = node.service === undefined ? null : platformServiceById(node.service);
     lines.push(
       `| ${markdownCell(nodeLabel(node))} | ${DEFAULT_NODE_LABELS[node.kind]} | ${
         service === null ? '—' : markdownCell(service.service.label)
-      } | ${configCell(node.config)} |`,
+      } | ${node.boundary === undefined ? '—' : markdownCell(node.boundary)} | ${configCell(node.config)} |`,
     );
   }
   lines.push('', '## Connections', '');

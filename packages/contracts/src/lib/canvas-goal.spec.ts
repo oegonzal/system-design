@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import { renderCanvasGoal } from './canvas-goal';
+import { CANVAS_VOCABULARY_HEADING, renderCanvasVocabularySection } from './canvas-vocabulary';
 import {
   LIFECYCLE_SECTION_HEADING,
   LIFECYCLE_STAGES,
@@ -15,10 +16,12 @@ const MARKDOWN =
   '# Design a thing\n\n## Scenario\n\nYou run a shop.\n\n## Functional requirements\n\n1. Sell.\n';
 
 describe('renderCanvasGoal', () => {
-  it('[GEN-8] is the prompt closed by the request lifecycle for a platform-neutral prompt, and no catalogue', () => {
+  it('[GEN-8] [GEN-9] is the prompt closed by the canvas vocabulary and the request lifecycle for a platform-neutral prompt, and no catalogue', () => {
     // Exactly this composition: a run is keyed by its goal, and the e2e scripts one by the same function.
     const goal = renderCanvasGoal({ markdown: MARKDOWN, platform: null });
-    expect(goal).toBe(`${MARKDOWN.trimEnd()}\n\n${renderLifecycleSection(null)}`);
+    expect(goal).toBe(
+      `${MARKDOWN.trimEnd()}\n\n${renderCanvasVocabularySection()}\n\n${renderLifecycleSection(null)}`,
+    );
     expect(goal).not.toContain(PLATFORM_SECTION_HEADING);
   });
 
@@ -28,6 +31,11 @@ describe('renderCanvasGoal', () => {
     expect(goal.startsWith(MARKDOWN.trimEnd())).toBe(true);
     expect(goal.split(PLATFORM_SECTION_HEADING)).toHaveLength(2);
     expect(goal.indexOf(PLATFORM_SECTION_HEADING)).toBeGreaterThan(MARKDOWN.indexOf('Sell.'));
+    // [GEN-9] The vocabulary stands between the prompt and the catalogue, once.
+    expect(goal.split(CANVAS_VOCABULARY_HEADING)).toHaveLength(2);
+    expect(goal.indexOf(CANVAS_VOCABULARY_HEADING)).toBeLessThan(
+      goal.indexOf(PLATFORM_SECTION_HEADING),
+    );
     for (const service of platformCatalogue(platform).services) {
       expect(goal).toContain(`\`${service.id}\``);
     }

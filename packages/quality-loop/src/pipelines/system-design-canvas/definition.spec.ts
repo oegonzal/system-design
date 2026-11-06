@@ -114,10 +114,11 @@ describe('the system-design-canvas pipeline', () => {
       (kind) => criterionKinds[kind].dimension === 'reasoning',
     );
     expect(reasoningKinds).toEqual(['tradeoff']);
-    // The standing criteria earn reasoning (the trade-off rows) and design (the communication rows).
+    // The standing criteria earn reasoning (the trade-off rows), design (the communication rows) and qualities (the operations row).
     expect(new Set(CANVAS_STANDING_CRITERIA.map((c) => criterionKinds[c.kind].dimension))).toEqual(
-      new Set(['reasoning', 'design']),
+      new Set(['reasoning', 'design', 'qualities']),
     );
+    expect(owners.get('placement_defect')).toEqual(['critic.structure']);
     expect(criterionKinds.communication.dimension).toBe('design');
     const judgeOf = (kind: string) =>
       SYSTEM_DESIGN_CANVAS.evaluators.find((evaluator) => evaluator.criterionKinds.includes(kind))

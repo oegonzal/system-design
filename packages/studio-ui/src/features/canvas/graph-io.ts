@@ -50,6 +50,9 @@ export function toCanvasGraph(nodes: SdNode[], edges: SdEdge[]): CanvasGraph {
       position: { x: Math.round(node.position.x), y: Math.round(node.position.y) },
     };
     if (node.data.service !== undefined) out.service = node.data.service;
+    if (node.data.boundary !== undefined && node.data.boundary.trim().length > 0) {
+      out.boundary = node.data.boundary;
+    }
     // Every list serializes only when non-empty, so an emptied editor never
     // leaves an `operations: []` key rattling around the wire.
     if (node.data.config && node.data.config.length > 0) {
@@ -103,6 +106,7 @@ export function fromCanvasGraph(graph: CanvasGraph): { nodes: SdNode[]; edges: S
       kind: node.kind,
       ...(node.service !== undefined ? { service: node.service } : {}),
       label: node.label,
+      ...(node.boundary !== undefined ? { boundary: node.boundary } : {}),
       ...(node.config ? { config: node.config.map((entry) => ({ ...entry })) } : {}),
       ...(node.responsibilities ? { responsibilities: [...node.responsibilities] } : {}),
       ...(node.operations

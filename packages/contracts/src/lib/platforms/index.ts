@@ -5,6 +5,7 @@
 export {
   isPlatformId,
   PLATFORM_IDS,
+  type PlatformBoundary,
   type PlatformCatalogue,
   type PlatformCategory,
   type PlatformId,

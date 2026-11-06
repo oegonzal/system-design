@@ -1,7 +1,7 @@
 import type { PlatformService } from '../service';
 import type { AwsCategoryId } from './categories';
 
-/** Where code runs, and how a request reaches it. */
+/** Where code runs, and how traffic reaches it and networks reach each other. */
 export const COMPUTE_AND_NETWORKING = [
   {
     id: 'aws.ec2',
@@ -201,5 +201,49 @@ export const COMPUTE_AND_NETWORKING = [
       'Many services in many VPCs that must find and authorise each other without a mesh to operate.',
     knobs: ['serviceNetwork', 'authPolicy', 'tls', 'retries', 'timeouts', 'healthCheck'],
     aliases: ['mesh', 'service network', 'service mesh'],
+  },
+  {
+    id: 'aws.privatelink',
+    label: 'PrivateLink',
+    category: 'networking',
+    roles: ['private-endpoint'],
+    what: 'VPC endpoints that reach AWS services and your own services over the private network — no internet gateway, no public address.',
+    whenToUse:
+      'A store or a managed service called from private subnets; a service offered to other accounts without exposing it.',
+    knobs: ['endpointType', 'services', 'policy', 'privateDns', 'crossAccount', 'acceptance'],
+    aliases: ['vpc endpoint', 'private endpoint', 'privatelink', 'endpoint service'],
+  },
+  {
+    id: 'aws.transit-gateway',
+    label: 'Transit Gateway',
+    category: 'networking',
+    roles: ['network-hub'],
+    what: 'A regional hub routing between VPCs, accounts, regions and premises over Direct Connect or VPN, with a route table per attachment.',
+    whenToUse:
+      'Many VPCs that must reach each other, or a data-centre link: hub-and-spoke instead of a mesh of peerings.',
+    knobs: ['attachments', 'routeTables', 'peering', 'directConnect', 'vpn', 'multicast'],
+    aliases: ['tgw', 'hub', 'direct connect', 'vpn', 'peering'],
+  },
+  {
+    id: 'aws.cloud-map',
+    label: 'Cloud Map',
+    category: 'networking',
+    roles: ['service-discovery'],
+    what: 'A service registry: names resolved by DNS or API to healthy instances as they register and deregister.',
+    whenToUse:
+      'Containers and functions calling each other on changing addresses; ECS registers tasks into it on its own.',
+    knobs: ['namespace', 'discoveryType', 'healthChecks', 'ttlSeconds', 'attributes'],
+    aliases: ['service discovery', 'registry', 'namespace', 'cloud map'],
+  },
+  {
+    id: 'aws.global-accelerator',
+    label: 'Global Accelerator',
+    category: 'networking',
+    roles: ['load-balancer'],
+    what: 'Two anycast static IPs at the edge routing to the nearest healthy regional endpoint, with health-based failover in seconds.',
+    whenToUse:
+      'Multi-region entry with static addresses, or TCP and UDP traffic that must avoid the public internet path.',
+    knobs: ['staticIps', 'endpointGroups', 'trafficDials', 'healthChecks', 'clientAffinity'],
+    aliases: ['anycast', 'static ip', 'global', 'accelerator'],
   },
 ] as const satisfies readonly PlatformService<AwsCategoryId>[];

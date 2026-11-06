@@ -21,6 +21,7 @@ import { Button, Heading, SelectField, Stack, Text, TextField } from '@sysdesign
 import { useCanvasStore } from '../canvas-store-context';
 import { CANVAS_COPY } from '../copy';
 import { catalogueFor, serviceOf } from '../platform-services';
+import { BoundaryField } from './boundary-field';
 import { ConfigEditor } from './config-editor';
 import { EdgeCarriesField } from './edge-carries-field';
 import { OperationsEditor } from './operations-editor';
@@ -191,6 +192,14 @@ export function PropertiesPanel({ className, catalogue = null }: PropertiesPanel
                 </Text>
               </Stack>
             ) : null}
+
+            <BoundaryField
+              value={node.data.boundary ?? ''}
+              boundaries={catalogue?.boundaries ?? []}
+              onChange={(boundary) =>
+                updateNode(node.id, { boundary: boundary.length === 0 ? null : boundary })
+              }
+            />
 
             <Stack gap={2} data-testid="config-section">
               <Heading level={3}>Configuration</Heading>

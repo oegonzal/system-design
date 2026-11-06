@@ -36,6 +36,27 @@ const nodeOf = (store: CanvasStore, id: string) =>
   store.getState().nodes.find((node) => node.id === id)?.data;
 
 describe('PropertiesPanel on a platform', () => {
+  it('[UX-33] offers the platform’s boundaries as chips that fill the boundary field, keeps what the author adds, and clears it when emptied', async () => {
+    const store = renderPanel(makePlatformGraph(), 'n-2');
+    for (const boundary of aws.boundaries) {
+      expect(screen.getByTestId(`boundary-hint-${boundary.id}`).textContent).toBe(boundary.label);
+    }
+    await userEvent.click(screen.getByTestId('boundary-hint-private-subnet'));
+    expect(nodeOf(store, 'n-2')?.boundary).toBe('private subnet');
+    await userEvent.click(screen.getByTestId('boundary-hint-security-group'));
+    expect(nodeOf(store, 'n-2')?.boundary).toBe('private subnet · security group');
+    await userEvent.type(screen.getByLabelText('Boundary'), ' sg-app');
+    expect(nodeOf(store, 'n-2')?.boundary).toBe('private subnet · security group sg-app');
+    await userEvent.clear(screen.getByLabelText('Boundary'));
+    expect(nodeOf(store, 'n-2')?.boundary).toBeUndefined();
+  });
+
+  it('[UX-33] offers no chips on a neutral prompt, and the field alone', () => {
+    renderPanel(makeGraph(), 'n-2', null);
+    expect(screen.queryByTestId('boundary-hints')).toBeNull();
+    expect(screen.getByLabelText('Boundary')).toBeTruthy();
+  });
+
   it('[UX-31] offers the catalogue’s services by shelf, with none first, and shows the named service’s own guide', () => {
     renderPanel(makePlatformGraph(), 'n-4');
     const select = screen.getByTestId('service-select') as HTMLSelectElement;

@@ -223,6 +223,21 @@ export const STUDIO_CRITERIA: readonly Criterion[] = [
     statement:
       'Every canvas goal closes with the request lifecycle section — the entries, the stages with the blocks, hop keys and, on a platform, the catalogue services that serve each, and the resting roles — after the platform section where there is one; the generator and the deriver word each request-path row from where the request enters to where it comes to rest; and a scripted run is keyed by the goal as the studio composes it.',
   },
+  {
+    id: 'UX-33',
+    statement:
+      'A production system can be drawn whole: the canvas offers roles for how it is built and shipped (a code repository, a build service, a deployment pipeline and service, an artifact registry, infrastructure as code), how networks reach each other (a private endpoint, a network hub, service discovery), what watches for compromise and drift and what backs up; a platform shelves its services for each; and every block may declare the boundary it sits in — a region, an account, a network, a subnet, a security group — in the platform’s own words, offered as chips, printed to the graders and the export.',
+  },
+  {
+    id: 'EVAL-8',
+    statement:
+      'Operations and placement are graded: a standing evolution row on every rubric asks how each deployable is built, delivered, rolled out and back, what observes it and what backs up its data, judged by the qualities evaluator; the structure critic owns a placement defect for a block sitting where the scenario does not allow it to be reached; and the migration that appended the row holds the contract’s statement byte for byte.',
+  },
+  {
+    id: 'GEN-9',
+    statement:
+      'Every canvas goal carries the canvas vocabulary — each role a block may play, shelf by shelf, in the guide’s own words, and the keys a hop is offered — between the prompt and the platform section, and a platform section closes with the boundaries a block may name, so every lens reads a kind and a boundary by the definition the author drew from.',
+  },
   // STAR repository
   {
     id: 'STAR-1',

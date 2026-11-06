@@ -27,6 +27,7 @@ export * from './lib/canvas';
 export * from './lib/platforms';
 export * from './lib/canvas.schema';
 export * from './lib/canvas-goal';
+export * from './lib/canvas-vocabulary';
 export * from './lib/lifecycle';
 export * from './lib/model.schema';
 export * from './lib/practice-formats';

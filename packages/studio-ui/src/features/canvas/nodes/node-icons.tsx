@@ -95,6 +95,33 @@ export const NODE_ICONS = {
       <circle cx="11.5" cy="11.5" r="2" />
     </svg>
   ),
+  /* A tunnel: a door inside a wall, nothing on the outside. */
+  'private-endpoint': (
+    <svg {...svgProps}>
+      <rect x="2" y="2.5" width="12" height="11" rx="1.3" />
+      <path d="M5.5 13.5V8a2.5 2.5 0 0 1 5 0v5.5" />
+      <path d="M8 10.5v1.5" />
+    </svg>
+  ),
+  /* A hub joined to four spokes. */
+  'network-hub': (
+    <svg {...svgProps}>
+      <circle cx="8" cy="8" r="2" />
+      <circle cx="3" cy="3" r="1.3" />
+      <circle cx="13" cy="3" r="1.3" />
+      <circle cx="3" cy="13" r="1.3" />
+      <circle cx="13" cy="13" r="1.3" />
+      <path d="M4 4l2.6 2.6M12 4L9.4 6.6M4 12l2.6-2.6M12 12 9.4 9.4" />
+    </svg>
+  ),
+  /* A directory: a magnifier over a list. */
+  'service-discovery': (
+    <svg {...svgProps}>
+      <path d="M3 4h6M3 7h4M3 10h3" />
+      <circle cx="10.5" cy="9.5" r="2.5" />
+      <path d="m12.3 11.3 2 2" />
+    </svg>
+  ),
   service: (
     <svg {...svgProps}>
       <rect x="2.5" y="2.5" width="11" height="11" rx="2" />
@@ -175,6 +202,15 @@ export const NODE_ICONS = {
     <svg {...svgProps}>
       <path d="M2.5 5.5h4l1.5 1.5h5.5v5.5h-11z" />
       <path d="M2.5 5.5V4h3.5" />
+    </svg>
+  ),
+  /* A stack of discs with a clock hand: restore points in time. */
+  'backup-service': (
+    <svg {...svgProps}>
+      <ellipse cx="7" cy="4" rx="4.5" ry="1.8" />
+      <path d="M2.5 4v4.5c0 1 2 1.8 4.5 1.8" />
+      <circle cx="11.5" cy="11" r="2.8" />
+      <path d="M11.5 9.5V11l1.1.8" />
     </svg>
   ),
   cache: (
@@ -297,6 +333,57 @@ export const NODE_ICONS = {
       <circle cx="10" cy="10.5" r="1.9" />
     </svg>
   ),
+  /* A branch: a trunk with a side commit. */
+  'code-repository': (
+    <svg {...svgProps}>
+      <circle cx="5" cy="3.5" r="1.5" />
+      <circle cx="5" cy="12.5" r="1.5" />
+      <circle cx="11" cy="6" r="1.5" />
+      <path d="M5 5v6M11 7.5c0 2.5-6 1.5-6 4" />
+    </svg>
+  ),
+  /* Gears: a change worked into an artifact. */
+  'build-service': (
+    <svg {...svgProps}>
+      <circle cx="6.5" cy="8" r="2.2" />
+      <path d="M6.5 3.8v1.4M6.5 10.8v1.4M2.3 8h1.4M9.3 8h1.4M3.5 5l1 1M8.5 10l1 1M3.5 11l1-1M8.5 6l1-1" />
+      <rect x="10.5" y="9.5" width="3.5" height="3.5" rx="0.8" />
+    </svg>
+  ),
+  /* Stages in a row, each handing on to the next. */
+  'deployment-pipeline': (
+    <svg {...svgProps}>
+      <rect x="1.5" y="6" width="3" height="4" rx="0.8" />
+      <rect x="6.5" y="6" width="3" height="4" rx="0.8" />
+      <rect x="11.5" y="6" width="3" height="4" rx="0.8" />
+      <path d="M4.5 8h2M9.5 8h2" />
+    </svg>
+  ),
+  /* An arrow landing on a fleet, with a way back. */
+  'deployment-service': (
+    <svg {...svgProps}>
+      <path d="M8 2.5v6M5.8 6.3 8 8.5l2.2-2.2" />
+      <rect x="2.5" y="10.5" width="3" height="3" rx="0.6" />
+      <rect x="6.5" y="10.5" width="3" height="3" rx="0.6" />
+      <rect x="10.5" y="10.5" width="3" height="3" rx="0.6" />
+    </svg>
+  ),
+  /* Boxes on a shelf: versions kept. */
+  'artifact-registry': (
+    <svg {...svgProps}>
+      <rect x="2" y="8.5" width="5" height="5" rx="0.8" />
+      <rect x="9" y="8.5" width="5" height="5" rx="0.8" />
+      <rect x="5.5" y="2.5" width="5" height="5" rx="0.8" />
+      <path d="M2 13.5h12" />
+    </svg>
+  ),
+  /* A template: angle brackets over a block. */
+  'infrastructure-as-code': (
+    <svg {...svgProps}>
+      <path d="m5 3.5-2.5 2.5L5 8.5M11 3.5l2.5 2.5L11 8.5" />
+      <rect x="4" y="10.5" width="8" height="3" rx="0.8" />
+    </svg>
+  ),
   /* A person, verified. */
   'auth-service': (
     <svg {...svgProps}>
@@ -335,6 +422,22 @@ export const NODE_ICONS = {
       <rect x="3" y="7" width="10" height="7" rx="1.3" />
       <path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2" />
       <path d="m6.3 10.5 1.3 1.3 2.3-2.3" />
+    </svg>
+  ),
+  /* A clipboard with a check and a line. */
+  'compliance-service': (
+    <svg {...svgProps}>
+      <rect x="3.5" y="3" width="9" height="11" rx="1.2" />
+      <path d="M6 2.5h4v2H6z" />
+      <path d="m5.8 8.5 1.4 1.4 2.6-2.6M5.8 12h4.4" />
+    </svg>
+  ),
+  /* An eye watching from a shield. */
+  'threat-detection': (
+    <svg {...svgProps}>
+      <path d="M8 1.5l5 1.8v4.2c0 3.3-2.2 5.3-5 6.3-2.8-1-5-3-5-6.3V3.3z" />
+      <path d="M4.5 8c1-1.6 2.2-2.4 3.5-2.4S10.5 6.4 11.5 8c-1 1.6-2.2 2.4-3.5 2.4S5.5 9.6 4.5 8z" />
+      <circle cx="8" cy="8" r="1" />
     </svg>
   ),
   /* A speedometer: the dial the operators watch. */

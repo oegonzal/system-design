@@ -18,12 +18,16 @@ const ROWS: Readonly<Record<string, readonly (typeof CANVAS_STANDING_CRITERIA)[n
   ),
   'Migration20261105100002_append_communication_criteria_to_prompts.ts':
     CANVAS_STANDING_CRITERIA.slice(3, 5),
-  'Migration20261106100001_append_tracing_criterion_to_prompts.ts':
-    CANVAS_STANDING_CRITERIA.slice(5),
+  'Migration20261106100001_append_tracing_criterion_to_prompts.ts': CANVAS_STANDING_CRITERIA.slice(
+    5,
+    6,
+  ),
+  'Migration20261106100002_append_operations_criterion_to_prompts.ts':
+    CANVAS_STANDING_CRITERIA.slice(6),
 };
 
 describe('the standing-criteria migrations', () => {
-  it('[EVAL-7] each carries its rows of the contract byte for byte, and no other row', () => {
+  it('[EVAL-7] [EVAL-8] each carries its rows of the contract byte for byte, and no other row', () => {
     expect(Object.values(ROWS).flat()).toEqual([...CANVAS_STANDING_CRITERIA]);
     for (const [file, rows] of Object.entries(ROWS)) {
       const text = readFileSync(new URL(`./migrations/${file}`, import.meta.url), 'utf8');

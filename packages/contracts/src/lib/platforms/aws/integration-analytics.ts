@@ -1,7 +1,7 @@
 import type { PlatformService } from '../service';
 import type { AwsCategoryId } from './categories';
 
-/** How parts talk, and how data is moved and analysed in bulk. */
+/** How parts talk asynchronously, and how data moves and is analysed. */
 export const INTEGRATION_AND_ANALYTICS = [
   {
     id: 'aws.sqs',
@@ -103,6 +103,46 @@ export const INTEGRATION_AND_ANALYTICS = [
       'templates',
     ],
     aliases: ['email', 'mail'],
+  },
+  {
+    id: 'aws.mq',
+    label: 'Amazon MQ',
+    category: 'integration',
+    roles: ['queue', 'pub-sub'],
+    what: 'Managed ActiveMQ and RabbitMQ brokers: AMQP, MQTT, STOMP and JMS as they are, with multi-AZ failover.',
+    whenToUse:
+      'An application that already speaks a broker protocol and must not be rewritten for SQS or SNS.',
+    knobs: [
+      'engine',
+      'deploymentMode',
+      'instanceType',
+      'protocols',
+      'storage',
+      'maintenanceWindow',
+    ],
+    aliases: ['activemq', 'rabbitmq', 'amqp', 'broker', 'jms'],
+  },
+  {
+    id: 'aws.iot-core',
+    label: 'IoT Core',
+    category: 'integration',
+    roles: ['pub-sub'],
+    what: 'An MQTT broker for devices with a registry, shadows, and rules that route messages to streams, queues and functions.',
+    whenToUse:
+      'Fleets of devices publishing telemetry and taking commands over MQTT, each with its own certificate.',
+    knobs: ['topics', 'rules', 'deviceShadows', 'registry', 'certificates', 'qos'],
+    aliases: ['mqtt', 'devices', 'telemetry', 'iot'],
+  },
+  {
+    id: 'aws.mwaa',
+    label: 'Managed Workflows for Apache Airflow',
+    category: 'integration',
+    roles: ['workflow-engine', 'scheduler'],
+    what: 'Managed Apache Airflow: DAGs scheduled and run on managed workers, with the Airflow UI and logs in CloudWatch.',
+    whenToUse:
+      'Data pipelines already written as Airflow DAGs, or batch orchestration with many dependent steps and operators.',
+    knobs: ['environmentClass', 'workers', 'schedulers', 'dagsLocation', 'airflowVersion'],
+    aliases: ['airflow', 'dags', 'orchestration', 'mwaa'],
   },
   {
     id: 'aws.kinesis-data-streams',
@@ -211,5 +251,16 @@ export const INTEGRATION_AND_ANALYTICS = [
       'queryLimits',
     ],
     aliases: ['sql on s3', 'query', 'presto', 'trino'],
+  },
+  {
+    id: 'aws.emr',
+    label: 'EMR',
+    category: 'analytics',
+    roles: ['batch-job', 'stream-processor'],
+    what: 'Managed Spark, Hive and Flink clusters — on EC2, EKS or serverless — over data in S3, sized per job and torn down after.',
+    whenToUse:
+      'Large batch or streaming transforms that outgrow Glue, or code that already runs on Spark.',
+    knobs: ['deploymentMode', 'instanceFleets', 'spot', 'autoScaling', 'releaseLabel', 'steps'],
+    aliases: ['spark', 'hadoop', 'hive', 'emr'],
   },
 ] as const satisfies readonly PlatformService<AwsCategoryId>[];

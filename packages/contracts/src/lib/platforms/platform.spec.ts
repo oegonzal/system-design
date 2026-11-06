@@ -73,6 +73,26 @@ describe('the platform catalogues', () => {
 });
 
 describe('renderPlatformSection', () => {
+  it('[UX-33] declares where a block may sit: boundaries with unique ids and labels, each explained within a line, and renders them last', () => {
+    for (const platform of PLATFORM_IDS) {
+      const catalogue = platformCatalogue(platform);
+      expect(catalogue.boundaries.length).toBeGreaterThan(0);
+      expect(new Set(catalogue.boundaries.map((b) => b.id)).size).toBe(catalogue.boundaries.length);
+      expect(new Set(catalogue.boundaries.map((b) => b.label)).size).toBe(
+        catalogue.boundaries.length,
+      );
+      for (const boundary of catalogue.boundaries) {
+        expect(boundary.what.length).toBeLessThanOrEqual(MAX_LINE);
+      }
+      const section = renderPlatformSection(catalogue);
+      const at = section.indexOf('### Boundaries');
+      expect(at).toBeGreaterThan(0);
+      for (const boundary of catalogue.boundaries) {
+        expect(section.slice(at)).toContain(`- ${boundary.label} — ${boundary.what}`);
+      }
+    }
+  });
+
   it('[GEN-7] writes the heading, the framing, one shelf per category and one line per service with its id, roles as names, what it is and its knobs', () => {
     const catalogue = platformCatalogue(PLATFORM_IDS[0]);
     const section = renderPlatformSection(catalogue);

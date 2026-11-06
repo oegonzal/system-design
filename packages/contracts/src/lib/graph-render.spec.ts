@@ -147,3 +147,19 @@ describe('renderEdgeLine', () => {
     );
   });
 });
+
+describe('a block’s boundary', () => {
+  it('[UX-33] prints after the label, quoted, and nothing when none is set', () => {
+    expect(
+      renderNodeLine({
+        id: 'n-4',
+        kind: 'database',
+        label: 'Orders DB',
+        boundary: 'private subnet',
+      }),
+    ).toBe('  node n-4 kind=database label="Orders DB" boundary="private subnet"');
+    expect(renderNodeLine({ id: 'n-4', kind: 'database', label: 'Orders DB' })).toBe(
+      '  node n-4 kind=database label="Orders DB"',
+    );
+  });
+});

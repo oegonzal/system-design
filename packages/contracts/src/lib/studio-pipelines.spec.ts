@@ -33,7 +33,7 @@ describe('the standing criteria', () => {
     { kind: 'scale', statement: '150 requests per second at peak.' },
   ];
 
-  it('[EVAL-4] [EVAL-6] [EVAL-7] are three trade-off rows then three communication rows, of declared kind and within the statement bound, closing every rubric after the prompt’s own rows', () => {
+  it('[EVAL-4] [EVAL-6] [EVAL-7] [EVAL-8] are three trade-off rows, three communication rows and one evolution row, of declared kind and within the statement bound, closing every rubric after the prompt’s own rows', () => {
     for (const criterion of [...CANVAS_STANDING_CRITERIA, ...PLATFORM_STANDING_CRITERIA]) {
       expect(CANVAS_CRITERION_KINDS).toContain(criterion.kind);
       expect(criterion.statement.length).toBeLessThanOrEqual(CRITERION_STATEMENT_BOUND.target);
@@ -45,6 +45,7 @@ describe('the standing criteria', () => {
       'communication',
       'communication',
       'communication',
+      'evolution',
     ]);
     expect(withStandingCriteria(own, null).map((c) => `${c.id}:${c.kind}`)).toEqual([
       'c1:functional',
@@ -55,6 +56,7 @@ describe('the standing criteria', () => {
       'c6:communication',
       'c7:communication',
       'c8:communication',
+      'c9:evolution',
     ]);
   });
 
@@ -76,9 +78,10 @@ describe('the standing criteria', () => {
       'c6:communication',
       'c7:communication',
       'c8:communication',
-      'c9:constraint',
+      'c9:evolution',
+      'c10:constraint',
     ]);
-    expect(rubric[8].statement).toBe(PLATFORM_STANDING_CRITERIA[0].statement);
+    expect(rubric[9].statement).toBe(PLATFORM_STANDING_CRITERIA[0].statement);
   });
 
   it('[EVAL-4] never pass the pipeline’s cap: a prompt whose rows would crowd them out keeps its first rows, with or without a platform', () => {

@@ -3,11 +3,12 @@ import type { ConfigEntry, NodeKind, NodeOperation, PlatformServiceId } from '@s
 import { serviceOf } from '../platform-services';
 import type { SdNodeData } from '../types';
 
-/** What an author's edit may change on a block; `service: null` takes the service off. */
+/** What an author's edit may change on a block; `service: null` takes the service off, `boundary: null` the boundary. */
 export interface NodePatch {
   label?: string;
   kind?: NodeKind;
   service?: PlatformServiceId | null;
+  boundary?: string | null;
   config?: ConfigEntry[];
   responsibilities?: string[];
   operations?: NodeOperation[];
@@ -25,8 +26,10 @@ const plays = (service: PlatformServiceId, kind: NodeKind): boolean =>
  * control has to know it.
  */
 export function patchedNodeData(data: SdNodeData, patch: NodePatch): SdNodeData {
-  const { service: askedService, kind: askedKind, ...rest } = patch;
-  const { service: current, ...kept } = { ...data, ...rest };
+  const { service: askedService, kind: askedKind, boundary: askedBoundary, ...rest } = patch;
+  const { service: current, boundary: currentBoundary, ...placed } = { ...data, ...rest };
+  const boundary = askedBoundary === null ? undefined : (askedBoundary ?? currentBoundary);
+  const kept = boundary === undefined ? placed : { ...placed, boundary };
   const kind = askedKind ?? kept.kind;
   if (askedService === null) return { ...kept, kind };
   const service = askedService ?? current;

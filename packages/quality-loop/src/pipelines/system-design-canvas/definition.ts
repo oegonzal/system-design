@@ -43,9 +43,15 @@
  *    every path and a warn validator lists what is absent, so a lens judges
  *    whether an absence is a defect here and never whether it is there.
  *    Where the goal declares a platform and its catalogue, every lens reads a
- *    component as the service it names and a hop as an integration that
- *    platform offers: one shared paragraph (`lenses/platform.md`) says so in
- *    the shape of the work, and no lens knows a vendor by name.
+ *    component as the service it names, a hop as an integration that
+ *    platform offers and a block's boundary as where the platform lets it
+ *    sit: one shared paragraph (`lenses/platform.md`) says so in the shape of
+ *    the work, and no lens knows a vendor by name. The goal's canvas
+ *    vocabulary defines every role a block may play, so a lens reads a kind
+ *    by the author's own definition.
+ * 5. Operations are a quality of the design: the standing evolution row asks
+ *    how it is built, delivered, rolled out and back, observed and backed up,
+ *    and the delivery, observability and backup roles are what answers it.
  *
  * The studio always provides the artifact, so the producer is the coach: it
  * runs on revise only — the controller never decides retry, because a fresh
@@ -85,7 +91,7 @@ const onPlatform = (persona: string): string => `${persona.trim()}\n\n${platform
 export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   id: CANVAS_PIPELINE_ID,
 
-  version: '2.2.0',
+  version: '2.3.0',
 
   // A goal another program composes; never a route, a target, or a choice in the UI.
 
@@ -198,6 +204,9 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
 
       tracing_gap:
         'A request from outside whose path shows no block or hop for a stage of its way in — name resolution, transport security, edge protection, the access layer, identity — where the goal’s scenario needs it; a traced path that ends where the request is still in flight; or a component a request reaches that no traced path lands on; and nothing says why.',
+
+      placement_defect:
+        'A block placed where the goal’s scenario does not allow it to be reached — a store or a worker in a boundary open to the outside, an entry point with nothing protecting it in its boundary — or a block with no boundary at all where the platform offers them and the scenario needs one.',
     } satisfies Record<CanvasFindingType, string>,
     maxCriteria: CANVAS_MAX_CRITERIA,
     // The transcript is the host's record of the interview — composed by the
@@ -265,7 +274,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       samples: 2,
       maxItems: 10,
       maxTokens: 32000,
-      findingTypes: ['boundary_defect', 'workflow_gap', 'topology_defect'],
+      findingTypes: ['boundary_defect', 'workflow_gap', 'topology_defect', 'placement_defect'],
     },
     {
       id: 'critic.communication',
@@ -404,6 +413,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       integration_misfit: { dimension: 'design', gate: false },
       service_misfit: { dimension: 'design', gate: false },
       tracing_gap: { dimension: 'design', gate: false },
+      placement_defect: { dimension: 'design', gate: false },
     } satisfies Record<CanvasFindingType, { dimension: string; gate: boolean }>,
 
     ...STANDARD_SCORING,

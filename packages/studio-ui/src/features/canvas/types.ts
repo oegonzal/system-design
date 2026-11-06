@@ -21,6 +21,8 @@ export type SdNodeData = {
   /** The platform service the block is, when it names one; `kind` is one of its roles. */
   service?: PlatformServiceId;
   label: string;
+  /** Where the block sits — a region, an account, a network, a subnet, a security group — in the platform's words. */
+  boundary?: string;
   config?: ConfigEntry[];
   responsibilities?: string[];
   operations?: NodeOperation[];

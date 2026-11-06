@@ -69,6 +69,21 @@ export const NODE_KIND_GUIDE = {
     whenToUse:
       'Many services with strict security or reliability needs — overkill for a two-service design.',
   },
+  'private-endpoint': {
+    what: 'A private path to a service across network boundaries — no public internet and no public address on the way.',
+    whenToUse:
+      'A store or a managed service reached from a private network; calls across accounts or networks without exposure.',
+  },
+  'network-hub': {
+    what: 'Joins networks — several private networks, regions, an office or data centre — through one routed hub.',
+    whenToUse:
+      'Many networks that must reach each other, or a link to premises; a hub rather than a mesh of peerings.',
+  },
+  'service-discovery': {
+    what: 'A registry where services find each other by name as their instances come and go.',
+    whenToUse:
+      'Several services on changing addresses — containers, functions — calling each other without hard-coded hosts.',
+  },
   // ── Compute
   service: {
     what: 'One deployable owning one responsibility and exposing it as a contract — the commands, queries and events it declares.',
@@ -128,6 +143,11 @@ export const NODE_KIND_GUIDE = {
     what: 'A shared file system many instances, containers and functions mount at once — files by path, not objects by key.',
     whenToUse:
       'Workers that must all read and write the same files mid-processing; never the place a record of truth lives.',
+  },
+  'backup-service': {
+    what: 'Takes and keeps restore points of stores on a schedule, with a retention and a restore path that is actually tried.',
+    whenToUse:
+      'Any data the business cannot re-create: backups with a retention and a drill, apart from replication.',
   },
   // ── Caching
   cache: {
@@ -206,6 +226,36 @@ export const NODE_KIND_GUIDE = {
     what: 'Central runtime configuration and feature flags, changed without a deploy.',
     whenToUse: 'Kill switches, gradual rollouts, per-tenant settings.',
   },
+  // ── Build & Deploy
+  'code-repository': {
+    what: 'Where the source lives and a change is reviewed and merged — the trigger of every delivery.',
+    whenToUse:
+      'Any system that is deployed: name where the code comes from, so the pipeline has something to start from.',
+  },
+  'build-service': {
+    what: 'Compiles, tests and packages a change into an artifact — an image, a bundle, a template — on every merge.',
+    whenToUse:
+      'Every deployable: a build nobody runs by hand, producing the one artifact the pipeline deploys everywhere.',
+  },
+  'deployment-pipeline': {
+    what: 'Carries a change stage by stage — build, test, approve, deploy — through one definition the whole team ships by.',
+    whenToUse:
+      'More than one deployable or environment, or a release that needs gates, approvals or an order.',
+  },
+  'deployment-service': {
+    what: 'Rolls an artifact out to compute — blue/green, canary, rolling — and rolls it back when the health checks fail.',
+    whenToUse:
+      'Any service with users on it: a rollout that can stop and reverse itself beats a redeploy by hand.',
+  },
+  'artifact-registry': {
+    what: 'Stores versioned, scanned build artifacts — container images, packages — that compute pulls at deploy time.',
+    whenToUse: 'Containers or shared packages: the registry is where the immutable versions live.',
+  },
+  'infrastructure-as-code': {
+    what: 'Declares the infrastructure as versioned templates a tool applies, so every environment is reproducible and reviewed.',
+    whenToUse:
+      'Any environment built more than once: staging and production from one definition, drift caught at review.',
+  },
   // ── Identity & Security
   'auth-service': {
     what: 'Owns identity: login, tokens, sessions, permissions — every protected call checks against it.',
@@ -231,6 +281,15 @@ export const NODE_KIND_GUIDE = {
     what: 'Decides what an authenticated caller may do — policies evaluated per request, apart from the code that serves it.',
     whenToUse:
       'Permissions shared across services or varying by tenant and resource; keep the rules in one place, not in every handler.',
+  },
+  'compliance-service': {
+    what: "Records every resource's configuration and checks it against rules, raising what drifts from them.",
+    whenToUse:
+      'Regulated or audited systems: proving encryption, logging and access rules hold over time, not once.',
+  },
+  'threat-detection': {
+    what: 'Watches logs, traffic and behaviour for compromise — misused credentials, scanning, malware — and raises findings.',
+    whenToUse: 'Anything internet-facing or holding sensitive data: detection beside prevention.',
   },
   // ── Observability
   monitoring: {

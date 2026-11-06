@@ -27,7 +27,7 @@ generated. It is data on the prompt; nothing in the studio branches on it.
   functional, domain model, interface, boundary, workflow, non-functional,
   scale, evolution, trade-off, constraint — each with an id (`c1`, `c2`, …)
   and its statement — communication among them: how the parts talk, hop by
-  hop. Six standing criteria close every rubric: three on trade-offs (every
+  hop. Seven standing criteria close every rubric: three on trade-offs (every
   load-bearing decision records an alternative and its cost, every binding
   that had a choice says why, the design's assumptions are stated) and three
   on communication (every hop declares its call style and mechanism and every
@@ -37,7 +37,9 @@ generated. It is data on the prompt; nothing in the studio branches on it.
   edge protection, the access layer, identity — every traced path comes to
   rest, and every component lies on or beside a traced path, as the goal's
   request lifecycle section declares and the Brief tab shows under each traced
-  path). A
+  path) and one on operations (how each deployable is built, delivered, rolled
+  out and back, what observes it, what backs up its data — answered with blocks
+  of the Build & Deploy, Observability and backup roles). A
   prompt that declares a **platform** adds one constraint: every component the
   platform offers a managed service for names it, and every hop between two
   services is an integration the platform offers. The platform shows beside

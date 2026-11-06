@@ -108,6 +108,11 @@ function SdNodeComponent({ id, data, selected }: NodeProps<SdNodeModel>) {
           {roleCount > 0 ? ` · ${roleCount} roles` : ''}
           {configCount > 0 ? ` · ${configCount} config` : ''}
         </Meta>
+        {data.boundary !== undefined ? (
+          <Meta title={data.boundary} data-testid={`node-boundary-${id}`}>
+            {`in ${data.boundary}`}
+          </Meta>
+        ) : null}
       </Body>
       <Handle type="source" position={Position.Bottom} />
     </Root>

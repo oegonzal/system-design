@@ -42,6 +42,7 @@ describe('prompts', () => {
         'c9:communication',
         'c10:communication',
         'c11:communication',
+        'c12:evolution',
       ]);
       expect(h.loop.criteriaRequests).toEqual([
         { pipeline: 'system-design-canvas', goal: AUTHORED_MARKDOWN },
@@ -66,9 +67,10 @@ describe('prompts', () => {
         'c9:communication',
         'c10:communication',
         'c11:communication',
-        'c12:constraint',
+        'c12:evolution',
+        'c13:constraint',
       ]);
-      expect(body.data.criteria[11]?.statement).toBe(PLATFORM_STANDING_CRITERIA[0].statement);
+      expect(body.data.criteria[12]?.statement).toBe(PLATFORM_STANDING_CRITERIA[0].statement);
       // The derivation read the markdown and nothing of the platform.
       expect(h.loop.criteriaRequests).toEqual([
         { pipeline: 'system-design-canvas', goal: AUTHORED_MARKDOWN },
@@ -145,6 +147,7 @@ describe('prompts', () => {
         'communication',
         'communication',
         'communication',
+        'evolution',
       ]);
     });
 
@@ -164,6 +167,7 @@ describe('prompts', () => {
         'communication',
         'communication',
         'communication',
+        'evolution',
       ]);
       const overridden = await call<GetPromptResponse>(`${h.url}/prompts/import`, {
         method: 'POST',
@@ -252,6 +256,7 @@ describe('prompts', () => {
         'c6',
         'c7',
         'c8',
+        'c9',
       ]);
       expect(h.loop.criteriaRequests).toHaveLength(2);
     });

@@ -30,6 +30,7 @@ import {
   NARRATIVE_DECISIONS_BOUND,
   NODE_CONFIG_KEYS_BOUND,
   NODE_KINDS,
+  NODE_BOUNDARY_BOUND,
   NODE_LABEL_BOUND,
   NODE_OPERATIONS_BOUND,
   NODE_RESPONSIBILITIES_BOUND,
@@ -109,6 +110,12 @@ export const canvasNodeSchema = z.strictObject({
       `The platform service this node is, by an id the goal's \`${PLATFORM_SECTION_HEADING}\` section lists; its kind must be one of the roles that section states for the service. Omit when the goal declares no platform.`,
     ),
   label: bounded.text(NODE_LABEL_BOUND),
+  /** Where the block sits — a region, an account, a network, a subnet, a security group — in the platform's words. */
+  boundary: bounded
+    .text(NODE_BOUNDARY_BOUND, {
+      description: `Where this block sits — a region, an account, a network, a subnet, a security group — as the goal's \`${PLATFORM_SECTION_HEADING}\` section names them under Boundaries; omit where placement is not the point.`,
+    })
+    .optional(),
   /** Canvas layout, so a stored revision re-renders where the author left it. */
   position: z
     .strictObject({ x: z.number(), y: z.number() })

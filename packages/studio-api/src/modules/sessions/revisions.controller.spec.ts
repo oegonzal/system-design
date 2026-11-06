@@ -81,6 +81,7 @@ describe('revisions', () => {
         'c9:fail',
         'c10:fail',
         'c11:fail',
+        'c12:fail',
       ]);
 
       // The terminal grade was written back: lists never fetch the loop.

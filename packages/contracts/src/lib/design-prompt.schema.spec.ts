@@ -241,6 +241,7 @@ describe('criteriaFromDraft', () => {
         'non_functional',
         'scale',
         'tradeoff',
+        'evolution',
         'constraint',
       ]),
     );

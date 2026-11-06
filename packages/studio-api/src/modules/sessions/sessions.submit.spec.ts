@@ -75,7 +75,8 @@ describe('sessions', () => {
       graph.edges[1] = { ...graph.edges[1], carries: ['CancelOrder'] };
       const brief: DesignBrief = {
         version: 1,
-        bindings: [{ criterionId: 'c11', nodeIds: ['nobody'], claim: 'bound to nothing' }],
+        // An id past every rubric a prompt can carry, standing rows included (`CANVAS_MAX_CRITERIA`).
+        bindings: [{ criterionId: 'c99', nodeIds: ['nobody'], claim: 'bound to nothing' }],
       };
       const narrative: DesignNarrative = {
         version: 1,
@@ -93,7 +94,7 @@ describe('sessions', () => {
         'unknown target node: ghost',
         'self-loop',
         'carries CancelOrder',
-        'unknown criterion: c11',
+        'unknown criterion: c99',
         'unknown node: nobody',
         'explains unknown node: ghost',
       ]) {

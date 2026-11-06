@@ -40,9 +40,18 @@ export interface PlatformService<C extends string = string> {
   readonly aliases: readonly string[];
 }
 
+/** Where a block may sit on the platform — a region, an account, a network, a subnet, a firewall — as a node's `boundary` names it. */
+export interface PlatformBoundary {
+  readonly id: string;
+  readonly label: string;
+  /** What the boundary is and what belongs inside it, one sentence (≤ 160 chars). */
+  readonly what: string;
+}
+
 export interface PlatformCatalogue<C extends string = string> {
   readonly id: PlatformId;
   readonly label: string;
   readonly categories: readonly PlatformCategory<C>[];
   readonly services: readonly PlatformService<C>[];
+  readonly boundaries: readonly PlatformBoundary[];
 }

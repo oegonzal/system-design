@@ -196,4 +196,26 @@ export const STORAGE_AND_DATABASE = [
     ],
     aliases: ['elasticsearch', 'search', 'vector', 'logs'],
   },
+  {
+    id: 'aws.memorydb',
+    label: 'MemoryDB',
+    category: 'database',
+    roles: ['kv-store', 'cache', 'distributed-lock'],
+    what: 'Redis-compatible in-memory store with a durable multi-AZ transaction log: microsecond reads, nothing lost on failover.',
+    whenToUse:
+      "A primary store that must answer in memory — sessions, leaderboards, counters — where a cache's loss would not do.",
+    knobs: ['nodeType', 'shards', 'replicasPerShard', 'snapshotRetention', 'acl', 'multiAz'],
+    aliases: ['redis', 'valkey', 'durable cache', 'memorydb'],
+  },
+  {
+    id: 'aws.keyspaces',
+    label: 'Keyspaces',
+    category: 'database',
+    roles: ['database'],
+    what: 'Serverless Apache Cassandra: CQL, wide rows, per-partition scale, point-in-time recovery, no cluster to run.',
+    whenToUse:
+      'Cassandra-shaped workloads — wide time-ordered rows, heavy writes — without the operations.',
+    knobs: ['capacityMode', 'ttl', 'pointInTimeRecovery', 'consistency', 'encryption'],
+    aliases: ['cassandra', 'cql', 'wide column', 'keyspaces'],
+  },
 ] as const satisfies readonly PlatformService<AwsCategoryId>[];

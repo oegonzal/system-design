@@ -10,6 +10,7 @@ export const AWS_CATEGORIES = [
   { id: 'analytics', label: 'Analytics' },
   { id: 'security', label: 'Security & Identity' },
   { id: 'management', label: 'Management & Observability' },
+  { id: 'developer-tools', label: 'Developer Tools' },
   { id: 'ml', label: 'Machine Learning' },
 ] as const satisfies readonly PlatformCategory[];
 

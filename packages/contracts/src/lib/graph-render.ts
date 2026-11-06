@@ -61,6 +61,7 @@ const renderConfig = (entries: readonly ConfigEntry[] | undefined): string =>
 
 export function renderNodeLine(node: CanvasNode): string {
   const service = node.service !== undefined ? ` service=${node.service}` : '';
+  const boundary = node.boundary !== undefined ? ` boundary=${JSON.stringify(node.boundary)}` : '';
   const config = renderConfig(node.config);
   const roles =
     node.responsibilities && node.responsibilities.length > 0
@@ -73,7 +74,7 @@ export function renderNodeLine(node: CanvasNode): string {
     shown.length > 0
       ? ` ops=[${shown.map(renderOperation).join('; ')}${elided > 0 ? `; …+${elided} more` : ''}]`
       : '';
-  return `  node ${node.id} kind=${node.kind}${service} label=${JSON.stringify(nodeLabel(node))}${config}${roles}${ops}`;
+  return `  node ${node.id} kind=${node.kind}${service} label=${JSON.stringify(nodeLabel(node))}${boundary}${config}${roles}${ops}`;
 }
 
 export function renderEdgeLine(edge: CanvasEdge): string {
