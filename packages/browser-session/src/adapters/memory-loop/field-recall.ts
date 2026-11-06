@@ -76,6 +76,17 @@ async function mapConcurrently<Item, Result>(
 }
 
 /**
+ * Where a record came from, as the one token an evidence line's tail is read
+ * back by: a source named with spaces has each written percent-encoded, so it
+ * reads back whole. Measured 2026-11-06: five records carried into the store
+ * named their source by a document's title — "document-digest:Operator
+ * guidance — session …" — and the first one recalled stopped a session on a
+ * form it had just filled.
+ */
+const originToken = (source: string): string =>
+  source.trim().replace(/\s/g, (space) => encodeURIComponent(space));
+
+/**
  * One recalled record as the goal lists it. The scope is read off the record's
  * own scope: one written under the binding's unit key holds of that unit of
  * work, any other of the subject. The source names the program that wrote it
@@ -91,7 +102,7 @@ const evidenceOf = (
   when: record.validFrom.slice(0, 'YYYY-MM-DD'.length),
   scope: bound.scope.unit !== null && bound.scope.unit in record.scope ? 'unit' : 'subject',
   kind: record.register,
-  source: { origin: record.provenance.source, ref: `${record.id}@v${record.version}` },
+  source: { origin: originToken(record.provenance.source), ref: `${record.id}@v${record.version}` },
 });
 
 /** The routes the host passed over, each reason once, in the host's declared words. */

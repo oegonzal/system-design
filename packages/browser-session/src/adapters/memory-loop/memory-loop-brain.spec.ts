@@ -78,6 +78,24 @@ const DEEP_POLICY = {
 };
 
 describe('the memory-loop brain', () => {
+  it('[BRW-21] lists a record whose source is named with spaces under that source as one token, so the goal composes and the line reads back whole', async () => {
+    const h = await brainUnderTest(completeRuns(ANSWERS));
+    const titled = 'document-digest:Operator guidance — session f5b86b33';
+    const fact = await h.client.remember(h.bound.spaceId, {
+      ...PYTHON_FACT,
+      provenance: { source: titled, sourceRunId: null },
+    });
+    await h.brain.answerFields(fieldsInput([PYTHON], null));
+    const items = readEvidenceItems(h.loop.startRequests[0]?.goal ?? '');
+    expect(items.map(({ source }) => source)).toEqual([
+      {
+        origin: 'document-digest:Operator%20guidance%20—%20session%20f5b86b33',
+        ref: `${fact.record.id}@v1`,
+      },
+    ]);
+    expect(decodeURIComponent(items[0]?.source.origin ?? '')).toBe(titled);
+  });
+
   it('[BRW-21] recalls once per distinct question — by text, under the open unit of work hashed — deals the hits into the goal under the legend with kind, scope and source, keeps the recall for the step, and reads the admission off the readout', async () => {
     const h = await brainUnderTest(completeRuns(ANSWERS));
     const fact = await h.client.remember(h.bound.spaceId, PYTHON_FACT);
