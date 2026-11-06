@@ -29,7 +29,7 @@ One application: from opening a listing's card to the confirmation that the appl
 ## The listing page
 
 - The list is https://builtin.com/jobs/remote/hybrid?search=Software+Engineering&city=Los+Angeles&state=California&country=USA&allLocations=true, 25 cards to a page; the pages after it add `&page=2`, `&page=3` … and are listed below the cards as links "Go to page 1", "Go to Page 2", "Go to Page 3" …, beside the link "Go to Next Page" — an arrow with no text, listed on every page but the last.
-- Each card holds a link naming the company, a link naming the job title — it opens the job page in a new tab — "Yesterday", "N Days Ago" or "Reposted …", "Remote" or "Remote or Hybrid", the places, pay and level, and sometimes a badge "Easy Apply": Built In's own form takes those, the rest apply on the employer's site. The company link, a heart that saves and a chevron that expands the card are never clicked. No card marks a job applied to before: the record under Units of work is the only guard.
+- Each card holds a link naming the company, a link naming the job title — it opens the job page in a new tab — "Yesterday", "N Days Ago" or "Reposted …", "Remote" or "Remote or Hybrid", the places, pay and level, and sometimes a badge "Easy Apply": Built In's own form takes those, the rest apply on the employer's site. The company link, a heart that saves and a chevron that expands the card are never clicked. A card taken by Built In's own form shows "Applied" beside its title; the record under Units of work guards every company applied to.
 - A cookie dialog in front of a page, on Built In or on an employer's site, is dismissed by its declining control — "Reject", "I do not accept", "Decline" — never by "Manage" or "Settings".
 
 ## The job page
