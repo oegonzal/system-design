@@ -145,6 +145,16 @@ export interface SessionState {
    * (2026-10-14) one field was ever kept so, in its own unit.
    */
   filled: ByUnit;
+  /**
+   * The fields this session left blank, by what each asks, in the unit of
+   * work they were left in: one the plan asks again in that unit is one the
+   * page would not go on without, whatever its markup says, so it is asked as
+   * required (`openUnitLeftBlank`). Measured 2026-11-06: an employer's form
+   * refused to go on, "Mobile Number is required", over a field its markup
+   * left optional; the session left it blank twice, never asked the
+   * operator, and the application failed.
+   */
+  leftBlank: ByUnit;
   /** What this step taught the memory, one record per operator answer, for the step's dump. */
   teachings: Teaching[];
   /** What this step captured after its actions, in order, for the step's dump. */
@@ -188,6 +198,7 @@ export function createState(ids: {
     lastStep: null,
     operatorAnswers: new Map(),
     filled: new Map(),
+    leftBlank: new Map(),
     teachings: [],
     captures: [],
     decisions: 0,
@@ -275,6 +286,10 @@ export const openUnitAnswers = (state: SessionState): Map<string, string> =>
 /** What this session settled into fields in the unit of work open now, by what each field asks: the only values a field here is kept for holding. */
 export const openUnitFilled = (state: SessionState): Map<string, string> =>
   openUnitEntries(state, state.filled);
+
+/** The fields this session left blank in the unit of work open now, by what each asks: asked again, each is asked as required. */
+export const openUnitLeftBlank = (state: SessionState): Map<string, string> =>
+  openUnitEntries(state, state.leftBlank);
 
 /** The units of work as the next goal is told them. */
 export const ledgerSummaryOf = (

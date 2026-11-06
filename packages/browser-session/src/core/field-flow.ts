@@ -20,7 +20,7 @@ import { askOperator, SuggestionsPrefetch, type SuggestionsRecord } from './oper
 import { BrainFaulted, type Decided, type FormReport } from './ports';
 import { stepJsonFile } from './session-dump';
 import { formTaskOf } from './open-unit';
-import { openUnitAnswers, openUnitFilled } from './session-state';
+import { openUnitAnswers, openUnitFilled, openUnitLeftBlank } from './session-state';
 
 /**
  * A plan's `askFields`: the fields go to the form-memory orchestration as
@@ -183,6 +183,9 @@ const settle = (
 ): Promise<FieldResult> => {
   switch (field.route) {
     case 'leave-blank':
+      // A field the page hides stays blank however often it is asked; any other is remembered, so asking it again asks it as required.
+      if (field.field.hiddenTraits.length === 0)
+        settled(openUnitLeftBlank(ctx.state), field.field, '');
       return Promise.resolve(result(field, 'leave-blank', field.source, null, null));
     case 'keep':
       if (field.value !== null) settled(openUnitFilled(ctx.state), field.field, field.value);
@@ -267,6 +270,23 @@ const fieldsOf = (refs: readonly string[], observation: PageObservation): FieldS
   refs.flatMap((ref) => {
     const element = elementByRef(observation.elements, ref);
     return element === undefined ? [] : [fieldSpecOf(element)];
+  });
+
+/**
+ * A field this session left blank in this unit of work and the plan asks
+ * again is needed: the page would not go on without it, whatever its markup
+ * says, so it is asked as required — answered from the evidence, else put to
+ * the operator.
+ */
+const neededAgain = (
+  fields: readonly FieldSpec[],
+  leftBlank: ReadonlyMap<string, string>,
+): FieldSpec[] =>
+  fields.map((field) => {
+    const key = fieldQuestionOf(field);
+    return key !== null && !field.required && leftBlank.has(key)
+      ? { ...field, required: true }
+      : field;
   });
 
 /** The fields still open: one that holds what this session settled for it in this unit of work is not a question. */
@@ -372,7 +392,7 @@ export async function askFields(
   refs: readonly string[],
   observation: PageObservation,
 ): Promise<FieldsOutcome> {
-  const fields = fieldsOf(refs, observation);
+  const fields = neededAgain(fieldsOf(refs, observation), openUnitLeftBlank(ctx.state));
   if (fields.length === 0)
     return { stopped: false, failed: false, note: 'no listed field matched' };
   const open = openOf(fields, openUnitFilled(ctx.state));

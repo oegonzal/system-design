@@ -1,6 +1,7 @@
 import { BROWSER_SESSION_PIPELINES, FAKE_RUBRIC, type StepPlan } from '@sysdesign/contracts';
 
 import { decidedAnswers, decidedPlan, FakeBrowser, InMemoryLedger, refusing } from './testing';
+import { fieldAnswer } from './testing-runs';
 import {
   JOURNEY_ANSWERS as ANSWERS,
   JOURNEY_PLANS as PLANS,
@@ -265,6 +266,59 @@ describe('the session engine', () => {
     expect(ledger.teachings).toEqual([{ decisionIds: [fields[1]?.id], ref: 'fake-teach-1' }]);
     expect(dumps.text('01-steps/03/teach.json')).toContain('fake-teach-1');
     expect(dumps.files.has('01-steps/03/fields.json')).toBe(true);
+  });
+
+  it('[BRW-3] asks the operator for a field it left blank in the unit once the plan asks it again: the page would not go on without it, whatever its markup says', async () => {
+    // Measured 2026-11-06: a form refused to go on, "Mobile Number is required", over a field its markup left optional.
+    const optional = pages().map((page) =>
+      page.id !== 'form'
+        ? page
+        : {
+            ...page,
+            observation: {
+              ...page.observation,
+              elements: page.observation.elements.map((element) =>
+                element.ref === 'e2' ? { ...element, required: false } : element,
+              ),
+            },
+          },
+    );
+    const unsettled = {
+      ...ANSWERS,
+      fields: ANSWERS.fields.map((field) =>
+        field.ref === 'e2'
+          ? fieldAnswer('e2', {
+              decision: 'ask-operator',
+              rests: 'none',
+              reason: 'nothing on record',
+            })
+          : field,
+      ),
+    };
+    const { detail, operator } = await run({
+      browser: new FakeBrowser(optional),
+      script: {
+        plans: [
+          PLANS.search,
+          PLANS.results,
+          PLANS.formOnly,
+          PLANS.formAgain,
+          PLANS.done,
+          PLANS.end,
+        ].map((p) => decidedPlan(p)),
+        answers: [decidedAnswers(unsettled), decidedAnswers(unsettled)],
+      },
+      lines: ['Yes'],
+    });
+    const asked = (step: number) =>
+      detail.decisions.find((d) => d.kind === 'field-answer' && d.step === step && d.ref === 'e2');
+    // Optional by its markup and settled by no evidence: left blank the first time, the operator not asked.
+    expect(asked(3)?.payload['route']).toBe('leave-blank');
+    // Asked again in the same unit: required now, and the operator answers it.
+    expect(asked(4)).toMatchObject({ source: 'operator', answer: 'Yes' });
+    expect(operator.questions.map((question) => question.prompt.title)).toEqual([
+      'Work authorisation',
+    ]);
   });
 
   it('[BRW-3] reads the field back when the operator fills the page and presses Enter, caches that answer and teaches it', async () => {
