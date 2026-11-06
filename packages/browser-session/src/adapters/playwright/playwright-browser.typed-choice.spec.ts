@@ -96,6 +96,69 @@ const FORM = `<!doctype html><html><head><title>Apply — address</title></head>
   </script>
 </body></html>`;
 
+/**
+ * A list that opens on a key or a click into its field — never on words set
+ * there whole — and exists only while open, its options buttons wrapped in
+ * presentational items, filtering by the words anywhere in an option: the
+ * country fields measured on 2026-11-06, whose lists stayed shut for words
+ * set whole and opened for the same words typed.
+ */
+const KEYED_FORM = `<!doctype html><html><head><title>Apply — residence</title></head>
+<body>
+  <main>
+    <form>
+      <label for="residence">Country of residence</label>
+      <input id="residence" type="text" role="combobox" aria-expanded="false" aria-controls="residence-list" placeholder="Select">
+      <label for="town">Town</label>
+      <input id="town" type="text">
+    </form>
+  </main>
+  <script>
+    (() => {
+    const NAMES = ['United Arab Emirates', 'United Kingdom', 'United States'];
+    const input = document.getElementById('residence');
+    let list = null;
+    const close = () => {
+      list?.remove();
+      list = null;
+      input.setAttribute('aria-expanded', 'false');
+    };
+    const render = () => {
+      if (list === null) {
+        list = document.createElement('ul');
+        list.id = 'residence-list';
+        list.setAttribute('role', 'listbox');
+        input.after(list);
+        input.setAttribute('aria-expanded', 'true');
+      }
+      const words = input.value.toLowerCase();
+      list.innerHTML = '';
+      for (const name of NAMES.filter((n) => n.toLowerCase().includes(words))) {
+        const item = document.createElement('li');
+        item.setAttribute('role', 'presentation');
+        const option = document.createElement('button');
+        option.type = 'button';
+        option.setAttribute('role', 'option');
+        option.title = name;
+        option.textContent = name;
+        option.addEventListener('mousedown', (event) => {
+          event.preventDefault();
+          input.value = name;
+          close();
+        });
+        item.appendChild(option);
+        list.appendChild(item);
+      }
+    };
+    input.addEventListener('keydown', () => setTimeout(render, 0));
+    input.addEventListener('mousedown', () => setTimeout(render, 0));
+    input.addEventListener('input', () => {
+      if (list !== null) render();
+    });
+    })();
+  </script>
+</body></html>`;
+
 const common = { reason: 'the procedure says so', expect: null, serves: [] };
 const select = (ref: string, option: string): Extract<StepAction, { kind: 'select' }> => ({
   kind: 'select',
@@ -188,6 +251,23 @@ describe('the Playwright browser and a field typed into and chosen from', () => 
     await browser.act(fill(country.ref, 'United States of America'));
     await leave();
     expect((await read()).value).toBeNull();
+  });
+
+  it('[BRW-27] types the words key by key, so a list that opens on a key and never on words set whole opens and is chosen from — after the words an earlier attempt left are cleared', async () => {
+    await browser.page.setContent(KEYED_FORM);
+    const residence = byName(await browser.observe(), 'combobox', 'Country of residence');
+    expect(residence).toMatchObject({ kind: 'fillable', options: null });
+    // An answer in a shape no option has: the list opens, offers nothing, and the words stay in the field.
+    await expect(browser.act(select(residence.ref, 'United States (+1)'))).rejects.toThrow(
+      'typed "United States (+1)": the field offered nothing for those words',
+    );
+    const again = byName(await browser.observe(), 'combobox', 'Country of residence');
+    expect(again.value).toBe('United States (+1)');
+    await browser.act(select(again.ref, 'United States'));
+    await browser.page.locator('#town').focus();
+    const chosen = byName(await browser.observe(), 'combobox', 'Country of residence');
+    expect(chosen.value).toBe('United States');
+    expect(await browser.page.locator('#residence-list').count()).toBe(0);
   });
 
   it('[BRW-27] says the field offered nothing when its list never shows, and leaves a combobox no one types into to open and pick', async () => {

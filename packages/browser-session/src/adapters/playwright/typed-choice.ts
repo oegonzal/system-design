@@ -10,10 +10,13 @@ const wholeText = (words: string): RegExp => new RegExp(`^\\s*${escapeRegExp(wor
 
 /**
  * A control both typed into and chosen from — an input with the combobox
- * role — commits the way a person commits it: the option's words typed, then
- * the option whose words are exactly those chosen, from the lists the control
- * itself names. Never a list elsewhere on the page: a form measured on
- * 2026-10-30 carried fifteen such controls. The option is clicked by its
+ * role — commits the way a person commits it: the option's words typed key by
+ * key, then the option whose words are exactly those chosen, from the lists
+ * the control itself names. Keys, never words set whole: measured 2026-11-06,
+ * one form's lists stayed shut for words set whole and opened for the same
+ * words typed. Words an earlier attempt left are cleared first, so the list
+ * filters by these words alone. Never a list elsewhere on the page: a form
+ * measured on 2026-10-30 carried fifteen such controls. The option is clicked by its
  * words, never by its place, so a list that renders again between the find
  * and the click still gets the option asked for. A control naming no list of
  * its own declares no choices, and the words typed stand, as a fill's do. One
@@ -26,7 +29,8 @@ export async function chooseByTyping(
   words: string,
   waitMs: number,
 ): Promise<void> {
-  await locator.fill(words);
+  await locator.fill('');
+  await locator.pressSequentially(words);
   const control = await locator.elementHandle();
   let list: string | false = false;
   try {
