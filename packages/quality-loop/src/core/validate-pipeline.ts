@@ -17,7 +17,7 @@ import { z } from 'zod';
 
 import { SCORES_FACTOR } from './controllers/compose';
 import { criterionLengthBound, providedStatementLimit } from './contracts';
-import type { PipelineDefinition } from './pipeline';
+import type { PipelineDefinition, StageSpec } from './pipeline';
 import { validatePolicy } from './policy';
 import { BOUNDS_VALIDATOR_ID, SCHEMA_VALIDATOR_ID } from './stages/schema-validator';
 import { CRITERIA_STAGE, LENSES_STAGE, PRODUCER_STAGE, REFOUND_STAGE } from './stages/shared';
@@ -40,8 +40,14 @@ type Fail = (message: string) => never;
 type Definition = PipelineDefinition<unknown>;
 
 /** A model-facing stage — a lens, the producer, the deriver — has a persona to speak from and room to answer. */
-function checkStage(name: string, stage: { persona: string; maxTokens: number }, fail: Fail): void {
+function checkStage(name: string, stage: StageSpec, fail: Fail): void {
   if (!(stage.maxTokens >= 1)) fail(`${name} needs maxTokens ≥ 1`);
+  if (stage.thinkingBudget !== undefined && !(stage.thinkingBudget >= 1)) {
+    fail(`${name} needs thinkingBudget ≥ 1`);
+  }
+  if (stage.thinkingBudget !== undefined && !(stage.thinkingBudget < stage.maxTokens)) {
+    fail(`${name} needs thinkingBudget below maxTokens, or the reply has no room`);
+  }
   if (stage.persona.trim().length === 0) fail(`${name} has an empty persona`);
 }
 

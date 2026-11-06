@@ -35,6 +35,17 @@ export interface StructuredRequest<T> {
    * beside the usage and the API calls so the three compare.
    */
   maxTokens?: number;
+  /**
+   * Tokens the model may spend thinking before it writes, for an ask whose
+   * reply must fit one API call: thinking plus the reply stay under the
+   * adapter's per-call ceiling, so the reply is never cut and resumed.
+   * Measured 2026-11-06: a coach redrawing a 39-block canvas thought 50–125k
+   * tokens before a 15–30k-token reply, crossed the ceiling on every turn,
+   * and the resumed call re-emitted the element it was cut in, leaving one
+   * brace unclosed in 7 of 13 replies. Unset, the provider's own default
+   * thinking; an adapter whose provider has no such knob ignores it.
+   */
+  thinkingBudget?: number;
 }
 
 export interface LlmClient {

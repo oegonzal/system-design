@@ -22,14 +22,11 @@ import type {
 import type { TaskSpec } from './contracts';
 import type { Controller, Validator } from './ports';
 
-/** What every lens declares: who it is, how often it samples, how much it may write. */
-export interface LensSpec {
+/** What every lens declares beyond what any model-facing stage does: who it is and how often it samples. */
+export interface LensSpec extends StageSpec {
   id: string;
-  /** The lens's expertise, as markdown text — imported with `?raw` beside the pipeline. */
-  persona: string;
   /** Independent samples per iteration; agreement across them is what confirms an item. */
   samples: number;
-  maxTokens: number;
 }
 
 /**
@@ -71,9 +68,19 @@ export interface EvaluatorSpec extends LensSpec {
   consumes: readonly UpstreamEvidence[];
 }
 
+/** What every model-facing stage declares: whose voice it speaks in, how much it may write, and how much it may think first. */
 export interface StageSpec {
+  /** The stage's expertise, as markdown text — imported with `?raw` beside the pipeline. */
   persona: string;
+  /** The most one ask is expected to write, thinking included; the call's time limit derives from it. */
   maxTokens: number;
+  /**
+   * Tokens the model may think before it writes, declared only where a reply
+   * must fit one API call — a redraw of a whole artifact, say — so thinking
+   * plus the reply stay under the adapter's per-call ceiling and the reply is
+   * never cut and resumed. Below `maxTokens`, or boot refuses the pipeline.
+   */
+  thinkingBudget?: number;
 }
 
 export interface ProducerSpec extends StageSpec {

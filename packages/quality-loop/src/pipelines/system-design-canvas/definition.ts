@@ -242,6 +242,13 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   producer: {
     persona: producer,
     maxTokens: 50000,
+    // A redraw must fit one API call. Measured 2026-11-06 on a 39-block
+    // canvas: the coach thought 50–125k tokens before a 15–30k-token reply,
+    // crossed the per-call ceiling on every turn, and the resumed call
+    // re-emitted the element it was cut in — 7 of 13 replies lost at that
+    // seam, 3 more to the time limit. 24k of thinking keeps the largest
+    // reply measured (30k) under the 64k ceiling with room.
+    thinkingBudget: 24_000,
     consumes: ['criteria', 'memories', 'setbacks'],
   },
 

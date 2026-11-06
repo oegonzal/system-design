@@ -59,6 +59,7 @@ export function createLlmCritic<T>(
           spec.maxItems,
         ),
         maxTokens: spec.maxTokens,
+        thinkingBudget: spec.thinkingBudget,
       };
 
       return sampleUnits(spec.id, clients, request, (sample, response): CriticReport => ({

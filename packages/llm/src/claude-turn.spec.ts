@@ -42,6 +42,28 @@ describe('the subscription client at its call site', () => {
     }
   });
 
+  it("[QL-22] spawns a declared thinking budget as the CLI's fixed budget, and leaves thinking to the CLI when none is declared", async () => {
+    const ok = () => [
+      { type: 'result', subtype: 'success', is_error: false, result: '{"answer":"ok"}' },
+    ];
+    const budgeted = scripted(ok());
+    await new ClaudeAgentLlmClient({ query: budgeted.run }).completeStructured({
+      system: 's',
+      user: 'u',
+      schema: answer,
+      thinkingBudget: 24_000,
+    });
+    expect(budgeted.seen.options?.['thinking']).toEqual({ type: 'enabled', budgetTokens: 24_000 });
+
+    const free = scripted(ok());
+    await new ClaudeAgentLlmClient({ query: free.run }).completeStructured({
+      system: 's',
+      user: 'u',
+      schema: answer,
+    });
+    expect(free.seen.options).not.toHaveProperty('thinking');
+  });
+
   it("[QL-22] a turn that ended on an API error is recorded as an error with the CLI's own reason", async () => {
     const calls: LlmCall[] = [];
     const { run } = scripted([

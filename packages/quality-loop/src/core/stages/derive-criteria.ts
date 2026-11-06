@@ -54,6 +54,7 @@ export function createCriteriaDeriver<T>(
       ),
       schema: criteriaSchema(kinds, room, criterionLengthBound(task)),
       maxTokens: spec.maxTokens,
+      thinkingBudget: spec.thinkingBudget,
     });
     if (reply.value === null) {
       return {

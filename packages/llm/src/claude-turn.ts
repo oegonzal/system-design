@@ -41,6 +41,8 @@ export interface TurnAsk {
   system: string;
   /** Only when the caller pinned one; otherwise the CLI's default rules. */
   model: string | undefined;
+  /** Only when the ask declared one; otherwise the CLI's own, adaptive thinking. */
+  thinkingBudget: number | undefined;
   abort: AbortController;
 }
 
@@ -48,10 +50,16 @@ export interface TurnAsk {
 export const turnOptions = ({
   system,
   model,
+  thinkingBudget,
   abort,
 }: TurnAsk): NonNullable<Parameters<ClaudeQuery>[0]['options']> => ({
   systemPrompt: system,
   ...(model ? { model } : {}),
+  // A declared budget is the SDK's fixed-budget mode; undeclared, the CLI
+  // decides how much to think, as it does for every other ask.
+  ...(thinkingBudget === undefined
+    ? {}
+    : { thinking: { type: 'enabled' as const, budgetTokens: thinkingBudget } }),
   maxTurns: 1,
   tools: NO_TOOLS,
   permissionMode: 'default',

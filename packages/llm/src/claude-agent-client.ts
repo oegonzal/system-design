@@ -207,7 +207,12 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable, LlmDetail
       try {
         const turn = query({
           prompt,
-          options: turnOptions({ system: request.system, model: this.requestedModel, abort }),
+          options: turnOptions({
+            system: request.system,
+            model: this.requestedModel,
+            thinkingBudget: request.thinkingBudget,
+            abort,
+          }),
         });
         const reading = readTurn(turn, outcome.transcript);
         const settled = await Promise.race([reading, deadline.abandoned.then(() => null)]);

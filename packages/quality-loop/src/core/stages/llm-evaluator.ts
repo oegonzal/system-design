@@ -51,6 +51,7 @@ export function createLlmEvaluator<T>(
           ctx.locations.map((location) => location.id),
         ),
         maxTokens: spec.maxTokens,
+        thinkingBudget: spec.thinkingBudget,
       };
 
       return sampleUnits(spec.id, clients, request, (sample, response): EvaluationReport => ({
