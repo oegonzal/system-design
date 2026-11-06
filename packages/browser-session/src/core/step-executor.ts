@@ -200,6 +200,30 @@ async function closeTask(
   ctx.unitClosed();
 }
 
+/**
+ * A unit whose page will not read is closed, never the session: it closes
+ * failed with the reason, as a plan's taskDone would close it, and its pages
+ * close with it (`step-flow.ts`), so the session goes on from the page the
+ * unit was taken from. Measured 2026-11-06: a job page embedding a dozen
+ * frames answered no read of its 117 elements three observations running, and
+ * the page-unreadable rail ended a session that had sent two units with 70
+ * minutes left.
+ */
+export async function closeUnreadableUnit(ctx: EngineContext, reads: number): Promise<void> {
+  await closeTask(
+    ctx,
+    {
+      kind: 'taskDone',
+      outcome: 'failed',
+      detail: `the page could not be read ${reads} observations in a row`,
+      reason: 'the page will not read',
+      expect: null,
+      serves: [],
+    },
+    `taskDone failed — the page could not be read ${reads} observations in a row`,
+  );
+}
+
 /** What one engine event did to the step: the failure it counts, if any, and whether the session is ending — the operator's stop, or its time being up. */
 interface Performed {
   failure: StepFailureEvent | null;

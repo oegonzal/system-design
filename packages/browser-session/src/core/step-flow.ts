@@ -35,7 +35,7 @@ import {
   railStateOf,
   tasksClosed,
 } from './session-state';
-import { executeActions, type Executed } from './step-executor';
+import { closeUnreadableUnit, executeActions, type Executed } from './step-executor';
 import { adviceSummary, recallAdvice, type AdviceRecord } from './unit-advice';
 
 /**
@@ -299,6 +299,16 @@ async function executePlan(
 /** One page: observe, plan through the loop, read the plan back, run what nobody objected to, check the rails. */
 export async function step(ctx: EngineContext): Promise<Termination | null> {
   const observation = await observe(ctx);
+  const { state, options } = ctx;
+  // A page that will not read inside a unit ends the unit, not the session:
+  // the unit closes failed, its pages close, and the next step reads the page
+  // it was taken from. With no unit open, the rail ends the session.
+  if (state.tasks.open !== null && state.unreadablePages >= options.rails.maxUnreadablePages) {
+    await closeUnreadableUnit(ctx, state.unreadablePages);
+    await closeUnitPages(ctx);
+    state.unreadablePages = 0;
+    return rails(ctx);
+  }
   // The rails are checked before the brain is asked for anything: a page that
   // will not read is not a plan anybody can write, and a session out of time
   // or units of work should not spend another run finding out.
