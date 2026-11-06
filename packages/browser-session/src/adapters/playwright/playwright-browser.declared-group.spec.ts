@@ -34,6 +34,12 @@ const DECLARED = `<!doctype html><html><head><title>Apply — additional questio
   <div role="group">${option('LangGraph')}${option('CrewAI')}${option('A custom orchestrator')}</div>
   <p>Anything else?</p>
   <fieldset>${option('Mixed A')}${option('Mixed B')}<input aria-label="Tell us more"></fieldset>
+  <h3 id="relocate">Are you open to relocation?</h3>
+  <div role="group" aria-labelledby="relocate">${option('Open')}${option('Not open')}</div>
+  <fieldset><legend>Work eligibility</legend>
+    <p>Are you authorized to work here?</p>${option('Yes')}${option('No')}
+    <p>Will you need sponsorship?</p>${option('Yes')}${option('No')}
+  </fieldset>
 </form>
 </body></html>`;
 
@@ -54,23 +60,28 @@ describe('the Playwright browser and checkboxes a page draws in a group it decla
     rmSync(profiles, { recursive: true, force: true });
   });
 
-  it('[BRW-2] reads a declared group holding drawn checkboxes and no other control as one question chosen from, with its question, and chooses the answer asked for', async () => {
+  it('[BRW-2] reads a declared group holding drawn checkboxes, no other control and one question as one question chosen from, with its question, and chooses the answer asked for', async () => {
     await browser.page.setContent(DECLARED);
     const observation = await browser.observe();
     const groups = observation.elements.filter((e) => e.role === 'listbox');
     expect(groups.map((g) => g.options)).toEqual([
       ['Yes', 'No'],
       ['LangGraph', 'CrewAI', 'A custom orchestrator'],
+      ['Open', 'Not open'],
     ]);
     expect(groups[0]?.context).toContain('US Citizen or Permanent Resident');
-    // Never listed as checkboxes apart; the group that holds a field keeps its own as the tree lists them.
+    // A group its author names asks by its own name.
+    expect(groups[2]?.name).toBe('Are you open to relocation?');
+    // Never listed as checkboxes apart; a group that holds a field, or two questions, keeps its own as the tree lists them.
     const apart = observation.elements.filter((e) => e.role === 'checkbox');
-    expect(apart).toHaveLength(2);
+    expect(apart).toHaveLength(6);
+    // Nothing ticked reads back as nothing, never as every answer's words.
+    expect(await browser.readValue(groups[0]?.ref ?? '')).toBeNull();
     await browser.act({ kind: 'select', ref: groups[0]?.ref ?? '', option: 'Yes', ...common });
     await browser.act({ kind: 'select', ref: groups[1]?.ref ?? '', option: 'CrewAI', ...common });
     const ticked = await browser.page.$$eval('.opt input', (inputs) =>
       inputs.map((input) => (input as HTMLInputElement).checked),
     );
-    expect(ticked).toEqual([true, false, false, true, false, false, false]);
+    expect(ticked.slice(0, 7)).toEqual([true, false, false, true, false, false, false]);
   });
 });

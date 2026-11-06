@@ -18,12 +18,21 @@ export interface Place {
   offset: Point;
 }
 
-export async function placeOf(locator: Locator): Promise<Place> {
+/** The frame that holds an element. */
+export async function frameOf(locator: Locator): Promise<Frame> {
   const handle = await locator.elementHandle();
   try {
-    const frame = (await handle.ownerFrame()) ?? locator.page().mainFrame();
-    if (frame.parentFrame() === null) return { frame, offset: { x: 0, y: 0 } };
-    const element = await frame.frameElement();
+    return (await handle.ownerFrame()) ?? locator.page().mainFrame();
+  } finally {
+    await handle.dispose();
+  }
+}
+
+export async function placeOf(locator: Locator): Promise<Place> {
+  const frame = await frameOf(locator);
+  if (frame.parentFrame() === null) return { frame, offset: { x: 0, y: 0 } };
+  const element = await frame.frameElement();
+  try {
     const box = await element.boundingBox();
     // The frame's content starts inside its border and padding.
     const inset = await element.evaluate((el: Element) => {
@@ -35,7 +44,7 @@ export async function placeOf(locator: Locator): Promise<Place> {
     });
     return { frame, offset: { x: (box?.x ?? 0) + inset.x, y: (box?.y ?? 0) + inset.y } };
   } finally {
-    await handle.dispose();
+    await element.dispose();
   }
 }
 

@@ -201,7 +201,7 @@ export class PageReader {
       scope: ancestry[index]?.scope ?? null,
       landmark: ancestry[index]?.landmark ?? null,
     });
-    const asGroups = groups.map(async ({ kind, box, options }) => {
+    const asGroups = groups.map(async ({ kind, box, options, declared }) => {
       const node = nodes[box];
       if (node?.ref === null || node === undefined) return null;
       const facts = await readElementFacts(page.locator(`aria-ref=${node.ref}`), timeout, {
@@ -211,7 +211,9 @@ export class PageReader {
       const { scope, landmark } = at(box);
       // A radio group is one by the HTML standard; a group of checkboxes is chosen from as a list is.
       const role = kind === 'radio' ? 'radiogroup' : 'listbox';
-      const element = toObservedElement({ ...node, role, name: '' }, facts, scope, '', landmark);
+      // A group the page declares is named by its author alone; its name is its question when no words beside it ask one.
+      const name = declared && facts.context === null ? (node.name ?? '') : '';
+      const element = toObservedElement({ ...node, role, name }, facts, scope, '', landmark);
       return { index: box, element, options, box: { ref: node.ref, kind, drawn: false } };
     });
     const asCheckboxes = drawn.map(async ({ box, option }) => {

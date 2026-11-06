@@ -23,6 +23,10 @@ const FORM = `<!doctype html><html><body><form>
     </div></div>
   <div><div style="${DRAWN_BOX}"><input type="checkbox" id="terms" style="${HIDDEN_INPUT}"></div>
     <label for="terms">I agree to the terms</label></div>
+  <p>Open to travel?</p>
+  <div class="redraws"><div class="opt"><div style="${DRAWN_BOX}"><input type="checkbox" style="${HIDDEN_INPUT}"></div><p>Open to travel</p></div></div>
+  <p>Hold a clearance?</p>
+  <div class="redraws" data-never><div class="opt"><div style="${DRAWN_BOX}"><input type="checkbox" style="${HIDDEN_INPUT}"></div><p>Hold a clearance</p></div></div>
 </form>
 <script>
   const NAMES = ['United Kingdom', 'United States +1'];
@@ -49,6 +53,15 @@ const FORM = `<!doctype html><html><body><form>
   input.addEventListener('keydown', (event) => (event.key === 'Escape' ? close() : setTimeout(render, 0)));
   input.addEventListener('mousedown', () => setTimeout(render, 0));
   input.addEventListener('input', () => { if (list !== null) render(); });
+  // A drawn answer clicked is drawn anew: ticked the other way, or unticked in a box that takes no click.
+  document.addEventListener('click', (event) => {
+    const option = event.target.closest('.redraws .opt');
+    if (option === null) return;
+    const next = option.cloneNode(true);
+    next.querySelector('input').checked =
+      option.closest('[data-never]') === null && !option.querySelector('input').checked;
+    option.replaceWith(next);
+  });
 </script></body></html>`;
 
 /** The careers page and the form it embeds, each served from an origin of its own, as such forms are. */
@@ -115,5 +128,23 @@ describe('the Playwright browser and the choices of a form a page embeds in a fr
     const form = browser.page.frameLocator('iframe');
     expect(await form.locator('#sponsor-no').isChecked()).toBe(true);
     expect(await form.locator('#terms').isChecked()).toBe(true);
+  });
+
+  it('[BRW-2] reads a drawn box the page draws anew inside a frame where the click landed: one that takes the click is ticked, one that never takes it fails', async () => {
+    await browser.page.goto(CAREERS);
+    await browser.page
+      .frameLocator('iframe')
+      .locator('.redraws')
+      .first()
+      .waitFor({ state: 'attached' });
+    const observation = await browser.observe();
+    const drawn = observation.elements.filter((e) => e.role === 'checkbox');
+    const [, travel, clearance] = drawn;
+    await browser.act({ kind: 'click', ref: travel?.ref ?? '', ...COMMON });
+    const form = browser.page.frameLocator('iframe');
+    expect(await form.locator('.redraws:not([data-never]) input').isChecked()).toBe(true);
+    await expect(
+      browser.act({ kind: 'click', ref: clearance?.ref ?? '', ...COMMON }),
+    ).rejects.toThrow(/reads unchecked where it was clicked/);
   });
 });

@@ -3,7 +3,7 @@ import type { Locator } from 'playwright';
 
 import { ActionFailed } from '../../core/ports';
 import { readElementFacts } from './element-facts';
-import { placeOf } from './frames';
+import { frameOf } from './frames';
 import { offeredNote } from './playwright-errors';
 
 /**
@@ -37,7 +37,7 @@ export async function chooseByTyping(
 ): Promise<void> {
   await typeWords(locator, words, waitMs);
   // The control's own frame: a form embedded in a page keeps its lists there.
-  const { frame } = await placeOf(locator);
+  const frame = await frameOf(locator);
   const control = await locator.elementHandle();
   let list: string | false = false;
   try {
@@ -130,7 +130,7 @@ function listWithExactOptionInPage({
  */
 export async function readTypedChoices(locator: Locator, waitMs: number): Promise<string[] | null> {
   await locator.click();
-  const { frame } = await placeOf(locator);
+  const frame = await frameOf(locator);
   const control = await locator.elementHandle();
   try {
     const handle = await frame.waitForFunction(optionsInPage, control, {

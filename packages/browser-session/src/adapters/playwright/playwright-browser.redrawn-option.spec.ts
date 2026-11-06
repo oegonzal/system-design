@@ -74,7 +74,7 @@ describe('the Playwright browser and an option the page draws anew when it is ch
     rmSync(profiles, { recursive: true, force: true });
   });
 
-  it('[BRW-2] clicks a drawn checkbox once: the page answered by drawing it anew, so it is read by the next observation and never clicked back', async () => {
+  it('[BRW-2] clicks a drawn checkbox once: the page drew it anew, ticked, which is read where the click landed as the checkbox it was, so it is never clicked back', async () => {
     await browser.page.setContent(REDRAWN);
     const observation = await browser.observe();
     const [box] = observation.elements.filter((e) => e.role === 'checkbox');
@@ -118,13 +118,13 @@ describe('the Playwright browser and an option the page draws anew when it is ch
     const observation = await browser.observe();
     const [, never] = observation.elements.filter((e) => e.role === 'checkbox');
     await expect(browser.act({ kind: 'click', ref: never?.ref ?? '', ...common })).rejects.toThrow(
-      /still reads unchecked/,
+      /reads unchecked where it was clicked/,
     );
     expect(await browser.page.locator('.never input').isChecked()).toBe(false);
     const relocate = observation.elements.find((e) => e.context?.includes('relocation') === true);
     expect(relocate).toBeDefined();
     await expect(
       browser.act({ kind: 'select', ref: relocate?.ref ?? '', option: 'No', ...common }),
-    ).rejects.toThrow(/held nothing/);
+    ).rejects.toThrow(/does not read chosen where it was clicked/);
   });
 });

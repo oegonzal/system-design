@@ -50,11 +50,17 @@ export interface ChoiceBox {
   drawn: boolean;
 }
 
-/** One group the page makes by name alone: the index of its box's node in the tree, and of the tree's nodes for its options. */
+/**
+ * One group of choices read as one question: the index of its box's node in
+ * the tree, and of the tree's nodes for its options — a group the page makes
+ * by name alone, or one it declares by a box's role (`declared`), whose own
+ * name, when its author gave it one, is its question.
+ */
 export interface NameGroup {
   kind: GroupKind;
   box: number;
   options: number[];
+  declared: boolean;
 }
 
 /** A checkbox the tree gave no ref, alone in its group: the index of the box that holds it alone, and of its own node. */
@@ -85,10 +91,12 @@ const parentsOf = (nodes: readonly SnapshotNode[]): number[] => {
 
 /**
  * The groups of one read whose options the page declares no group around,
- * each under the box that holds it alone, and the checkboxes the tree gave no
- * ref, each under the box that holds it alone. A box is read in the page once
- * per kind however many options sit in it, and the walk stops once the
- * deadline passes: an option not reached is listed as the tree lists it.
+ * each under the box that holds it alone; the checkboxes the tree gave no ref
+ * that a box the page declares a group gathers as one question; and the rest
+ * of those checkboxes, each under the box that holds it alone. A box is read
+ * in the page once per kind however many options sit in it, and the walk
+ * stops once the deadline passes: an option not reached is listed as the tree
+ * lists it.
  */
 export async function readNameGroups(
   page: Page,
@@ -139,7 +147,7 @@ export async function readNameGroups(
           choice.kind === kind && ancestorsOf(choice.index).includes(box) ? [choice.index] : [],
         );
         options.forEach((option) => placed.add(option));
-        groups.push({ kind, box, options });
+        groups.push({ kind, box, options, declared: false });
       } else if (kind === 'checkbox' && unreffed) {
         placed.add(index);
         drawn.push({ box, option: index });
@@ -156,15 +164,17 @@ export async function readNameGroups(
 }
 
 /**
- * Checkboxes its page drew, each alone in a box of its own, that a box the
- * page declares a group by its role — a fieldset, `role="group"` — gathers
- * with no other control: one question, chosen from as checkboxes sharing a
- * name are, under the group's ref. Measured 2026-11-06: two application
- * forms drew each answer of a question — "Yes" and "No", or a list to pick
- * from — as a nameless checkbox beside its words, the question's answers
- * alone in a group; each was listed as a checkbox apart with nothing to tell
- * it by, the plan's askFields on them was refused, and both sessions ended
- * on three failed steps.
+ * Checkboxes its page drew, each the only checkbox in the box listed for it,
+ * that a box the page declares a group by its role — a fieldset,
+ * `role="group"` — gathers as one question: no other control in it, each
+ * answer's words told apart from the others', and no words between two
+ * answers outside both, which would be a second question. Chosen from as
+ * checkboxes sharing a name are, under the group's ref. Measured 2026-11-06:
+ * two application forms drew each answer of a question — "Yes" and "No", or
+ * a list to pick from — as a nameless checkbox beside its words, the
+ * question's answers alone in a group; each was listed as a checkbox apart
+ * with nothing to tell it by, the plan's askFields on them was refused, and
+ * both sessions ended on three failed steps.
  */
 async function declaredGroups(
   page: Page,
@@ -189,7 +199,7 @@ async function declaredGroups(
       true,
     );
     if (reading !== null && !reading.shared && reading.groupSize === options.length) {
-      groups.push({ kind: 'checkbox', box, options });
+      groups.push({ kind: 'checkbox', box, options, declared: true });
     }
   }
   return groups;
@@ -238,7 +248,37 @@ function choiceBoxInPage(
   if (foreign || (!declared && options.length > 1 && !options.every(sameGroup))) {
     return { groupSize: 0, holdsAll: false, shared: true };
   }
-  if (declared) return { groupSize: options.length, holdsAll: true, shared: false };
+  if (declared) {
+    // Each answer's row: the outermost box inside the group that holds it and no other answer.
+    const rowOf = (option: Element): Element => {
+      let row: Element = option;
+      while (row.parentElement !== null && row.parentElement !== box) {
+        const holds = options.filter((other) => row.parentElement?.contains(other)).length;
+        if (holds > 1) break;
+        row = row.parentElement;
+      }
+      return row;
+    };
+    const rows = options.map(rowOf);
+    const words = rows.map((row) => (row.textContent ?? '').replace(/\s+/g, ' ').trim());
+    const apart = new Set(words).size === words.length;
+    // Words between two answers that no answer's row holds ask a second question.
+    const [firstRow] = rows;
+    const lastRow = rows[rows.length - 1];
+    const walker = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
+    let between = false;
+    for (let node = walker.nextNode(); node !== null && !between; node = walker.nextNode()) {
+      const inRow = rows.some((row) => row.contains(node));
+      const afterFirst =
+        firstRow !== undefined &&
+        (firstRow.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+      const beforeLast =
+        lastRow !== undefined &&
+        (lastRow.compareDocumentPosition(node) & Node.DOCUMENT_POSITION_PRECEDING) !== 0;
+      between = !inRow && afterFirst && beforeLast && (node.textContent ?? '').trim() !== '';
+    }
+    return { groupSize: options.length, holdsAll: true, shared: !apart || between };
+  }
   const root = first.getRootNode() as Document | ShadowRoot;
   const group =
     first.name === ''
