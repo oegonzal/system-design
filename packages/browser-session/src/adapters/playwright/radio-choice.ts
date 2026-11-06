@@ -28,48 +28,85 @@ const drawnAnew = async (box: Locator): Promise<boolean> =>
   // A box whose frame is gone cannot be counted: it has left the page as surely.
   (await box.count().catch(() => 0)) === 0;
 
-/** What one option is, kept across the page drawing it anew, and whether it reads chosen. */
-interface OptionRead {
+/**
+ * What one option is, kept across the page drawing it anew: the name and value
+ * of its native input, else the words of its own label — never an id, which a
+ * page may mint afresh each time it draws — or nothing to find it again by.
+ */
+interface OptionKey {
   key: string;
+  kind: 'value' | 'label' | 'none';
+}
+
+/** An option read: what it is, and whether it reads chosen. */
+interface OptionRead extends OptionKey {
   chosen: boolean;
 }
 
 /**
- * The option a click is aimed at — read before the click from the element,
- * or where the click landed once the page drew it anew: what it is (the name
- * and value of its native input, else its id, else the words of the box that
- * holds it alone) and whether it reads chosen; null when no box at the point
- * holds just one option, or the frame cannot be read.
- */
-const readOption = (
-  frame: Frame,
-  target: { option: ElementHandle<Element> } | { at: Point },
-  options: GroupOptions,
-): Promise<OptionRead | null> =>
-  frame
-    .evaluate(optionInPage, {
-      option: 'option' in target ? target.option : null,
-      at: 'at' in target ? target.at : null,
-      options,
-    })
-    .catch(() => null);
-
-/**
- * In the page: an option read as the group's reader reads one — chosen by
- * its own state, its ARIA state, or the native input it draws. One function
- * on purpose — Playwright serialises it whole.
+ * In the page: an option read as the group's reader reads one — chosen by its
+ * own state, its ARIA state, or the native input it draws — found as given,
+ * by its key anywhere in the frame, or as the one option the smallest box
+ * around a point holds; null when none is. One function on purpose —
+ * Playwright serialises it whole.
  */
 function optionInPage({
   option,
+  find,
   at,
   options,
 }: {
   option: Element | null;
+  find: { key: string; kind: 'value' | 'label' | 'none' } | null;
   at: { x: number; y: number } | null;
   options: string;
-}): OptionRead | null {
+}): { key: string; kind: 'value' | 'label' | 'none'; chosen: boolean } | null {
+  const tidy = (text: string | null | undefined): string =>
+    (text ?? '').replace(/\s+/g, ' ').trim();
+  const inputOf = (el: Element): HTMLInputElement | null =>
+    (el.matches('input')
+      ? el
+      : el.querySelector('input[type="radio"], input[type="checkbox"]')) as HTMLInputElement | null;
+  const labelOf = (el: Element): string => {
+    for (const each of [el, inputOf(el)]) {
+      if (each === null) continue;
+      const aria = tidy(each.getAttribute('aria-label'));
+      if (aria !== '') return aria;
+      const by = (each.getAttribute('aria-labelledby') ?? '')
+        .split(/\s+/)
+        .filter((id) => id !== '');
+      const named = tidy(by.map((id) => document.getElementById(id)?.textContent ?? '').join(' '));
+      if (named !== '') return named;
+      const labels = (each as HTMLInputElement).labels;
+      const labelled = tidy(
+        Array.from(labels ?? [])
+          .map((label) => label.textContent)
+          .join(' '),
+      );
+      if (labelled !== '') return labelled;
+    }
+    return '';
+  };
+  const keyOf = (el: Element): { key: string; kind: 'value' | 'label' | 'none' } => {
+    const input = inputOf(el);
+    const name = input?.getAttribute('name') ?? '';
+    const value = input?.getAttribute('value') ?? '';
+    if (name !== '' && value !== '') return { key: `${name}=${value}`, kind: 'value' };
+    const label = labelOf(el);
+    return label !== '' ? { key: label, kind: 'label' } : { key: '', kind: 'none' };
+  };
+  const chosenOf = (el: Element): boolean =>
+    el.getAttribute('aria-checked') === 'true' ||
+    (el as HTMLInputElement).checked === true ||
+    el.querySelector('input[type="radio"]:checked, input[type="checkbox"]:checked') !== null;
   let found: Element | null = option;
-  if (found === null && at !== null) {
+  if (found === null && find !== null && find.kind !== 'none') {
+    const matching = Array.from(document.querySelectorAll(options)).filter(
+      (each) => keyOf(each).key === find.key,
+    );
+    found = matching.length === 1 ? (matching[0] ?? null) : null;
+  }
+  if (found === null && at !== null && (find === null || find.kind === 'none')) {
     for (
       let node = document.elementFromPoint(at.x, at.y);
       node !== null;
@@ -83,27 +120,7 @@ function optionInPage({
       }
     }
   }
-  if (found === null) return null;
-  const input = found.matches('input')
-    ? found
-    : found.querySelector('input[type="radio"], input[type="checkbox"]');
-  const name = input?.getAttribute('name') ?? '';
-  const value = input?.getAttribute('value') ?? '';
-  let row: Element = found;
-  while (row.parentElement !== null && row.parentElement.querySelectorAll(options).length === 1) {
-    row = row.parentElement;
-  }
-  const key =
-    name !== '' && value !== ''
-      ? `${name}=${value}`
-      : found.id !== ''
-        ? `#${found.id}`
-        : (row.textContent ?? '').replace(/\s+/g, ' ').trim();
-  const chosen =
-    found.getAttribute('aria-checked') === 'true' ||
-    (found as HTMLInputElement).checked === true ||
-    found.querySelector('input[type="radio"]:checked, input[type="checkbox"]:checked') !== null;
-  return { key, chosen };
+  return found === null ? null : { ...keyOf(found), chosen: chosenOf(found) };
 }
 
 /** The option an element is, read before a click on it. */
@@ -114,26 +131,48 @@ async function optionBefore(
 ): Promise<OptionRead | null> {
   const handle = await element.elementHandle();
   try {
-    return await readOption(frame, { option: handle }, options);
+    return await frame
+      .evaluate(optionInPage, {
+        option: handle as ElementHandle<Element>,
+        find: null,
+        at: null,
+        options,
+      })
+      .catch(() => null);
   } finally {
     await handle.dispose();
   }
 }
 
 /**
- * After a click the page answered by drawing its option anew: done when the
- * option drawn where the click landed is the one aimed at and reads as the
- * click meant it to; the failure, naming what it read there, otherwise.
+ * After a click the page answered by drawing its option anew: the option is
+ * found again by what it was — anywhere in its frame by its value or label,
+ * else as the option drawn where the click landed — and read until it reads
+ * as the click meant, within the declared wait. Done then; a failure naming
+ * that option when it still reads the other way; left to the next
+ * observation when it cannot be found again at all.
  */
 async function readAnew(
   frame: Frame,
   at: Point,
-  { before, meant, options }: { before: OptionRead | null; meant: boolean; options: GroupOptions },
-  failure: (now: OptionRead | null) => ActionFailed,
+  {
+    before,
+    meant,
+    options,
+    waits,
+  }: { before: OptionRead | null; meant: boolean; options: GroupOptions; waits: RadioWaits },
+  failure: (now: OptionRead) => ActionFailed,
 ): Promise<void> {
-  const now = await readOption(frame, { at }, options);
-  if (now !== null && before !== null && now.key === before.key && now.chosen === meant) return;
-  throw failure(now);
+  const find = before === null ? null : { key: before.key, kind: before.kind };
+  const until = Date.now() + waits.optionWaitMs;
+  let now: OptionRead | null = null;
+  for (;;) {
+    now = await frame.evaluate(optionInPage, { option: null, find, at, options }).catch(() => null);
+    if (now !== null && now.chosen === meant) return;
+    if (Date.now() >= until) break;
+    await frame.page().waitForTimeout(waits.settleRetryMs);
+  }
+  if (now !== null) throw failure(now);
 }
 
 /** How a select on a radio group waits on the page: for the choice to show, and between reads of it. */
@@ -206,11 +245,11 @@ export async function chooseRadio(
     readAnew(
       place.frame,
       point,
-      { before, meant: true, options },
+      { before, meant: true, options, waits },
       () =>
         new ActionFailed(
           'select',
-          `the page drew the field anew after the click, and ${JSON.stringify(words)} does not read chosen where it was clicked`,
+          `the page drew the field anew after the click, and ${JSON.stringify(words)} still reads unchosen`,
         ),
     );
   if (first.self) {
@@ -299,13 +338,13 @@ export async function toggleCheckbox(
     readAnew(
       place.frame,
       point,
-      { before, meant: !was, options: CHECKBOX_OPTIONS },
+      { before, meant: !was, options: CHECKBOX_OPTIONS, waits: { optionWaitMs, settleRetryMs } },
       (now) =>
         new ActionFailed(
           'click',
-          `the page drew the checkbox anew after the click, and it reads ${
-            now === null ? 'as nothing' : now.chosen ? 'checked' : 'unchecked'
-          } where it was clicked`,
+          `the page drew the checkbox anew after the click, and it still reads ${
+            now.chosen ? 'checked' : 'unchecked'
+          }`,
         ),
     );
   const turned = async (): Promise<boolean> => (await holds(settleRetryMs)) === !was;
@@ -365,11 +404,11 @@ export async function chooseLoneRadio(
       return readAnew(
         place.frame,
         middle,
-        { before, meant: true, options: RADIO_OPTIONS },
+        { before, meant: true, options: RADIO_OPTIONS, waits: { optionWaitMs, settleRetryMs } },
         () =>
           new ActionFailed(
             'select',
-            'the page drew the radio anew after the click, and it does not read chosen where it was clicked',
+            'the page drew the radio anew after the click, and it still reads unchosen',
           ),
       );
     }

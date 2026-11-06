@@ -25,6 +25,8 @@ const REDRAWN = `<!doctype html><html><head><title>Apply — questions</title>
     event.preventDefault();
     const input = option.querySelector('input');
     const takes = option.closest('[data-never]') === null;
+    // A box marked late draws its answer anew unticked, and ticks it a moment later.
+    const late = option.closest('[data-late]') !== null;
     const next = option.parentElement.cloneNode(true);
     const inputs = Array.from(next.querySelectorAll('input'));
     const at = Array.from(option.parentElement.querySelectorAll('input')).indexOf(input);
@@ -40,11 +42,14 @@ const REDRAWN = `<!doctype html><html><head><title>Apply — questions</title>
             : each.checked;
     });
     option.parentElement.replaceWith(next);
+    if (late) setTimeout(() => (next.querySelector('input').checked = true), 60);
   });
 </script>
   <form>
     <p>Are you able to work remotely?</p>
     <div class="question"><div class="opt"><div style="${DRAWN_BOX}"><input type="checkbox" style="${HIDDEN_INPUT}"></div><p>Yes</p></div></div>
+    <p>Will you travel?</p>
+    <div class="late" data-late><div class="opt"><div style="${DRAWN_BOX}"><input type="checkbox" style="${HIDDEN_INPUT}"></div><p>Will travel</p></div></div>
     <p>Do you hold a clearance?</p>
     <div class="never" data-never><div class="opt"><div style="${DRAWN_BOX}"><input type="checkbox" style="${HIDDEN_INPUT}"></div><p>Hold a clearance</p></div></div>
     <fieldset data-never><legend>Do you need relocation?</legend>
@@ -116,15 +121,23 @@ describe('the Playwright browser and an option the page draws anew when it is ch
   it('[BRW-2] reads a choice drawn anew where the click landed: one the page never takes fails rather than passing as chosen', async () => {
     await browser.page.setContent(REDRAWN);
     const observation = await browser.observe();
-    const [, never] = observation.elements.filter((e) => e.role === 'checkbox');
+    const [, , never] = observation.elements.filter((e) => e.role === 'checkbox');
     await expect(browser.act({ kind: 'click', ref: never?.ref ?? '', ...common })).rejects.toThrow(
-      /reads unchecked where it was clicked/,
+      /still reads unchecked/,
     );
     expect(await browser.page.locator('.never input').isChecked()).toBe(false);
     const relocate = observation.elements.find((e) => e.context?.includes('relocation') === true);
     expect(relocate).toBeDefined();
     await expect(
       browser.act({ kind: 'select', ref: relocate?.ref ?? '', option: 'No', ...common }),
-    ).rejects.toThrow(/does not read chosen where it was clicked/);
+    ).rejects.toThrow(/still reads unchosen/);
+  });
+
+  it('[BRW-2] waits for a choice drawn anew to read as the click meant: one the page ticks a moment after drawing it is done, not a failure', async () => {
+    await browser.page.setContent(REDRAWN);
+    const observation = await browser.observe();
+    const late = observation.elements.filter((e) => e.role === 'checkbox')[1];
+    await browser.act({ kind: 'click', ref: late?.ref ?? '', ...common });
+    expect(await browser.page.locator('.late input').isChecked()).toBe(true);
   });
 });

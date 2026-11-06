@@ -13,8 +13,16 @@ import { offeredNote } from './playwright-errors';
  */
 const POLL_MS = 50;
 
-/** Words an element shows whole, around its own whitespace — never a longer text they begin. */
-const wholeText = (words: string): RegExp => new RegExp(`^\\s*${escapeRegExp(words)}\\s*$`);
+/** Words an element shows whole, its whitespace between and around them any run of it — never a longer text they begin. */
+const wholeText = (words: string): RegExp =>
+  new RegExp(
+    `^\\s*${words
+      .replace(/\s+/g, ' ')
+      .trim()
+      .split(' ')
+      .map((word) => escapeRegExp(word))
+      .join('\\s+')}\\s*$`,
+  );
 
 /**
  * A control both typed into and chosen from — an input with the combobox

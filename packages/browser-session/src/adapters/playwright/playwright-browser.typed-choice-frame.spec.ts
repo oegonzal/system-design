@@ -145,6 +145,6 @@ describe('the Playwright browser and the choices of a form a page embeds in a fr
     expect(await form.locator('.redraws:not([data-never]) input').isChecked()).toBe(true);
     await expect(
       browser.act({ kind: 'click', ref: clearance?.ref ?? '', ...COMMON }),
-    ).rejects.toThrow(/reads unchecked where it was clicked/);
+    ).rejects.toThrow(/still reads unchecked/);
   });
 });
