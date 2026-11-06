@@ -163,7 +163,10 @@ export function briefMarkdown(
       ? `${binding.criterionId} — ${markdownCell(statement)}`
       : binding.criterionId;
     const components = binding.nodeIds.map((id) => labels.get(id) ?? id).join(', ') || '—';
-    const path = (binding.path ?? []).map((edgeId) => hops.get(edgeId) ?? edgeId).join(', then ');
+    // Numbered as the canvas numbers a shown path: the walk's order, stated.
+    const path = (binding.path ?? [])
+      .map((edgeId, index) => `${index + 1}. ${hops.get(edgeId) ?? edgeId}`)
+      .join('; ');
     lines.push(
       `| ${criterion} | ${markdownCell(binding.claim)} | ${markdownCell(components)} | ${
         markdownCell(path) || '—'

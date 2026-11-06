@@ -154,6 +154,29 @@ describe('DesignBriefEditor', () => {
     expect(screen.getByTestId('flow-rest-c1').textContent).toBe('Comes to rest at Orders.');
   });
 
+  it('[UX-34] a hop added shows the path on the canvas; the toggle turns it off and on; another criterion’s path replaces it; an emptied path shows nothing', async () => {
+    const store = renderEditor();
+    await userEvent.click(screen.getByTestId('flow-open-c1'));
+    await userEvent.click(screen.getByTestId('flow-hop-c1-e-1'));
+    expect(store.getState().focus).toEqual({ criterionId: 'c1' });
+    expect(screen.getByTestId('flow-focus-c1').getAttribute('aria-pressed')).toBe('true');
+    expect(store.getState().edges.find((edge) => edge.id === 'e-1')?.data?.sequence).toEqual([1]);
+
+    await userEvent.click(screen.getByTestId('flow-focus-c1'));
+    expect(store.getState().focus).toBeNull();
+    expect(screen.getByTestId('flow-focus-c1').getAttribute('aria-pressed')).toBe('false');
+    await userEvent.click(screen.getByTestId('flow-focus-c1'));
+    expect(store.getState().focus).toEqual({ criterionId: 'c1' });
+
+    await userEvent.click(screen.getByTestId('flow-open-c2'));
+    await userEvent.click(screen.getByTestId('flow-hop-c2-e-2'));
+    expect(store.getState().focus).toEqual({ criterionId: 'c2' });
+    expect(screen.getByTestId('flow-focus-c1').getAttribute('aria-pressed')).toBe('false');
+
+    await userEvent.click(screen.getByTestId('flow-clear-c2'));
+    expect(store.getState().focus).toBeNull();
+  });
+
   it('undoes a hop and clears a path', async () => {
     const store = renderEditor();
     await userEvent.click(screen.getByTestId('flow-open-c1'));

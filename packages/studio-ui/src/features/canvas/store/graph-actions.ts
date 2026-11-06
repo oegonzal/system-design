@@ -2,6 +2,7 @@ import { DEFAULT_NODE_LABELS } from '@sysdesign/contracts';
 import { applyEdgeChanges, applyNodeChanges, type NodePositionChange } from '@xyflow/react';
 
 import { NODE_MIN_FOOTPRINT } from '../geometry';
+import { markersFor } from '../edges/edge-markers';
 import { dropPosition, placeBlock, type Placement } from '../placement';
 import { isNodeKind, serviceOf, type PaletteBlock } from '../platform-services';
 import type { SdEdge, SdNode } from '../types';
@@ -130,6 +131,7 @@ export const graphActions = ({ set, get, edits: { commit } }: ActionDeps): Graph
       type: 'sd',
       source: connection.source,
       target: connection.target,
+      ...markersFor('sync'),
       data: { kind: 'sync' },
     };
     commit({ edges: [...edges, edge] });
@@ -153,23 +155,26 @@ export const graphActions = ({ set, get, edits: { commit } }: ActionDeps): Graph
     if (!edges.some((edge) => edge.id === id)) return;
     commit(
       {
-        edges: edges.map((edge) =>
-          edge.id === id
-            ? {
-                ...edge,
-                ...(patch.label !== undefined ? { label: patch.label } : {}),
-                // Spread, never rebuilt: a kind-only patch keeps the carries
-                // and the config as they were, and an empty list clears its own
-                // field (serialization omits empty lists).
-                data: {
-                  ...edge.data,
-                  kind: patch.kind ?? edge.data?.kind ?? 'sync',
-                  ...(patch.carries !== undefined ? { carries: patch.carries } : {}),
-                  ...(patch.config !== undefined ? { config: patch.config } : {}),
-                },
-              }
-            : edge,
-        ),
+        edges: edges.map((edge) => {
+          if (edge.id !== id) return edge;
+          const kind = patch.kind ?? edge.data?.kind ?? 'sync';
+          // A new kind redraws the arrowheads: the old reply marker goes
+          // before the kind's own set is spread, so an async hop keeps none.
+          const { markerStart: _previous, ...kept } = edge;
+          return {
+            ...(patch.kind !== undefined ? { ...kept, ...markersFor(kind) } : edge),
+            ...(patch.label !== undefined ? { label: patch.label } : {}),
+            // Spread, never rebuilt: a kind-only patch keeps the carries
+            // and the config as they were, and an empty list clears its own
+            // field (serialization omits empty lists).
+            data: {
+              ...edge.data,
+              kind,
+              ...(patch.carries !== undefined ? { carries: patch.carries } : {}),
+              ...(patch.config !== undefined ? { config: patch.config } : {}),
+            },
+          };
+        }),
       },
       fieldKey('edge', id, patch),
     );
@@ -208,6 +213,6 @@ export const graphActions = ({ set, get, edits: { commit } }: ActionDeps): Graph
   clear() {
     const { nodes, edges } = get();
     if (nodes.length === 0 && edges.length === 0) return;
-    commit({ nodes: [], edges: [], selectedId: null, highlight: null });
+    commit({ nodes: [], edges: [], selectedId: null, highlight: null, focus: null });
   },
 });

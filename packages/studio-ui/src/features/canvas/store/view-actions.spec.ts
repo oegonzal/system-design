@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { makeGraph } from '../../../testing/canvas-fixtures';
+import { makeBinding, makeBrief, makeGraph } from '../../../testing/canvas-fixtures';
 import { createCanvasStore, type CanvasStore } from '../canvas-store';
 
 describe('canvas-store', () => {
@@ -119,6 +119,67 @@ describe('canvas-store', () => {
       store.getState().inspect('n-2');
       expect(store.getState().selectedId).toBe('n-2');
       expect(selectedFlags(store)).toEqual(['n-1', 'n-2', 'e-1']);
+    });
+  });
+
+  describe('the shown path', () => {
+    const edgeData = (store: CanvasStore, id: string) =>
+      store.getState().edges.find((edge) => edge.id === id)?.data;
+    const nodeData = (store: CanvasStore, id: string) =>
+      store.getState().nodes.find((node) => node.id === id)?.data;
+
+    it('[UX-34] focusPath numbers the criterion’s hops in walk order, marks the blocks on the path, dims what is off it, and clearFocus strips it all', () => {
+      const store = createCanvasStore(makeGraph());
+      store.getState().loadBrief(makeBrief());
+
+      store.getState().focusPath('c1');
+      expect(store.getState().focus).toEqual({ criterionId: 'c1' });
+      expect(edgeData(store, 'e-1')?.sequence).toEqual([1]);
+      expect(edgeData(store, 'e-2')?.sequence).toEqual([2]);
+      expect(edgeData(store, 'e-1')?.onPath).toBe(true);
+      expect(nodeData(store, 'n-1')?.onPath).toBe(true);
+      expect(nodeData(store, 'n-3')?.onPath).toBe(true);
+
+      store.getState().addNode('cache');
+      expect(nodeData(store, 'n-4')?.onPath).toBe(false);
+
+      store.getState().clearFocus();
+      expect(store.getState().focus).toBeNull();
+      expect(edgeData(store, 'e-1')?.sequence).toBeUndefined();
+      expect(edgeData(store, 'e-1')?.onPath).toBeUndefined();
+      expect(nodeData(store, 'n-4')?.onPath).toBeUndefined();
+    });
+
+    it('[UX-34] a hop the walk revisits carries every position it holds', () => {
+      const store = createCanvasStore(makeGraph());
+      store
+        .getState()
+        .onConnect({ source: 'n-3', target: 'n-1', sourceHandle: null, targetHandle: null });
+      store
+        .getState()
+        .loadBrief(makeBrief({ bindings: [makeBinding({ path: ['e-1', 'e-2', 'e-3', 'e-1'] })] }));
+
+      store.getState().focusPath('c1');
+      expect(edgeData(store, 'e-1')?.sequence).toEqual([1, 4]);
+      expect(edgeData(store, 'e-3')?.sequence).toEqual([3]);
+    });
+
+    it('[UX-34] a finding’s highlight and a shown path exclude each other, and a criterion with no path shows nothing', () => {
+      const store = createCanvasStore(makeGraph());
+      store.getState().loadBrief(makeBrief());
+
+      store.getState().focusPath('c1');
+      store.getState().setHighlight({ nodeIds: ['n-3'], edgeIds: [], severity: 'high' });
+      expect(store.getState().focus).toBeNull();
+      expect(edgeData(store, 'e-1')?.sequence).toBeUndefined();
+
+      store.getState().focusPath('c1');
+      expect(store.getState().highlight).toBeNull();
+      expect(nodeData(store, 'n-3')?.severity).toBeNull();
+
+      store.getState().focusPath('c3');
+      expect(store.getState().focus).toBeNull();
+      expect(edgeData(store, 'e-1')?.sequence).toBeUndefined();
     });
   });
 });

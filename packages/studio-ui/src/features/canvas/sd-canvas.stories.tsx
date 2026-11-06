@@ -5,7 +5,12 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { ReactFlowProvider } from '@xyflow/react';
 import { useState, type ReactNode } from 'react';
 
-import { makeGraph } from '../../testing/canvas-fixtures';
+import {
+  makeBinding,
+  makeBrief,
+  makeGraph,
+  makeLifecycleGraph,
+} from '../../testing/canvas-fixtures';
 import { withCanvasStore } from '../../testing/story-decorators';
 import { useCanvasStoreApi } from './canvas-store-context';
 import { SdCanvas } from './sd-canvas';
@@ -147,4 +152,25 @@ function RevisionLoader() {
 export const RevisionLoadedUnderABanner: Story = {
   decorators: [withCanvasStore((store) => store.getState().setGraph(makeGraph()))],
   render: () => <Workspace above={<RevisionLoader />} />,
+};
+
+/** A path shown on the canvas: the way in traced end to end, every hop numbered, the request at rest. */
+export const FocusedPath: Story = {
+  decorators: [
+    withCanvasStore((store) => {
+      store.getState().setGraph(makeLifecycleGraph());
+      store.getState().loadBrief(
+        makeBrief({
+          bindings: [
+            makeBinding({
+              nodeIds: ['n-5', 'n-6'],
+              path: ['e-1', 'e-2', 'e-3', 'e-4', 'e-5'],
+              claim: 'The catalog is read behind the front door, from the edge in',
+            }),
+          ],
+        }),
+      );
+      store.getState().focusPath('c1');
+    }),
+  ],
 };

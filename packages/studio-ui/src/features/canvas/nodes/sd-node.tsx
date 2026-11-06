@@ -6,6 +6,7 @@ import { transient } from '@sysdesign/design-system';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { memo } from 'react';
 
+import { dimmedStyle } from '../focus-style';
 import { NODE_WIDTH } from '../geometry';
 import type { SdNode as SdNodeModel } from '../types';
 import { serviceOf } from '../platform-services';
@@ -15,6 +16,7 @@ const Root = styled('div', transient)<{
   $kind: NodeKind;
   $selected: boolean;
   $severity: Severity | null;
+  $onPath: boolean;
 }>`
   display: flex;
   align-items: center;
@@ -30,15 +32,19 @@ const Root = styled('div', transient)<{
   box-shadow: ${({ theme }) => theme.shadow.sm};
   font-family: ${({ theme }) => theme.font.family.base};
 
-  /* Selection ring and severity outline share the outline channel; a finding
-     pointing at the selected node wins — that is the one being discussed. */
-  outline: ${({ theme, $selected, $severity }) =>
+  /* Selection ring, severity outline and the shown path's ring share the
+     outline channel; a finding pointing at the selected node wins — that is
+     the one being discussed — then the selection, then the path. */
+  outline: ${({ theme, $selected, $severity, $onPath }) =>
     $severity
       ? `2px solid ${theme.color.severity[$severity].fg}`
       : $selected
         ? `2px solid ${theme.color.border.focus}`
-        : 'none'};
+        : $onPath
+          ? `2px solid ${theme.color.border.accent}`
+          : 'none'};
   outline-offset: 2px;
+  transition: opacity ${({ theme }) => theme.motion.duration.normal};
 `;
 
 const IconChip = styled('span', transient)<{ $kind: NodeKind }>`
@@ -90,8 +96,11 @@ function SdNodeComponent({ id, data, selected }: NodeProps<SdNodeModel>) {
       $kind={data.kind}
       $selected={selected ?? false}
       $severity={severity}
+      $onPath={data.onPath === true}
+      style={dimmedStyle(data.onPath)}
       data-testid={`node-${id}`}
       data-kind={data.kind}
+      {...(data.onPath !== undefined ? { 'data-on-path': String(data.onPath) } : {})}
       {...(data.service !== undefined ? { 'data-service': data.service } : {})}
       {...(opCount > 0 ? { 'data-op-count': opCount } : {})}
       {...(severity ? { 'data-severity': severity } : {})}

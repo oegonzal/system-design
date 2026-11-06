@@ -238,6 +238,11 @@ export const STUDIO_CRITERIA: readonly Criterion[] = [
     statement:
       'Every canvas goal carries the canvas vocabulary — each role a block may play, shelf by shelf, in the guide’s own words, and the keys a hop is offered — between the prompt and the platform section, and a platform section closes with the boundaries a block may name, so every lens reads a kind and a boundary by the definition the author drew from.',
   },
+  {
+    id: 'UX-34',
+    statement:
+      'A connection reads as what it is — a sync call drawn with a request arrowhead and a reply arrowhead, an async hop dashed with one, a legend on the canvas saying so — and a traced path can be shown on the canvas from the Brief tab: its hops numbered on their connections in walk order (several numbers where a hop is revisited), the rest of the diagram dimmed, shown as the path is traced, hidden by its toggle or Escape, replaced by the next path shown, never in a finding’s way; the export numbers the same hops.',
+  },
   // STAR repository
   {
     id: 'STAR-1',

@@ -7,6 +7,7 @@ import { transient } from '@sysdesign/design-system';
 import { BaseEdge, EdgeLabelRenderer, useStore, type EdgeProps } from '@xyflow/react';
 import { memo, useEffect, useLayoutEffect, useMemo, useState, type CSSProperties } from 'react';
 
+import { dimmedStyle } from '../focus-style';
 import type { Size } from '../geometry';
 import type { SdEdge as SdEdgeModel } from '../types';
 import { connectionCurve, curvePath, type Curve } from './edge-path';
@@ -30,19 +31,27 @@ const still = css`
  * The line itself, as inline style on the path rather than a stylesheet rule:
  * whatever copies the diagram out of the page — the PDF export clones the
  * viewport — keeps exactly what is drawn. A finding's severity outranks the
- * selection, which outranks the resting line; async calls are dashed.
+ * selection, which outranks a hop of the shown path, which outranks the
+ * resting line; async calls are dashed.
  */
 export function edgeStroke(
   theme: Theme,
-  { kind, severity, selected }: { kind: EdgeKind; severity: Severity | null; selected: boolean },
+  {
+    kind,
+    severity,
+    selected,
+    onPath = false,
+  }: { kind: EdgeKind; severity: Severity | null; selected: boolean; onPath?: boolean },
 ): CSSProperties {
   return {
     stroke: severity
       ? theme.color.severity[severity].fg
       : selected
         ? theme.color.border.focus
-        : theme.color.border.default,
-    strokeWidth: severity ? 2.5 : selected ? 2 : 1.5,
+        : onPath
+          ? theme.color.border.accent
+          : theme.color.border.default,
+    strokeWidth: severity ? 2.5 : selected || onPath ? 2 : 1.5,
     ...(kind === 'async' ? { strokeDasharray: '7 5' } : {}),
   };
 }
@@ -65,6 +74,9 @@ const EdgeGroup = styled('g', transient)<{ $kind: EdgeKind }>`
 const LabelChip = styled.div`
   position: absolute;
   pointer-events: all;
+  display: inline-flex;
+  align-items: center;
+  gap: ${({ theme }) => theme.space[2]}px;
   padding: 1px ${({ theme }) => theme.space[3]}px;
   border-radius: ${({ theme }) => theme.radius.pill};
   background: ${({ theme }) => theme.color.bg.surface};
@@ -72,6 +84,20 @@ const LabelChip = styled.div`
   color: ${({ theme }) => theme.color.text.secondary};
   font-size: ${({ theme }) => theme.font.size.xs};
   font-family: ${({ theme }) => theme.font.family.base};
+`;
+
+/** A hop's number in the shown path: the accent pair, so it reads as the path's own mark. */
+const SequenceBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.6em;
+  padding: 0 ${({ theme }) => theme.space[2]}px;
+  border-radius: ${({ theme }) => theme.radius.pill};
+  background: ${({ theme }) => theme.color.accent.default};
+  color: ${({ theme }) => theme.color.accent.fg};
+  font-weight: ${({ theme }) => theme.font.weight.semibold};
+  line-height: 1.6;
 `;
 
 /** The size the pill is laid out at, in flow units (unscaled by the zoom); null until it is in the page. */
@@ -106,18 +132,36 @@ function useLaidOutSize(element: HTMLElement | null, text: string): Size | null 
  * like the line's stroke: a copy of the diagram (the PDF) keeps it where the
  * screen shows it.
  */
-function EdgePill({ id, curve, text }: { id: string; curve: Curve; text: string }) {
+function EdgePill({
+  id,
+  curve,
+  text,
+  sequence,
+  onPath,
+}: {
+  id: string;
+  curve: Curve;
+  text: string | null;
+  sequence: readonly number[];
+  onPath: boolean | undefined;
+}) {
   const [chip, setChip] = useState<HTMLDivElement | null>(null);
-  const size = useLaidOutSize(chip, text);
+  const size = useLaidOutSize(chip, `${sequence.join(',')}|${text ?? ''}`);
   const point = usePillPlace(id, curve, size);
   return (
     <EdgeLabelRenderer>
       <LabelChip
         ref={setChip}
         data-testid={`edge-pill-${id}`}
-        style={{ transform: `translate(-50%, -50%) translate(${point.x}px, ${point.y}px)` }}
+        style={{
+          transform: `translate(-50%, -50%) translate(${point.x}px, ${point.y}px)`,
+          ...dimmedStyle(onPath),
+        }}
       >
-        {text}
+        {sequence.map((ordinal) => (
+          <SequenceBadge key={ordinal}>{ordinal}</SequenceBadge>
+        ))}
+        {text !== null ? <span>{text}</span> : null}
       </LabelChip>
     </EdgeLabelRenderer>
   );
@@ -136,6 +180,7 @@ function SdEdgeComponent(props: EdgeProps<SdEdgeModel>) {
     targetPosition,
     data,
     label,
+    markerStart,
     markerEnd,
     selected = false,
   } = props;
@@ -161,6 +206,9 @@ function SdEdgeComponent(props: EdgeProps<SdEdgeModel>) {
 
   const kind = data?.kind ?? 'sync';
   const severity = data?.severity ?? null;
+  // The shown path, as the store painted it: this hop's numbers and whether it is on it.
+  const sequence = data?.sequence ?? [];
+  const onPath = data?.onPath;
 
   // The pill: carries win, the prose label is the fallback — a structured
   // declaration outranks prose. Graphs without carries render exactly as
@@ -178,15 +226,21 @@ function SdEdgeComponent(props: EdgeProps<SdEdgeModel>) {
       $kind={kind}
       data-testid={`edge-${id}`}
       data-kind={kind}
+      style={dimmedStyle(onPath)}
       {...(severity ? { 'data-severity': severity } : {})}
+      {...(onPath !== undefined ? { 'data-on-path': String(onPath) } : {})}
+      {...(sequence.length > 0 ? { 'data-sequence': sequence.join(',') } : {})}
     >
       <BaseEdge
         id={id}
         path={curvePath(curve)}
+        markerStart={markerStart}
         markerEnd={markerEnd}
-        style={edgeStroke(theme, { kind, severity, selected })}
+        style={edgeStroke(theme, { kind, severity, selected, onPath: onPath === true })}
       />
-      {pill !== null ? <EdgePill id={id} curve={curve} text={pill} /> : null}
+      {pill !== null || sequence.length > 0 ? (
+        <EdgePill id={id} curve={curve} text={pill} sequence={sequence} onPath={onPath} />
+      ) : null}
     </EdgeGroup>
   );
 }

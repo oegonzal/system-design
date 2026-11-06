@@ -42,6 +42,7 @@ export function createCanvasStore(initial?: CanvasGraph): CanvasStore {
       relations: [],
       bindings: [],
       highlight: null,
+      focus: null,
 
       ...graphActions(deps),
       ...historyActions(deps),

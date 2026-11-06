@@ -43,6 +43,9 @@ export function DesignBriefEditor({ criteria, deriving = false }: DesignBriefEdi
   const toggleBindingEntity = useCanvasStore((state) => state.toggleBindingEntity);
   const setBindingPath = useCanvasStore((state) => state.setBindingPath);
   const clearBinding = useCanvasStore((state) => state.clearBinding);
+  const focus = useCanvasStore((state) => state.focus);
+  const focusPath = useCanvasStore((state) => state.focusPath);
+  const clearFocus = useCanvasStore((state) => state.clearFocus);
 
   const graph: CanvasGraph = useMemo(() => toCanvasGraph(nodes, edges), [nodes, edges]);
   const groups = useMemo(() => groupCriteriaByKind(criteria), [criteria]);
@@ -86,7 +89,13 @@ export function DesignBriefEditor({ criteria, deriving = false }: DesignBriefEdi
                 onTradeoff={(tradeoff) => setBindingTradeoff(criterion.id, tradeoff)}
                 onToggleNode={(nodeId) => toggleBindingNode(criterion.id, nodeId)}
                 onToggleEntity={(entityId) => toggleBindingEntity(criterion.id, entityId)}
-                onPath={(path) => setBindingPath(criterion.id, path)}
+                // Tracing shows the path as it grows; an emptied path is no longer shown (the store drops it).
+                onPath={(path) => {
+                  setBindingPath(criterion.id, path);
+                  if (path.length > 0) focusPath(criterion.id);
+                }}
+                focused={focus?.criterionId === criterion.id}
+                onFocus={(on) => (on ? focusPath(criterion.id) : clearFocus())}
                 onClear={() => clearBinding(criterion.id)}
               />
             ))}

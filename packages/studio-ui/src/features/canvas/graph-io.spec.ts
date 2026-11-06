@@ -190,4 +190,21 @@ describe('graph-io', () => {
     );
     expect(serialized.edges.map((edge) => edge.id)).toEqual(['e-1']);
   });
+
+  it('[UX-34] hydrates a sync connection with both arrowheads and an async one with the request’s alone, and serializes neither', () => {
+    const graph = makePlatformGraph();
+    const { edges } = fromCanvasGraph(graph);
+    const byId = (id: string) => edges.find((edge) => edge.id === id);
+    const sync = graph.edges.find((edge) => edge.kind === 'sync');
+    const async = graph.edges.find((edge) => edge.kind === 'async');
+    if (!sync || !async) throw new Error('the platform fixture draws both call styles');
+    expect(byId(sync.id)?.markerStart).toBeDefined();
+    expect(byId(sync.id)?.markerEnd).toBeDefined();
+    expect(byId(async.id)?.markerStart).toBeUndefined();
+    expect(byId(async.id)?.markerEnd).toBeDefined();
+    for (const edge of toCanvasGraph(fromCanvasGraph(graph).nodes, edges).edges) {
+      expect(edge).not.toHaveProperty('markerStart');
+      expect(edge).not.toHaveProperty('markerEnd');
+    }
+  });
 });

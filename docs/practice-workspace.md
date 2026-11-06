@@ -63,7 +63,11 @@ generated. It is data on the prompt; nothing in the studio branches on it.
   the requirement instead, and the cost of the one chosen. A row is `bound`
   once it has a claim and at least one component; nothing else is checked
   here. Whether the claim holds, and whether the choice is defended, is the
-  grader's call.
+  grader's call. As you trace a path it is **shown on the canvas**: its hops
+  numbered on their connections in walk order, everything else dimmed;
+  _Show on canvas_ hides or restores it, Escape dismisses it, and tracing
+  another criterion shows that path instead. An export made while a path is
+  shown carries its numbering and dimming.
 - **Model** — the _data_ half: the **entities** the design keeps, each with
   the node that **owns** it, its **key**, its **fields**, the **invariants**
   every instance must hold and the **states** it moves through, and the
@@ -244,6 +248,9 @@ its own **Configuration** — how the hop is made and what happens when it fails
 (protocol, auth, a timeout, retries, a dead-letter queue, the delivery or
 ordering guarantee), offered as chips and free-form like a block's.
 
+- A **connection** is drawn as what it means: a sync call is a request and its
+  reply, so it carries an arrowhead at each end; an async hop is one message
+  one way, dashed with a single arrowhead. The legend under the canvas says so.
 - **Configuration** is free-form: any key, with a value typed as you enter it
   — `true`/`false` become flags, a number stays a number, anything else is
   text. There is no vocabulary to learn; the grader reads whatever you wrote,

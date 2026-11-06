@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { overlaps, type Box, type Size } from '../geometry';
 import { SdNode } from '../nodes/sd-node';
 import type { SdEdge as SdEdgeModel, SdNode as SdNodeModel } from '../types';
+import { markersFor } from './edge-markers';
 import { edgeStroke, SdEdge } from './sd-edge';
 
 const nodeTypes = { sd: SdNode };
@@ -197,16 +198,82 @@ describe('SdEdge', () => {
     expect(path?.style.strokeDasharray).toBe('7 5');
   });
 
-  it('strokes by severity over selection over rest', () => {
+  it('strokes by severity over selection over the shown path over rest', () => {
     const theme = createTheme(DEFAULT_APPEARANCE_SETTINGS);
     const rest = edgeStroke(theme, { kind: 'sync', severity: null, selected: false });
-    const selected = edgeStroke(theme, { kind: 'sync', severity: null, selected: true });
+    const onPath = edgeStroke(theme, {
+      kind: 'sync',
+      severity: null,
+      selected: false,
+      onPath: true,
+    });
+    const selected = edgeStroke(theme, {
+      kind: 'sync',
+      severity: null,
+      selected: true,
+      onPath: true,
+    });
     const flagged = edgeStroke(theme, { kind: 'sync', severity: 'high', selected: true });
 
     expect(rest.stroke).toBe(theme.color.border.default);
     expect(rest).not.toHaveProperty('strokeDasharray');
+    expect(onPath.stroke).toBe(theme.color.border.accent);
+    expect(onPath.strokeWidth).toBe(2);
     expect(selected.stroke).toBe(theme.color.border.focus);
     expect(flagged.stroke).toBe(theme.color.severity.high.fg);
+  });
+
+  it('[UX-34] draws a sync call with a reply arrowhead at its source and the request’s at its target; an async hop one way only', async () => {
+    renderEdges([
+      connection({ id: 'e-1', ...markersFor('sync') }),
+      connection({
+        id: 'e-2',
+        target: 'n-1',
+        source: 'n-2',
+        ...markersFor('async'),
+        data: { kind: 'async' },
+      }),
+    ]);
+
+    const sync = (await screen.findByTestId('edge-e-1')).querySelector(
+      'path.react-flow__edge-path',
+    );
+    const async = (await screen.findByTestId('edge-e-2')).querySelector(
+      'path.react-flow__edge-path',
+    );
+    expect(sync?.getAttribute('marker-start')).toMatch(/^url\(['"]?#/);
+    expect(sync?.getAttribute('marker-end')).toMatch(/^url\(['"]?#/);
+    expect(async?.getAttribute('marker-start')).toBeNull();
+    expect(async?.getAttribute('marker-end')).toMatch(/^url\(['"]?#/);
+  });
+
+  it('[UX-34] numbers a hop of the shown path on its pill — alone when nothing else is on it, before the words when there are', async () => {
+    renderEdges([
+      connection({ id: 'e-1', data: { kind: 'sync', sequence: [1], onPath: true } }),
+      connection({
+        id: 'e-2',
+        label: 'writes',
+        data: { kind: 'sync', sequence: [2, 4], onPath: true },
+      }),
+    ]);
+
+    const first = await screen.findByTestId('edge-pill-e-1');
+    expect(first.textContent).toBe('1');
+    expect(screen.getByTestId('edge-e-1').getAttribute('data-sequence')).toBe('1');
+    const second = await screen.findByTestId('edge-pill-e-2');
+    expect(second.textContent).toBe('24writes');
+    expect(screen.getByText('writes')).toBeTruthy();
+    expect(screen.getByTestId('edge-e-2').getAttribute('data-sequence')).toBe('2,4');
+    expect(screen.getByTestId('edge-e-2').getAttribute('data-on-path')).toBe('true');
+  });
+
+  it('[UX-34] dims a hop off the shown path inline, line and pill alike, and says so as data', async () => {
+    renderEdge({ label: 'writes', data: { kind: 'sync', onPath: false } });
+
+    const edge = await screen.findByTestId('edge-e-1');
+    expect(edge.getAttribute('data-on-path')).toBe('false');
+    expect(edge.style.opacity).toBe('0.35');
+    expect(screen.getByTestId('edge-pill-e-1').style.opacity).toBe('0.35');
   });
 
   it('stamps the call style as data-kind', async () => {

@@ -61,6 +61,18 @@ export class BriefPanel {
     }
   }
 
+  /** Show the criterion's path on the canvas, or hide it. */
+  async toggleFocus(criterionId: string): Promise<void> {
+    await this.page.getByTestId(`flow-focus-${criterionId}`).click();
+  }
+
+  async expectFocused(criterionId: string, pressed: boolean): Promise<void> {
+    await expect(this.page.getByTestId(`flow-focus-${criterionId}`)).toHaveAttribute(
+      'aria-pressed',
+      String(pressed),
+    );
+  }
+
   async expectTraced(criterionId: string, hops: number): Promise<void> {
     await expect(this.page.getByTestId(`flow-status-${criterionId}`)).toContainText(
       `Traced · ${hops} ${hops === 1 ? 'hop' : 'hops'}`,

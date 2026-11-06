@@ -5,7 +5,7 @@ import { act, createEvent, fireEvent, screen } from '@testing-library/react';
 import { ReactFlowProvider, useStoreApi } from '@xyflow/react';
 import { describe, expect, it } from 'vitest';
 
-import { makeGraph } from '../../testing/canvas-fixtures';
+import { makeBrief, makeGraph } from '../../testing/canvas-fixtures';
 import { createCanvasStore, type CanvasStore } from './canvas-store';
 import { CanvasStoreProvider } from './canvas-store-context';
 import { FIT_ZOOM, viewArea } from './framing';
@@ -154,6 +154,22 @@ describe('SdCanvas', () => {
       (element) => element.selected,
     );
     expect(marked).toEqual([]);
+  });
+
+  it('[UX-34] shows the legend, and a click on the empty pane keeps the shown path', () => {
+    const store = createCanvasStore(makeGraph());
+    const { surface } = mountCanvas(store);
+    expect(screen.getByTestId('canvas-legend').textContent).toContain('request and reply');
+    act(() => {
+      store.getState().loadBrief(makeBrief());
+      store.getState().focusPath('c1');
+    });
+
+    const pane = surface().querySelector<HTMLElement>('.react-flow__pane');
+    if (!pane) throw new Error('no pane');
+    fireEvent.click(pane);
+
+    expect(store.getState().focus).toEqual({ criterionId: 'c1' });
   });
 
   it('[UX-2] a modifier-click adds to the selection: the canvas keeps every selected element, and the panel follows the one last clicked', () => {

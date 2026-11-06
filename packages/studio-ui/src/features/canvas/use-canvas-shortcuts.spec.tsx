@@ -1,7 +1,7 @@
 import { act, fireEvent, render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { makeGraph } from '../../testing/canvas-fixtures';
+import { makeBrief, makeGraph } from '../../testing/canvas-fixtures';
 import { createCanvasStore, type CanvasStore } from './canvas-store';
 import { CanvasStoreProvider } from './canvas-store-context';
 import { useCanvasShortcuts } from './use-canvas-shortcuts';
@@ -56,6 +56,20 @@ describe('useCanvasShortcuts', () => {
 
     expect(store.getState().highlight).toBeNull();
     expect(store.getState().nodes[2]?.data.severity).toBeNull();
+  });
+
+  it('[UX-34] Escape dismisses the shown path too', () => {
+    const store = createCanvasStore(makeGraph());
+    mount(store);
+    act(() => {
+      store.getState().loadBrief(makeBrief());
+      store.getState().focusPath('c1');
+    });
+
+    fireEvent.keyDown(document.body, { key: 'Escape' });
+
+    expect(store.getState().focus).toBeNull();
+    expect(store.getState().edges[0]?.data?.sequence).toBeUndefined();
   });
 
   it('stops listening once the canvas unmounts', () => {

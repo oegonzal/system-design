@@ -46,6 +46,9 @@ export interface CriterionBindingRowProps {
   onToggleNode: (nodeId: string) => void;
   onToggleEntity: (entityId: string) => void;
   onPath: (path: string[]) => void;
+  /** Whether this criterion's path is the one shown on the canvas. */
+  focused: boolean;
+  onFocus: (focused: boolean) => void;
   onClear: () => void;
 }
 
@@ -68,6 +71,8 @@ export function CriterionBindingRow({
   onToggleNode,
   onToggleEntity,
   onPath,
+  focused,
+  onFocus,
   onClear,
 }: CriterionBindingRowProps) {
   const path = binding?.path ?? [];
@@ -172,7 +177,9 @@ export function CriterionBindingRow({
             graph={graph}
             path={path}
             disabled={disabled}
+            focused={focused}
             onChange={onPath}
+            onFocus={onFocus}
           />
         ) : (
           <div>

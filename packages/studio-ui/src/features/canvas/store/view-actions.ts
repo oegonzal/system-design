@@ -1,4 +1,4 @@
-import { marked, paintSeverity } from './elements';
+import { focusPainted, marked, paintFocus, paintSeverity } from './elements';
 import type { ActionDeps } from './history';
 import type { CanvasState } from './state';
 
@@ -8,6 +8,8 @@ export type ViewActions = Pick<
   | 'inspect'
   | 'setHighlight'
   | 'clearHighlight'
+  | 'focusPath'
+  | 'clearFocus'
   | 'setReadOnly'
   | 'requestFit'
   | 'attachViewport'
@@ -28,13 +30,36 @@ export const viewActions = ({ set, get }: ActionDeps): ViewActions => ({
     set({ selectedId: id });
   },
 
+  // A finding's highlight and a shown path exclude each other: an element the
+  // finding points at must never be the one dimmed off the path.
   setHighlight(highlight) {
     const { nodes, edges } = get();
+    const unfocused = paintFocus(nodes, edges, null);
     set({
       highlight,
-      nodes: paintSeverity(nodes, new Set(highlight.nodeIds), highlight.severity),
-      edges: paintSeverity(edges, new Set(highlight.edgeIds), highlight.severity),
+      focus: null,
+      nodes: paintSeverity(unfocused.nodes, new Set(highlight.nodeIds), highlight.severity),
+      edges: paintSeverity(unfocused.edges, new Set(highlight.edgeIds), highlight.severity),
     });
+  },
+
+  focusPath(criterionId) {
+    const { nodes, edges, bindings } = get();
+    set({
+      highlight: null,
+      ...focusPainted({
+        nodes: paintSeverity(nodes, new Set<string>(), null),
+        edges: paintSeverity(edges, new Set<string>(), null),
+        bindings,
+        focus: { criterionId },
+      }),
+    });
+  },
+
+  clearFocus() {
+    const { nodes, edges, focus } = get();
+    if (!focus) return;
+    set({ focus: null, ...paintFocus(nodes, edges, null) });
   },
 
   clearHighlight() {

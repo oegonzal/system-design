@@ -43,6 +43,84 @@ export function paintSeverity<T extends SdNode | SdEdge>(
   });
 }
 
+/** Each edge's positions in a walk, 1-based; a revisited edge gets every position it holds. */
+export function pathOrdinals(path: readonly string[]): Map<string, number[]> {
+  const ordinals = new Map<string, number[]>();
+  path.forEach((edgeId, index) => {
+    ordinals.set(edgeId, [...(ordinals.get(edgeId) ?? []), index + 1]);
+  });
+  return ordinals;
+}
+
+const sameSequence = (a: number[] | undefined, b: number[] | undefined): boolean =>
+  a === b ||
+  (a !== undefined && b !== undefined && a.length === b.length && a.every((n, i) => n === b[i]));
+
+/**
+ * The shown path written onto the elements: every edge's `sequence` and
+ * `onPath`, every node's `onPath` (an end of a path edge), or all three
+ * stripped when no path is shown. Same element back when nothing changed, so
+ * a repaint on every edit costs no re-render.
+ */
+export function paintFocus(
+  nodes: SdNode[],
+  edges: SdEdge[],
+  path: readonly string[] | null,
+): { nodes: SdNode[]; edges: SdEdge[] } {
+  const ordinals = path === null ? null : pathOrdinals(path);
+  const onPathNodes = new Set<string>();
+  if (ordinals !== null) {
+    for (const edge of edges) {
+      if (!ordinals.has(edge.id)) continue;
+      onPathNodes.add(edge.source);
+      onPathNodes.add(edge.target);
+    }
+  }
+  const paintedEdges = edges.map((edge) => {
+    const sequence = ordinals?.get(edge.id);
+    const onPath = ordinals === null ? undefined : sequence !== undefined;
+    if (sameSequence(edge.data?.sequence, sequence) && edge.data?.onPath === onPath) return edge;
+    const { sequence: _s, onPath: _p, ...rest } = edge.data ?? { kind: 'sync' as const };
+    return {
+      ...edge,
+      data: {
+        ...rest,
+        ...(sequence !== undefined ? { sequence } : {}),
+        ...(onPath !== undefined ? { onPath } : {}),
+      },
+    } as SdEdge;
+  });
+  const paintedNodes = nodes.map((node) => {
+    const onPath = ordinals === null ? undefined : onPathNodes.has(node.id);
+    if (node.data.onPath === onPath) return node;
+    const { onPath: _p, ...rest } = node.data;
+    return { ...node, data: { ...rest, ...(onPath !== undefined ? { onPath } : {}) } } as SdNode;
+  });
+  return { nodes: paintedNodes, edges: paintedEdges };
+}
+
+/**
+ * The paint every repaint site applies: the focused binding's path on the
+ * elements, and no focus at all once that binding has no path to show.
+ */
+export function focusPainted(state: {
+  nodes: SdNode[];
+  edges: SdEdge[];
+  bindings: readonly { criterionId: string; path?: string[] }[];
+  focus: { criterionId: string } | null;
+}): { nodes: SdNode[]; edges: SdEdge[]; focus: { criterionId: string } | null } {
+  const path =
+    state.focus === null
+      ? null
+      : (state.bindings.find((binding) => binding.criterionId === state.focus?.criterionId)?.path ??
+        null);
+  const shown = path !== null && path.length > 0 ? path : null;
+  return {
+    ...paintFocus(state.nodes, state.edges, shown),
+    focus: shown === null ? null : state.focus,
+  };
+}
+
 export const unselected = <T extends SdNode | SdEdge>(element: T): T =>
   element.selected ? { ...element, selected: false } : element;
 

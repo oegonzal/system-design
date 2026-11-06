@@ -12,7 +12,10 @@ export interface FlowTracerProps {
   path: string[];
   /** Shown, never edited — no hop can be added, undone or cleared. */
   disabled?: boolean;
+  /** Whether this path is the one shown on the canvas, its hops numbered. */
+  focused: boolean;
   onChange: (path: string[]) => void;
+  onFocus: (focused: boolean) => void;
 }
 
 /**
@@ -31,7 +34,9 @@ export function FlowTracer({
   graph,
   path,
   disabled = false,
+  focused,
   onChange,
+  onFocus,
 }: FlowTracerProps) {
   const hops = nextHops(graph, path);
   const visited = walkNodes(graph, path);
@@ -71,10 +76,19 @@ export function FlowTracer({
 
       {path.length > 0 ? (
         // In a row of its own: the column would stretch the chip past its words.
-        <Stack direction="row">
+        <Stack direction="row" gap={2} align="center">
           <Badge tone="success" data-testid={`flow-status-${criterionId}`}>
             {`Traced · ${path.length} ${path.length === 1 ? 'hop' : 'hops'}`}
           </Badge>
+          <Button
+            size="sm"
+            variant="subtle"
+            selected={focused}
+            data-testid={`flow-focus-${criterionId}`}
+            onClick={() => onFocus(!focused)}
+          >
+            Show on canvas
+          </Button>
         </Stack>
       ) : null}
 

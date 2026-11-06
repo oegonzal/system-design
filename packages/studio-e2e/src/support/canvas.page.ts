@@ -254,6 +254,25 @@ export class CanvasPage {
     await expect(this.node(id)).toHaveAttribute('data-severity', severity);
   }
 
+  /** The hop's numbers in the shown path, as its pill reads them. */
+  async expectEdgeSequence(edgeId: string, sequence: string): Promise<void> {
+    await expect(this.edge(edgeId)).toHaveAttribute('data-sequence', sequence);
+  }
+
+  /** Whether a block or connection is on the shown path (`true`), off it (`false`), or no path is shown (`null`). */
+  async expectOnPath(id: string, onPath: boolean | null): Promise<void> {
+    const element = this.page.getByTestId(id.startsWith('e-') ? `edge-${id}` : `node-${id}`);
+    if (onPath === null) await expect(element).not.toHaveAttribute('data-on-path');
+    else await expect(element).toHaveAttribute('data-on-path', String(onPath));
+  }
+
+  /** A sync call is drawn with a reply arrowhead at its source as well as the request's at its target. */
+  async expectRequestReply(edgeId: string): Promise<void> {
+    const path = this.edge(edgeId).locator('path.react-flow__edge-path');
+    await expect(path).toHaveAttribute('marker-start', /url\(/);
+    await expect(path).toHaveAttribute('marker-end', /url\(/);
+  }
+
   async expectEdgeHighlighted(id: string, severity: Severity): Promise<void> {
     await expect(this.edge(id)).toHaveAttribute('data-severity', severity);
   }

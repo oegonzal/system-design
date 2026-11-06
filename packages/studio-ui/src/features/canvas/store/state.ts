@@ -30,6 +30,11 @@ export interface HighlightState {
   severity: Severity;
 }
 
+/** The criterion whose traced path is shown on the canvas: its hops numbered, the rest dimmed. */
+export interface FocusState {
+  criterionId: string;
+}
+
 /**
  * Everything an author's edit can change: what a draft is made of and what
  * undo puts back. Selection, highlight and measured sizes ride along on the
@@ -127,6 +132,8 @@ export interface CanvasState extends CanvasContent {
   history: CanvasHistory;
   viewport: CanvasViewport | null;
   highlight: HighlightState | null;
+  /** The path on show, or none. View state: never an edit, never serialized, dropped by a load. */
+  focus: FocusState | null;
 
   setGraph(graph: CanvasGraph): void;
   /**
@@ -166,6 +173,9 @@ export interface CanvasState extends CanvasContent {
   inspect(id: string): void;
   setHighlight(highlight: HighlightState): void;
   clearHighlight(): void;
+  /** Shows the criterion's traced path on the canvas, replacing any other and any finding's highlight. */
+  focusPath(criterionId: string): void;
+  clearFocus(): void;
   setReadOnly(readOnly: boolean): void;
   /** Asks the canvas on screen to frame the diagram (once it is measured). */
   requestFit(): void;

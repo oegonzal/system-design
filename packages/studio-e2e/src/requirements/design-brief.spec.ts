@@ -36,6 +36,19 @@ test.describe('the design brief', () => {
     await expect(page.getByTestId('flow-stage-c1-ingress')).toContainText('missing');
     await expect(page.getByTestId('flow-rest-c1')).toContainText('Comes to rest at');
 
+    // [UX-34] The traced path is shown on the canvas as it is traced: its hops
+    // numbered, a stray block dimmed; the toggle hides it; a sync call reads both ways.
+    await canvas.brief.expectFocused('c1', true);
+    await canvas.expectEdgeSequence('e-1', '1');
+    await canvas.expectEdgeSequence('e-2', '2');
+    await canvas.addFromPalette('cache'); // n-4, off the path
+    await canvas.expectOnPath('n-4', false);
+    await canvas.expectOnPath('n-2', true);
+    await canvas.brief.toggleFocus('c1');
+    await canvas.brief.expectFocused('c1', false);
+    await canvas.expectOnPath('n-4', null);
+    await canvas.expectRequestReply('e-1');
+
     await canvas.submit();
     await canvas.feedback.expectComplete(1);
 

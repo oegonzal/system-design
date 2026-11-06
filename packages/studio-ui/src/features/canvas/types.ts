@@ -28,12 +28,18 @@ export type SdNodeData = {
   operations?: NodeOperation[];
   /** Set while a finding highlights this element; drives the outline color. */
   severity?: Severity | null;
+  /** While a path is shown: true on it, false off it; unset when none is shown. */
+  onPath?: boolean;
 };
 
 export type SdNode = Node<SdNodeData, 'sd'>;
 
 export type SdEdgeData = {
   kind: EdgeKind;
+  /** The hop's positions in the shown path, 1-based; several where the walk revisits it. */
+  sequence?: number[];
+  /** While a path is shown: true on it, false off it; unset when none is shown. */
+  onPath?: boolean;
   carries?: string[];
   /** How the hop is made and what happens when it fails, as free-form entries. */
   config?: ConfigEntry[];

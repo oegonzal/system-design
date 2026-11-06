@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { makeGraph, makeInterfaceGraph } from '../../../testing/canvas-fixtures';
+import { makeBrief, makeGraph, makeInterfaceGraph } from '../../../testing/canvas-fixtures';
 import { createCanvasStore, type CanvasStore } from '../canvas-store';
 import { viewArea } from '../framing';
 import {
@@ -266,5 +266,36 @@ describe('canvas-store', () => {
 
       expect(node?.position).toEqual({ x: 692 - NODE_MIN_FOOTPRINT.width, y: 280 });
     });
+  });
+
+  it('[UX-34] a new connection carries the request and reply arrowheads of a sync call; re-kinded to async it keeps only the request, and back it has both again', () => {
+    const store = createCanvasStore();
+    store.getState().addNode('service');
+    store.getState().addNode('database');
+    store
+      .getState()
+      .onConnect({ source: 'n-1', target: 'n-2', sourceHandle: null, targetHandle: null });
+    const edge = () => store.getState().edges[0];
+    expect(edge().markerEnd).toBeDefined();
+    expect(edge().markerStart).toBeDefined();
+
+    store.getState().updateEdge('e-1', { kind: 'async' });
+    expect(edge().markerStart).toBeUndefined();
+    expect(edge().markerEnd).toBeDefined();
+
+    store.getState().updateEdge('e-1', { kind: 'sync' });
+    expect(edge().markerStart).toBeDefined();
+  });
+
+  it('[UX-34] a block added while a path is shown reads off it, and Clear drops the shown path', () => {
+    const store = createCanvasStore(makeGraph());
+    store.getState().loadBrief(makeBrief());
+    store.getState().focusPath('c1');
+
+    store.getState().addNode('cache');
+    expect(store.getState().nodes.find((node) => node.id === 'n-4')?.data.onPath).toBe(false);
+
+    store.getState().clear();
+    expect(store.getState().focus).toBeNull();
   });
 });

@@ -38,6 +38,22 @@ describe('SdNode', () => {
     expect(root.getAttribute('data-severity')).toBe('critical');
   });
 
+  it('[UX-34] stamps that it is on the shown path, undimmed', async () => {
+    renderNode({ kind: 'service', label: 'On', onPath: true });
+
+    const root = await screen.findByTestId('node-n-1');
+    expect(root.getAttribute('data-on-path')).toBe('true');
+    expect(root.style.opacity).toBe('');
+  });
+
+  it('[UX-34] dims itself inline when a path is shown and it is off it', async () => {
+    renderNode({ kind: 'service', label: 'Off', onPath: false });
+
+    const root = await screen.findByTestId('node-n-1');
+    expect(root.getAttribute('data-on-path')).toBe('false');
+    expect(root.style.opacity).toBe('0.35');
+  });
+
   it('[UX-31] names the platform service a block is before its role, and stamps it as data', async () => {
     renderNode({ kind: 'queue', service: 'aws.sqs', label: 'Order events' });
     const root = await screen.findByTestId('node-n-1');

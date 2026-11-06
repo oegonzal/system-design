@@ -9,7 +9,6 @@ import {
   BackgroundVariant,
   ControlButton,
   Controls,
-  MarkerType,
   MiniMap,
   ReactFlow,
   useReactFlow,
@@ -27,6 +26,7 @@ import { NODE_DRAG_MIME } from './palette/palette';
 import { isPaletteBlock } from './platform-services';
 import type { SdEdge as SdEdgeModel, SdNode as SdNodeModel } from './types';
 import { useCanvasShortcuts } from './use-canvas-shortcuts';
+import { CanvasLegend } from './legend';
 import { useFitRequests } from './use-fit-requests';
 
 /**
@@ -35,11 +35,6 @@ import { useFitRequests } from './use-fit-requests';
  */
 const nodeTypes = { sd: SdNode };
 const edgeTypes = { sd: SdEdge };
-
-const defaultEdgeOptions = {
-  type: 'sd' as const,
-  markerEnd: { type: MarkerType.ArrowClosed, width: 16, height: 16 },
-};
 
 const deleteKeyCodes = ['Backspace', 'Delete'];
 
@@ -186,7 +181,6 @@ export function SdCanvas() {
         edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
-        defaultEdgeOptions={defaultEdgeOptions}
         colorMode={theme.mode}
         // The floor every fit frames at, so the zoom-out control stops where a fit does.
         minZoom={FIT_ZOOM.min}
@@ -219,6 +213,7 @@ export function SdCanvas() {
           </ControlButton>
         </Controls>
         <MiniMap<SdNodeModel> pannable style={MINIMAP_SIZE} nodeColor={minimapNodeColor} />
+        <CanvasLegend />
       </ReactFlow>
     </CanvasFrame>
   );

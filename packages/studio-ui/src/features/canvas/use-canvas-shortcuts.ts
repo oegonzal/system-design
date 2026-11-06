@@ -47,13 +47,16 @@ export const CANVAS_SHORTCUTS = {
     exclusive: true,
     run: (state) => state.redo(),
   },
-  dismissHighlight: {
+  dismiss: {
     key: 'escape',
     mod: false,
     ariaKeys: 'Escape',
     // Escape stays the page's too: whatever else listens for it still hears it.
     exclusive: false,
-    run: (state) => state.clearHighlight(),
+    run: (state) => {
+      state.clearHighlight();
+      state.clearFocus();
+    },
   },
 } as const satisfies Record<string, CanvasShortcut>;
 

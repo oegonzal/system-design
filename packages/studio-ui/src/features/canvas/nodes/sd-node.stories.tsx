@@ -11,6 +11,7 @@ import { ReactFlow } from '@xyflow/react';
 import { withReactFlow } from '../../../testing/story-decorators';
 import { SdEdge } from '../edges/sd-edge';
 import type { SdEdge as SdEdgeModel, SdNode as SdNodeModel } from '../types';
+import { markersFor } from '../edges/edge-markers';
 import { SdNode } from './sd-node';
 
 const nodeTypes = { sd: SdNode };
@@ -282,10 +283,90 @@ export const WithCarriesPill: Story = {
         type: 'sd',
         source: 'n-1',
         target: 'n-2',
+        ...markersFor('sync'),
         data: {
           kind: 'sync',
           carries: ['placeOrder', 'getOrder', 'cancelOrder', 'listOrders'],
         },
+      },
+    ],
+  },
+};
+
+/** A sync call drawn with a request and a reply arrowhead beside an async hop drawn one way, dashed. */
+export const RequestAndReplyBesideOneWay: Story = {
+  args: {
+    nodes: [
+      node('n-1', { kind: 'client', label: 'Client' }, { x: 60, y: 0 }),
+      node('n-2', { kind: 'dns', label: 'DNS' }, { x: 60, y: 180 }),
+      node('n-3', { kind: 'queue', label: 'Events' }, { x: 320, y: 180 }),
+    ],
+    edges: [
+      {
+        id: 'e-1',
+        type: 'sd',
+        source: 'n-1',
+        target: 'n-2',
+        label: 'resolve',
+        ...markersFor('sync'),
+        data: { kind: 'sync' },
+      },
+      {
+        id: 'e-2',
+        type: 'sd',
+        source: 'n-1',
+        target: 'n-3',
+        label: 'publishes',
+        ...markersFor('async'),
+        data: { kind: 'async' },
+      },
+    ],
+  },
+};
+
+/** A shown path: its hops numbered in walk order — one revisited — and a block off it dimmed. */
+export const FocusedPathWithRevisit: Story = {
+  args: {
+    nodes: [
+      node('n-1', { kind: 'client', label: 'Client', onPath: true }, { x: 60, y: 0 }),
+      node('n-2', { kind: 'service', label: 'Order Service', onPath: true }, { x: 60, y: 180 }),
+      node('n-3', { kind: 'cache', label: 'Cache', onPath: true }, { x: 320, y: 180 }),
+      node('n-4', { kind: 'monitoring', label: 'Metrics', onPath: false }, { x: 320, y: 0 }),
+    ],
+    edges: [
+      {
+        id: 'e-1',
+        type: 'sd',
+        source: 'n-1',
+        target: 'n-2',
+        ...markersFor('sync'),
+        data: { kind: 'sync', sequence: [1], onPath: true },
+      },
+      {
+        id: 'e-2',
+        type: 'sd',
+        source: 'n-2',
+        target: 'n-3',
+        label: 'reads',
+        ...markersFor('sync'),
+        data: { kind: 'sync', sequence: [2, 4], onPath: true },
+      },
+      {
+        id: 'e-3',
+        type: 'sd',
+        source: 'n-3',
+        target: 'n-2',
+        label: 'miss',
+        ...markersFor('sync'),
+        data: { kind: 'sync', sequence: [3], onPath: true },
+      },
+      {
+        id: 'e-4',
+        type: 'sd',
+        source: 'n-2',
+        target: 'n-4',
+        ...markersFor('async'),
+        data: { kind: 'async', onPath: false },
       },
     ],
   },

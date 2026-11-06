@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { makeGraph } from '../../../testing/canvas-fixtures';
+import { makeBinding, makeBrief, makeGraph } from '../../../testing/canvas-fixtures';
 import { createCanvasStore, type CanvasStore } from '../canvas-store';
 import { HISTORY_LIMIT, selectCanRedo, selectCanUndo } from './state';
 
@@ -93,6 +93,26 @@ describe('canvas-store', () => {
       expect(store.getState().nodes.find((node) => node.id === 'n-3')?.data.severity).toBe('high');
       store.getState().undo();
       expect(store.getState().bindings).toEqual([]);
+    });
+
+    it('[UX-34] repaints the shown path on what undo and redo restore, numbers a hop added to it, and drops it when the path is emptied', () => {
+      const store = createCanvasStore(makeGraph());
+      store.getState().loadBrief(makeBrief({ bindings: [makeBinding({ path: ['e-1'] })] }));
+      const sequence = (id: string) =>
+        store.getState().edges.find((edge) => edge.id === id)?.data?.sequence;
+      store.getState().focusPath('c1');
+
+      store.getState().setBindingPath('c1', ['e-1', 'e-2']);
+      expect(sequence('e-2')).toEqual([2]);
+      store.getState().undo();
+      expect(sequence('e-1')).toEqual([1]);
+      expect(sequence('e-2')).toBeUndefined();
+      store.getState().redo();
+      expect(sequence('e-2')).toEqual([2]);
+
+      store.getState().setBindingPath('c1', []);
+      expect(store.getState().focus).toBeNull();
+      expect(sequence('e-1')).toBeUndefined();
     });
 
     it('keeps at most HISTORY_LIMIT steps, and a load starts a new history', () => {

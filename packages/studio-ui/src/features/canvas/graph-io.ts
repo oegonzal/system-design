@@ -7,6 +7,7 @@ import {
   type NodeOperation,
 } from '@sysdesign/contracts';
 
+import { markersFor } from './edges/edge-markers';
 import type { SdEdge, SdNode } from './types';
 
 /**
@@ -120,6 +121,7 @@ export function fromCanvasGraph(graph: CanvasGraph): { nodes: SdNode[]; edges: S
     type: 'sd',
     source: edge.source,
     target: edge.target,
+    ...markersFor(edge.kind),
     ...(edge.label !== undefined ? { label: edge.label } : {}),
     data: {
       kind: edge.kind,

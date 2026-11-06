@@ -51,6 +51,7 @@ export const TracedThroughEveryStage: Story = {
           ],
         }),
       );
+      store.getState().focusPath('c1');
     }),
   ],
 };
