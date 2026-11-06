@@ -1,9 +1,9 @@
 import {
+  ADVICE_UNITS_BOUND,
   ADVISORS_HEADING,
   MISSION_WITH_IDENTITY,
   MISSION_WITH_TAKEN,
   ON_RECORD_TAKEN,
-  UNITS_ON_RECORD_BOUND,
   type StepPlan,
   type UnitAdvice,
 } from '@sysdesign/contracts';
@@ -173,16 +173,17 @@ describe('a taskStart at a unit on record', () => {
       'refused by the session: a unit on record to avoid is never started; choose another item. The taskStart names company "Acme" (applied 2026-10-03).',
     ]);
 
-    // Measured 2026-10-14: the goal renders UNITS_ON_RECORD_BOUND units and counts the rest; the session reads every one the advisor answered.
-    const past = Array.from({ length: UNITS_ON_RECORD_BOUND.target }, (_, i) => ({
+    // The goal names units within a byte bound and counts the rest; the session reads every one the advisor answered,
+    // so a unit past the listing — Acme, last of as many as an advisor answers with — is refused all the same.
+    const past = Array.from({ length: ADVICE_UNITS_BOUND.target - 1 }, (_, i) => ({
       name: 'company',
-      value: `Company ${i}`,
+      value: `Company ${i} of a record long past the listing's bytes`,
       stance: 'avoid' as const,
     }));
     const long = await session([PLANS.search, opening('Acme'), PLANS.end], {
       advisors: advisors(advice('record', [...past, ACME])),
     });
-    expect(long.brain.planInputs[1]?.onRecord.units).toHaveLength(UNITS_ON_RECORD_BOUND.target + 1);
+    expect(long.brain.planInputs[1]?.onRecord.units).toHaveLength(ADVICE_UNITS_BOUND.target);
     expect(long.detail.tasks).toEqual([]);
     expect(long.logs).toContain('step 2: unit-refused (1 in a row)');
     expect(long.brain.planInputs[2]?.history.at(-1)?.note).toBe(NOTE);

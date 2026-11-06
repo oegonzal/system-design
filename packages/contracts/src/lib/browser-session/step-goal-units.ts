@@ -7,6 +7,7 @@
  * listing the session had handled, and the mission's "never the same listing
  * twice" had nothing to rest on.
  */
+import { textBytes } from '../quality-loop/goal-index';
 import { quoted } from '../text';
 import { describeIdentity } from '../units/identity';
 import type { UnitOnRecord, UnitsOnRecord } from '../units/record';
@@ -14,8 +15,7 @@ import {
   UNIT_STANCE_MEANINGS,
   UNIT_STANCE_ON_RECORD,
   UNIT_STANCES_STRONGEST_FIRST,
-  UNITS_ON_RECORD_BOUND,
-  type UnitStance,
+  UNITS_ON_RECORD_BYTES_BOUND,
 } from '../units/vocab';
 import type { TaskLedgerSummary } from './observation.schema';
 import { TASK_OUTCOME_SPENDS, TASK_OUTCOMES } from './vocab';
@@ -66,23 +66,58 @@ const ledgerLines = (ledger: TaskLedgerSummary): string[] => [
       ]),
 ];
 
+/** A unit on record as the listing names it: its identity's values; the facts they are values of are said once per group (`factsOf`). */
+const nameOf = (unit: UnitOnRecord): string =>
+  unit.identity.map((facet) => quoted(facet.value)).join(' · ');
+const factsOf = (unit: UnitOnRecord): string =>
+  unit.identity.map((facet) => facet.name).join(' · ');
+
+/**
+ * The first units, in the order given, whose names — and the separators
+ * between them — fit within the bytes the goal spends naming the record.
+ */
+const firstNamedWithin = (units: readonly UnitOnRecord[], bytes: number): UnitOnRecord[] => {
+  let spent = 0;
+  const shown: UnitOnRecord[] = [];
+  for (const unit of units) {
+    const cost = textBytes(nameOf(unit)) + (shown.length === 0 ? 0 : ', '.length);
+    if (spent + cost > bytes) break;
+    spent += cost;
+    shown.push(unit);
+  }
+  return shown;
+};
+
+/** The units of one stance as lines: one per group of units that share the facts they are known by. */
+const groupLines = (units: readonly UnitOnRecord[]): string[] => {
+  const groups = new Map<string, string[]>();
+  for (const unit of units) {
+    const facts = factsOf(unit);
+    groups.set(facts, [...(groups.get(facts) ?? []), nameOf(unit)]);
+  }
+  return [...groups].map(([facts, names]) => `  - by ${facts}: ${names.join(', ')}`);
+};
+
 /**
  * The units on record from earlier sessions, strongest stance first, each by
- * its identity and the advisor's note, within the rendered bound; the rest
- * counted, apart from what the advisor itself left out. The goal budget has
- * no slack to give, so a line is one unit and a bound is a bound — and the
- * bound is the rendering's alone: the session holds a taskStart to every unit
- * on record, listed here or not (`refusedOnRecord`), which the Limits say
- * once (`onRecordLimit`); the heading names the stance in a few words and
- * repeats no rule.
+ * its identity's values — the facts it is known by named once for the group,
+ * no note — so a record of the size measured fits whole in the bytes forty
+ * lines with notes took, and the planner can keep off every unit on record
+ * rather than the forty it was shown; past the bound the last units in the
+ * advisor's order, weakest stance first to go, are counted, apart from what
+ * the advisor itself left out. The bound is the
+ * rendering's alone: the session holds a taskStart to every unit on record,
+ * listed here or not (`refusedOnRecord`), which the Limits say once
+ * (`onRecordLimit`); the heading names the stance in a few words and repeats
+ * no rule.
  */
 const onRecordLines = (onRecord: UnitsOnRecord): string[] => {
   if (onRecord.units.length === 0 && onRecord.omitted === 0) return [];
-  const byStance = (stance: UnitStance): UnitOnRecord[] =>
-    onRecord.units.filter((unit) => unit.stance === stance);
-  /** Strongest first: what is never started is what the planner must read first. */
-  const ordered = UNIT_STANCES_STRONGEST_FIRST.flatMap(byStance);
-  const shown = ordered.slice(0, UNITS_ON_RECORD_BOUND.target);
+  /** Strongest first, then as the advisor ordered them: what is never started is what the planner must read first. */
+  const ordered = UNIT_STANCES_STRONGEST_FIRST.flatMap((stance) =>
+    onRecord.units.filter((unit) => unit.stance === stance),
+  );
+  const shown = firstNamedWithin(ordered, UNITS_ON_RECORD_BYTES_BOUND.target);
   const cut = ordered.length - shown.length;
   const lines = UNIT_STANCES_STRONGEST_FIRST.flatMap((stance) => {
     const units = shown.filter((unit) => unit.stance === stance);
@@ -90,10 +125,7 @@ const onRecordLines = (onRecord: UnitsOnRecord): string[] => {
       ? []
       : [
           `- On record from earlier sessions ${UNIT_STANCE_ON_RECORD[stance]} (${UNIT_STANCE_MEANINGS[stance]}):`,
-          ...units.map(
-            (unit) =>
-              `  - ${describeIdentity(unit.identity)}${unit.note === '' ? '' : ` — ${unit.note}`}`,
-          ),
+          ...groupLines(units),
         ];
   });
   return [

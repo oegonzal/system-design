@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { UNITS_ON_RECORD_BOUND } from '../units/vocab';
+import { textBytes } from '../quality-loop/goal-index';
+import { UNITS_ON_RECORD_BYTES_BOUND } from '../units/vocab';
 import type { UnitOnRecord } from '../units/record';
 import {
   emptyLedger,
@@ -32,7 +33,7 @@ describe('the Units of work section with a record beyond this session', () => {
     expect(plain).not.toContain('Unit identity declares');
   });
 
-  it('[BRW-13] renders the units on record under Units of work, strongest stance first with the engine’s word on each, each by its identity and the advisor’s note; only the forbidden ones reach the index, and the Limits state the session’s check of the whole record once, with the mission’s exception as this page bears on it', () => {
+  it('[BRW-13] renders the units on record under Units of work, strongest stance first with the engine’s word on each, each by its identity’s values with the facts named once and no note; only the forbidden ones reach the index, and the Limits state the session’s check of the whole record once, with the mission’s exception as this page bears on it', () => {
     const record = {
       units: [
         onRecord('Acme', 'avoid', 'applied 2026-10-03, 2 applications'),
@@ -44,8 +45,9 @@ describe('the Units of work section with a record beyond this session', () => {
       stepGoalInput({ mission: MISSION_WITH_IDENTITY, onRecord: record }),
     );
     expect(goal).toContain(
-      '- On record from earlier sessions as forbidden (never started):\n  - company "Globex" — in progress in another session\n- On record from earlier sessions to avoid (prefer another item):\n  - company "Acme" — applied 2026-10-03, 2 applications',
+      '- On record from earlier sessions as forbidden (never started):\n  - by company: "Globex"\n- On record from earlier sessions to avoid (prefer another item):\n  - by company: "Acme"',
     );
+    expect(goal).not.toContain('applied 2026-10-03');
     // The mission declares no exception: a unit to avoid is never started, and the rule is said once.
     expect(goal).toContain(
       '- A taskStart naming a unit on record, listed above or not, is refused by the session and the plan stops there: a unit on record as forbidden is never started; a unit on record to avoid is never started.',
@@ -71,25 +73,49 @@ describe('the Units of work section with a record beyond this session', () => {
     );
   });
 
-  it('[BRW-13] renders the bound, counts the rest, and counts apart what the advisor itself left out; a record with nothing in it renders nothing', () => {
-    // Measured 2026-10-14: 43 on record, 40 rendered, and the planner opened
-    // one of the three cut as "not on the list". The Limits now say once that
-    // a taskStart is refused at any unit on record, listed or not; the count
-    // only counts, and what the advisor counted past its own bound is nobody's
-    // to refuse, so it is counted apart.
-    const units = Array.from({ length: UNITS_ON_RECORD_BOUND.target + 3 }, (_, i) =>
-      onRecord(`Company ${i}`, 'avoid'),
+  it('[BRW-13] names every unit on record within the bytes the record may take, groups units by the facts they are known by, counts the rest, and counts apart what the advisor itself left out; a record with nothing in it renders nothing', () => {
+    // Measured 2026-11-06: 185 companies on record, 40 lines rendered with notes, and the planner opened companies
+    // past the forty, a refused step each; named by value alone, all 185 take 2,952 bytes against 2,520 for the forty.
+    const units = Array.from({ length: 300 }, (_, i) =>
+      onRecord(`Company ${i}`, 'avoid', 'applied'),
     );
     const goal = composeStepGoal(
       stepGoalInput({ mission: MISSION_WITH_IDENTITY, onRecord: { units, omitted: 7 } }),
     );
-    expect(goal.match(/^ {2}- company "Company \d+"$/gm)).toHaveLength(
-      UNITS_ON_RECORD_BOUND.target,
-    );
+    const listed = /^ {2}- by company: (.*)$/m.exec(goal)?.[1] ?? '';
+    const names = listed.split(', ');
+    // In the advisor's order, as many as the bytes allow, and the rest counted.
+    expect(names.slice(0, 3)).toEqual(['"Company 0"', '"Company 1"', '"Company 2"']);
+    expect(textBytes(listed)).toBeLessThanOrEqual(UNITS_ON_RECORD_BYTES_BOUND.target);
+    expect(names.length).toBeGreaterThan(200);
     expect(goal).toContain(
-      '  (3 more on record not listed)\n  (7 more on record the advisor counted and did not name)',
+      `  (${300 - names.length} more on record not listed)\n  (7 more on record the advisor counted and did not name)`,
     );
     expect(goal).toContain('listed above or not, is refused by the session');
+    // Units known by other facts are a group of their own, each fact named once.
+    const mixed = composeStepGoal(
+      stepGoalInput({
+        mission: MISSION_WITH_IDENTITY,
+        onRecord: {
+          units: [
+            onRecord('Acme', 'avoid'),
+            {
+              identity: [
+                { name: 'company', value: 'Initech' },
+                { name: 'title', value: 'Staff Engineer' },
+              ],
+              stance: 'avoid',
+              note: '',
+            },
+            onRecord('Globex', 'avoid'),
+          ],
+          omitted: 0,
+        },
+      }),
+    );
+    expect(mixed).toContain(
+      '  - by company: "Acme", "Globex"\n  - by company · title: "Initech" · "Staff Engineer"',
+    );
     // Only what the advisor left out: nothing cut from the listing.
     const counted = composeStepGoal(
       stepGoalInput({

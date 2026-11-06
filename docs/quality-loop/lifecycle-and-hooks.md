@@ -332,9 +332,10 @@ mission (## Unit identity, ## Advisors)      environment (UNIT_ADVISOR_URLS)
 5. **The answer rides into the goal as data.** `composeStepGoal`
    (`packages/contracts/src/lib/browser-session/step-goal.ts:323`) renders
    `## Units of work` (`:340`; `step-goal-units.ts:99`), strongest stance
-   first, 40 units rendered and the rest counted as "(N more on record not
-   listed)" (`step-goal-units.ts:74, 90`; `UNITS_ON_RECORD_BOUND`,
-   `vocab.ts:79`); a `## Limits` line per stance (`:344-349`;
+   first, each unit named by its identity's values, the facts named once per
+   group, within `UNITS_ON_RECORD_BYTES_BOUND` (3,200 bytes, `vocab.ts:83`),
+   and the rest counted as "(N more on record not listed)"
+   (`step-goal-units.ts`, `onRecordLines`); a `## Limits` line per stance (`:344-349`;
    `step-limits.ts:101`); and the fenced index with `unitFacets`,
    `unitsForbidden` (`forbiddenOf`, `:329`; `units/record.ts:33`) and
    `onRecordTaken` (`:354`; `step-index.ts:233-242`). Units merely to avoid
@@ -359,7 +360,7 @@ mission (## Unit identity, ## Advisors)      environment (UNIT_ADVISOR_URLS)
    (`units/mission-taken.ts:34, 94`) **and** the plan declared
    `onRecordTaken: true`. A hit opens nothing, records a not-executed history
    line and an objection, and counts a `unit-refused` failure (`:215-216`).
-   This holds for units past the 40 the goal had room to render.
+   This holds for units past the ones the goal had room to name.
 8. **Sameness is one key.** `facetKey` trims, NFKC-normalises and lower-cases
    under `en-US` (`contracts/src/lib/units/identity.ts:49-50`);
    `identityKey` sorts facets by name (`:56`); `matchesRecord` compares keys
@@ -389,8 +390,9 @@ advised"):
 
 - A **forbidden** unit (in progress in another live session) is refused twice
   — by the loop's validator from the index and by the session from the whole
-  advice. Two paths to one answer, deliberately: the goal renders at most 40
-  of up to 200 answered units, so a validator alone could not hold the record.
+  advice. Two paths to one answer, deliberately: the goal names only the
+  answered units that fit `UNITS_ON_RECORD_BYTES_BOUND`, of up to 200, so a
+  validator alone could not hold the record.
 - An **avoid** unit (applied within 90 days) is never a validator fact. It is
   prose for the planner plus the session's refusal, which the shipped mission
   lifts when the page lists no next-page control and the plan declares

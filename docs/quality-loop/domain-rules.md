@@ -103,8 +103,8 @@ where this page lists the control the mission ties it to (the shipped
 mission's `- avoid unless "Next"`: a next page of results is listed; measured
 over 263 recorded results pages, 249 listed that button). The session then
 holds every `taskStart` that runs to the whole record the step was composed
-with — every unit the advisor answered, not the `UNITS_ON_RECORD_BOUND` the
-goal had room to list: a forbidden unit is refused all the same, and a company
+with — every unit the advisor answered, not only the ones the goal had room to
+name within `UNITS_ON_RECORD_BYTES_BOUND`: a forbidden unit is refused all the same, and a company
 applied to within the window (`avoid`) is refused unless the mission declares
 the exception and the plan declares `onRecordTaken: true`; the refusal opens no
 unit, stops the plan there and is carried into the next goal. Measured

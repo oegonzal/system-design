@@ -3,7 +3,7 @@
  * advisors answered, never only the ones the goal had room to list. Measured
  * 2026-10-14 on a live session: 43 units on record, every one to avoid, and a
  * step goal of 63,954 bytes with the snapshot already at the words-cut rung,
- * so the rendering listed `UNITS_ON_RECORD_BOUND` of them and counted three;
+ * so the rendering listed forty of them and counted three;
  * the planner wrote of one of the three that it was not on the list, opened
  * it, and began applying again where an application had gone four days
  * before. The rule is declared per stance (`UNIT_STANCE_TAKEN`) and granted

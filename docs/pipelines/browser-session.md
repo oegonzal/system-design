@@ -158,8 +158,8 @@ pnpm browser-session show <sessionId>                    # each unit with its id
 What to read: `advice.json` per step — `answered` on every step, or `stale`
 with the step the advice is from and the fault that opened the streak; the
 goal in the run dump (`static/runs/<runId>/01-goal.md`) renders the units on
-record under `## Units of work` by stance — `UNITS_ON_RECORD_BOUND` of them,
-the rest counted — and lists the forbidden ones in its index; a `taskStart`
+record under `## Units of work` by stance — each named by its identity's
+values within `UNITS_ON_RECORD_BYTES_BOUND`, the rest counted — and lists the forbidden ones in its index; a `taskStart`
 naming one is cut by the limits validator and the next plan's objection says
 so, as is one declaring `onRecordTaken: true` where the mission declares no
 exception (`## Taking a unit on record`) or the page lists the control the
