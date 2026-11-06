@@ -109,7 +109,10 @@ export class PageReader {
         // A page that never reports a load state is still read: what it has is what the session gets.
       }
       try {
-        return await page.locator('body').ariaSnapshot({ mode: 'ai' });
+        // Bounded: a frame that never answers would hold the read for the action timeout.
+        return await page
+          .locator('body')
+          .ariaSnapshot({ mode: 'ai', timeout: this.policy.snapshotTimeoutMs });
       } catch {
         // Mid-navigation there is no body to match; another read is the answer.
         return null;

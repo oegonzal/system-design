@@ -55,6 +55,7 @@ const observePolicySchema = z.strictObject({
   actionTimeoutMs: positive,
   pageOpenWaitMs: positive,
   settleTimeoutMs: positive,
+  snapshotTimeoutMs: positive,
   settleRetryMs: positive,
   emptySnapshotReads: positive,
   factsTimeoutMs: positive,

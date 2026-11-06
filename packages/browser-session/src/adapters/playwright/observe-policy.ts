@@ -21,6 +21,17 @@ export interface ObservePolicy {
   /** How long the observer waits for the document to settle before each read of the page. */
   settleTimeoutMs: number;
   /**
+   * How long one read of the accessibility tree may take: what the page and
+   * the frames that answer show by then is the read, and a frame that has
+   * not answered is left out of it. Measured 2026-11-06: job pages embedding
+   * a dozen to twenty lazy frames that never loaded held every read for the
+   * action timeout, 15 s, so an observation's budget was gone before an
+   * element was read and the page read as empty (117 of 117, 89 of 89 unread)
+   * — with a 2 s bound the same tree, 519 refs, came back in 2 s, and in 0.5 s
+   * at 500 ms.
+   */
+  snapshotTimeoutMs: number;
+  /**
    * How long it waits between reads that came back without a ref or that
    * differ from the read before — and between reads of a radio group a select
    * clicked beside, until the group reads as chosen.
