@@ -18,6 +18,7 @@ const LISTING = `<!doctype html><html><head><title>Listing</title></head><body>
   <a href="about:blank" target="_blank">Open another</a>
   <button type="button" onclick="setTimeout(() => window.open('about:blank'), 500)">Open later</button>
   <a href="about:blank" target="_blank" onclick="event.preventDefault(); setTimeout(() => window.open('about:blank'), 2500)">Open slowly</a>
+  <button type="button" onclick="setTimeout(() => window.open('about:blank'), 2500)">Open much later</button>
 </body></html>`;
 
 const page = (title: string) =>
@@ -128,6 +129,22 @@ describe('the Playwright browser and the pages a unit opens', () => {
     // The tab registers 2.5 s after the click: past the page-open wait, within the wait for a page the link declares.
     await browser.act(click(slowly.ref));
     expect(browser.page).not.toBe(opener);
+    expect(await browser.closeOpenedPages()).toEqual({ closed: 1, front: opener.url() });
+  });
+
+  it('[BRW-25] holds an action that declares no new page to the short page-open wait: a page it opens past that is read on a later step', async () => {
+    const opener = browser.page;
+    await opener.setContent(LISTING);
+    const observation = await browser.observe();
+    const later = observation.elements.find(
+      (e) => e.role === 'button' && e.name === 'Open much later',
+    );
+    if (later === undefined) throw new Error('no button "Open much later" observed');
+
+    await browser.act(click(later.ref));
+    // The action returned before the page came: the opener is still in front.
+    expect(browser.page).toBe(opener);
+    await browser.page.context().waitForEvent('page');
     expect(await browser.closeOpenedPages()).toEqual({ closed: 1, front: opener.url() });
   });
 });

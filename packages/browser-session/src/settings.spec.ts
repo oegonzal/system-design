@@ -417,6 +417,19 @@ describe('the session settings', () => {
         ),
       ),
     ).toThrow(/untaught: names a channel twice/);
+    // [BRW-25] The wait for a page a link declares is the longer one: a file that makes it shorter is refused by name.
+    const observe = JSON.parse(real(join(CONFIG, 'observe', 'standard.json'))) as Record<
+      string,
+      unknown
+    >;
+    expect(() =>
+      readSessionSettings(
+        PACKAGE_ROOT,
+        choosing(SHIPPED, {
+          'observe/standard.json': JSON.stringify({ ...observe, newPageWaitMs: 1000 }),
+        }),
+      ),
+    ).toThrow(/newPageWaitMs: is shorter than pageOpenWaitMs/);
     // A channel's own recovery window is a field no schema declares: the session's one bus window serves it.
     expect(() =>
       readSessionSettings(

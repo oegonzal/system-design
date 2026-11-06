@@ -51,21 +51,27 @@ const capturePolicySchema = z.strictObject({
 const positive = z.number().int().positive();
 
 /** How the browser waits on and reads a page; each field's meaning is `ObservePolicy`'s. */
-const observePolicySchema = z.strictObject({
-  actionTimeoutMs: positive,
-  pageOpenWaitMs: positive,
-  newPageWaitMs: positive,
-  settleTimeoutMs: positive,
-  snapshotTimeoutMs: positive,
-  settleRetryMs: positive,
-  emptySnapshotReads: positive,
-  factsTimeoutMs: positive,
-  observeBudgetMs: positive,
-  wholesaleReads: positive,
-  stableReads: positive,
-  scrollPx: positive,
-  optionWaitMs: positive,
-}) satisfies z.ZodType<ObservePolicy>;
+const observePolicySchema = z
+  .strictObject({
+    actionTimeoutMs: positive,
+    pageOpenWaitMs: positive,
+    newPageWaitMs: positive,
+    settleTimeoutMs: positive,
+    snapshotTimeoutMs: positive,
+    settleRetryMs: positive,
+    emptySnapshotReads: positive,
+    factsTimeoutMs: positive,
+    observeBudgetMs: positive,
+    wholesaleReads: positive,
+    stableReads: positive,
+    scrollPx: positive,
+    optionWaitMs: positive,
+  })
+  .refine((policy) => policy.newPageWaitMs >= policy.pageOpenWaitMs, {
+    message:
+      'is shorter than pageOpenWaitMs: the wait for a page a link declares is the longer one',
+    path: ['newPageWaitMs'],
+  }) satisfies z.ZodType<ObservePolicy>;
 
 /** The engine's own stop rules: each a limit that ends the session `stopped`, but `targetDone`, its goal. */
 const railsSchema = z
