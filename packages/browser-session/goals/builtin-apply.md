@@ -6,6 +6,12 @@ Apply to software engineering roles that can be worked remotely — never an int
 
 One application: from opening a listing's card to the confirmation that the application was sent, or the point at which the listing is set aside. Its label is the job title and the company as the job page names them.
 
+## Marks
+
+- "Dropbox": a cloud-storage upload helper beside a file control — never clicked; the résumé goes into the file control by upload. A mark is a word on a control, never a stop condition.
+- "Google Drive": the same helper for another cloud store — never clicked.
+- "Enter manually": a helper that replaces the file control with a text box — never clicked; the résumé is uploaded as a file.
+
 ## Unit identity
 
 - company: the company as the job page names it, in the link above the title.
