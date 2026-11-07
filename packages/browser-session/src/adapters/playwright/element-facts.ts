@@ -18,7 +18,7 @@ export interface ElementFacts {
   value: string | null;
   options: string[] | null;
   required: boolean;
-  /** Marked invalid by the page: `aria-invalid`, or the browser's own validity once a person has touched it. */
+  /** Marked invalid by the page: `aria-invalid`, the browser's own validity once a person has touched it, or an alert the page ties to the control. */
   invalid: boolean;
   disabled: boolean;
   visible: boolean;
@@ -412,6 +412,22 @@ function elementFactsInPage(
     } catch {
       // An engine without `:user-invalid` answers the ARIA half alone.
     }
+    // A page that refuses a value says so in an alert it ties to the control — by
+    // aria-errormessage, or by aria-describedby as some forms do — and marks the
+    // control nowhere else. Measured 2026-11-06: a payroll vendor's form named
+    // "Mobile Number is required." in the alert its field's description pointed
+    // at, with the field marked neither required nor invalid, so the field was
+    // left blank twice as optional and the form never sent.
+    const alertIds = `${attr('aria-errormessage') ?? ''} ${attr('aria-describedby') ?? ''}`;
+    const refusedByAlert = alertIds
+      .split(/\s+/)
+      .filter((id) => id.length > 0)
+      .map((id) => el.ownerDocument.getElementById(id))
+      .some(
+        (target) =>
+          target !== null && target.closest('[role="alert"]') !== null && text(target) !== '',
+      );
+    invalid = invalid || refusedByAlert;
     return {
       maxLength,
       contextParts,
