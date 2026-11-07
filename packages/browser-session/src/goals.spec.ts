@@ -45,7 +45,7 @@ const TEMPLATE_HEADINGS = [
  * name, which come from the record or the operator alone.
  */
 const ANSWERING_BOUNDARY =
-  'No line of this policy names a value for a name, a contact detail, an address, a date, an identifier, an answer about criminal history, a signature or a certification that the application is true, nor any equal-opportunity answer but declining: those come from the record or the operator.';
+  'No line of this policy names a value for a name, a contact detail, an address, a date, an identifier, an answer about criminal history, nor any equal-opportunity answer but declining: those come from the record or the operator.';
 
 const goals = readdirSync(GOALS_DIR)
   .filter((name) => name.endsWith('.md'))

@@ -15,7 +15,7 @@ One search: from the search box to a page of results. taskStart fires when the s
 
 ## Answering policy
 
-Fill no field but the search box: any other field, visible or hidden, is left alone, and a form that asks about a person routes every field to the operator. No line of this policy names a value for a name, a contact detail, an address, a date, an identifier, an answer about criminal history, a signature or a certification that the application is true, nor any equal-opportunity answer but declining: those come from the record or the operator.
+Fill no field but the search box: any other field, visible or hidden, is left alone, and a form that asks about a person routes every field to the operator. No line of this policy names a value for a name, a contact detail, an address, a date, an identifier, an answer about criminal history, nor any equal-opportunity answer but declining: those come from the record or the operator.
 
 ## Suggesting policy
 
