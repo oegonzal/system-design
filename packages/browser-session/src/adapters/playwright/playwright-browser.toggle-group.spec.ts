@@ -12,9 +12,10 @@ import { HIDDEN_INPUT, specBrowserOptions } from './testing';
  * checkbox that keeps the answer, pressing one releasing the other — a row of
  * them pressed one by one, chips each in a list item, styled buttons, a box
  * its author names, a box the page draws anew on each click, a table's cell,
- * and boxes beside inputs parked off the page, transparent or clipped away.
- * Beside them, the boxes that are no such question. Run with the `browser`
- * project.
+ * boxes beside inputs parked off the page, transparent or clipped away, and
+ * chips that each wrap the checkbox the page keeps their answer in. Beside
+ * them, the boxes that are no such question, a card's action row outside the
+ * form among them. Run with the `browser` project.
  */
 const toggle = (words: string, pressed = false, attrs = ''): string =>
   `<button type="button" aria-pressed="${pressed}" ${attrs}>${words}</button>`;
@@ -32,6 +33,8 @@ const TOGGLES = `<!doctype html><html><head><title>Apply — application</title>
     if (kept !== null) kept.checked = pressed.textContent === 'Yes';
   };
   document.addEventListener('click', (event) => {
+    // A label's click reaches the input it wraps a second time; the label's own click is the one counted.
+    if (event.target instanceof HTMLInputElement) return;
     const pressed = event.target.closest('[aria-pressed]');
     if (pressed === null) return;
     const box = pressed.closest('.one, .many, .redrawn, .stuck');
@@ -85,6 +88,9 @@ const TOGGLES = `<!doctype html><html><head><title>Apply — application</title>
   <fieldset><legend>Which shift do you prefer?</legend>
     <div class="one" role="group" aria-label="Shift">${toggle('Early')}${toggle('Late')}</div>
   </fieldset>
+  <div><span>Which days can you work?</span>
+    <div class="many"><label role="button" aria-pressed="false" tabindex="0"><input type="checkbox" style="${HIDDEN_INPUT}">Mon</label><label role="button" aria-pressed="false" tabindex="0"><input type="checkbox" style="${HIDDEN_INPUT}">Tue</label></div>
+  </div>
   <div class="actions"><button type="button">Save draft</button><button type="button">Cancel</button></div>
   <div class="many">${toggle('Agree')}${toggle('Disagree')}<input aria-label="Tell us why"></div>
   <div class="many">${toggle('Remote')}${toggle('Onsite')}<input type="checkbox" aria-label="Either works"></div>
@@ -100,6 +106,7 @@ const TOGGLES = `<!doctype html><html><head><title>Apply — application</title>
   <div class="one">${toggle('Accept')}${toggle('Decline')}<a href="#terms" style="opacity: 0">Read the terms</a></div>
   <div class="one">${toggle('Red')}${toggle('Blue')}<button type="button" style="opacity: 0">Reset</button></div>
 </form>
+<article><h3>Staff Engineer</h3><div class="many">${toggle('Save job')}${toggle('Hide job')}</div></article>
 <script>document.getElementById('shadowed').attachShadow({ mode: 'open' }).textContent = 'Which days?';</script>
 </body></html>`;
 
@@ -138,9 +145,10 @@ describe('the Playwright browser and buttons a page declares pressed or not, in 
       ['Yes', 'No'],
       ['Yes', 'No'],
       ['Early', 'Late'],
+      ['Mon', 'Tue'],
     ]);
     const [sponsorship, zones, stacks, relocation, start, clearance, graduated, veteran] = groups;
-    const [, , , , , , , , relocate, license, weekends, later, shift] = groups;
+    const [, , , , , , , , relocate, license, weekends, later, shift, days] = groups;
     expect(sponsorship?.context).toContain('require visa sponsorship');
     expect(start?.context).toContain('start within a month');
     // Inputs parked off the page, transparent or clipped away are no control a person sees.
@@ -153,9 +161,15 @@ describe('the Playwright browser and buttons a page declares pressed or not, in 
     // Its name is not its question when words beside it ask one.
     expect(shift?.name).toBe('');
     expect(shift?.context).toContain('Which shift do you prefer?');
+    // Chips that each wrap the checkbox keeping their answer are the question's options, never fields of their own.
+    expect(days?.context).toContain('Which days can you work?');
+    expect(
+      observation.elements.filter((e) => e.role === 'checkbox').map((e) => e.name),
+    ).not.toContain('Mon');
     expect(groups.map((g) => g.value)).toEqual([
       null,
       'Pacific',
+      null,
       null,
       null,
       null,
@@ -171,7 +185,7 @@ describe('the Playwright browser and buttons a page declares pressed or not, in 
     // Plain buttons, toggles beside a field, a checkbox a person sees, any link or a button that is no
     // toggle, toggles that read alike or not at all, a lone toggle, two questions in one box — their
     // words drawn by CSS, an image's or in a shadow root included — and a toolbar or a navigation,
-    // around them or around their box, stay as the tree lists them.
+    // around them or around their box, and a card's action row outside the form, stay as the tree lists them.
     const buttons = observation.elements.filter((e) => e.role === 'button').map((e) => e.name);
     expect(buttons).toEqual([
       'I agree to the terms',
@@ -212,6 +226,9 @@ describe('the Playwright browser and buttons a page declares pressed or not, in 
       'Decline',
       'Red',
       'Blue',
+      'Save job',
+      'Hide job',
+      // A button no person sees is listed after those they do.
       'Reset',
     ]);
     const select = (ref: string | undefined, option: string) =>
@@ -239,6 +256,7 @@ describe('the Playwright browser and buttons a page declares pressed or not, in 
     await select(veteran?.ref, 'No');
     await select(relocate?.ref, 'No');
     await select(license?.ref, 'Yes');
+    await select(days?.ref, 'Tue');
     const again = (await browser.observe()).elements.filter((e) => e.role === 'listbox');
     expect(again.map((g) => g.value)).toEqual([
       'Yes',
@@ -254,6 +272,7 @@ describe('the Playwright browser and buttons a page declares pressed or not, in 
       null,
       null,
       null,
+      'Tue',
     ]);
   });
 });

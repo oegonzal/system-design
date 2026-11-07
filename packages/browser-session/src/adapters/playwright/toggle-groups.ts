@@ -1,8 +1,8 @@
 import { elementKindOf } from '@sysdesign/contracts';
-import type { Locator, Page } from 'playwright';
+import type { Frame, Locator, Page } from 'playwright';
 
 import type { SnapshotNode } from '../../core/snapshot/aria-snapshot';
-import { CONTROLS_BESIDE_TOGGLES, TOGGLE_OPTIONS } from './dom-selectors';
+import { CONTROLS_BESIDE_TOGGLES, QUESTION_CONTAINERS, TOGGLE_OPTIONS } from './dom-selectors';
 import { readElementFacts } from './element-facts';
 import type { NameGroup } from './name-groups';
 import { readRadioGroup } from './radio-group';
@@ -34,14 +34,34 @@ const insideOf = (nodes: readonly SnapshotNode[], box: number): number[] => {
   return inside;
 };
 
-/** Whether any frame of the page holds a button that declares whether it is pressed: none, and no box is read for one. */
-async function holdsToggles(page: Page): Promise<boolean> {
+/** How many toggle buttons a frame holds, or none when it does not answer within the wait: a busy frame holds no read. */
+async function togglesIn(frame: Frame, waitMs: number): Promise<number> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const late = new Promise<number>((resolve) => {
+    timer = setTimeout(() => resolve(0), waitMs);
+  });
+  try {
+    return await Promise.race([
+      frame
+        .locator(TOGGLE_OPTIONS)
+        .count()
+        .catch(() => 0),
+      late,
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
+ * Whether any frame of the page holds a button that declares whether it is
+ * pressed, each frame given the facts timeout to answer and none read past
+ * the deadline: none, and no box is read for one.
+ */
+async function holdsToggles(page: Page, timeout: number, deadline: number): Promise<boolean> {
   for (const frame of page.frames()) {
-    const count = await frame
-      .locator(TOGGLE_OPTIONS)
-      .count()
-      .catch(() => 0);
-    if (count > 0) return true;
+    if (Date.now() > deadline) return false;
+    if ((await togglesIn(frame, timeout)) > 0) return true;
   }
   return false;
 }
@@ -51,6 +71,8 @@ async function holdsToggles(page: Page): Promise<boolean> {
  * in the smallest box with a ref the tree gives around them: one question,
  * chosen from as a group of checkboxes is, under the box's ref — when no box
  * around them, theirs included, declares another purpose (`OTHER_PURPOSES`);
+ * the box is asked in a form, a fieldset or group or a dialog
+ * (`QUESTION_CONTAINERS`), or holds an input it keeps the answer in;
  * the box holds no link, which is followed and never answered, and no other
  * control a person sees, as the element facts tell what a person sees (the
  * inputs a page keeps the answer in, hidden from sight, aside); no words
@@ -72,20 +94,26 @@ export async function toggleGroups(
 ): Promise<NameGroup[]> {
   const buttonsIn = (box: number): number[] =>
     insideOf(nodes, box).filter((at) => nodes[at]?.role === 'button');
+  // Every button's boxes, and how many buttons the tree lists inside each box, counted once.
+  const chains = new Map<number, number[]>();
+  nodes.forEach((node, index) => {
+    if (node.role === 'button') chains.set(index, ancestorsOf(index));
+  });
+  const buttonsUnder = new Map<number, number>();
+  for (const chain of chains.values()) {
+    for (const at of chain) buttonsUnder.set(at, (buttonsUnder.get(at) ?? 0) + 1);
+  }
   // Each button's box: the smallest box with a ref around it that holds another button the tree lists.
   const boxOf = new Map<number, number>();
-  nodes.forEach((node, index) => {
-    if (node.role !== 'button') return;
-    const box = ancestorsOf(index).find(
-      (at) => nodes[at]?.ref !== null && buttonsIn(at).length > 1,
-    );
-    if (box !== undefined) boxOf.set(index, box);
-  });
+  for (const [button, chain] of chains) {
+    const box = chain.find((at) => nodes[at]?.ref !== null && (buttonsUnder.get(at) ?? 0) > 1);
+    if (box !== undefined) boxOf.set(button, box);
+  }
   // A box is gathered by a button with a ref, one a plan can press; a pressed one the tree gave no ref is still its answer.
   const boxes = new Set(
     [...boxOf].filter(([button]) => nodes[button]?.ref !== null).map(([, box]) => box),
   );
-  if (boxes.size === 0 || !(await holdsToggles(page))) return [];
+  if (boxes.size === 0 || !(await holdsToggles(page, timeout, deadline))) return [];
   /** Whether the tree lists words at a node between a box's first and last button, outside every button. */
   const wordsBetween = (at: number, first: number, last: number): boolean => {
     const node = nodes[at];
@@ -148,7 +176,11 @@ async function showsAnotherControl(box: Locator, timeout: number): Promise<boole
 
 const readToggleBox = async (box: Locator, timeout: number): Promise<number> => {
   try {
-    return await box.evaluate(toggleBoxInPage, { own: TOGGLE_OPTIONS }, { timeout });
+    return await box.evaluate(
+      toggleBoxInPage,
+      { own: TOGGLE_OPTIONS, asked: QUESTION_CONTAINERS },
+      { timeout },
+    );
   } catch {
     return 0;
   }
@@ -156,15 +188,19 @@ const readToggleBox = async (box: Locator, timeout: number): Promise<number> => 
 
 /**
  * In the page: how many toggle buttons a box holds as one question — none
- * when it holds fewer than two, or when words its page renders sit between
- * two of them outside both, which ask a second question. One function on
- * purpose — Playwright serialises it whole.
+ * when it holds fewer than two; when it sits in no form, fieldset, group or
+ * dialog and holds no input it keeps the answer in, so it asks nothing; or
+ * when words its page renders sit between two of them outside both, which
+ * ask a second question. One function on purpose — Playwright serialises it
+ * whole.
  */
-function toggleBoxInPage(box: Element, { own }: { own: string }): number {
+function toggleBoxInPage(box: Element, { own, asked }: { own: string; asked: string }): number {
   const options = Array.from(box.querySelectorAll(own));
   const [first] = options;
   const last = options[options.length - 1];
   if (first === undefined || last === undefined || options.length < 2) return 0;
+  if (box.closest(asked) === null && box.querySelector('input, select, textarea') === null)
+    return 0;
   const walker = document.createTreeWalker(box, NodeFilter.SHOW_TEXT);
   for (let node = walker.nextNode(); node !== null; node = walker.nextNode()) {
     if ((node.textContent ?? '').trim() === '') continue;

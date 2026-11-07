@@ -57,6 +57,15 @@ export const CONTROLS_BESIDE_TOGGLES = `:is(${[
 ].join(', ')}):not([aria-pressed]):not([aria-pressed] *)`;
 
 /**
+ * Where a page asks its questions: a form, a fieldset or a group, a dialog. A
+ * box of toggle buttons is one question only inside one of these, or holding
+ * an input it keeps the answer in (`toggle-groups.ts`) — never the action row
+ * a card or a panel draws among its other content.
+ */
+export const QUESTION_CONTAINERS =
+  'form, [role="form"], fieldset, [role="group"], dialog, [role="dialog"], [role="alertdialog"]';
+
+/**
  * The ARIA states that say an option is chosen, each when it reads "true": a
  * radio's or a checkbox's, and a toggle button's. Declared once for the
  * group's reader (`radio-group.ts`) and the read of an option the page drew

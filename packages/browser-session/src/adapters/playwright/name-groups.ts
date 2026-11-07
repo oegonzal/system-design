@@ -167,9 +167,11 @@ export async function readNameGroups(
   const declared = await declaredGroups(page, nodes, ancestorsOf, drawn, timeout);
   const gathered = new Set(declared.flatMap((group) => group.options));
   const toggles = await toggleGroups(page, nodes, ancestorsOf, timeout, deadline);
+  // A checkbox drawn inside a toggle button is that button's own: its group lists it, under the box around them.
+  const pressed = new Set(toggles.flatMap((group) => group.options));
   return {
     groups: [...groups, ...declared, ...toggles],
-    drawn: drawn.filter((checkbox) => !gathered.has(checkbox.option)),
+    drawn: drawn.filter((checkbox) => !gathered.has(checkbox.option) && !pressed.has(checkbox.box)),
   };
 }
 
