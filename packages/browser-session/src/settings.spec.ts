@@ -174,12 +174,21 @@ describe('the session settings', () => {
     expect(brain.legend.map((entry) => entry.kind)).toEqual(
       brain.facts.map((role) => brain.binding.registers[role]?.name),
     );
-    // A total table over the field types: free text draws deepest; the cap and the fan-out are declared.
+    // A total table over the field types: free text draws deepest, and a question a short answer settles draws five —
+    // measured 2026-11-07, the dated span a years-of-experience question rests on ranked as deep as fifth once new
+    // standing answers came in; the cap and the fan-out are declared.
     expect(Object.keys(brain.recall.hitsPerFieldType).sort()).toEqual([...FIELD_TYPES].sort());
-    expect(brain.recall.hitsPerFieldType.textarea).toBe(10);
-    for (const type of FIELD_TYPES.filter((type) => type !== 'textarea')) {
-      expect(brain.recall.hitsPerFieldType[type]).toBe(3);
-    }
+    expect(brain.recall.hitsPerFieldType).toEqual({
+      text: 5,
+      textarea: 10,
+      number: 5,
+      date: 3,
+      select: 5,
+      radio: 5,
+      checkbox: 3,
+      file: 3,
+      unknown: 3,
+    });
     expect(brain.recall.maxEvidence).toBe(24);
     expect(brain.recall.concurrency).toBe(4);
     expect(brain.project).toBe('job-assistant');

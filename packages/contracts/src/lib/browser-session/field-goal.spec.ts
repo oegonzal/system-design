@@ -22,8 +22,10 @@ import {
   type EvidenceItem,
   type FieldGoalInput,
 } from './field-goal';
-import { unitNamedLegend } from './field-goal-terms';
+import { FORM_GOAL_TERMS, unitNamedLegend } from './field-goal-terms';
 import { formObservation, resumeChunk } from './fixtures';
+import { FIELD_ANSWER_PIPELINE_ID } from './pipelines';
+import { UNCITED_ANSWER_BASES } from './vocab';
 import { readFencedIndex, stripIndexSection } from '../quality-loop/goal-index';
 
 const fields = () =>
@@ -277,6 +279,17 @@ describe('composeFieldGoal', () => {
     expect(closedOptionsOf(typed)).toBeNull();
     // Words past what it offers are the page's to take or refuse: no fault.
     expect(valueFaults(typed, 'Maybe')).toEqual([]);
+  });
+
+  it('[QL-39] names every kind resting on another section of the goal before the operator is asked, with evidence or none', () => {
+    const terms = FORM_GOAL_TERMS[FIELD_ANSWER_PIPELINE_ID];
+    const asking = terms.limits.filter((line) => line.includes('ask the operator'));
+    expect(asking).toHaveLength(1);
+    for (const kind of UNCITED_ANSWER_BASES) {
+      expect(asking[0]).toContain(kind);
+      expect(terms.noEvidence).toContain(kind);
+    }
+    expect(terms.noEvidence.startsWith('(none recalled:')).toBe(true);
   });
 
   it('[QL-39] finds its own fields heading even when the prose uses the same words', () => {

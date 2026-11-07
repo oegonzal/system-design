@@ -22,6 +22,60 @@ const SESSION = { sessionId: 'session-1', step: 6 };
 const CRITERIA = [{ id: 'c1', kind: 'grounding', statement: 'Rest every value on the evidence.' }];
 
 describe('the form goal', () => {
+  it('[BRW-16] carries the mission less the sections only the planner reads, every other section whole and in order', () => {
+    const mission = [
+      '# Mission',
+      '',
+      'Apply to each opening.',
+      '',
+      '## Per-unit procedure',
+      '',
+      '1. Open the first card.',
+      '',
+      '## Answering policy',
+      '',
+      'Answer from the evidence.',
+      '',
+      '## Stop conditions',
+      '',
+      '- blocked (stopped) "Verify": a bot check.',
+      '',
+      '## Never do',
+      '',
+      '- Never create an account.',
+      '',
+      '## Task events',
+      '',
+      '`done` once the page says it was sent.',
+    ].join('\n');
+    const prose = renderFieldProse({ mission, task: null });
+    expect(prose).toContain(
+      [
+        '# Mission',
+        '',
+        'Apply to each opening.',
+        '',
+        '## Answering policy',
+        '',
+        'Answer from the evidence.',
+        '',
+        '## Never do',
+        '',
+        '- Never create an account.',
+      ].join('\n'),
+    );
+    for (const plannerOnly of [
+      'Per-unit procedure',
+      'Open the first card',
+      'Stop conditions',
+      'a bot check',
+      'Task events',
+      'it was sent',
+    ]) {
+      expect(prose).not.toContain(plannerOnly);
+    }
+  });
+
   it('[BRW-16] states under the open unit what the page laid out under the declared landmark — titled by that landmark, counting the nodes shown — and fits the statement to the budget by a declared ladder: cut at a node boundary before any field, dropped before the goal is refused', async () => {
     const task: FormTask = {
       label: 'Senior Engineer at Acme',

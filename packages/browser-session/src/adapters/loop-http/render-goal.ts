@@ -1,13 +1,22 @@
 import {
+  ADVISORS_HEADING,
   composeFieldGoal,
   composeStepGoal,
+  CONTEXT_HEADING,
+  DOCUMENTS_HEADING,
+  MARKS_HEADING,
+  PROCEDURE_HEADING,
+  STOPS_HEADING,
   stopsOf,
   stopsOnPage,
+  TAKEN_HEADING,
   takenOf,
   takenOnPage,
+  TASK_EVENTS_HEADING,
   GOAL_BUDGET_BYTES,
   GoalBudgetExceeded,
   textBytes,
+  withoutSections,
   type FieldGoalInput,
   type FormPipeline,
   type PageObservation,
@@ -217,8 +226,30 @@ const statementSection = (context: UnitContext, shown: number): string[] => [
 ];
 
 /**
- * The prose half of a field-answer goal: the mission verbatim, and the unit of
- * work the fields belong to — with the identity its mission declared, so a
+ * The sections of a mission only the planner reads — how a unit is worked,
+ * stopped on, taken on record and reported, the marks, landmark, advisors and
+ * documents a plan reads by — which no field's answer rests on. A form goal
+ * leaves them out and carries every other section — the site's own
+ * descriptions and both policies among them — whole and in order. Measured
+ * 2026-11-07: carried whole, a mission left 81 bytes of the budget beside a
+ * statement at its bound and the heaviest recorded fields, and these sections
+ * held 6.3 KB of it.
+ */
+const PLANNER_SECTIONS: ReadonlySet<string> = new Set([
+  PROCEDURE_HEADING,
+  TASK_EVENTS_HEADING,
+  STOPS_HEADING,
+  TAKEN_HEADING,
+  MARKS_HEADING,
+  CONTEXT_HEADING,
+  ADVISORS_HEADING,
+  DOCUMENTS_HEADING,
+]);
+
+/**
+ * The prose half of a field-answer goal: the mission less the sections only
+ * the planner reads (`PLANNER_SECTIONS`), and the unit of work the fields
+ * belong to — with the identity its mission declared, so a
  * question about "this employer" is answered against a declared value, never a
  * reading of the label; and with what the page stated about the unit when it
  * opened — the first `shown` of its node lines, every one by default — so a
@@ -236,7 +267,7 @@ export function renderFieldProse(
   const statement =
     context === null ? [] : statementSection(context, shown ?? statementLines(context).length);
   return [
-    input.mission.trim(),
+    withoutSections(input.mission, PLANNER_SECTIONS).trim(),
     '',
     OPEN_UNIT_HEADING,
     '',

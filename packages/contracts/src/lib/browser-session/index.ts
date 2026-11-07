@@ -28,4 +28,5 @@ export * from './fixtures';
 export * from './mission-marks';
 export * from './mission-documents';
 export * from './mission-stops';
+export { PROCEDURE_HEADING, TASK_EVENTS_HEADING, withoutSections } from './mission-sections';
 export * from './action-identity';

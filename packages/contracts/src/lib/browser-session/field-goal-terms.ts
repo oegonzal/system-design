@@ -63,12 +63,11 @@ export const FORM_GOAL_TERMS: Readonly<
   Record<FormPipeline, { noEvidence: string; limits: readonly string[] }>
 > = {
   [FIELD_ANSWER_PIPELINE_ID]: {
-    noEvidence:
-      '(none recalled: answer nothing about the subject from memory; route such fields to the operator)',
+    noEvidence: `(none recalled: no value rests on the evidence; one declared ${UNCITED_ANSWER_BASES.join(' or ')} rests on its own section of the goal and stands; route the rest to the operator)`,
     limits: [
       '- Answer every listed field exactly once, by its ref, in the order listed.',
       "- A value stays within the field's character limit; a selectable field takes one of its listed options, or where the list counts more the page offers, one of those verbatim; a field you type into that lists options takes an option's exact words, and words it holds that are none of its options are no choice — answer it, never keep them; a number field takes a number.",
-      '- A field the page hides is left blank. A value about the subject rests only on listed evidence, cited by alias; a value saying only what the unit of work is rests on what the Open unit of work states the page said of it, by the word unit; with neither, ask the operator.',
+      `- A field the page hides is left blank. A value rests on listed evidence, cited by alias, or — declared ${UNCITED_ANSWER_BASES.join(' or ')} — on the section of the goal that kind's meaning below names; with none of these, ask the operator.`,
       `- Each value declares how it rests, by one word: ${ANSWER_BASES.map((kind) => `${kind} — ${ANSWER_BASIS_MEANINGS[kind]}`).join('; ')}. A value resting on the evidence (${CITING_ANSWER_BASES.join(', ')}) cites it by alias; one resting on ${UNCITED_ANSWER_BASES.join(' or ')} cites none; a mapped value needs options to map onto; a keep, an ask or a blank rests on none.`,
       '- Validators check these limits; they are not criteria.',
     ],

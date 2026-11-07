@@ -2,7 +2,8 @@
  * A mission declares facts for the engine under `##` headings, one bullet
  * each — its Marks, its Stop conditions, its Unit identity, its Unit context,
  * its Advisors.
- * `bulletsUnder` is the one reader of such a section; `declaredSection` is the
+ * `bulletsUnder` is the one reader of such a section, and `withoutSections`
+ * the one way to leave sections out of it; `declaredSection` is the
  * one grammar machine: a bullet regex whose named groups are the row, a row
  * schema, a list bound, the refusal that names the offending bullet, and an
  * optional rule across rows. A section is a declaration of these, never a
@@ -27,6 +28,13 @@ export const declaredOnce =
     return null;
   };
 
+/** The template's prose sections no grammar here reads, which the planner reads by name: how a unit is worked, and the task events it reports. */
+export const PROCEDURE_HEADING = '## Per-unit procedure';
+export const TASK_EVENTS_HEADING = '## Task events';
+
+/** Whether a line opens a section: a `#` or `##` heading, where every reader here stops. */
+const opensSection = (line: string): boolean => /^#{1,2} /.test(line);
+
 /** The bullets under a heading, trimmed, blank lines skipped, up to the next heading; none when the heading is absent. */
 export function bulletsUnder(mission: string, heading: string): string[] {
   const lines = mission.split('\n');
@@ -34,11 +42,23 @@ export function bulletsUnder(mission: string, heading: string): string[] {
   if (start === -1) return [];
   const bullets: string[] = [];
   for (const line of lines.slice(start + 1)) {
-    if (/^#{1,2} /.test(line)) break;
+    if (opensSection(line)) break;
     if (line.trim() === '') continue;
     bullets.push(line.trim());
   }
   return bullets;
+}
+
+/** The mission with the sections under the given headings left out, each up to the next heading; the rest verbatim and in order. */
+export function withoutSections(mission: string, headings: ReadonlySet<string>): string {
+  let kept = true;
+  return mission
+    .split('\n')
+    .filter((line) => {
+      if (opensSection(line)) kept = !headings.has(line.trim());
+      return kept;
+    })
+    .join('\n');
 }
 
 export interface DeclaredSection<Row> {

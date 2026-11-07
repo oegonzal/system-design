@@ -39,6 +39,14 @@ const TEMPLATE_HEADINGS = [
   '## Task events',
 ];
 
+/**
+ * The owner's answering boundary, declared 2026-11-07 with his wish that forms
+ * be answered as loosely as the record allows: the values no policy line may
+ * name, which come from the record or the operator alone.
+ */
+const ANSWERING_BOUNDARY =
+  'No line of this policy names a value for a name, a contact detail, an address, a date, an identifier, an answer about criminal history, a signature or a certification that the application is true, nor any equal-opportunity answer but declining: those come from the record or the operator.';
+
 const goals = readdirSync(GOALS_DIR)
   .filter((name) => name.endsWith('.md'))
   .map((name) => ({ name, text: readFileSync(join(GOALS_DIR, name), 'utf8') }));
@@ -47,6 +55,17 @@ describe('the goals', () => {
   it('[BRW-8] are markdown files beside the program, at least one', () => {
     expect(goals.length).toBeGreaterThan(0);
   });
+
+  it.each(goals.map((goal) => [goal.name, goal.text] as const))(
+    '[BRW-8] %s keeps the answering boundary in its Answering policy',
+    (_name, text) => {
+      const policy = text.slice(
+        text.indexOf('\n## Answering policy\n'),
+        text.indexOf('\n## Suggesting policy\n'),
+      );
+      expect(policy).toContain(ANSWERING_BOUNDARY);
+    },
+  );
 
   it.each(goals.map((goal) => [goal.name, goal.text] as const))(
     '[BRW-8] %s carries every template heading, speaks the cause and outcome words, and composes under the budget',

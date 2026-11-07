@@ -63,12 +63,12 @@
   ],
   "recall": {
     "hitsPerFieldType": {
-      "text": 3,
+      "text": 5,
       "textarea": 10,
-      "number": 3,
+      "number": 5,
       "date": 3,
-      "select": 3,
-      "radio": 3,
+      "select": 5,
+      "radio": 5,
       "checkbox": 3,
       "file": 3,
       "unknown": 3
