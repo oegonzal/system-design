@@ -49,10 +49,8 @@ describe('the Playwright browser, on a field the page refuses in an alert', () =
       required: false,
       context: 'Country code was added to the field. Mobile Number is required.',
     });
-    expect(byName('Email')).toMatchObject({
-      invalid: true,
-      context: 'Enter a valid email address.',
-    });
+    // An error message is the page's refusal, not the words a person reads beside the field.
+    expect(byName('Email')).toMatchObject({ invalid: true, context: null });
     expect(byName('Postal code')?.invalid).toBe(false);
   });
 });
