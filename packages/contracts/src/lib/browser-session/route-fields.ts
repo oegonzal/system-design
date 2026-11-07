@@ -74,16 +74,20 @@ const holds = (field: FieldSpec): boolean =>
   field.value !== null && field.value !== '' && !holdsUnchosenWords(field);
 
 /**
- * Whether the page needs a value in the field: one it marks required, or a
- * choice it asks with nothing chosen. A radio group can say it is required
- * only through attributes its radios may never carry, and leaving a question
- * unanswered is a choice about the subject, so it is the operator's to make
- * — `/blank` included. Measured 2026-10-09: a form that marked every select
- * and text field required marked none of its radio questions, each was left
- * blank as optional, and the page refused to advance past the blank.
+ * Whether the page needs a value in the field: one it marks required, one it
+ * marks invalid — it refused what the field holds, or a blank, and will not
+ * go on with it — or a choice it asks with nothing chosen. A radio group can
+ * say it is required only through attributes its radios may never carry, and
+ * leaving a question unanswered is a choice about the subject, so it is the
+ * operator's to make — `/blank` included. Measured 2026-10-09: a form that
+ * marked every select and text field required marked none of its radio
+ * questions, each was left blank as optional, and the page refused to advance
+ * past the blank. Measured 2026-11-06: a form marked its phone field required
+ * only in the alert it showed on refusing the page, so an answer the operator
+ * alone could give was left blank twice as optional, and the form never sent.
  */
 export const needsValue = (field: FieldSpec): boolean =>
-  field.required || (field.role === 'radiogroup' && !holds(field));
+  field.required || field.invalid || (field.role === 'radiogroup' && !holds(field));
 
 /** The answers of the best iteration by ref, when its artifact read as answers. */
 const answersOf = (best: IterationTrace | null): Map<string, FieldAnswer> => {
@@ -149,7 +153,7 @@ function answerRoute(
             answer,
             'ask-operator',
             'loop',
-            `${field.required ? 'required field' : 'unanswered choice'} left blank: ${answer.reason}`,
+            `${field.required ? 'required field' : field.invalid ? 'refused field' : 'unanswered choice'} left blank: ${answer.reason}`,
           )
         : readout(position, field, answer, 'leave-blank', 'blank', answer.reason);
     case 'answer':
@@ -211,9 +215,9 @@ function fieldRoute(
  * each finding type and validator withholds, never "any finding" — then the
  * model's decision, typed when the answering settings fill the kind the value
  * declares it rests on. The operator is asked only for a field the page needs
- * a value in — one it marks required, or a choice it asks with nothing
- * chosen: any other the answers could not settle is left blank, and the row
- * says why.
+ * a value in — one it marks required or invalid, or a choice it asks with
+ * nothing chosen: any other the answers could not settle is left blank, and
+ * the row says why.
  *
  * A run that fell short is recorded on the row and demotes nothing by
  * itself: the judges' objections arrive as what the report withholds at the

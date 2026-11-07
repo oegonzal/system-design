@@ -196,6 +196,21 @@ describe('routeFields', () => {
     );
     expect(blankRequired[0].route).toBe('ask-operator');
     expect(blankRequired[0].reason).toContain('required field left blank');
+    // A field the page marks invalid is one it needs a value in, required or not: unsettled, it is the operator's.
+    const refused = fields().map((field) =>
+      field.ref === 'e4' ? { ...field, invalid: true, value: '+1' } : field,
+    );
+    const asked = route(
+      decided(judgedRun({ artifact: answers({ e4: { decision: 'ask-operator', value: null } }) })),
+      refused,
+    );
+    expect(asked[3]).toMatchObject({ route: 'ask-operator', source: 'loop' });
+    const blanked = route(
+      decided(judgedRun({ artifact: answers({ e4: { decision: 'leave-blank', value: null } }) })),
+      refused,
+    );
+    expect(blanked[3].route).toBe('ask-operator');
+    expect(blanked[3].reason).toContain('refused field left blank');
   });
 
   it('[QL-37] keeps what a field holds when the model says so or answers with the same value, asks when a keep has nothing to keep, and blanks an optional field a judge faulted', () => {
