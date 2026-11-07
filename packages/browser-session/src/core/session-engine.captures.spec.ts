@@ -92,6 +92,9 @@ describe('what a session images beside each step', () => {
     expect(listed(refused.dumps, '03')).toEqual([
       ['captures/01-fill-years-of-experience-with-python.png', 'fill', 'failed'],
     ]);
+    // The record says why the page refused it, so a session's last step can be explained from its dump alone.
+    const records = JSON.parse(refused.dumps.text('01-steps/03/captures.json')) as CaptureRecord[];
+    expect(records.map((record) => record.detail)).toEqual(['fill e1: the element is detached']);
     const quiet = await journey(
       { after: ['fill', 'select'], failures: false },
       refusing(new FakeBrowser(pages()), 'fill', 'form'),

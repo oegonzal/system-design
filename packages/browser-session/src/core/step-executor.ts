@@ -290,7 +290,7 @@ async function act(
   } catch (error) {
     if (!(error instanceof ActionFailed)) throw error;
     pushHistory(state, label, 'failed', error.message);
-    await captureAfter(ctx, action, described, 'failed');
+    await captureAfter(ctx, action, described, 'failed', error.message);
     return true;
   }
   pushHistory(state, label, 'ok', null);

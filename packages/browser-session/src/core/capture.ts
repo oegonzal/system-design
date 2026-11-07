@@ -30,6 +30,7 @@ export async function captureAfter(
   action: BrowserAction,
   described: { label: string; touched: string | null },
   outcome: CaptureRecord['outcome'],
+  detail: string | null = null,
 ): Promise<void> {
   const { capture } = ctx.options;
   // An action that ran is imaged when the policy names its kind; one the page refused, when it asks for refusals.
@@ -51,6 +52,7 @@ export async function captureAfter(
     kind: action.kind,
     label: described.label,
     outcome,
+    detail,
     at: deps.clock.now().toISOString(),
   };
   state.captures.push(record);

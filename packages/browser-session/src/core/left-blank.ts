@@ -1,6 +1,7 @@
 import type { FieldSpec } from '@sysdesign/contracts';
 
 import type { RoutedField } from './field-routing';
+import { pageOf } from './session-state';
 
 /** Who left a field blank, as the open unit remembers it: the session's routing, or the operator's own choice. */
 export type BlankedBy = 'session' | 'operator';
@@ -10,20 +11,6 @@ export interface LeftBlank {
   by: BlankedBy;
   held: string | null;
 }
-
-/**
- * The page a field was seen on, as the blanks it holds are kept by: its
- * address without the query or the fragment. A ref is minted afresh for each
- * document, so a ref, role and name met on another page may be another field.
- */
-const pageOf = (url: string): string => {
-  try {
-    const { origin, pathname } = new URL(url);
-    return `${origin}${pathname}`;
-  } catch {
-    return url;
-  }
-};
 
 /**
  * A field left blank, as the open unit remembers it: by the page it is on and

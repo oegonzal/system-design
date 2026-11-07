@@ -22,6 +22,7 @@ import {
   excerpt,
   identityKey,
   unitKeyOf,
+  type PageObservation,
 } from '@sysdesign/contracts';
 
 import type { PendingExpectation } from './expectations';
@@ -111,6 +112,8 @@ export interface SessionState {
   unreadablePages: number;
   /** The identity of the page the current step observed, compared with the step before. */
   fingerprint: string | null;
+  /** The page the last observation was of — its address without the query, and the scope in front — as objections are kept by. */
+  page: string | null;
   /** Whether this step's page is the same page the last step observed. */
   pageUnchanged: boolean;
   /** Observations in a row of a page that did not change, whatever the steps between them did; reset by a page that moved. */
@@ -192,6 +195,7 @@ export function createState(ids: {
     brainFaults: 0,
     unreadablePages: 0,
     fingerprint: null,
+    page: null,
     pageUnchanged: false,
     stalledSteps: 0,
     operatorStopped: false,
@@ -245,15 +249,20 @@ export const railStateOf = (state: SessionState): RailState => ({
  * that ran clean, and a count of failed steps saw none of them. A page that
  * moved ends the stall.
  */
-export function noteObservation(state: SessionState, fingerprint: string): void {
+export function noteObservation(state: SessionState, fingerprint: string, page: string): void {
   state.pageUnchanged = state.fingerprint === fingerprint;
   state.fingerprint = fingerprint;
-  // An objection is about a plan made on another page once this one has
-  // moved: carried on, it reads as one to this page. Measured 2026-10-08: a
+  // An objection is about a plan made on another page once the session is on
+  // one: carried on, it reads as one to this page. Measured 2026-10-08: a
   // click that opened a listing was followed, step after step, by the last
   // page's "taskStart follows the click" and "open the first card" — and the
-  // planner clicked a card again, twelve steps of 23.
-  if (!state.pageUnchanged) clearObjections(state);
+  // planner clicked a card again, twelve steps of 23. A page the step's own
+  // actions changed — a box ticked, a field filled — is still the page the
+  // objections were made on, and they stand. Measured 2026-11-06: a refused
+  // askFields, a click that ticked one box, and the same askFields proposed
+  // again under "no plan on this page has been refused", the third failure.
+  if (state.page !== page) clearObjections(state);
+  state.page = page;
   state.stalledSteps = state.pageUnchanged ? state.stalledSteps + 1 : 0;
   // A pass the evaluator gave the last plan becomes a session fact only once
   // the engine's own identity says the page moved: one sample's word is
@@ -349,6 +358,29 @@ export function pushObjections(state: SessionState, objections: readonly Objecti
   );
   if (state.objections.length > OBJECTIONS_MAX) state.objections.length = OBJECTIONS_MAX;
 }
+
+/**
+ * The page an observation is of, as objections and blanks are kept by: its
+ * address without the query or the fragment, its title, and the scope in
+ * front — what changes when the session is on another page, and stays when
+ * the step's own actions changed this one. A ref is minted afresh for each
+ * document, and a plan refused on one page says nothing about another.
+ */
+export const pageOf = (url: string): string => {
+  try {
+    const { origin, pathname } = new URL(url);
+    return `${origin}${pathname}`;
+  } catch {
+    return url;
+  }
+};
+
+export const pageIdentityOf = (
+  observation: Pick<PageObservation, 'url' | 'title' | 'activeScope'>,
+): string =>
+  [pageOf(observation.url), observation.title, JSON.stringify(observation.activeScope)].join(
+    '\u0000',
+  );
 
 /** Nothing is owed to the next producer: a plan ran every action it proposed, or the page moved. */
 export function clearObjections(state: SessionState): void {

@@ -77,7 +77,7 @@ describe('an answer the page refuses', () => {
 
   it('[BRW-3] stands once the declared asks are spent, and the fields after it are not attempted', async () => {
     const browser = refusing(new FakeBrowser(journeyPages()), 'select', 'form');
-    const { detail, operator, brain } = await run({
+    const { detail, operator, brain, logs } = await run({
       script: script(),
       lines: ['No', 'Yes'],
       browser,
@@ -90,5 +90,7 @@ describe('an answer the page refuses', () => {
       ['e2', 'operator', 'failed'],
     ]);
     expect(brain.taught).toEqual([]);
+    // A refusal after a field was filled is a step that ran, not one failed step toward the limit.
+    expect(logs.filter((line) => line.includes('action-failed'))).toEqual([]);
   });
 });

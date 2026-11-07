@@ -109,7 +109,7 @@ export async function fill(
     await ctx.deps.browser.act(action);
   } catch (error) {
     if (!(error instanceof ActionFailed)) throw error;
-    await captureAfter(ctx, action, entry, 'failed');
+    await captureAfter(ctx, action, entry, 'failed', error.message);
     return result(field, 'fill', source, value, reply, 'failed', error.message);
   }
   await captureAfter(ctx, action, entry, 'ok');

@@ -442,7 +442,12 @@ export async function askFields(
   dumpFields(ctx, routed, results, decided, fault, prefetch?.record() ?? null);
   return {
     stopped,
-    failed: results.some((outcome) => outcome.outcome === 'failed'),
+    // A refusal after a field was filled is a step that ran: the page moved, the note names the refused field, and
+    // the next plan answers it in the words the page offered. Measured 2026-11-06: three such steps, four fields
+    // filled between them, ended a session at the failure limit with the form one select short of sending.
+    failed:
+      results.some((outcome) => outcome.outcome === 'failed') &&
+      !results.some((outcome) => outcome.outcome === 'ok' && outcome.route === 'fill'),
     note: summarize(results, routed),
   };
 }

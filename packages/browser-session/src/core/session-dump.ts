@@ -105,6 +105,8 @@ export interface CaptureRecord {
   /** The action as the history reads it — a fill with its value, which no file name carries. */
   label: string;
   outcome: 'ok' | 'failed';
+  /** Why the page refused the action, for one that failed; null for one that ran. */
+  detail: string | null;
   at: string;
 }
 

@@ -1,7 +1,13 @@
-import { type StepPlan, finding } from '@sysdesign/contracts';
+import { type StepPlan, finding, observedElement } from '@sysdesign/contracts';
 
-import { decidedAnswers, decidedPlan } from './testing';
-import { JOURNEY_ANSWERS as ANSWERS, JOURNEY_PLANS as PLANS } from './testing-journey';
+import { decidedAnswers, decidedPlan, FakeBrowser } from './testing';
+import {
+  JOURNEY_ANSWERS as ANSWERS,
+  JOURNEY_PLANS as PLANS,
+  JOURNEY_URLS,
+  journeyPages,
+  observation,
+} from './testing-journey';
 import { runScripted as run } from './testing-session';
 
 /**
@@ -72,6 +78,60 @@ describe('the hand-off between steps', () => {
     });
     expect(brain.planInputs[1]?.objections).toEqual([
       { step: 1, from: 'references', at: ['action.2'], detail: 'e2 is not a listed element' },
+    ]);
+  });
+
+  it('[BRW-1] objections stand on the page they were raised on however the step’s own actions changed it: a click that ticks a box keeps them for the next plan', async () => {
+    // Measured 2026-11-06: a refused askFields, a click that ticked one box, and the same askFields
+    // proposed again under "no plan on this page has been refused" — the third failure in a row.
+    const pages = journeyPages();
+    const search = pages.find((page) => page.id === 'search');
+    if (search === undefined) throw new Error('the journey has no search page');
+    const remote = observedElement('e3', 'checkbox', 'Remote only');
+    search.observation = observation(JOURNEY_URLS.search, 'Search', [
+      ...search.observation.elements,
+      remote,
+    ]);
+    search.transitions = { ...search.transitions, 'click e3': 'search-ticked' };
+    pages.push({
+      id: 'search-ticked',
+      observation: observation(JOURNEY_URLS.search, 'Search', [
+        ...search.observation.elements.filter((element) => element.ref !== 'e3'),
+        { ...remote, value: 'checked' },
+      ]),
+    });
+    const tickThenFill: StepPlan = {
+      ...PLANS.search,
+      actions: [
+        { kind: 'click', ref: 'e3', reason: 'remote only', expect: null, serves: [] },
+        { kind: 'fill', ref: 'e1', value: 'x', reason: 'refine', expect: null, serves: [] },
+      ],
+    };
+    const cutAfterTheClick = decidedPlan(tickThenFill, {
+      decision: 'revise',
+      validation: [
+        {
+          validatorId: 'limits',
+          gate: 'cut',
+          problems: [
+            {
+              severity: 'high',
+              locationRefs: ['action.2'],
+              message:
+                'fill follows the click at action.1: the page it would act on has not been observed',
+            },
+          ],
+        },
+      ],
+    });
+    const { brain, browser } = await run({
+      script: { plans: [cutAfterTheClick, decidedPlan(PLANS.end)], answers: [] },
+      browser: new FakeBrowser(pages),
+    });
+    // The click changed the page — the box reads ticked — but the session is on the page the objection was made on.
+    expect(browser.pageId).toBe('search-ticked');
+    expect(brain.planInputs[1]?.objections.map((objection) => objection.at)).toEqual([
+      ['action.2'],
     ]);
   });
 

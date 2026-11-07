@@ -29,6 +29,7 @@ import { observationFiles, stepJsonFile } from './session-dump';
 import {
   ledgerSummaryOf,
   noteObservation,
+  pageIdentityOf,
   progressOf,
   pushHistory,
   pushObjections,
@@ -80,7 +81,7 @@ async function observe(ctx: EngineContext): Promise<PageObservation> {
   state.captures = [];
   const observation = await deps.browser.observe();
   const screenshot = await deps.browser.screenshot(null).catch(() => null);
-  noteObservation(state, observationFingerprint(observation));
+  noteObservation(state, observationFingerprint(observation), pageIdentityOf(observation));
   settleExpectation(ctx, observation);
   ctx.dumpFiles('step files', observationFiles(state.step, observation, screenshot));
   // A read that did not reach the page is counted, and one that did clears the count.
