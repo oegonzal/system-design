@@ -1,11 +1,13 @@
 import type { Locator, Page } from 'playwright';
 
 import type { SnapshotNode } from '../../core/snapshot/aria-snapshot';
-import { CHECKBOX_OPTIONS, RADIO_OPTIONS } from './dom-selectors';
+import { CHECKBOX_OPTIONS, RADIO_OPTIONS, TOGGLE_OPTIONS } from './dom-selectors';
 import type { GroupOptions } from './radio-group';
+import { toggleGroups } from './toggle-groups';
 
 /**
- * Choices a page groups by their name alone, and checkboxes it draws itself.
+ * Choices a page groups by their name alone, checkboxes it draws itself, and
+ * buttons it declares pressed or not, in a box of their own (`toggle-groups.ts`).
  *
  * The HTML standard makes the radios that share a name and a form one radio
  * button group — one question, answered once — whether or not the page
@@ -31,12 +33,13 @@ import type { GroupOptions } from './radio-group';
  * out flat among other fields, or in a box another control shares — are left
  * as the tree lists them.
  */
-export type GroupKind = 'radio' | 'checkbox';
+export type GroupKind = 'radio' | 'checkbox' | 'toggle';
 
 /** The options selector each kind of group is read by. */
 export const GROUP_OPTIONS: Readonly<Record<GroupKind, GroupOptions>> = {
   radio: RADIO_OPTIONS,
   checkbox: CHECKBOX_OPTIONS,
+  toggle: TOGGLE_OPTIONS,
 };
 
 /**
@@ -53,8 +56,10 @@ export interface ChoiceBox {
 /**
  * One group of choices read as one question: the index of its box's node in
  * the tree, and of the tree's nodes for its options — a group the page makes
- * by name alone, or one it declares by a box's role (`declared`), whose own
- * name, when its author gave it one, is its question.
+ * by name alone; or one whose box is the question's own (`declared`) — a box
+ * the page declares a group by its role, or one of toggle buttons
+ * (`toggle-groups.ts`) — whose own name, when its author gave it one, is its
+ * question.
  */
 export interface NameGroup {
   kind: GroupKind;
@@ -62,6 +67,9 @@ export interface NameGroup {
   options: number[];
   declared: boolean;
 }
+
+/** The kinds of choice a page makes of its own inputs: grouped by name, or drawn by the page. */
+type InputKind = Exclude<GroupKind, 'toggle'>;
 
 /** A checkbox the tree gave no ref, alone in its group: the index of the box that holds it alone, and of its own node. */
 export interface DrawnCheckbox {
@@ -92,11 +100,12 @@ const parentsOf = (nodes: readonly SnapshotNode[]): number[] => {
 /**
  * The groups of one read whose options the page declares no group around,
  * each under the box that holds it alone; the checkboxes the tree gave no ref
- * that a box the page declares a group gathers as one question; and the rest
- * of those checkboxes, each under the box that holds it alone. A box is read
- * in the page once per kind however many options sit in it, and the walk
- * stops once the deadline passes: an option not reached is listed as the tree
- * lists it.
+ * that a box the page declares a group gathers as one question; the buttons
+ * that declare whether they are pressed, two or more in a box of their own
+ * (`toggleGroups`); and the rest of those checkboxes, each under the box that
+ * holds it alone. A box's options are read in the page together, however many
+ * sit in it, and the walk stops once the deadline passes: an option not
+ * reached is listed as the tree lists it.
  */
 export async function readNameGroups(
   page: Page,
@@ -112,7 +121,7 @@ export async function readNameGroups(
     }
     return ancestors;
   };
-  const kindOf = (node: SnapshotNode): GroupKind | null =>
+  const kindOf = (node: SnapshotNode): InputKind | null =>
     node.role === 'radio' ? 'radio' : node.role === 'checkbox' ? 'checkbox' : null;
   // A radio inside a radiogroup the page declares is that group's, read by its own role.
   const choices = nodes.flatMap((node, index) => {
@@ -123,7 +132,7 @@ export async function readNameGroups(
       : [{ index, kind }];
   });
   const read = new Map<string, BoxReading | null>();
-  const boxReading = async (box: number, kind: GroupKind): Promise<BoxReading | null> => {
+  const boxReading = async (box: number, kind: InputKind): Promise<BoxReading | null> => {
     const key = `${kind}:${box}`;
     const ref = nodes[box]?.ref ?? null;
     if (ref === null) return null;
@@ -157,8 +166,9 @@ export async function readNameGroups(
   }
   const declared = await declaredGroups(page, nodes, ancestorsOf, drawn, timeout);
   const gathered = new Set(declared.flatMap((group) => group.options));
+  const toggles = await toggleGroups(page, nodes, ancestorsOf, timeout, deadline);
   return {
-    groups: [...groups, ...declared],
+    groups: [...groups, ...declared, ...toggles],
     drawn: drawn.filter((checkbox) => !gathered.has(checkbox.option)),
   };
 }
@@ -207,7 +217,7 @@ async function declaredGroups(
 
 const readBox = async (
   box: Locator,
-  kind: GroupKind,
+  kind: InputKind,
   timeout: number,
   declared = false,
 ): Promise<BoxReading | null> => {

@@ -81,8 +81,9 @@ export async function performAction(
 }
 
 /**
- * A `<select>` takes the option by label; a group the page makes by name
- * alone chooses among the options its box holds; a radio group chooses the
+ * A `<select>` takes the option by label; a group the observation lists under
+ * its box (`name-groups.ts`) — by name, by a box's role, or of toggle buttons
+ * — chooses among the options its box holds; a radio group chooses the
  * radio whose words, as the observation read them, are the option's; a control
  * typed into types the option's words and chooses that option; anything else
  * opens and picks.

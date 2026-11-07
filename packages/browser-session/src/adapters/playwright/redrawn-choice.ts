@@ -1,6 +1,7 @@
 import type { ElementHandle, Frame, Locator } from 'playwright';
 
 import { ActionFailed } from '../../core/ports';
+import { CHOSEN_STATES } from './dom-selectors';
 import type { Point } from './frames';
 import type { GroupOptions } from './radio-group';
 
@@ -43,21 +44,23 @@ export interface OptionRead extends OptionKey {
 
 /**
  * In the page: an option read as the group's reader reads one — chosen by its
- * own state, its ARIA state, or the native input it draws — found as given,
- * by its key anywhere in the frame, or as the one option the smallest box
- * around a point holds; null when none is. One function on purpose —
- * Playwright serialises it whole.
+ * own state, a chosen ARIA state (`CHOSEN_STATES`), or the native input it
+ * draws — found as given, by its key anywhere in the frame, or as the one
+ * option the smallest box around a point holds; null when none is. One
+ * function on purpose — Playwright serialises it whole.
  */
 function optionInPage({
   option,
   find,
   at,
   options,
+  chosenStates,
 }: {
   option: Element | null;
   find: { key: string; kind: 'value' | 'label' | 'none' } | null;
   at: { x: number; y: number } | null;
   options: string;
+  chosenStates: readonly string[];
 }): { key: string; kind: 'value' | 'label' | 'none'; chosen: boolean } | null {
   const tidy = (text: string | null | undefined): string =>
     (text ?? '').replace(/\s+/g, ' ').trim();
@@ -94,7 +97,7 @@ function optionInPage({
     return label !== '' ? { key: label, kind: 'label' } : { key: '', kind: 'none' };
   };
   const chosenOf = (el: Element): boolean =>
-    el.getAttribute('aria-checked') === 'true' ||
+    chosenStates.some((state) => el.getAttribute(state) === 'true') ||
     (el as HTMLInputElement).checked === true ||
     el.querySelector('input[type="radio"]:checked, input[type="checkbox"]:checked') !== null;
   let found: Element | null = option;
@@ -135,6 +138,7 @@ export async function optionBefore(
         find: null,
         at: null,
         options,
+        chosenStates: CHOSEN_STATES,
       })
       .catch(() => null);
   } finally {
@@ -165,7 +169,9 @@ export async function readAnew(
   const until = Date.now() + waits.optionWaitMs;
   let now: OptionRead | null = null;
   for (;;) {
-    now = await frame.evaluate(optionInPage, { option: null, find, at, options }).catch(() => null);
+    now = await frame
+      .evaluate(optionInPage, { option: null, find, at, options, chosenStates: CHOSEN_STATES })
+      .catch(() => null);
     if (now !== null && now.chosen === meant) return;
     if (Date.now() >= until) break;
     await frame.page().waitForTimeout(waits.settleRetryMs);

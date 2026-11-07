@@ -1,10 +1,10 @@
 import type { Locator } from 'playwright';
 
-import { CHECKBOX_OPTIONS, RADIO_OPTIONS } from './dom-selectors';
+import { CHECKBOX_OPTIONS, CHOSEN_STATES, RADIO_OPTIONS, TOGGLE_OPTIONS } from './dom-selectors';
 import type { Point } from './frames';
 
-/** Which options a group is read by: its radios, or its checkboxes. */
-export type GroupOptions = typeof RADIO_OPTIONS | typeof CHECKBOX_OPTIONS;
+/** Which options a group is read by: its radios, its checkboxes, or its toggle buttons. */
+export type GroupOptions = typeof RADIO_OPTIONS | typeof CHECKBOX_OPTIONS | typeof TOGGLE_OPTIONS;
 
 /** One option of a group as a person reads it: its words, whether it is chosen, and whether the page disables it. */
 interface RadioOption {
@@ -20,7 +20,7 @@ interface RadioAim extends Point {
 
 /**
  * A group of choices as a person reads it — a radio group, or a group of
- * checkboxes read the same way: every option in the page's order (the
+ * checkboxes or toggle buttons read the same way: every option in the page's order (the
  * options selector), disabled ones included; the question every option is
  * named after, empty when they are not; whether the page marks any option
  * required or invalid; and, when one option is aimed at, the points a
@@ -42,13 +42,17 @@ const readInPage = async (
   timeout?: number,
 ): Promise<RadioGroupReading | null> => {
   try {
-    return await group.evaluate(radioGroupInPage, { radioOptions: options, aimAt }, { timeout });
+    return await group.evaluate(
+      radioGroupInPage,
+      { radioOptions: options, aimAt, chosenStates: CHOSEN_STATES },
+      { timeout },
+    );
   } catch {
     return null;
   }
 };
 
-/** The group under a locator as a person reads it, by its radios unless told its options are checkboxes; null when the read fails. */
+/** The group under a locator as a person reads it, by its radios unless told its options are checkboxes or toggle buttons (`GroupOptions`); null when the read fails. */
 export const readRadioGroup = (
   group: Locator,
   timeout?: number,
@@ -95,7 +99,11 @@ export const answerable = (reading: RadioGroupReading): RadioOption[] =>
  */
 function radioGroupInPage(
   group: Element,
-  { radioOptions, aimAt }: { radioOptions: string; aimAt: number | null },
+  {
+    radioOptions,
+    aimAt,
+    chosenStates,
+  }: { radioOptions: string; aimAt: number | null; chosenStates: readonly string[] },
 ): RadioGroupReading {
   const doc = group.ownerDocument;
   const radios = Array.from(group.querySelectorAll(radioOptions));
@@ -275,7 +283,7 @@ function radioGroupInPage(
     );
   };
   const isChecked = (radio: Element): boolean =>
-    radio.getAttribute('aria-checked') === 'true' ||
+    chosenStates.some((state) => radio.getAttribute(state) === 'true') ||
     (radio as HTMLInputElement).checked === true ||
     radio.querySelector('input[type="radio"]:checked, input[type="checkbox"]:checked') !== null;
 

@@ -15,11 +15,11 @@ import {
 
 /**
  * A group's option chosen as a person chooses it — a radio group's, or a
- * group of checkboxes read the same way: the one option the observation
+ * group of checkboxes or toggle buttons read the same way: the one option the observation
  * offers whose words are the option's — never one the page disables, and
  * none at all when two read alike — clicked where a person's click on it
  * lands (`radio-group.ts`); one chosen already is left as it is, since a
- * click on a checkbox would take it back out. A radio that takes the click itself
+ * click on a checkbox or a pressed toggle would take it back out. A radio that takes the click itself
  * is clicked there, and the group read back. Otherwise each
  * point a person tries — its labels, the box drawn around it, the marks
  * beside it, its row, its words — is clicked in turn until the group reads
@@ -54,7 +54,7 @@ export async function chooseRadio(
     );
   }
   const at = reading.options.indexOf(option);
-  // Chosen already: a click would only take a checkbox back out of the answer.
+  // Chosen already: a click would only take a checkbox or a pressed toggle back out of the answer.
   if (option.checked) return;
   const aimed = await aimAtOption(group, at, options);
   if (aimed?.options[at]?.words !== words) {

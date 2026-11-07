@@ -181,13 +181,15 @@ export class PageReader {
   }
 
   /**
-   * The groups the page makes by name alone and the checkboxes it draws
-   * itself (`name-groups.ts`), each as one element under its box's ref: a
-   * group read as the group it is, named by nothing of its own — its question
-   * is the words before its box, its context — and a drawn checkbox named as
-   * the tree names it, seen where its box is seen and holding what its
-   * checkbox holds. A box whose facts never come back leaves its options as
-   * the tree lists them.
+   * The groups the page makes by name alone, those whose box is the
+   * question's own — gathered by a box's role, or of buttons it declares
+   * pressed — and the checkboxes it draws itself (`name-groups.ts`), each as
+   * one element under its box's ref: a group read as the group it is, its
+   * question the words before its box, its context — or, for a box the
+   * question's own, the box's own name when no words beside it ask one — and
+   * a drawn checkbox named as the tree names it, seen where its box is seen
+   * and holding what its checkbox holds. A box whose facts never come back
+   * leaves its options as the tree lists them.
    */
   private async choiceBoxes(
     nodes: readonly SnapshotNode[],
@@ -211,7 +213,7 @@ export class PageReader {
       const { scope, landmark } = at(box);
       // A radio group is one by the HTML standard; a group of checkboxes is chosen from as a list is.
       const role = kind === 'radio' ? 'radiogroup' : 'listbox';
-      // A group the page declares is named by its author alone; its name is its question when no words beside it ask one.
+      // A box the question's own is named by its author alone; its name is its question when no words beside it ask one.
       const name = declared && facts.context === null ? (node.name ?? '') : '';
       const element = toObservedElement({ ...node, role, name }, facts, scope, '', landmark);
       return { index: box, element, options, box: { ref: node.ref, kind, drawn: false } };

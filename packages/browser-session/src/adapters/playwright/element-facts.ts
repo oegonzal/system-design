@@ -446,11 +446,12 @@ const contextOf = (parts: ContextParts, groupQuestion: string): string | null =>
  * The facts for one located element, or null when the element is gone, the
  * read fails, or it does not answer inside `timeout`. A group of choices is
  * read by its own reader: a radio group the page declares by role, or a box
- * the observation reads as the group its options make by name
- * (`name-groups.ts`). A facts read is a single DOM evaluate on an element
- * Playwright has already located, so it answers in about a millisecond; left
- * to inherit the action timeout it was given fifteen seconds, which is the
- * whole of the hazard `readWithinBudget` bounds.
+ * the observation lists as a group (`name-groups.ts`) — its options grouped
+ * by name, gathered by a box's role, or toggle buttons in a box of their own.
+ * A facts read is a single DOM evaluate on an element Playwright has already
+ * located, so it answers in about a millisecond; left to inherit the action
+ * timeout it was given fifteen seconds, which is the whole of the hazard
+ * `readWithinBudget` bounds.
  */
 export async function readElementFacts(
   locator: Locator,

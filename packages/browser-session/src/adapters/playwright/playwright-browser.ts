@@ -227,9 +227,10 @@ export class PlaywrightBrowser implements BrowserPort {
         asGroup: box === undefined ? null : GROUP_OPTIONS[box.kind],
       });
       if (facts === null) return null;
-      // A field holds what an observation reads it to hold: a control's value, the option a select, a
-      // radio group or a group of checkboxes has chosen — never every option's words, nor a checkbox's
-      // bare "on". Only a drawn control, whose value no observation reads, is read by the words it shows.
+      // A field holds what an observation reads it to hold: a control's value, the option a select or a
+      // radio group has chosen, the options a group of checkboxes or toggle buttons holds, joined — never
+      // every option's words, nor a checkbox's bare "on". Only a drawn control, whose value no
+      // observation reads, is read by the words it shows.
       if (
         facts.inputType !== null ||
         listed.role === 'radiogroup' ||

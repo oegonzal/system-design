@@ -1,3 +1,5 @@
+import { ELEMENT_KIND_BY_ROLE } from '@sysdesign/contracts';
+
 /**
  * What the page says is a modal dialog in front of everything else: a modal
  * dialog role, or a native dialog opened modally. Declared once for every
@@ -27,3 +29,38 @@ export const RADIO_OPTIONS =
  */
 export const CHECKBOX_OPTIONS =
   '[role="checkbox"]:not([role="checkbox"] *), input[type="checkbox"]:not([role="checkbox"] *)';
+
+/**
+ * The options of a group of toggle buttons, each once, read the way a radio
+ * group's are (`RADIO_OPTIONS`): every button that declares whether it is
+ * pressed — a native button or a `role="button"` carrying `aria-pressed` —
+ * but one drawn inside another element that declares `aria-pressed`.
+ */
+export const TOGGLE_OPTIONS =
+  'button[aria-pressed]:not([aria-pressed] *), [role="button"][aria-pressed]:not([aria-pressed] *)';
+
+/**
+ * Every control a person acts on — a native control, a link, an editable
+ * region, an element whose role the role table says affords an action
+ * (`ELEMENT_KIND_BY_ROLE`) — but a toggle button and what is drawn inside
+ * one: what a box of toggle buttons may hold beside them only out of a
+ * person's sight (`toggle-groups.ts`), as the element facts tell it.
+ */
+export const CONTROLS_BESIDE_TOGGLES = `:is(${[
+  'a[href]',
+  'button',
+  'input:not([type="hidden"])',
+  'select',
+  'textarea',
+  '[contenteditable="true"]',
+  ...Object.keys(ELEMENT_KIND_BY_ROLE).map((role) => `[role="${role}"]`),
+].join(', ')}):not([aria-pressed]):not([aria-pressed] *)`;
+
+/**
+ * The ARIA states that say an option is chosen, each when it reads "true": a
+ * radio's or a checkbox's, and a toggle button's. Declared once for the
+ * group's reader (`radio-group.ts`) and the read of an option the page drew
+ * anew (`redrawn-choice.ts`), and passed into the page, where a module
+ * constant does not reach, so the two never read a choice apart.
+ */
+export const CHOSEN_STATES: readonly string[] = ['aria-checked', 'aria-pressed'];
