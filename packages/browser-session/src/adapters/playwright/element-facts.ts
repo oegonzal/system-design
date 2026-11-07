@@ -2,6 +2,7 @@ import { ELEMENT_NAME_BOUND, HIDDEN_TRAITS, type HiddenTrait } from '@sysdesign/
 import type { Locator } from 'playwright';
 
 import { MODAL_DIALOGS } from './dom-selectors';
+import { contextOf, type ContextParts } from './element-context';
 import { answerable, readRadioGroup, type GroupOptions } from './radio-group';
 
 /**
@@ -30,19 +31,6 @@ export interface ElementFacts {
   modal: boolean;
   /** The text the DOM renders inside it — what a person reads on it; empty when it renders none. */
   text: string;
-}
-
-/** The words around an element as the page shows them, which its context is composed from (`contextOf`). */
-interface ContextParts {
-  /** What its `aria-describedby` names. */
-  described: string;
-  placeholder: string;
-  /** The legend of the fieldset it sits in. */
-  legend: string;
-  /** The words just before a control whose name asks nothing. */
-  preceding: string;
-  /** What a file control accepts. */
-  accepts: string;
 }
 
 /** What one read in the page says of an element: its facts but its context, whether it is a radio group — read apart (`radio-group.ts`) — and its context's parts. */
@@ -123,22 +111,41 @@ function elementFactsInPage(
    * 2026-11-01: an employer's form put "Desired Salary?" in the row's label
    * box and the textarea, named only by its placeholder "Type your response",
    * alone in the field box beside it, so the question was never read and the
-   * operator would have been asked "Type your response".
+   * operator would have been asked "Type your response". A button that shows
+   * no words and that nothing names — an icon that opens, clears or steps the
+   * control beside it — asks nothing and owns no words, so it neither ends
+   * the climb nor takes the words before it. Measured 2026-11-07: an
+   * employer's form put "Current Location" in a label tied to no field, above
+   * a box holding the field and an icon-only button that opens its list; the
+   * field was observed with no question, so it was left blank, and the form
+   * would not send without it.
    */
   const precedingWords = (): string => {
     if (!nameAsksNothing) return '';
     const control =
       'input:not([type="hidden"]), select, textarea, button, [role="combobox"], [role="radiogroup"]';
+    const ownsWords = (node: Element): boolean =>
+      node.tagName !== 'BUTTON' ||
+      text(node) !== '' ||
+      node.querySelector('img[alt]:not([alt=""])') !== null ||
+      ['aria-label', 'aria-labelledby', 'title'].some(
+        (name) => (node.getAttribute(name) ?? '').trim() !== '',
+      );
+    /** Whether a node is or holds a control that owns words. */
+    const holdsControl = (node: Element): boolean =>
+      [node, ...Array.from(node.querySelectorAll(control))].some(
+        (one) => one.matches(control) && ownsWords(one),
+      );
     const another = (node: Element): boolean =>
       Array.from(node.querySelectorAll(control)).some(
-        (other) => other !== el && !el.contains(other),
+        (other) => other !== el && !el.contains(other) && ownsWords(other),
       );
     let node: Element = el;
     for (let parent = el.parentElement; parent !== null; parent = node.parentElement) {
       for (let before = node.previousSibling; before !== null; before = before.previousSibling) {
         if (before.nodeType === Node.ELEMENT_NODE) {
           const element = before as Element;
-          if (element.matches(control) || element.querySelector(control) !== null) return '';
+          if (holdsControl(element)) return '';
           const words = text(element);
           if (words !== '') return words;
         } else if (before.nodeType === Node.TEXT_NODE) {
@@ -423,24 +430,6 @@ function elementFactsInPage(
     radioGroup: attr('role') === 'radiogroup',
   };
 }
-
-/**
- * Its context: its description, its placeholder, its question — the legend
- * of its fieldset, the question its radios are named after, else the words
- * before it, one of them, never two — and what a file control accepts.
- */
-const contextOf = (parts: ContextParts, groupQuestion: string): string | null => {
-  const question = parts.legend || groupQuestion || parts.preceding;
-  const context = [
-    parts.described,
-    parts.placeholder,
-    question,
-    parts.accepts === '' ? '' : `accepts ${parts.accepts}`,
-  ]
-    .filter((part) => part.length > 0)
-    .join(' · ');
-  return context === '' ? null : context;
-};
 
 /**
  * The facts for one located element, or null when the element is gone, the

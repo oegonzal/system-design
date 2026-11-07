@@ -12,8 +12,10 @@ import { specBrowserOptions } from './testing';
  * its placeholder — a hint, never a label, by the HTML standard: the nearest
  * words before it, in the boxes it fills alone. Drawn as an employer's form
  * drew its questions on 2026-11-01 — the question in the row's label box, the
- * textarea alone in the field box beside it — beside the shapes that must
- * read no question: a field whose box is shared, one labelled by its own
+ * textarea alone in the field box beside it — and as another drew its
+ * location on 2026-11-07, a label tied to no field above a box holding the
+ * field and an icon-only button that opens its list; beside the shapes that
+ * must read no question: a field whose box is shared, one labelled by its own
  * name, and one whose nearest words belong to another field. Run with the
  * `browser` project.
  */
@@ -32,6 +34,10 @@ const QUESTIONS = `<!doctype html><html><head><title>Apply — questions</title>
     <div><input name="last" placeholder="Last name"></div>
     <p>Portfolio <input name="site" placeholder="https://"></p>
     <div><span>City</span><input name="city" placeholder="City"><button type="button">Use my location</button></div>
+    <div><label for="nowhere">Current Location</label>
+      <div><input role="combobox" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" placeholder="Start typing..."><button type="button"><svg width="12" height="12"></svg></button></div></div>
+    <div><span>Region</span>
+      <div><input name="region" placeholder="Search regions"><button type="button" aria-label="Clear"><svg width="12" height="12"></svg></button></div></div>
   </form>
 </body></html>`;
 
@@ -69,6 +75,11 @@ describe('the Playwright browser, on the question a person reads above a field',
     expect(fieldNamed(observation, 'Your answer').context).toBe('When could you start?');
     // Words right before it in its own box, and in the box it shares with its own words only.
     expect(fieldNamed(observation, 'https://').context).toBe('Portfolio');
+    // A button that shows no words and that nothing names asks nothing: the climb passes the box it shares.
+    expect(fieldNamed(observation, 'Start typing...')).toMatchObject({
+      role: 'combobox',
+      context: 'Current Location',
+    });
   });
 
   it('[BRW-2] reads no question where a person would not: a field named by its label keeps its placeholder as a hint, and words past a box another control shares belong to that control', async () => {
@@ -80,5 +91,7 @@ describe('the Playwright browser, on the question a person reads above a field',
     expect(fieldNamed(observation, 'Last name').context).toBeNull();
     // A box holding a button besides the field: the words before the field are still its own.
     expect(fieldNamed(observation, 'City').context).toBe('City');
+    // An icon-only button its page names owns words, and the words before the box it shares are not the field's.
+    expect(fieldNamed(observation, 'Search regions').context).toBeNull();
   });
 });
