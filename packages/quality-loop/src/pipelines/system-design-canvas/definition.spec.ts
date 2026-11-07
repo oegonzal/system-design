@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 import { carryParts } from '../../core/contracts';
 import { describePipeline } from '../../core/describe-pipeline';
 import { validatePipeline } from '../../core/validate-pipeline';
-import { capsAgainstMeasured, seededCaps } from '../../core/testing';
+import { capsAgainstMeasured } from '../../core/testing';
 import { SYSTEM_DESIGN_CANVAS } from './definition';
 import measured from './measured.json';
 import { canvasOutput, type CanvasSubmission } from './output';
@@ -55,41 +55,26 @@ describe('the system-design-canvas pipeline', () => {
     );
   });
 
-  it('[QL-33] [QL-49] every declared output cap is a fifth above what its stage has measurably written, or above the seed it holds until this version is measured', () => {
+  it('[QL-33] [QL-49] every declared output cap is held at least a fifth above what its stage has measurably written', () => {
     // `measured.json`, refreshed by `pnpm measure:bounds --pipeline=system-design-canvas
-    // --since=<the date 2.1.0 first ran>`. A cap is also the call's time
-    // limit, so one a stage outwrites is a call cut short. The coach writes
-    // into the submission schema contracts declares, so its fields are
-    // measured and held there (`canvas.schema.spec.ts`). Until this version's
-    // own runs are measured, every stage holds the most its predecessor wrote
-    // under 1.0.0 (48 runs, 2026-09-30 to 10-03): the three critics that
-    // replaced the architecture critic hold its 25,362, and so does the
-    // communication critic 2.1.0 added; a measurement replaces a seed the
-    // moment it exists.
-    const seeds = seededCaps({
-      'critic.requirements': 24678,
-      'critic.model': 25362,
-      'critic.structure': 25362,
-      'critic.communication': 25362,
-      'critic.fitness': 25362,
-      'critic.explanation': 25094,
-      'evaluator.coverage': 10135,
-      'evaluator.design': 11958,
-      'evaluator.qualities': 11958,
-      'evaluator.reasoning': 10135,
-      producer: 40173,
-    });
+    // --since=2026-11-06T22:33:00Z --runs-dir=<the dumps of those runs>`. The
+    // window — 3 runs, 2026-11-06T22:33Z to 2026-11-07T00:32Z — opens at the
+    // low redraw the coach's effort note measured, which ran before that
+    // declaration was committed (66ff7ea8, 23:15:55Z, 35 s after the run
+    // finished), and holds the two coach runs that followed: an earlier
+    // window would hold the coach to the thinking that change removed.
+    // Every lens and the coach are measured there, so no seed stands in for
+    // one; the deriver is exempt below, for the reason given. A cap is also
+    // the call's time limit. The coach writes into the submission schema
+    // contracts declares, so its fields are measured and held there
+    // (`canvas.schema.spec.ts`).
     expect(
-      capsAgainstMeasured(
-        SYSTEM_DESIGN_CANVAS,
-        { ...seeds, ...measured.caps },
-        {
-          exempt: {
-            criteria:
-              'derived only through POST /criteria, whose dumps are kind `criteria` and never measured',
-          },
+      capsAgainstMeasured(SYSTEM_DESIGN_CANVAS, measured.caps, {
+        exempt: {
+          criteria:
+            'derived only through POST /criteria, whose dumps are kind `criteria` and never measured',
         },
-      ),
+      }),
     ).toEqual([]);
   });
 

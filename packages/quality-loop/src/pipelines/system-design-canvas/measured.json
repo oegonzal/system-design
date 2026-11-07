@@ -1,17 +1,19 @@
 {
-  "since": "2026-10-20T20:06:34.669Z",
-  "until": "2026-10-20T20:56:37.036Z",
-  "runs": 2,
+  "since": "2026-11-06T22:33:26.657Z",
+  "until": "2026-11-07T00:32:46.977Z",
+  "runs": 3,
   "fields": {},
   "caps": {
-    "critic.explanation": { "n": 4, "max": 7505, "p99": 7505, "maxApiCalls": 1 },
-    "critic.fitness": { "n": 5, "max": 5343, "p99": 5343, "maxApiCalls": 1 },
-    "critic.model": { "n": 4, "max": 6385, "p99": 6385, "maxApiCalls": 1 },
-    "critic.requirements": { "n": 4, "max": 8747, "p99": 8747, "maxApiCalls": 1 },
-    "critic.structure": { "n": 4, "max": 6496, "p99": 6496, "maxApiCalls": 1 },
-    "evaluator.coverage": { "n": 4, "max": 3620, "p99": 3620, "maxApiCalls": 1 },
-    "evaluator.design": { "n": 2, "max": 2134, "p99": 2134, "maxApiCalls": 1 },
-    "evaluator.qualities": { "n": 4, "max": 3293, "p99": 3293, "maxApiCalls": 1 },
-    "evaluator.reasoning": { "n": 4, "max": 1333, "p99": 1333, "maxApiCalls": 1 }
+    "critic.communication": { "n": 13, "max": 26131, "p99": 26131, "maxApiCalls": 1 },
+    "critic.explanation": { "n": 12, "max": 22732, "p99": 22732, "maxApiCalls": 1 },
+    "critic.fitness": { "n": 13, "max": 24612, "p99": 24612, "maxApiCalls": 1 },
+    "critic.model": { "n": 12, "max": 19738, "p99": 19738, "maxApiCalls": 1 },
+    "critic.requirements": { "n": 13, "max": 31228, "p99": 31228, "maxApiCalls": 1 },
+    "critic.structure": { "n": 14, "max": 20527, "p99": 20527, "maxApiCalls": 1 },
+    "evaluator.coverage": { "n": 15, "max": 15011, "p99": 15011, "maxApiCalls": 1 },
+    "evaluator.design": { "n": 12, "max": 16524, "p99": 16524, "maxApiCalls": 1 },
+    "evaluator.qualities": { "n": 12, "max": 16448, "p99": 16448, "maxApiCalls": 1 },
+    "evaluator.reasoning": { "n": 12, "max": 12505, "p99": 12505, "maxApiCalls": 1 },
+    "producer": { "n": 6, "max": 57362, "p99": 57362, "maxApiCalls": 1 }
   }
 }

@@ -229,19 +229,35 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   // can shape a revision and never a grade. It still revises against the
   // remediations the panel selected, never against a score. A revision its
   // judges found no better than the best is named to it on the next ask
-  // (setbacks), so it does not write the same thing again. Every cap is
-  // sized from the recorded runs (the spec holds the measurements) with a
-  // fifth of headroom, and each is also the call's time limit
-  // (`callTimeLimitMs`), so a cap a stage outwrites is a call cut short: a
-  // coached canvas has taken up to 40.2k output tokens in one turn, thinking
-  // included (2026-10-02, a revision the seam now keeps whole), critics up
-  // to 25.4k on a dense diagram and evaluators up to 12.0k under the lenses
-  // 2.0.0 replaced — the seeds the spec holds until this version's own runs
-  // are measured; the communication critic holds the same seed as its
-  // siblings.
+  // (setbacks), so it does not write the same thing again.
+  //
+  // Every cap is held at least a fifth above the most its stage has
+  // measurably written (`measured.json` beside this file, which the spec
+  // holds each cap to): the coach's, the requirements critic's and the four
+  // evaluators' sit at that fifth rounded up to the hundred (the coach's to
+  // the thousand); the other five critics hold a flat 32,000, 1.22× to
+  // 1.62× their most in the window (communication's 26,131 to model's
+  // 19,738); and the deriver's 4,000 is exempt there, since criteria are
+  // derived only through POST /criteria, whose dumps are never measured.
+  // The window is 3 runs, 2026-11-06T22:33Z to 2026-11-07T00:32Z: the first
+  // is the low redraw the effort note below measured — 40,616 output tokens
+  // in one API call, finished 35 s before that declaration was committed
+  // (66ff7ea8, 23:15:55Z), so the change ran before its commit — and the
+  // other two are the coach runs that followed (23:17Z, 00:32Z). An earlier
+  // window would hold the coach to the thinking that change removed. Every
+  // one of the window's 6 coach turns fit one API call; the largest wrote
+  // 57,362 output tokens, thinking included — a reply that missed its
+  // schema, which the measure counts as it counts an answer — and turns of
+  // 54,282, 57,017 and 57,362 wrote past the 50,000 then declared and
+  // finished: a cap is the call's time limit (`callTimeLimitMs`: 30 s plus
+  // the cap at 25 tokens/s, so 69,000 → ~2,790 s), and what cuts a call is
+  // the 64,000 one API call may write (`OUTPUT_TOKEN_CEILING`,
+  // packages/llm). 69,000 exceeds that ceiling: its top 5,000 is reached
+  // only by a call cut and resumed — the failure the effort cap exists to
+  // avoid — so the one-call room above 57,362 is 11.6%, not a fifth.
   producer: {
     persona: producer,
-    maxTokens: 50000,
+    maxTokens: 69000,
     // A redraw must fit one API call. Measured 2026-11-06 on a 39-block
     // canvas: the coach thought 50–125k tokens before a 15–30k-token reply,
     // crossed the per-call ceiling on every turn, and the resumed call
@@ -266,7 +282,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       persona: onPlatform(criticRequirements),
       samples: 2,
       maxItems: 10,
-      maxTokens: 30000,
+      maxTokens: 37500,
       findingTypes: ['missing_requirement', 'constraint_violation'],
     },
     {
@@ -332,7 +348,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       persona: onPlatform(evaluatorCoverage),
       samples: 2,
       consumes: ['findings'],
-      maxTokens: 12200,
+      maxTokens: 18100,
       criterionKinds: ['functional', 'constraint'],
     },
     {
@@ -340,7 +356,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       persona: onPlatform(evaluatorDesign),
       samples: 2,
       consumes: ['findings'],
-      maxTokens: 16000,
+      maxTokens: 19900,
       criterionKinds: ['domain_model', 'interface', 'boundary', 'workflow', 'communication'],
     },
     {
@@ -348,7 +364,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       persona: onPlatform(evaluatorQualities),
       samples: 2,
       consumes: ['findings'],
-      maxTokens: 16000,
+      maxTokens: 19800,
       criterionKinds: ['non_functional', 'scale', 'evolution'],
     },
     {
@@ -356,7 +372,7 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
       persona: onPlatform(evaluatorReasoning),
       samples: 2,
       consumes: ['findings'],
-      maxTokens: 12200,
+      maxTokens: 15100,
       criterionKinds: ['tradeoff'],
     },
   ],

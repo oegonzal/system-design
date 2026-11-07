@@ -205,23 +205,18 @@ describe('designSubmissionSchema', () => {
 
   it('[QL-49] every bound the coach writes into sits above what it has measurably written', () => {
     // `measured/canvas.json`: every field the canvas coach wrote across the
-    // recorded runs, refreshed by `pnpm measure:bounds`. A target under the
-    // 99th percentile written would make most revisions overruns, and a
-    // ceiling at or under the longest would keep it past the ceiling rather
-    // than accept it — which a submit, held to the ceilings, then refuses.
+    // recorded runs — the 3 redraws of 2026-11-06T22:33:26Z…2026-11-07T00:32:46Z,
+    // the first after the coach's effort was capped (66ff7ea8) — refreshed by
+    // `pnpm measure:bounds --pipeline=system-design-canvas --since=…`. A target
+    // under the 99th percentile written would make most revisions overruns,
+    // and a ceiling at or under the longest would keep it past the ceiling
+    // rather than accept it — which a submit, held to the ceilings, then refuses.
     expect(measured.runs).toBeGreaterThan(0);
-    // The trade-off slots and the decisions arrived with the canvas
-    // pipeline's 2.0.0; no coach has written one yet. The exemptions go the
-    // day `pnpm measure:bounds --pipeline=system-design-canvas` first finds them.
-    const unwritten = 'added with the canvas pipeline’s 2.0.0; no coach has written one yet';
-    // A connection's config arrived with 2.1.0, the platform catalogues' day;
-    // the exemption goes when `pnpm measure:bounds --pipeline=system-design-canvas`
-    // first finds a coach writing one.
-    const hopConfig =
-      'added with the canvas pipeline’s 2.1.0 (2026-11-05); no coach has written one yet';
-    // A block's boundary arrived with 2.3.0; the exemption goes when a coach writes one.
-    const placement =
-      'added with the canvas pipeline’s 2.3.0 (2026-11-06); no coach has written one yet';
+    // A block's responsibilities are the author's editor's to write: no coach
+    // redraw in the window wrote one (0 of 214 nodes — the coach states a
+    // block's role as its operations and config). Held the day a coach writes one.
+    const authored =
+      'written by the author’s editor; no coach redraw in the window wrote one (0 of 214 nodes)';
     // The transcript is composed by the studio from stored turns, never
     // written by a model; its bounds hold what the interviewer pipeline's
     // own schema allows a reply, and are measured where that is measured.
@@ -230,23 +225,8 @@ describe('designSubmissionSchema', () => {
     expect(
       boundsAgainstMeasured(designSubmissionSchema, measured.fields, {
         exempt: {
-          'graph.nodes[].boundary': placement,
-          'brief.bindings[].tradeoff': unwritten,
-          'narrative.componentRationales[].tradeoff': unwritten,
-          'narrative.decisions': unwritten,
-          'narrative.decisions[].choice': unwritten,
-          'narrative.decisions[].alternative': unwritten,
-          'narrative.decisions[].cost': unwritten,
-          'narrative.decisions[].reconsiderWhen': unwritten,
-          'narrative.decisions[].nodeIds': unwritten,
-          'narrative.decisions[].nodeIds[]': unwritten,
-          'narrative.assumptions': unwritten,
-          'narrative.assumptions[]': unwritten,
-          'brief.bindings[].entityIds': unwritten,
-          'brief.bindings[].entityIds[]': unwritten,
-          'graph.edges[].config': hopConfig,
-          'graph.edges[].config[].key': hopConfig,
-          'graph.edges[].config[].value': hopConfig,
+          'graph.nodes[].responsibilities': authored,
+          'graph.nodes[].responsibilities[]': authored,
           'transcript.turns': composed,
           'transcript.turns[].phase': composed,
           'transcript.turns[].text': composed,
@@ -254,22 +234,6 @@ describe('designSubmissionSchema', () => {
           'transcript.turns[].disclosesCriterionIds[]': composed,
           'transcript.phases': composed,
           'transcript.phases[].id': composed,
-          'model.entities': unwritten,
-          'model.entities[].id': unwritten,
-          'model.entities[].name': unwritten,
-          'model.entities[].ownerNodeId': unwritten,
-          'model.entities[].key': unwritten,
-          'model.entities[].fields': unwritten,
-          'model.entities[].fields[].name': unwritten,
-          'model.entities[].fields[].note': unwritten,
-          'model.entities[].invariants': unwritten,
-          'model.entities[].invariants[]': unwritten,
-          'model.entities[].states': unwritten,
-          'model.entities[].states[]': unwritten,
-          'model.relations': unwritten,
-          'model.relations[].from': unwritten,
-          'model.relations[].to': unwritten,
-          'model.relations[].note': unwritten,
         },
       }),
     ).toEqual([]);

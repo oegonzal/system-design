@@ -724,7 +724,7 @@ iteration 2, the best, against those 17, but all three attempts were cut off at 
 so there was nothing to judge, the decision was escalate, and the quality run stopped. That
 recording predates a change: it ran at commit 2924192, with the producer's `maxTokens` at 28,000, a
 fixed 300 s cap on every call, and three attempts. The cap has since been replaced. A call's limit
-now derives from its declared `maxTokens` — 32,000 at 25 tokens/s plus 30 s, about 1,310 s — and
+now derives from its declared `maxTokens` — 69,000 since 2026-11-07, at 25 tokens/s plus 30 s, about 2,790 s — and
 a timeout gets two attempts.
 
 **The next two coach quality runs never had a revision judged.** Both adopted 18-01-11's
@@ -778,8 +778,10 @@ named where there is one.
   prompts — 18-58-32 and 21-53-19 each made three identical attempts and stopped at iteration 2,
   their replies lost to a single field 3–19% over its bound. A size overrun is now kept and
   recorded, a structurally refused reply is asked again with its faults named, and a lost produce
-  spends one iteration (_When it stops_, above). The producer declares 50,000 output tokens, above
-  the 40,173 its longest recorded turn wrote.
+  spends one iteration (_When it stops_, above). The producer declares 69,000 output tokens, a
+  fifth above the 57,362 its longest turn in that window wrote (3 runs, 2026-11-06T22:33Z to
+  2026-11-07T00:32Z: the low-effort redraw the coach's effort note measured and the two coach
+  runs that followed).
 - **A screened recall reads legacy lessons by pipeline alone.** A point stored before lineage was
   recorded carries none: `known-evidence` compares it by pipeline rather than prompt, and it never
   collapses as a twin, until `POST /memory/:id/reindex` back-fills its memory run's lineage.

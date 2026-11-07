@@ -12,17 +12,20 @@ import type { ReasoningEffort } from './llm-client';
 
 /**
  * Output-token ceiling for one API call of the spawned turn, thinking
- * included. Sized from recorded runs: the largest turns so far wrote 40,173
- * (a canvas coach, 2026-10-02), 26,054 (an agentic-design producer,
- * 2026-09-23) and 21,122 (a canvas coach, 2026-10-01) output tokens, and at
- * the old 16,000 each was cut and resumed in a second message. A cut is not
+ * included. Sized from the runs recorded up to 2026-10-02: the largest turns
+ * then wrote 40,173 (a canvas coach, 2026-10-02), 26,054 (an agentic-design
+ * producer, 2026-09-23) and 21,122 (a canvas coach, 2026-10-01) output
+ * tokens, and at the old 16,000 each was cut and resumed in a second message. A cut is not
  * lossy — the turn's text is read whole, see `TurnTranscript`, and the
  * record counts the calls in `apiCalls` — but the CLI resumes a turn only so
  * many times: on 2026-11-06 a canvas coach redrawing a 33-block design wrote
  * past 32,000 on every call, reached five calls and ended `max_output_tokens`
  * four times running, with nothing judged. Raised to the current models'
- * own output limit so one call carries what the canvas producer declares
- * (`maxTokens: 50000`); a turn that still resumes is a declaration to revisit.
+ * own output limit. A declaration may still exceed it: `maxTokens` is the
+ * turn's expected output, not a per-call cap, and the canvas coach declares
+ * 69,000 for turns that measured up to 57,362 in one call once its effort
+ * was capped (2026-11-06/07) — the room above the ceiling is reachable only
+ * by a resumed call, which that effort level exists to avoid.
  */
 export const OUTPUT_TOKEN_CEILING = 64_000;
 

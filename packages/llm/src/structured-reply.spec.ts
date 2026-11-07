@@ -177,10 +177,10 @@ describe('extractStructured', () => {
  * each a complete revision of 30–40k output tokens, each refused because a
  * string or two ran 1–19% past the bound it was shown. The objects are the
  * replies as written, unfenced; `overran` is every field the old parse named,
- * with what it wrote and the bound that field declares now. Measured, three
- * of those targets now sit above what the coach writes (`pnpm
- * measure:bounds`), so a field is an overrun only while it is past the target
- * it is asked for today — and every one is within its ceiling.
+ * with what it wrote and the bound that field declares now. The targets are
+ * sized from measurement (`pnpm measure:bounds`), so a field is an overrun
+ * only while it is past the target it is asked for today — and every one is
+ * within its ceiling.
  */
 const RECORDED_COACH_LOSSES: readonly [string, unknown, Record<string, [number, Bound]>][] = [
   [

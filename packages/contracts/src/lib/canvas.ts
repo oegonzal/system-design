@@ -9,7 +9,8 @@
  * what the author draws with, and the quality loop's lenses judge whatever
  * they drew. The shapes themselves are the zod schema in `canvas.schema.ts`.
  */
-import { bound } from './bounds';
+import { bound, exact } from './bounds';
+import { CANVAS_MAX_CRITERIA } from './studio-pipelines';
 
 /**
  * Every building block the palette offers. The single source of the
@@ -283,10 +284,17 @@ export type OperationKind = (typeof OPERATION_KINDS)[number];
  * accepts the ceiling without a word, and the parse keeps what runs past it —
  * nothing is cut to fit, and nothing a little over is refused. Each target
  * sits at or above the 99th percentile the coach has measurably written and
- * each ceiling above the longest (`measured/canvas.json`, which
- * `pnpm measure:bounds` refreshes and `canvas.schema.spec.ts` holds them to),
- * and the editors enforce the same declarations as `maxLength`. Ids are
- * exact: a wrong one is a fault.
+ * each ceiling above the longest, over the window `measured/canvas.json`
+ * holds: the 3 coach redraws of 2026-11-06T22:33:26Z…2026-11-07T00:32:46Z,
+ * the first after the coach's effort was capped (66ff7ea8) — an earlier
+ * window would hold the producer to the thinking that change removed.
+ * `pnpm measure:bounds --pipeline=system-design-canvas
+ * --since=2026-11-06T22:33:00Z --runs-dir=<the dumps of those runs>`
+ * refreshes the fixture, `canvas.schema.spec.ts` holds every bound to it,
+ * and the editors enforce the same declarations as `maxLength`. A list the
+ * coach fills one entry per criterion is sized by the pipeline's criteria
+ * cap, by policy — `exact`, held by no measurement. Ids are exact too: a
+ * wrong one is a fault.
  */
 export const CANVAS_NODES_BOUND = bound(100, 'list');
 export const CANVAS_EDGES_BOUND = bound(300, 'list');
@@ -297,7 +305,14 @@ export const NODE_BOUNDARY_BOUND = bound(120);
 export const EDGE_LABEL_BOUND = bound(80);
 
 export const NODE_RESPONSIBILITIES_BOUND = bound(6, 'list');
-/** Measured 2026-10-13 over the coach's canvases: p99 124, max 137 — a clause, not a sentence. */
+/**
+ * Measured 2026-10-13 over the coach's canvases: p99 124, max 137 — a clause,
+ * not a sentence. That stays the last measurement: in the window above no
+ * coach redraw wrote a responsibility (0 of 214 nodes; the coach states a
+ * block's role as its operations and config), so the author's editor is the
+ * one writer, and `canvas.schema.spec.ts` exempts the path until a coach
+ * writes one.
+ */
 export const RESPONSIBILITY_BOUND = bound(150);
 export const NODE_OPERATIONS_BOUND = bound(12, 'list');
 export const OPERATION_NAME_MAX_LENGTH = 60;
@@ -311,7 +326,8 @@ export const NODE_CONFIG_KEYS_BOUND = bound(20, 'list');
 export const EDGE_CONFIG_KEYS_BOUND = bound(10, 'list');
 /** One config entry, on a node or an edge: the key is exact, the value's text bounded. */
 export const CONFIG_KEY_MAX_LENGTH = 40;
-export const CONFIG_STRING_VALUE_BOUND = bound(120);
+/** One bound for a node's and a hop's values. Measured in the window above: node values p99 157, max 215 (536 written); hop values p99 121, max 180 (944 written). */
+export const CONFIG_STRING_VALUE_BOUND = bound(200);
 /**
  * The keys a connection's config is offered as suggestions: how a hop is made
  * and what happens when it fails. Suggestions only — any key is accepted, as
@@ -332,19 +348,28 @@ export const EDGE_CONFIG_HINTS = [
   'idempotencyKey',
 ] as const;
 
-export const BRIEF_BINDINGS_BOUND = bound(24, 'list');
-export const BINDING_NODES_BOUND = bound(12, 'list');
+/** One binding per criterion (the brief validator refuses a criterion bound twice), so the count is the pipeline's criteria cap. */
+export const BRIEF_BINDINGS_BOUND = exact(CANVAS_MAX_CRITERIA);
+/** A binding may name every component the canvas may hold. */
+export const BINDING_NODES_BOUND = CANVAS_NODES_BOUND;
 export const FLOW_STEPS_BOUND = bound(24, 'list');
-export const BINDING_CLAIM_BOUND = bound(360);
+/** Measured in the window above: p99 558, max 593 (127 claims). */
+export const BINDING_CLAIM_BOUND = bound(600);
 /** Why this mechanism and not another: the alternative considered and the cost of the choice. */
 export const BINDING_TRADEOFF_BOUND = bound(360);
 
 export const NARRATION_PROSE_BOUND = bound(720);
-export const NARRATION_OVERVIEW_BOUND = bound(1500);
-export const NARRATION_COMPONENT_RATIONALES_BOUND = bound(40, 'list');
-export const NARRATION_CRITERION_NARRATIONS_BOUND = bound(24, 'list');
-/** The decisions a design rests on: each a choice, the alternative, the cost, and what would change it. */
-export const NARRATIVE_DECISIONS_BOUND = bound(12, 'list');
+/** Measured in the window above: p99 1,649, max 1,649 (5 overviews). */
+export const NARRATION_OVERVIEW_BOUND = bound(1700);
+/** The rationales may name every component the canvas may hold. */
+export const NARRATION_COMPONENT_RATIONALES_BOUND = CANVAS_NODES_BOUND;
+/** One narration per criterion (the repair keeps the first), so the count is the pipeline's criteria cap. */
+export const NARRATION_CRITERION_NARRATIONS_BOUND = exact(CANVAS_MAX_CRITERIA);
+/**
+ * The decisions a design rests on: each a choice, the alternative, the cost,
+ * and what would change it. Measured in the window above: p99 18, max 18 (5 lists).
+ */
+export const NARRATIVE_DECISIONS_BOUND = bound(20, 'list');
 export const DECISION_TEXT_BOUND = bound(360);
 export const DECISION_NODES_BOUND = bound(6, 'list');
 /** The assumptions the design depends on, each one sentence, stated rather than smuggled into a claim. */
