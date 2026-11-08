@@ -3,6 +3,7 @@ import {
   CANVAS_FINDING_TYPES,
   CANVAS_MAX_CRITERIA,
   CANVAS_STANDING_CRITERIA,
+  canvasChangeSchema,
   type DesignTranscript,
   isPlatformServiceId,
   PLATFORM_IDS,
@@ -32,6 +33,10 @@ describe('the system-design-canvas pipeline', () => {
     expect(SYSTEM_DESIGN_CANVAS.id).toBe('system-design-canvas');
     expect(SYSTEM_DESIGN_CANVAS.producer.persona).toContain('system-design-canvas');
     expect(SYSTEM_DESIGN_CANVAS.producer.persona).toContain('`ai-`');
+    // [QL-84] [QL-85] A revision is the contract's change set applied to the
+    // best, and a round briefs the coach with the twelve worst remediations.
+    expect(canvasOutput.revise?.schema).toBe(canvasChangeSchema);
+    expect(SYSTEM_DESIGN_CANVAS.policy.briefing).toEqual({ remediationsPerRound: 12 });
   });
 
   it('[QL-21] [QL-32] [QL-56] its kinds, its cap and its numbering are the contract’s declarations, and its coach sees the criteria, any lessons its run recalled and what its last revision no better than the best was found wrong with', () => {
@@ -65,9 +70,12 @@ describe('the system-design-canvas pipeline', () => {
     // window would hold the coach to the thinking that change removed.
     // Every lens and the coach are measured there, so no seed stands in for
     // one; the deriver is exempt below, for the reason given. A cap is also
-    // the call's time limit. The coach writes into the submission schema
-    // contracts declares, so its fields are measured and held there
-    // (`canvas.schema.spec.ts`).
+    // the call's time limit. The coach's reply is the contract's change set
+    // (`canvasChangeSchema`), written in the submission's own element
+    // schemas: the submission's fields are measured and held in
+    // `canvas.schema.spec.ts`, and the change set's own paths, which no
+    // recorded reply has written yet, are exempt there until the first recorded
+    // change sets measure them (none as of 2026-11-08).
     expect(
       capsAgainstMeasured(SYSTEM_DESIGN_CANVAS, measured.caps, {
         exempt: {

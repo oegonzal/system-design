@@ -165,6 +165,14 @@ function checkLoop(policy: DecisionPolicy, fail: Fail): void {
   }
 }
 
+/** The briefing cap, when declared: a whole number of remediations from 1 — a cap of 0 would brief a revise with nothing to fix. */
+function checkBriefing(policy: DecisionPolicy, fail: Fail): void {
+  const cap = policy.briefing?.remediationsPerRound;
+  if (cap !== undefined && !(Number.isInteger(cap) && cap >= 1)) {
+    fail('briefing.remediationsPerRound must be a whole number ≥ 1');
+  }
+}
+
 /** Throws on the first violation, naming the pipeline. A bad rubric must never grade anyone. */
 export function validatePolicy(
   policy: DecisionPolicy,
@@ -179,6 +187,7 @@ export function validatePolicy(
   checkFindingTypes(policy, task, dimensions, fail);
   checkPricing(policy, fail);
   checkLoop(policy, fail);
+  checkBriefing(policy, fail);
 }
 
 /**

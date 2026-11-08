@@ -298,6 +298,19 @@ export type OperationKind = (typeof OPERATION_KINDS)[number];
  */
 export const CANVAS_NODES_BOUND = bound(100, 'list');
 export const CANVAS_EDGES_BOUND = bound(300, 'list');
+/*
+ * The change set a revise returns (`canvas-change.schema.ts`) is sized to
+ * one round's change, never to the whole canvas. Measured over chain 4's
+ * rounds (session 2681e7b0, read 2026-11-07): a round changed or added 6–19
+ * nodes and 12–42 edges, and removed 0–4. Generous past that on purpose: a
+ * list past its ceiling is trimmed by whole items, and an item trimmed here
+ * is a remediation that never reaches the artifact. `canvas.schema.spec.ts`
+ * holds these to nothing until the first recorded change sets (none as of 2026-11-08).
+ */
+export const CHANGE_NODE_UPSERTS_BOUND = bound(24, 'list');
+export const CHANGE_EDGE_UPSERTS_BOUND = bound(48, 'list');
+/** One bound for the node removals and the edge removals of a change set. */
+export const CHANGE_REMOVALS_BOUND = bound(24, 'list');
 export const CANVAS_ID_MAX_LENGTH = 64;
 export const NODE_LABEL_BOUND = bound(80);
 /** Where a block sits — a region, an account, a network, a subnet, a security group — as the goal's platform names them. */

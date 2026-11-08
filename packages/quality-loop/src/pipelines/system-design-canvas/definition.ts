@@ -57,7 +57,12 @@
  * runs on revise only — the controller never decides retry, because a fresh
  * attempt would replace the author's canvas with the model's — and is told
  * to keep the author's ids and to prefix anything it adds with `ai-` so the
- * studio can tell the two apart.
+ * studio can tell the two apart. It answers with a change set against the
+ * best, which the loop applies and judges whole (`canvasOutput.revise`), and
+ * a round hands it every validator note on the best, then the worst of the
+ * rest until a declared cap is reached (`policy.briefing`): a list within
+ * the cap is handed whole, a longer one is cut there, and the record keeps
+ * every note.
  */
 import {
   CANVAS_MAX_CRITERIA,
@@ -257,15 +262,20 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   // avoid — so the one-call room above 57,362 is 11.6%, not a fifth.
   producer: {
     persona: producer,
+    // Every turn in that window was a whole-canvas redraw, and a revision is
+    // now a change set (`canvasOutput.revise`): the cap holds the redraws it
+    // was sized on until the first change-set replies are measured (none
+    // recorded as of 2026-11-08) and it is re-sized from them.
     maxTokens: 69000,
-    // A redraw must fit one API call. Measured 2026-11-06 on a 39-block
-    // canvas: the coach thought 50–125k tokens before a 15–30k-token reply,
-    // crossed the per-call ceiling on every turn, and the resumed call
-    // re-emitted the element it was cut in — 7 of 13 replies lost at that
-    // seam, 3 more to the time limit. A fixed thinking budget was passed and
-    // ignored; the effort level is the knob the CLI documents and honours.
-    // Measured on the same redraw: medium thought ~45k and still crossed the
-    // ceiling once (65.6k tokens, 2 calls, 573 s); low fit one call (336 s).
+    // A reply must fit one API call. Measured 2026-11-06 on a 39-block
+    // canvas, every turn a redraw: the coach thought 50–125k tokens before a
+    // 15–30k-token reply, crossed the per-call ceiling on every turn, and the
+    // resumed call re-emitted the element it was cut in — 7 of 13 replies
+    // lost at that seam, 3 more to the time limit. A fixed thinking budget
+    // was passed and ignored; the effort level is the knob the CLI documents
+    // and honours. Measured on the same redraw: medium thought ~45k and still
+    // crossed the ceiling once (65.6k tokens, 2 calls, 573 s); low fit one
+    // call (336 s).
     effort: 'low',
     consumes: ['criteria', 'memories', 'setbacks'],
   },
@@ -450,5 +460,16 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
     thresholds: { acceptAt: 75, rejectBelow: 30 },
 
     loop: { maxIterations: 3, plateauAfter: 2, concurrency: 3, lostProduces: 1 },
+
+    // Twelve of the best's remediations a round, worst first, every validator
+    // note among them. Measured 2026-11-07 on coach chain 4 (session
+    // 2681e7b0): each round handed 30–35 at once — 11 findings, 18–23
+    // criteria short of pass and 2 validator notes — and, answering those
+    // 30–35, the coach rewrote 22–31 of 34 bindings and restated 34–64% of
+    // each 82–120 KB redraw unchanged while the score ran 67.7 → 72.2 →
+    // 68.5 → 65. Twelve is declared, not yet measured: the first capped
+    // rounds (none recorded as of 2026-11-08) will size it. The record and the route keep the whole list;
+    // only the ask is capped.
+    briefing: { remediationsPerRound: 12 },
   },
 };

@@ -269,6 +269,30 @@ describe('validatePipeline', () => {
     expect(() => validatePipeline(asAny(open))).toThrow(/not strict.*byKey: open object/);
   });
 
+  it('[QL-84] a declared revise shape is asked like the output: boot refuses an empty instruction and a change schema a strict endpoint would refuse, and takes one the conversion closes', () => {
+    const tiny = tinyPipeline();
+    const revising = (schema: z.ZodType, instruction: string) =>
+      asAny(
+        tinyPipeline({
+          task: {
+            ...tiny.task,
+            output: { ...tiny.task.output, revise: { schema, instruction, apply: (best) => best } },
+          },
+        }),
+      );
+    const change = z.strictObject({ set: z.strictObject({ text: z.string().nullable() }) });
+    expect(() => validatePipeline(revising(change, 'Return only what changes.'))).not.toThrow();
+    expect(() => validatePipeline(revising(change, ' '))).toThrow(/revise instruction is empty/);
+    // An optional key is shown required and nullable, as the output schema's is
+    // ([QL-62]); an open object is what the endpoint refuses, named by its path.
+    expect(() =>
+      validatePipeline(revising(z.strictObject({ set: change.optional() }), 'x')),
+    ).not.toThrow();
+    expect(() =>
+      validatePipeline(revising(z.strictObject({ set: z.record(z.string(), z.string()) }), 'x')),
+    ).toThrow(/revise schema is not strict.*set: open object/);
+  });
+
   it('[QL-1] refuses a lens consuming evidence nothing produces before it, and evidence it does not know', () => {
     const base = tinyPipeline();
     expect(() =>

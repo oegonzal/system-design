@@ -27,7 +27,7 @@ import {
   REFOUND_STAGE,
   stageDiagnostic,
 } from '../stages/shared';
-import { refusalsOf, setbacksOf } from './briefing';
+import { briefedRemediations, refusalsOf, setbacksOf } from './briefing';
 import type { Loop } from './run-pipeline';
 import { runLensWaves, type Judged } from './waves';
 
@@ -73,7 +73,9 @@ export async function runIteration<T>(
 
 /**
  * Iteration 1 adopts a provided artifact exactly as handed in; every other
- * iteration asks the producer, and what it produced passes through the
+ * iteration asks the producer — briefed with the best's remediations as the
+ * policy's briefing cap allows (`briefedRemediations`), the rest counted as
+ * withheld — and what it produced passes through the
  * output shape's `normalize` (when declared) before any validator sees it,
  * and every part the task declares carried is then the revised artifact's,
  * whatever the reply held — that value is what the lenses judge and the trace
@@ -87,11 +89,13 @@ async function produceOrAdopt<T>(
   previous: IterationTrace<T> | null,
 ): Promise<{ artifact: T | null; diagnostics: Diagnostic[] }> {
   if (mode === 'provided') return { artifact: loop.input.output as T, diagnostics: [] };
+  const briefed = briefedRemediations(best?.remediations ?? [], loop.definition.policy);
   const produced = await loop.stages.producer.produce({
     contract: loop.contract,
     mode,
     prior: mode === 'revise' ? (best?.artifact ?? null) : null,
-    remediations: best?.remediations ?? [],
+    remediations: briefed.handed,
+    withheld: briefed.withheld,
     refusals: refusalsOf(previous, best),
     setbacks: setbacksOf(previous, best),
     memories: loop.input.memories ?? [],

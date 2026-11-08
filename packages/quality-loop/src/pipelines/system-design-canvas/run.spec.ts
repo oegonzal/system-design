@@ -3,15 +3,26 @@ import { describe, expect, it } from 'vitest';
 
 import {
   BINDING_CLAIM_BOUND,
+  canvasChangeSchema,
+  designSubmissionSchema,
+  parseLenient,
   repairSubmission,
+  type Binding,
+  type CanvasChange,
   type CanvasEdge,
-  type DesignSubmission,
 } from '@sysdesign/contracts';
 
 import { runPipeline } from '../../core/loop/run-pipeline';
 import { fakeLlm, sequencedLlm } from '../../core/testing';
 import { SYSTEM_DESIGN_CANVAS } from './definition';
-import { coachedSubmission, sampleCriteria, sampleSubmission } from './testing';
+import {
+  coachedChange,
+  sampleBrief,
+  sampleCriteria,
+  sampleModel,
+  sampleNarrative,
+  sampleSubmission,
+} from './testing';
 
 const GOAL = '# Serve an order history\n\nShoppers see their past orders; two sources feed them.';
 
@@ -166,45 +177,51 @@ const judges = [
   reasoningResults,
 ];
 
-const canned = [...judges, coachedSubmission()];
+const canned = [...judges, coachedChange()];
 
-/** What a coach might return: a criterion it invented, a criterion bound twice, and a path that fans out. */
-const sloppyCoached = (): DesignSubmission => {
-  const coached = coachedSubmission();
-  const first = coached.brief?.bindings[0];
-  if (!first || !coached.brief) throw new Error('the fixture binds c1');
-  return {
-    ...coached,
-    brief: {
-      version: 1,
-      bindings: [
-        ...coached.brief.bindings.map((binding) =>
-          binding.criterionId === 'c2'
-            ? // edge-1 does not start where edge-9 ends: a fan-out tacked onto the walk.
-              { ...binding, path: [...(binding.path ?? []), 'edge-1'] }
-            : binding,
-        ),
-        {
-          criterionId: 'c99',
-          nodeIds: ['service-1'],
-          claim: 'a criterion the rubric never listed',
-        },
-        { ...first, claim: 'bound twice' },
-      ],
+/** The change with bindings the coach also rewrote — whole, by criterion id; a later entry for one criterion wins. */
+const withBindingUpserts = (change: CanvasChange, upsert: Binding[]): CanvasChange => ({
+  changes: {
+    ...change.changes,
+    bindings: {
+      upsert: [...(change.changes.bindings?.upsert ?? []), ...upsert],
+      remove: change.changes.bindings?.remove ?? [],
     },
-  };
+  },
+});
+
+/** What a coach might return: a criterion it invented, one bound criterion rewritten twice in the same change set, and a path that fans out. */
+const sloppyChange = (): CanvasChange => {
+  const [c1, c2] = sampleBrief().bindings;
+  return withBindingUpserts(coachedChange(), [
+    // edge-1 does not start where edge-9 ends: a fan-out tacked onto the walk.
+    { ...c2, path: [...(c2.path ?? []), 'edge-1'] },
+    { criterionId: 'c99', nodeIds: ['service-1'], claim: 'a criterion the rubric never listed' },
+    // Each rewrite replaces the author's c1 binding in place, so the later one
+    // is the binding and nothing is bound twice.
+    { ...c1, claim: 'the earlier rewrite' },
+    { ...c1, claim: 'the later rewrite, which wins' },
+  ]);
 };
 
-/** A coach revision the repair cannot save: an edge to a node that is not drawn. */
-const brokenCoached = (): DesignSubmission => {
-  const coached = coachedSubmission();
+/** A coach change the repair cannot save: an edge to a node that is not drawn. */
+const brokenChange = (): CanvasChange => {
+  const coached = coachedChange();
   const dangling: CanvasEdge = {
     id: 'ai-edge-9',
     source: 'service-1',
     target: 'nowhere',
     kind: 'sync',
   };
-  return { ...coached, graph: { ...coached.graph, edges: [...coached.graph.edges, dangling] } };
+  return {
+    changes: {
+      ...coached.changes,
+      edges: {
+        upsert: [...(coached.changes.edges?.upsert ?? []), dangling],
+        remove: coached.changes.edges?.remove ?? [],
+      },
+    },
+  };
 };
 
 describe('the system-design-canvas loop', () => {
@@ -256,11 +273,12 @@ describe('the system-design-canvas loop', () => {
     expect(trace.stopReason).toBe('max-iterations');
   });
 
-  it('[QL-21] coached, the revision keeps every author id and prefixes what it adds with ai-', async () => {
+  it('[QL-21] [QL-84] coached, the coach is asked for a change set and the revision — the change applied to the best — keeps every author id, every part it did not name, and prefixes what it adds with ai-', async () => {
+    const exchanges: LlmExchange[] = [];
     const trace = await runPipeline(
       SYSTEM_DESIGN_CANVAS,
       { goal: GOAL, output: sampleSubmission(), criteria: sampleCriteria(), maxIterations: 2 },
-      { llm: fakeLlm(...canned), sink: () => undefined, now: () => 0 },
+      { llm: fakeLlm(...canned), sink: (exchange) => exchanges.push(exchange), now: () => 0 },
     );
 
     expect(trace.iterations.map((iteration) => iteration.mode)).toEqual(['provided', 'revise']);
@@ -282,15 +300,41 @@ describe('the system-design-canvas loop', () => {
     for (const part of added) expect(part.id.startsWith('ai-')).toBe(true);
     // The added replica is one more location the panel can cite.
     expect(trace.iterations[1].locations.map((location) => location.id)).toContain('node.16');
+    // Asked in the change schema, in the pipeline's words — never the canvas again.
+    const briefing = exchanges.find((exchange) => exchange.scope === 'producer');
+    const asked = Object.keys((briefing?.schema as { properties: object }).properties);
+    expect(asked).toEqual(['changes']);
+    expect(briefing?.user).toContain(
+      '# Instructions\n\nReturn only a change set against the artifact above',
+    );
+    // Everything the change did not name is the author's, the model included:
+    // a redraw used to drop it, and nothing noticed.
+    expect(revised.model).toEqual(sampleModel());
+    expect(revised.brief).toEqual(sampleBrief());
+    expect(revised.narrative).toEqual(sampleNarrative());
   });
 
-  it('[QL-25] a coach revision that binds an unlisted criterion, binds one twice or breaks a path is repaired before judging — the author’s own submission never is', async () => {
+  it('[QL-84] no judge’s reply and no whole submission reads as a change set, so the coach is never answered with one', () => {
+    // The fake model answers with the first canned object that parses
+    // leniently, unknown keys stripped. The change schema's one required
+    // root key, `changes`, is all that keeps a findings reply, a results
+    // reply and the author's own canvas from reading as an empty change —
+    // and a change set from reading as a canvas. Were the key optional,
+    // every coach ask in these specs would be answered with a judge's reply.
+    for (const reply of [...judges, sampleSubmission()]) {
+      expect(parseLenient(canvasChangeSchema, reply).ok).toBe(false);
+    }
+    expect(parseLenient(canvasChangeSchema, coachedChange()).ok).toBe(true);
+    expect(parseLenient(designSubmissionSchema, coachedChange()).ok).toBe(false);
+  });
+
+  it('[QL-25] a coach change set that binds an unlisted criterion, rewrites one criterion twice or breaks a path is applied and repaired before judging — the unlisted binding dropped, the later rewrite the one binding, the walk cut where it stops connecting — and the author’s own submission never is', async () => {
     const exchanges: LlmExchange[] = [];
     const trace = await runPipeline(
       SYSTEM_DESIGN_CANVAS,
       { goal: GOAL, output: sampleSubmission(), criteria: sampleCriteria(), maxIterations: 2 },
       {
-        llm: fakeLlm(...judges, sloppyCoached()),
+        llm: fakeLlm(...judges, sloppyChange()),
         sink: (exchange) => exchanges.push(exchange),
         now: () => 0,
       },
@@ -304,7 +348,11 @@ describe('the system-design-canvas loop', () => {
     if (artifact === null || artifact.brief === null) throw new Error('the coach must answer');
     const bound = artifact.brief.bindings.map((binding) => binding.criterionId);
     expect(bound).not.toContain('c99');
-    expect(bound.filter((id) => id === 'c1')).toHaveLength(1);
+    // Two rewrites of c1 in one change set: the later replaced the author's
+    // binding in place, so c1 is bound once, by it.
+    expect(artifact.brief.bindings.filter((binding) => binding.criterionId === 'c1')).toEqual([
+      expect.objectContaining({ claim: 'the later rewrite, which wins' }),
+    ]);
     expect(artifact.brief.bindings.find((b) => b.criterionId === 'c2')?.path).toEqual([
       'edge-4',
       'edge-14',
@@ -337,18 +385,16 @@ describe('the system-design-canvas loop', () => {
   it('[QL-47] a coach revision with a claim past its ceiling is still repaired before judging, and one with an edge to nowhere still blocks', async () => {
     // Past the ceiling and short of the cut: the seam keeps it whole, so the repair and `references` must read it whole too.
     const long = 'x'.repeat(BINDING_CLAIM_BOUND.ceiling + 105);
-    const wordy = (coached: DesignSubmission): DesignSubmission => {
-      if (!coached.brief) throw new Error('the fixture has a brief');
-      const [first, ...rest] = coached.brief.bindings;
-      return { ...coached, brief: { version: 1, bindings: [{ ...first, claim: long }, ...rest] } };
-    };
-    const revise = async (coached: DesignSubmission) =>
+    /** The change with c1 rewritten whole, its claim past the ceiling. */
+    const wordy = (change: CanvasChange): CanvasChange =>
+      withBindingUpserts(change, [{ ...sampleBrief().bindings[0], claim: long }]);
+    const revise = async (change: CanvasChange) =>
       (
         await runPipeline(
           SYSTEM_DESIGN_CANVAS,
           { goal: GOAL, output: sampleSubmission(), criteria: sampleCriteria(), maxIterations: 2 },
           {
-            llm: fakeLlm(...judges, coached),
+            llm: fakeLlm(...judges, change),
             sink: () => undefined,
             now: () => 0,
           },
@@ -362,7 +408,7 @@ describe('the system-design-canvas loop', () => {
         .find((report) => report.validatorId === id)
         ?.problems.map((p) => p.message);
 
-    const repaired = await revise(wordy(sloppyCoached()));
+    const repaired = await revise(wordy(sloppyChange()));
     expect(problemsOf(repaired, 'references')).toEqual([]);
     const bindings = repaired.artifact?.brief?.bindings ?? [];
     expect(bindings.map((binding) => binding.criterionId)).not.toContain('c99');
@@ -370,7 +416,7 @@ describe('the system-design-canvas loop', () => {
       expect.objectContaining({ claim: long }),
     ]);
 
-    const blocked = await revise(wordy(brokenCoached()));
+    const blocked = await revise(wordy(brokenChange()));
     expect(problemsOf(blocked, 'references')).toEqual([
       'edge ai-edge-9 references unknown target node: nowhere',
     ]);
@@ -383,7 +429,7 @@ describe('the system-design-canvas loop', () => {
       SYSTEM_DESIGN_CANVAS,
       { goal: GOAL, output: sampleSubmission(), criteria: sampleCriteria(), maxIterations: 3 },
       {
-        llm: sequencedLlm(...judges, brokenCoached(), coachedSubmission()),
+        llm: sequencedLlm(...judges, brokenChange(), coachedChange()),
         sink: (exchange) => exchanges.push(exchange),
         now: () => 0,
       },

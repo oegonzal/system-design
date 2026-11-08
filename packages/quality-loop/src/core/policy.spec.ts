@@ -51,6 +51,8 @@ describe('validatePolicy', () => {
     ],
     ['a negative lost-produce allowance', { loop: { ...tinyPolicy().loop, lostProduces: -1 } }],
     ['a fractional lost-produce allowance', { loop: { ...tinyPolicy().loop, lostProduces: 0.5 } }],
+    ['a briefing cap below 1', { briefing: { remediationsPerRound: 0 } }],
+    ['a fractional briefing cap', { briefing: { remediationsPerRound: 1.5 } }],
   ])('[QL-1] rejects %s, naming the pipeline', (_label, override) => {
     expect(() => validatePolicy({ ...tinyPolicy(), ...override }, task, 'tiny@0')).toThrow(
       /pipeline tiny@0/,

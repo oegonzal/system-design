@@ -214,6 +214,15 @@ export interface PolicyNumbers {
   maxIterations: number | null;
   plateauAfter: number | null;
   concurrency: number | null;
+  /**
+   * The briefing cap: of the best's selected remediations the producer is
+   * handed per revise or retry, every validator note, then the worst of the
+   * rest up to this many in all — a fill rule, not a count, as the contract's
+   * `briefing` declares it. Null when the policy leaves it undeclared — which,
+   * the contract says, hands every one of them — and, like every number here,
+   * when no pipeline was available.
+   */
+  remediationsPerRound: number | null;
   version: string | null;
 }
 
@@ -230,5 +239,6 @@ export const policyNumbers = (policy: PipelineSummary['policy'] | null): PolicyN
   maxIterations: policy?.loop.maxIterations ?? null,
   plateauAfter: policy?.loop.plateauAfter ?? null,
   concurrency: policy?.loop.concurrency ?? null,
+  remediationsPerRound: policy?.briefing?.remediationsPerRound ?? null,
   version: policy?.version ?? null,
 });

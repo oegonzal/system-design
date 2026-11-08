@@ -12,6 +12,7 @@ import {
   scriptedStages,
   type TinyOutput,
   tinyPipeline,
+  tinyPolicy,
 } from '../testing';
 import { runLoop } from './run-pipeline';
 
@@ -105,10 +106,12 @@ describe('runLoop', () => {
     ]);
     expect(trace.stopReason).toBe('accepted');
     expect(trace.bestIteration).toBe(2);
-    expect(inputs[1]).toMatchObject({ mode: 'revise', prior: DRAFT_1 });
+    expect(inputs[1]).toMatchObject({ mode: 'revise', prior: DRAFT_1, withheld: 0 });
+    // Both medium: the located finding before the criterion shortfall, whatever
+    // their keys sort to — a capped briefing hears the defect it can act on first.
     expect(inputs[1].remediations.map((note) => note.note)).toEqual([
-      'criterion c1: it is there',
       'something is missing',
+      'criterion c1: it is there',
     ]);
     // The producer improves against reasons, never against a number.
     expect(JSON.stringify(inputs)).not.toContain('overall');
@@ -418,5 +421,61 @@ describe('runLoop', () => {
     expect(trace.iterations).toHaveLength(3);
     expect(trace.stopReason).toBe('plateau');
     expect(trace.bestIteration).toBe(1);
+  });
+
+  it('[QL-85] a briefing cap hands the worst of the best’s remediations up to the cap — every validator note first — counts the rest as withheld, and the trace keeps them all', async () => {
+    const inputs: ProducerInput<TinyOutput>[] = [];
+    const recording = (): Producer<TinyOutput> => {
+      const scripted = scriptedProducer([DRAFT_1, DRAFT_2]);
+      return {
+        produce: (input) => {
+          inputs.push(input);
+          return scripted.produce(input);
+        },
+      };
+    };
+    const capped = tinyPipeline({
+      policy: { ...tinyPolicy(), briefing: { remediationsPerRound: 1 } },
+    });
+
+    // Iteration 1 leaves a finding (gap|text) and a partial criterion (c1), both medium:
+    // the finding is handed and the criterion withheld, while the record keeps both.
+    const trace = await runLoop(
+      scriptedStages({ producer: recording() }),
+      capped,
+      { goal: 'g', maxIterations: 2 },
+      clock,
+    );
+    expect(trace.iterations[0].remediations.map((note) => note.subject)).toEqual([
+      { finding: 'gap|text' },
+      { criterion: 'c1' },
+    ]);
+    expect(inputs[0]).toMatchObject({ mode: 'initial', remediations: [], withheld: 0 });
+    expect(inputs[1].remediations.map((note) => note.subject)).toEqual([{ finding: 'gap|text' }]);
+    expect(inputs[1].withheld).toBe(1);
+
+    // Every validator note is handed, past the cap: the artifact is refused until it passes them.
+    inputs.length = 0;
+    const warning = (id: string) => ({
+      id,
+      gate: 'warn' as const,
+      validate: () => ({
+        validatorId: id,
+        gate: 'warn' as const,
+        problems: [{ severity: 'low' as const, locationRefs: ['text'], message: `${id} objects` }],
+      }),
+    });
+    const warned = await runLoop(
+      scriptedStages({ producer: recording(), validators: [warning('v1'), warning('v2')] }),
+      capped,
+      { goal: 'g', maxIterations: 2 },
+      clock,
+    );
+    expect(warned.iterations[0].remediations).toHaveLength(4);
+    expect(inputs[1].remediations.map((note) => note.subject)).toEqual([
+      { validator: 'v1' },
+      { validator: 'v2' },
+    ]);
+    expect(inputs[1].withheld).toBe(2);
   });
 });

@@ -3,8 +3,16 @@
  * that binds each criterion to the components holding it (and, where a
  * request travels, the path of edges), and the narrative keyed to nodes and
  * criteria. The schema is the one in `@sysdesign/contracts` — the studio API
- * validates a submission with it and the coach writes into it — so there is
- * nothing here to drift.
+ * validates a submission with it, and the coach's change set is written in
+ * its element schemas — so there is nothing here to drift.
+ *
+ * A coached revision is a CHANGE SET against the best (`revise`: the
+ * contract's `canvasChangeSchema`, applied by the loop with the contract's
+ * `applyCanvasChange` and judged whole), never the canvas redrawn. Measured
+ * 2026-11-07 on coach chain 4 (session 2681e7b0), where every revision was a
+ * redraw: 34–64% of each 82–120 KB reply re-emitted elements no remediation
+ * had named, 22–31 of 34 bindings were rewritten a round, and the reasoning
+ * dimension swung 90 → 50 as the parts nobody criticised were re-rolled.
  *
  * Location ids are positional (`node.3`, `binding.1`), never the author's own
  * canvas ids: a lens may cite only what the render printed, and the render
@@ -25,6 +33,8 @@
  * studio's tracer showed the author.
  */
 import {
+  applyCanvasChange,
+  canvasChangeSchema,
   designSubmissionSchema,
   nodeReach,
   pathStages,
@@ -33,6 +43,7 @@ import {
   repairSubmission,
   roleNames,
   submissionLocations,
+  type CanvasChange,
   type CanvasGraph,
   type DesignSubmission,
   type PathTracing,
@@ -205,7 +216,7 @@ function renderDecision(
   );
 }
 
-export const canvasOutput: OutputShape<CanvasSubmission> = {
+export const canvasOutput: OutputShape<CanvasSubmission, CanvasChange> = {
   schema: designSubmissionSchema,
 
   /** The contract's one numbering, projected to what a lens may cite; the studio joins on the same ids. */
@@ -314,5 +325,21 @@ export const canvasOutput: OutputShape<CanvasSubmission> = {
       );
     }
     return lines.join('\n');
+  },
+
+  /**
+   * How a revision is asked for: a change set against the artifact the coach
+   * was shown, each list in the contract's own words, applied to the best by
+   * the contract's own function — so what is judged, stored as the iteration's
+   * artifact and shown to the studio is a whole canvas; the change set itself
+   * survives only as the producer's recorded reply in the run dump.
+   * How much a change set may name is the contract's to size (`canvas.ts`,
+   * the `CHANGE_*` bounds); the list rules are the submission's.
+   */
+  revise: {
+    schema: canvasChangeSchema,
+    apply: applyCanvasChange,
+    instruction:
+      'Return only a change set against the artifact above: the nodes, edges, entities, bindings, rationales and narrations you add or rewrite — whole, by their ids — the ids you remove, and the decisions, assumptions, model relations or overview as they should read when you rewrite them. Apply every listed remediation. Everything you do not name stays exactly as it is.',
   },
 };

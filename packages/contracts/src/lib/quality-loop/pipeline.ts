@@ -121,6 +121,18 @@ export interface DecisionPolicy {
      */
     lostProduces: number;
   };
+  /**
+   * How the producer is briefed on a revise or retry. Absent, every selected
+   * remediation of the best is handed, as every pipeline before the field.
+   * With `remediationsPerRound`, the worst of them up to that many — every
+   * validator note first, then the rest in the controller's worst-first
+   * order (`briefedRemediations`); the decision, the trace and every reader
+   * keep the whole list, and the prompt's heading says how many were kept
+   * back. Measured 2026-11-07, canvas coach chain 4: handed 30–35 at once,
+   * the coach rewrote 22–31 of 34 bindings a round and the score ran
+   * 67.7 → 72.2 → 68.5 → 65.
+   */
+  briefing?: { remediationsPerRound: number };
 }
 
 /** A gate's declared parameters, as data — the numbers a trace's details are measured against. */

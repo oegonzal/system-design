@@ -1,14 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 
+import { CANVAS_NODES_BOUND, EDGE_CONFIG_HINTS, NODE_CONFIG_KEYS_BOUND } from './canvas';
+import { canvasChangeSchema } from './canvas-change.schema';
 import {
-  CANVAS_NODES_BOUND,
-  CANVAS_MAX_TOTAL_OPERATIONS,
-  EDGE_CONFIG_HINTS,
-  NODE_CONFIG_KEYS_BOUND,
-} from './canvas';
-import { designSubmissionSchema, sessionDraftSchema, type DesignSubmission } from './canvas.schema';
-import { boundsAgainstMeasured } from './measured-bounds';
+  CANVAS_RULES,
+  designSubmissionSchema,
+  sessionDraftSchema,
+  type DesignSubmission,
+} from './canvas.schema';
+import { boundsAgainstMeasured, declaredSizes } from './measured-bounds';
 import measured from './measured/canvas.json';
 
 /** A complete, valid submission: every optional field present once. */
@@ -222,9 +223,24 @@ describe('designSubmissionSchema', () => {
     // own schema allows a reply, and are measured where that is measured.
     const composed =
       'composed by the studio from interview turns; no interview has been graded yet';
+    // The change set is measured beside the submission — the same coach writes
+    // both, the submission whole and the change set on a revise — and its
+    // roots are its own, so no path is declared twice. The fixture predates
+    // the change set, so every `changes.*` path it does not measure is held
+    // to nothing; a path is held from the day the fixture measures it, with
+    // no edit here. The whole-artifact paths stay measured only while chain
+    // 4's redraws are in the window: a re-measure over change-set runs alone
+    // would leave them unmeasured, so the next window must hold both.
+    const unrecorded =
+      "no change set has been recorded yet — the coach's first change sets are measured in the first recorded change sets (none as of 2026-11-08); this exemption is derived from the paths the fixture lacks, so each path is held automatically the day the fixture measures it, with no edit here";
+    const unmeasuredChangePaths = Object.keys(declaredSizes(canvasChangeSchema)).filter(
+      (path) => !Object.hasOwn(measured.fields, path),
+    );
+    expect(unmeasuredChangePaths.every((path) => path.startsWith('changes.'))).toBe(true);
     expect(
-      boundsAgainstMeasured(designSubmissionSchema, measured.fields, {
+      boundsAgainstMeasured([designSubmissionSchema, canvasChangeSchema], measured.fields, {
         exempt: {
+          ...Object.fromEntries(unmeasuredChangePaths.map((path) => [path, unrecorded])),
           'graph.nodes[].responsibilities': authored,
           'graph.nodes[].responsibilities[]': authored,
           'transcript.turns': composed,
@@ -250,12 +266,15 @@ describe('designSubmissionSchema', () => {
    * expressed as a bound must therefore be said here, or the writer is refused
    * for a rule it was never told.
    */
-  it('tells the coach, in the JSON Schema itself, every rule that would void its revision', () => {
-    const json = JSON.stringify(z.toJSONSchema(designSubmissionSchema));
-    for (const rule of [
-      `all nodes together declare at most ${CANVAS_MAX_TOTAL_OPERATIONS} operations`,
-      'Every node id is distinct,',
-      'Every edge id is distinct, and no edge joins a node to itself.',
+  it('tells the coach, in the JSON Schema itself, every rule that would void its revision — in the submission it writes whole and in the change set it writes on a revise', () => {
+    const schemas = {
+      submission: JSON.stringify(z.toJSONSchema(designSubmissionSchema)),
+      'change set': JSON.stringify(z.toJSONSchema(canvasChangeSchema)),
+    };
+    // The list rules said once in CANVAS_RULES, and the element rules both
+    // schemas carry because they share the element schemas.
+    const shared = [
+      ...Object.values(CANVAS_RULES),
       'One entry per key; a key set twice is refused.',
       'A name must be unique on the node',
       'each declared on its source or its target, and none repeated',
@@ -265,9 +284,24 @@ describe('designSubmissionSchema', () => {
       // The rules that were already stated, kept here so one list is the record.
       "The author's id; keep it.",
       'One connected walk of existing edge ids',
-      'At most one binding per criterion.',
+    ];
+    for (const [name, json] of Object.entries(schemas)) {
+      for (const rule of shared) {
+        expect(json, `the ${name} never tells the coach: ${rule}`).toContain(rule);
+      }
+    }
+    // The change set's own: what a change leaves alone, what goes with a
+    // removal, which of two entries for one key stands, and what a replaced
+    // list must carry.
+    for (const rule of [
+      'Everything you do not name stays exactly as it is.',
+      'every edge touching a removed node goes with it',
+      'a later entry for the same criterion wins',
+      'include every one you keep',
     ]) {
-      expect(json, `the coach is never told: ${rule}`).toContain(rule);
+      expect(schemas['change set'], `the change set never tells the coach: ${rule}`).toContain(
+        rule,
+      );
     }
   });
 });

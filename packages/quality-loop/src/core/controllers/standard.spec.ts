@@ -358,10 +358,11 @@ describe('the standard controller', () => {
       tinyPolicy(),
     );
     expect(lower.finalDecision).toBe('revise');
-    // Equal severity: ordered by subject key, so the criterion shortfall precedes the finding.
+    // Equal severity: the located finding precedes the criterion shortfall, whatever
+    // their keys sort to — a capped briefing hears the defect it can act on first.
     expect(lower.selectedRemediations.map((remediation) => remediation.action)).toEqual([
-      'revise',
       'retry',
+      'revise',
     ]);
     const stuck = decide(
       {

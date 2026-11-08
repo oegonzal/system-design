@@ -1,7 +1,9 @@
-import { describeIssue } from '@sysdesign/contracts';
+import { describeIssue, type RemediationNote } from '@sysdesign/contracts';
 import { SCHEMA_MISS, type LlmCall } from '@sysdesign/llm';
 import { describe, expect, it } from 'vitest';
+import { z } from 'zod';
 
+import type { ReviseShape, TaskSpec } from '../contracts';
 import { criterion, fakeLlm, tinyPipeline, type TinyOutput } from '../testing';
 import { createLlmProducer } from './llm-producer';
 import { MEMORIES_HEADING } from './prompting';
@@ -27,6 +29,7 @@ describe('createLlmProducer', () => {
           note: 'say more',
         },
       ],
+      withheld: 0,
       refusals: [],
       setbacks: [],
       memories: [],
@@ -45,6 +48,7 @@ describe('createLlmProducer', () => {
       mode: 'initial' as const,
       prior: null,
       remediations: [],
+      withheld: 0,
       refusals: [],
       setbacks: [],
       memories: [],
@@ -78,6 +82,7 @@ describe('createLlmProducer', () => {
       mode: 'revise' as const,
       prior,
       remediations: [],
+      withheld: 0,
       refusals: [],
       setbacks: [],
       memories,
@@ -109,6 +114,7 @@ describe('createLlmProducer', () => {
       mode: 'initial',
       prior: null,
       remediations: [],
+      withheld: 0,
       refusals: [],
       setbacks: [],
       memories: [],
@@ -132,6 +138,7 @@ describe('createLlmProducer', () => {
       mode: 'initial',
       prior: null,
       remediations: [],
+      withheld: 0,
       refusals: [],
       setbacks: [],
       memories: [],
@@ -157,6 +164,7 @@ describe('createLlmProducer', () => {
       mode: 'revise',
       prior,
       remediations: [],
+      withheld: 0,
       refusals: [
         {
           subject: { schema: 'parts[0]' },
@@ -207,6 +215,7 @@ describe('createLlmProducer', () => {
           note: 'say more',
         },
       ],
+      withheld: 0,
       refusals: [],
       setbacks: [
         {
@@ -247,5 +256,84 @@ describe('createLlmProducer', () => {
       llm,
     ).produce({ ...input, setbacks: [] });
     expect(calls[2].user).not.toContain(heading);
+  });
+
+  it('[QL-84] under a declared revise shape, a revise of a prior asks for a change in the shape’s schema and words and answers with the change applied to the prior; a first draft and a retry still ask the output schema', async () => {
+    const changeSchema = z.strictObject({ set: z.strictObject({ text: z.string().nullable() }) });
+    const revise: ReviseShape<TinyOutput, z.infer<typeof changeSchema>> = {
+      schema: changeSchema,
+      instruction: 'Return only what changes.',
+      apply: (best, change) => ({ ...best, text: change.set.text ?? best.text }),
+    };
+    // A shape sealed on its own change type is an `OutputShape<TinyOutput>`.
+    const task: TaskSpec<TinyOutput> = {
+      ...definition.task,
+      output: { ...definition.task.output, revise },
+    };
+    const calls: LlmCall[] = [];
+    // Neither canned answer parses as the other ask: the change is no artifact, the artifact no change.
+    const llm = fakeLlm({ set: { text: 'new' } }, { text: 'fresh', parts: [] }).withRecorder(
+      (call) => calls.push(call),
+    );
+    const producer = createLlmProducer(task, definition.producer, llm);
+    const input = {
+      contract,
+      prior: null,
+      remediations: [],
+      withheld: 0,
+      refusals: [],
+      setbacks: [],
+      memories: [],
+    };
+    const asked = (call: LlmCall) =>
+      Object.keys((call.schema as { properties: Record<string, unknown> }).properties);
+
+    const revised = await producer.produce({ ...input, mode: 'revise', prior });
+    expect(asked(calls[0])).toEqual(['set']);
+    expect(calls[0].user).toContain('[text] old');
+    expect(calls[0].user).toContain('# Instructions\n\nReturn only what changes.');
+    expect(revised.output).toEqual({ text: 'new', parts: ['p'] });
+
+    const first = await producer.produce({ ...input, mode: 'initial' });
+    const retried = await producer.produce({ ...input, mode: 'retry' });
+    expect(asked(calls[1])).toEqual(['text', 'parts']);
+    expect(asked(calls[2])).toEqual(['text', 'parts']);
+    expect(calls[2].user).toContain('# Instructions\n\nStart over from the goal.');
+    expect(first.output).toEqual({ text: 'fresh', parts: [] });
+    expect(retried.output).toEqual({ text: 'fresh', parts: [] });
+  });
+
+  it('[QL-85] its heading says how many of the best’s remediations it was handed when the policy kept some back, and nothing when none was', async () => {
+    const calls: LlmCall[] = [];
+    const llm = fakeLlm({ text: 'new', parts: [] }).withRecorder((call) => calls.push(call));
+    const note = (finding: string): RemediationNote => ({
+      subject: { finding },
+      action: 'revise',
+      severity: 'medium',
+      targetRefs: ['text'],
+      note: `fix ${finding}`,
+    });
+    const input = {
+      contract,
+      mode: 'revise' as const,
+      prior,
+      remediations: [note('gap|text'), note('wrong|text')],
+      withheld: 3,
+      refusals: [],
+      setbacks: [],
+      memories: [],
+    };
+    const producer = createLlmProducer(definition.task, definition.producer, llm);
+    await producer.produce(input);
+    expect(calls[0].user).toContain(
+      '# Remediations to apply (the 2 worst of 5)\n\n- [medium] fix gap|text (at: text)\n- [medium] fix wrong|text (at: text)',
+    );
+    await producer.produce({ ...input, withheld: 0 });
+    expect(calls[1].user).toContain(
+      '# Remediations to apply\n\n- [medium] fix gap|text (at: text)',
+    );
+    // A retry's pitfalls are the same list, capped the same way, and say so the same way.
+    await producer.produce({ ...input, mode: 'retry', prior: null });
+    expect(calls[2].user).toContain('# Pitfalls of the discarded attempt (the 2 worst of 5)');
   });
 });

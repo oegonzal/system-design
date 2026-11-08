@@ -26,6 +26,8 @@ export * from './lib/appearance';
 export * from './lib/canvas';
 export * from './lib/platforms';
 export * from './lib/canvas.schema';
+export * from './lib/canvas-change.schema';
+export * from './lib/canvas-change';
 export * from './lib/canvas-goal';
 export * from './lib/canvas-vocabulary';
 export * from './lib/lifecycle';

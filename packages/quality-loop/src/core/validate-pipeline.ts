@@ -1,6 +1,6 @@
 /**
  * Boot's check of a pipeline declaration: every lens, judge, wave, validator,
- * task bound, controller and output schema it declares is checked here, and
+ * task bound, controller, output schema and revise shape it declares is checked here, and
  * a malformed one fails before the service boots — never mid-run. Nothing
  * here runs a stage; it reads the declaration as data.
  */
@@ -276,6 +276,35 @@ function checkController(definition: Definition, fail: Fail): void {
   }
 }
 
+/**
+ * A schema the model answers in — the output's, a revise shape's. The model
+ * is shown it at its targets and the reply is read against its ceilings,
+ * both from this one conversion: an unsupported zod type, or a bound
+ * declared where none can sit, fails here rather than as a null response
+ * mid-run. And a strict endpoint refuses the request for an open object or
+ * an optional property, every time, before any model reads the goal — so a
+ * schema that breaks the convention never boots instead of never producing.
+ */
+function checkModelSchema(name: string, schema: z.ZodType, fail: Fail): void {
+  const faults = strictSchemaFaults(modelSchema(schema).json);
+  if (faults.length > 0) {
+    fail(`${name} is not strict — a strict endpoint refuses it: ${faults.join('; ')}`);
+  }
+}
+
+/**
+ * A declared revise shape is asked of the model as the output is: its
+ * instruction says what a change is, in words, and its schema is held to the
+ * same conversion as the output schema — or the first revision of every run
+ * would be refused before any model read it.
+ */
+function checkRevise(definition: Definition, fail: Fail): void {
+  const { revise } = definition.task.output;
+  if (revise === undefined) return;
+  if (revise.instruction.trim().length === 0) fail('revise instruction is empty');
+  checkModelSchema('revise schema', revise.schema, fail);
+}
+
 /** Fails fast on a malformed pipeline — before boot completes, never mid-run. */
 export function validatePipeline(definition: PipelineDefinition<unknown>): void {
   const name = describePipelineId(definition);
@@ -292,17 +321,6 @@ export function validatePipeline(definition: PipelineDefinition<unknown>): void 
   checkTask(definition, fail);
   checkValidators(definition, fail);
   checkController(definition, fail);
-
-  // The model is shown the output schema at its targets and the reply is read
-  // against its ceilings, both from this one conversion: an unsupported zod
-  // type, or a bound declared where none can sit, fails here rather than as a
-  // null response mid-run.
-  const shown = modelSchema(definition.task.output.schema);
-  // A strict endpoint refuses the request for an open object or an optional
-  // property, every time, before any model reads the goal — so the schema that
-  // breaks the convention never boots instead of never producing.
-  const faults = strictSchemaFaults(shown.json);
-  if (faults.length > 0) {
-    fail(`output schema is not strict — a strict endpoint refuses it: ${faults.join('; ')}`);
-  }
+  checkModelSchema('output schema', definition.task.output.schema, fail);
+  checkRevise(definition, fail);
 }

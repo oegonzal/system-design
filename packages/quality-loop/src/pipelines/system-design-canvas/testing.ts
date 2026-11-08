@@ -5,9 +5,11 @@
  * translated to the one submission schema: a storefront pushing webhooks, a
  * point-of-sale system polled on a schedule, an owned read model behind a
  * queue and an idempotent indexer (`testing.graph.ts` holds the diagram).
- * `sampleCriteria` is the rubric it answers.
+ * `sampleCriteria` is the rubric it answers, and `coachedChange` the change
+ * set a coach might return against it — what the loop applies to the best.
  */
 import type {
+  CanvasChange,
   DesignBrief,
   DesignModel,
   DesignNarrative,
@@ -215,13 +217,15 @@ export const sampleSubmission = (overrides: Partial<CanvasSubmission> = {}): Can
   ...overrides,
 });
 
-/** The sample with a read replica the coach added — every author id kept, the new parts prefixed `ai-`. */
-export const coachedSubmission = (): CanvasSubmission => {
-  const base = sampleSubmission();
-  return {
-    graph: {
-      nodes: [
-        ...base.graph.nodes,
+/**
+ * The change set a coach might return against the sample: a read replica —
+ * one node and the two edges that wire it, every id prefixed `ai-` — and
+ * nothing else named, so every author id and every other part stays as it is.
+ */
+export const coachedChange = (): CanvasChange => ({
+  changes: {
+    nodes: {
+      upsert: [
         {
           id: 'ai-replica-1',
           kind: 'replica',
@@ -229,8 +233,10 @@ export const coachedSubmission = (): CanvasSubmission => {
           config: [{ key: 'lagMs', value: 200 }],
         },
       ],
-      edges: [
-        ...base.graph.edges,
+      remove: [],
+    },
+    edges: {
+      upsert: [
         { id: 'ai-edge-1', source: 'database-1', target: 'ai-replica-1', kind: 'async' },
         {
           id: 'ai-edge-2',
@@ -240,8 +246,7 @@ export const coachedSubmission = (): CanvasSubmission => {
           label: 'read',
         },
       ],
+      remove: [],
     },
-    brief: base.brief,
-    narrative: base.narrative,
-  };
-};
+  },
+});

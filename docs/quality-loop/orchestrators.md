@@ -358,9 +358,19 @@ nothing is digested.
   read it, what they confirmed wrong with it as setbacks. The producer works from the original
   submission only while it is still the best. The judges grade every iteration from scratch: they
   never see an earlier grade or what the producer was asked to fix.
-- **Is the coach applying the fixes?** Yes. Its producer is handed every remediation the best
-  iteration selected, each with its rationale, and told to "Return the WHOLE artifact again with
-  every remediation applied". Nothing checks them one by one; the only verdict is the next grade.
+- **Is the coach applying the fixes?** Yes. Its producer is handed the remediations the best
+  iteration selected, each with its rationale — every validator note, then the worst of the rest up
+  to the twelve its policy declares (`briefing.remediationsPerRound`; when any were kept back the
+  prompt heading reads "Remediations to apply (the N worst of M)", and the decision and the record
+  keep the whole list either way) — and asked for a change set against the best: the elements it
+  adds or rewrites, whole and by id, the ids it removes, and the lists it rewrites as they should
+  read, applied to the best by `applyCanvasChange` from `@sysdesign/contracts` (beside the canvas
+  schema; the pipeline declares it as its output's `revise.apply`) before anything judges it. The
+  engine's default ask, "Return the WHOLE artifact again with every remediation applied", still
+  serves every pipeline that declares no revise shape; the canvas coach left it because the redraw
+  measured as the regression (chain 4, 2026-11-07: 34–64% of each 82–120 KB reply re-emitted
+  unchanged elements, 22–31 of 34 bindings were rewritten a round, and reasoning swung 90 → 50).
+  Nothing checks the fixes one by one; the only verdict is the next grade.
   In 18-01-11, iteration 2 was handed the grade's 15 fixes. Its grade moved c7 to pass and c4 and
   c9 from fail to partial, left the other five targeted criteria where they were, and the score
   rose from 55.6 to 57.8.
@@ -469,7 +479,8 @@ settles the decision, a canvas row reads differently:
 | the route, with no remediation selected         | "Below the accept threshold, with no fix the lenses could point to — it needs a person’s judgement." |
 
 N is the length of **that iteration's own** remediation list. Everything below is included, worst
-first, with no cap and no deduplication:
+first, with no deduplication and no cap here — the policy's briefing cap applies where the list is
+handed to the producer, never to this record:
 
 | Source              | Selected when                                         | The note the producer reads                |
 | ------------------- | ----------------------------------------------------- | ------------------------------------------ |
@@ -556,15 +567,23 @@ and the memory orchestrator's recall, screen nothing and compose the query they 
 2. the recalled lessons, the same in every iteration of the quality run;
 3. under "Your previous artifact", the **best** artifact so far, which is not necessarily
    iteration k − 1's;
-4. under "Remediations to apply", **every** remediation note of that best iteration;
+4. under "Remediations to apply", the remediation notes of that best iteration — every one unless
+   the policy caps the briefing (`briefing.remediationsPerRound`; the canvas coach declares 12),
+   when every validator note is handed and then the worst of the rest up to the cap in the
+   controller's order, under the heading "Remediations to apply (the N worst of M)" when any were
+   kept back; the decision's `selectedRemediations` keep the whole list either way;
 5. only when iteration k − 1 was blocked by a validator and did not become best, that iteration's
    validator notes, as refusals;
-6. the instruction "Return the WHOLE artifact again with every remediation applied and everything
-   that was not criticised preserved."
+6. the ask: the revise shape's own instruction when the pipeline's output declares one — the
+   canvas coach's asks for a change set against the artifact above, which `applyCanvasChange`
+   applies to the best before anything judges it — and otherwise the engine's default, "Return the
+   WHOLE artifact again with every remediation applied and everything that was not criticised
+   preserved."
 
 It sees every criterion, passed or not, but never which ones passed. It never sees a score, a
 finding marked `requires_user` or `unfixable`, or what a losing iteration's judges said beyond the
-finding notes its policy selected (its setbacks) and refusals.
+finding notes its policy selected (its setbacks) and refusals; under a capped briefing it never
+sees the remediations held back, only how many there were.
 
 **Do fixes accumulate from one iteration to the next?** Only while each revision wins, as the
 answers at the top of this section say. If iteration 2 beats the base, iteration 3 revises

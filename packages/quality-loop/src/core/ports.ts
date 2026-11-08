@@ -57,6 +57,12 @@ export interface ProducerInput<T> {
   prior: T | null;
   remediations: RemediationNote[];
   /**
+   * How many of the best's remediations the policy's briefing cap kept back
+   * from this ask (`briefedRemediations`); 0 when none was. The prompt says
+   * so, so the producer knows the list it reads is the worst of a longer one.
+   */
+  withheld: number;
+  /**
    * Why the latest attempt was thrown out before any judge read it — the
    * validator notes of an iteration a validator blocked and that never
    * became best, or, when the last produce answered nothing, the faults the

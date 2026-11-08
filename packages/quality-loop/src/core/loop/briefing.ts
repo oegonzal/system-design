@@ -4,11 +4,14 @@
  * attempt which never became best, and the findings the judges confirmed
  * against one that was judged and fell short. The producer revises the best
  * with the best's remediations; without these it would never hear what its
- * own last attempt got wrong.
+ * own last attempt got wrong. And which of the best's remediations it is
+ * handed at all: every one, or under a declared briefing cap the worst of
+ * them (`briefedRemediations`).
  */
 import {
   describeIssue,
   PRODUCE_MODES,
+  type DecisionPolicy,
   type IterationTrace,
   type RemediationNote,
   type SchemaIssue,
@@ -84,3 +87,28 @@ export const setbacksOf = <T>(
     return finding !== null && !held.has(finding);
   });
 };
+
+/**
+ * The remediations of the best the next ask is handed. Every one, when the
+ * policy declares no briefing cap. Under one, every validator note — the
+ * artifact is refused until it passes them, whatever else it fixes — then
+ * the rest in the order the controller selected them, worst first, up to
+ * the cap; each stays in its place in that order. `withheld` counts the
+ * notes kept back, so the prompt can say so; the decision and the trace keep
+ * the whole list. Why a pipeline caps, and the measurement behind the first
+ * cap declared, is on `DecisionPolicy.briefing` in contracts.
+ */
+export function briefedRemediations(
+  notes: readonly RemediationNote[],
+  policy: DecisionPolicy,
+): { handed: RemediationNote[]; withheld: number } {
+  const cap = policy.briefing?.remediationsPerRound;
+  if (cap === undefined) return { handed: [...notes], withheld: 0 };
+  const chosen = new Set(notes.filter((note) => 'validator' in note.subject));
+  for (const note of notes) {
+    if (chosen.size >= cap) break;
+    chosen.add(note);
+  }
+  const handed = notes.filter((note) => chosen.has(note));
+  return { handed, withheld: notes.length - handed.length };
+}

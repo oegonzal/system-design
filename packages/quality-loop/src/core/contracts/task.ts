@@ -8,11 +8,27 @@ import {
 import type { ZodType } from 'zod';
 
 /**
+ * How a revision is asked for and read back, when a pipeline declares it. On
+ * a revise of a prior the producer is asked for a CHANGE against the artifact
+ * under revision — answered in `schema`, asked for in `instruction`, the
+ * pipeline's own words — and the loop stores `apply(prior, change)`: a whole
+ * artifact, judged and stored as any produced one, so no reader of a run
+ * sees anything but the artifact. `apply` is pure and total over what
+ * `schema` parsed. A method signature on purpose: a shape sealed on its own
+ * `C` is assignable where an `OutputShape<T>` is expected.
+ */
+export interface ReviseShape<T, C> {
+  readonly schema: ZodType<C>;
+  readonly instruction: string;
+  apply(best: T, change: C): T;
+}
+
+/**
  * The pipeline's code half: how an output is parsed, addressed and shown to a
  * judge. Everything else about a task is data, and every wire type lives in
  * `@sysdesign/contracts` under `quality-loop/`.
  */
-export interface OutputShape<T> {
+export interface OutputShape<T, C = unknown> {
   readonly schema: ZodType<T>;
   /** Engine-assigned, deterministic ids (`component.1`, `flow.2` …). */
   locate(output: T): ArtifactLocation[];
@@ -27,6 +43,14 @@ export interface OutputShape<T> {
    * stored artifact changes nothing — what is judged is what is stored.
    */
   normalize?(output: T, contract: TaskContract<T>): T;
+  /**
+   * Optional. How a revision is asked for: a change against the artifact
+   * under revision, applied by the loop (`ReviseShape`). Undeclared, a
+   * revision is the whole artifact again in `schema`, as every pipeline
+   * before the field. The first draft and a retry revise nothing, and are
+   * asked for the whole artifact either way.
+   */
+  readonly revise?: ReviseShape<T, C>;
 }
 
 /** One declared criterion: its kind, and the sentence the panel grades against. */

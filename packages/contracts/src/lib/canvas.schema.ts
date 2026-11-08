@@ -64,7 +64,23 @@ import { CRITERION_ID_MAX_LENGTH } from './quality-loop/evidence';
 
 const canvasId = (description?: string) =>
   bounded.id(CANVAS_ID_MAX_LENGTH, { min: 1, description });
-const criterionId = () => bounded.id(CRITERION_ID_MAX_LENGTH, { min: 1 });
+/** A node's, an edge's or an entity's id as another part refers to it — a binding, a rationale, a change set's removals. */
+export const canvasIdSchema = canvasId();
+/** A rubric criterion's id, as a binding and a narration are keyed by it. */
+export const criterionIdSchema = bounded.id(CRITERION_ID_MAX_LENGTH, { min: 1 });
+
+/**
+ * The rules a list holds its items to that no bound can carry — a budget
+ * summed across nodes, a distinct id, one binding per criterion — said once:
+ * the submission schema and the change-set schema both describe their lists
+ * with them, and `canvas.schema.spec.ts` holds both JSON schemas to telling
+ * the coach each one, since a `.describe()` is the only channel that reaches it.
+ */
+export const CANVAS_RULES = {
+  distinctNodes: `Every node id is distinct, and all nodes together declare at most ${CANVAS_MAX_TOTAL_OPERATIONS} operations.`,
+  distinctEdges: 'Every edge id is distinct, and no edge joins a node to itself.',
+  oneBindingPerCriterion: 'At most one binding per criterion.',
+} as const;
 
 /** A config value is a scalar the author typed: text, a number or a flag. */
 export const configValueSchema = z.union([
@@ -141,8 +157,8 @@ export type CanvasNode = z.infer<typeof canvasNodeSchema>;
 
 export const canvasEdgeSchema = z.strictObject({
   id: canvasId("The author's id; keep it. A new edge takes an id starting with `ai-`."),
-  source: canvasId(),
-  target: canvasId(),
+  source: canvasIdSchema,
+  target: canvasIdSchema,
   /** A solid request/response call, or fire-and-forget messaging. */
   kind: z.enum(EDGE_KINDS),
   label: bounded.text(EDGE_LABEL_BOUND).optional(),
@@ -163,14 +179,14 @@ export const canvasEdgeSchema = z.strictObject({
 export type CanvasEdge = z.infer<typeof canvasEdgeSchema>;
 
 export const canvasGraphSchema = z.strictObject({
+  // The budget is the one rule no bound can carry — it is a sum across nodes —
+  // so it is stated in the description, interpolated, rather than left for
+  // the writer to be refused by a number it was never shown.
   nodes: bounded.list(CANVAS_NODES_BOUND, canvasNodeSchema, {
-    // The budget is the one rule no bound can carry — it is a sum across nodes —
-    // so it is stated here, interpolated, rather than left for the writer to be
-    // refused by a number it was never shown.
-    description: `Every node id is distinct, and all nodes together declare at most ${CANVAS_MAX_TOTAL_OPERATIONS} operations.`,
+    description: CANVAS_RULES.distinctNodes,
   }),
   edges: bounded.list(CANVAS_EDGES_BOUND, canvasEdgeSchema, {
-    description: 'Every edge id is distinct, and no edge joins a node to itself.',
+    description: CANVAS_RULES.distinctEdges,
   }),
 });
 export type CanvasGraph = z.infer<typeof canvasGraphSchema>;
@@ -182,20 +198,20 @@ export type CanvasGraph = z.infer<typeof canvasGraphSchema>;
  * held it. One binding per criterion.
  */
 export const bindingSchema = z.strictObject({
-  criterionId: criterionId(),
-  nodeIds: bounded.list(BINDING_NODES_BOUND, canvasId(), {
+  criterionId: criterionIdSchema,
+  nodeIds: bounded.list(BINDING_NODES_BOUND, canvasIdSchema, {
     min: 1,
     description: 'Every node that holds this criterion, existing ids only.',
   }),
   path: bounded
-    .list(FLOW_STEPS_BOUND, canvasId(), {
+    .list(FLOW_STEPS_BOUND, canvasIdSchema, {
       description:
         'One connected walk of existing edge ids, in order — each edge starts where the previous one ends. The single route a request takes, never every edge involved.',
     })
     .optional(),
   claim: bounded.text(BINDING_CLAIM_BOUND, { min: 1 }),
   entityIds: bounded
-    .list(BINDING_ENTITIES_BOUND, canvasId(), {
+    .list(BINDING_ENTITIES_BOUND, canvasIdSchema, {
       description: 'The entities of the model that hold this criterion, existing ids only.',
     })
     .optional(),
@@ -213,7 +229,7 @@ export const DESIGN_BRIEF_VERSION = 1;
 export const designBriefSchema = z.strictObject({
   version: z.literal(DESIGN_BRIEF_VERSION),
   bindings: bounded.list(BRIEF_BINDINGS_BOUND, bindingSchema, {
-    description: 'At most one binding per criterion.',
+    description: CANVAS_RULES.oneBindingPerCriterion,
   }),
 });
 export type DesignBrief = z.infer<typeof designBriefSchema>;
@@ -221,7 +237,7 @@ export type DesignBrief = z.infer<typeof designBriefSchema>;
 export const NARRATION_VERSION = 1;
 
 export const componentRationaleSchema = z.strictObject({
-  nodeId: canvasId(),
+  nodeId: canvasIdSchema,
   prose: bounded.text(NARRATION_PROSE_BOUND),
   tradeoff: bounded
     .text(NARRATION_PROSE_BOUND, {
@@ -258,7 +274,7 @@ export const designDecisionSchema = z.strictObject({
     })
     .optional(),
   nodeIds: bounded
-    .list(DECISION_NODES_BOUND, canvasId(), {
+    .list(DECISION_NODES_BOUND, canvasIdSchema, {
       description: 'The nodes the decision concerns, existing ids only.',
     })
     .optional(),
@@ -266,7 +282,7 @@ export const designDecisionSchema = z.strictObject({
 export type DesignDecision = z.infer<typeof designDecisionSchema>;
 
 export const criterionNarrationSchema = z.strictObject({
-  criterionId: criterionId(),
+  criterionId: criterionIdSchema,
   prose: bounded.text(NARRATION_PROSE_BOUND),
 });
 export type CriterionNarration = z.infer<typeof criterionNarrationSchema>;
@@ -318,7 +334,7 @@ export type DesignSubmission = z.infer<typeof designSubmissionSchema>;
  * is about to draw.
  */
 export const bindingDraftSchema = bindingSchema.extend({
-  nodeIds: bounded.list(BINDING_NODES_BOUND, canvasId()),
+  nodeIds: bounded.list(BINDING_NODES_BOUND, canvasIdSchema),
   claim: bounded.text(BINDING_CLAIM_BOUND),
 });
 

@@ -146,10 +146,18 @@ describe('the declared policy beside what it did', () => {
       maxIterations: 3,
       plateauAfter: 2,
       concurrency: 2,
+      // The fixture declares no briefing cap, and the one optional number is
+      // null rather than invented: the contract hands every remediation then.
+      remediationsPerRound: null,
       version: '1',
     });
+    const { policy } = makePipeline();
+    expect(
+      policyNumbers({ ...policy, briefing: { remediationsPerRound: 5 } }).remediationsPerRound,
+    ).toBe(5);
     const none = policyNumbers(null);
     expect(none.acceptAt).toBeNull();
+    expect(none.remediationsPerRound).toBeNull();
     expect(none.blockingSeverities).toEqual([]);
     expect(gateRows(null, null)).toEqual([]);
     expect(dimensionRows(null, null)).toEqual([]);

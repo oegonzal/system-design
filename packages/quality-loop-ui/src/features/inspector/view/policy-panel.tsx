@@ -23,6 +23,24 @@ import type { DimensionRow, GateRow, PolicyNumbers, ValidatorRow } from '../mode
 
 const pct = (value: number | null): string => (value === null ? '—' : `${value}`);
 
+/**
+ * The briefing cap in words — the rule the contract states, never a count:
+ * every validator note is handed whatever the cap, the worst of the rest fill
+ * up to it, and fewer go when fewer were selected. An undeclared cap means
+ * what the contract says it means — every selected remediation is handed —
+ * but only once there is a policy to read it off: `version` is required on
+ * one, so it is null exactly when there is none, and the row then reads like
+ * its neighbours.
+ */
+const briefing = (numbers: PolicyNumbers): string => {
+  if (numbers.remediationsPerRound !== null) {
+    return `every validator note, then the worst of the rest up to ${numbers.remediationsPerRound} selected remediations in all, handed to the producer per revise or retry`;
+  }
+  return numbers.version === null
+    ? '—'
+    : 'every selected remediation handed to the producer per revise or retry';
+};
+
 export interface PolicyPanelProps {
   numbers: PolicyNumbers;
   gates: readonly GateRow[];
@@ -108,6 +126,10 @@ export function PolicyPanel({
                   {pct(numbers.plateauAfter)} without progress · {pct(numbers.concurrency)} lenses
                   at once
                 </td>
+              </tr>
+              <tr>
+                <th scope="row">Briefing</th>
+                <td>{briefing(numbers)}</td>
               </tr>
             </tbody>
           </Table>

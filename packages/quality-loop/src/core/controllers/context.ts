@@ -272,8 +272,22 @@ const validatorRemediations = (ledger: EvidenceLedger): Remediation[] =>
 
 const subjectKey = (remediation: Remediation): string => Object.values(remediation.subject)[0];
 
+/**
+ * Within one severity, the subject the producer can act on first: a
+ * validator's refusal, a located finding, a criterion's shortfall, a refused
+ * reply's path. A capped briefing hears the subject it can act on first —
+ * digits sort before letters, so a `cN` criterion key would otherwise precede
+ * most `type|ref` finding keys (every type from `c…` on) and a capped round
+ * would fill with criterion shortfalls before the located defects.
+ */
+const SUBJECT_RANK = ['validator', 'finding', 'criterion', 'schema'] as const;
+
+const subjectRank = (remediation: Remediation): number =>
+  (SUBJECT_RANK as readonly string[]).indexOf(Object.keys(remediation.subject)[0]);
+
 const worstFirst = (a: Remediation, b: Remediation): number =>
   severityRank(a.severity) - severityRank(b.severity) ||
+  subjectRank(a) - subjectRank(b) ||
   compareStrings(subjectKey(a), subjectKey(b));
 
 /** Everything the producer could act on, worst first. Pricing and fixing are different questions. */

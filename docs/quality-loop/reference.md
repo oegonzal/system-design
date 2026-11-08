@@ -104,19 +104,20 @@ Nothing outside a pipeline folder may import a concrete pipeline — the registr
 model-facing stage with a persona and a token cap, every criterion kind judged by exactly one
 evaluator, no evaluator consuming findings with no critic before it, under `cited` corroboration no
 evaluator of a gating kind reading the critics first (`checkCorroboration`), every carried part a
-key the output schema declares, a valid controller
+key the output schema declares, a declared revise shape with an ask and a change schema a strict
+endpoint accepts (`checkRevise`), a valid controller
 projection, and the output schema convertible to JSON Schema. `Controller.decide`
 is synchronous by contract, which is how "the controller never awaits a model" is held by the type
 rather than by review.
 
 ### `core/contracts/` — the vocabulary of a task
 
-| File              | What it does                                                             | Exports                                                                                                     |
-| ----------------- | ------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- |
-| `task.ts`         | The pipeline's code half: parse, address and render an artifact.         | `OutputShape`, `TaskSpec`, `TaskContract`                                                                   |
-| `output-shape.ts` | The layout habits every output shape shares.                             | `numbered`, `section`, `numberedSection`                                                                    |
-| `validation.ts`   | The shape of an exact check a pipeline brings: `block`, `cut` or `warn`. | `indexedValidator`, `asWarning`, `IndexedRule`, `problem`, `REFERENCES_VALIDATOR_ID`, `LIMITS_VALIDATOR_ID` |
-| `run-record.ts`   | One run as the service holds it, and as the wire sees it.                | `RunRecord`, `toRunDto`, `summariseExchange`                                                                |
+| File              | What it does                                                                                 | Exports                                                                                                                                                        |
+| ----------------- | -------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `task.ts`         | The pipeline's code half: parse, address, render — and, when declared, revise — an artifact. | `OutputShape`, `ReviseShape`, `FixedCriterion`, `TaskSpec`, `criterionLengthBound`, `providedStatementLimit`, `overlongCriteria`, `carryParts`, `TaskContract` |
+| `output-shape.ts` | The layout habits every output shape shares.                                                 | `numbered`, `section`, `numberedSection`                                                                                                                       |
+| `validation.ts`   | The shape of an exact check a pipeline brings: `block`, `cut` or `warn`.                     | `indexedValidator`, `asWarning`, `IndexedRule`, `problem`, `REFERENCES_VALIDATOR_ID`, `LIMITS_VALIDATOR_ID`                                                    |
+| `run-record.ts`   | One run as the service holds it, and as the wire sees it.                                    | `RunRecord`, `toRunDto`, `summariseExchange`                                                                                                                   |
 
 A validator reads the fenced index — the codec is `goal-index.ts` in `@sysdesign/contracts`, shared with every
 composer — never prose, and reports nothing on a malformed artifact — the schema validator owns that report. No model reads the index: `goalSection` in `core/stages/prompting.ts`
@@ -152,19 +153,21 @@ a decision.
 
 ### `core/loop/` — the iteration engine
 
-| File              | What it does                                                                          | Exports                                                              |
-| ----------------- | ------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
-| `run-pipeline.ts` | The loop: produce or adopt, validate, judge, normalise, decide, repeat.               | `runPipeline`, `runLoop`, `RunInput`, `RunDeps`, `IterationListener` |
-| `iteration.ts`    | One iteration as named steps: produce or adopt, validate, judge, decide.              | `runIteration`                                                       |
-| `briefing.ts`     | What the next ask is told about the attempt before: refusals and setbacks.            | `refusalsOf`, `setbacksOf`, `lostProduce`, `wasBlocked`              |
-| `waves.ts`        | The critics, then any evaluator that consumes their findings; the normaliser between. | `runLensWaves`, `Judged`                                             |
-| `materialize.ts`  | Definition plus model client becomes concrete stages.                                 | `materialize`, `materializeCriteria`                                 |
-| `rubric.ts`       | Checks a supplied rubric could have been derived, before any row.                     | `rubricProblems`                                                     |
-| `scoped-llm.ts`   | The recording twin of the model client, plus bounded concurrency.                     | `scopeLlm`, `mapConcurrent`                                          |
+| File              | What it does                                                                                                                             | Exports                                                              |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| `run-pipeline.ts` | The loop: produce or adopt, validate, judge, normalise, decide, repeat.                                                                  | `runPipeline`, `runLoop`, `RunInput`, `RunDeps`, `IterationListener` |
+| `iteration.ts`    | One iteration as named steps: produce or adopt, validate, judge, decide.                                                                 | `runIteration`                                                       |
+| `briefing.ts`     | What the next ask is told about the attempt before — refusals and setbacks — and which remediations it is handed under the policy's cap. | `refusalsOf`, `setbacksOf`, `lostProduce`, `briefedRemediations`     |
+| `waves.ts`        | The critics, then any evaluator that consumes their findings; the normaliser between.                                                    | `runLensWaves`, `Judged`                                             |
+| `materialize.ts`  | Definition plus model client becomes concrete stages.                                                                                    | `materialize`, `materializeCriteria`                                 |
+| `rubric.ts`       | Checks a supplied rubric could have been derived, before any row.                                                                        | `rubricProblems`                                                     |
+| `scoped-llm.ts`   | The recording twin of the model client, plus bounded concurrency.                                                                        | `scopeLlm`, `mapConcurrent`                                          |
 
 A new iteration has to be strictly better to be crowned. An adopted iteration is cloned and runs no
 stage. The output shape's `normalize` is applied only to a produced artifact, never to a supplied
-one. How a host hooks into the loop — `RunDeps.onIteration` and the exchange sink, the recorder,
+one; a revise under a declared revise shape is a whole artifact by then — the producer asks for a
+change and returns `revise.apply(best, change)` — so `normalize` and every validator read whole
+artifacts. How a host hooks into the loop — `RunDeps.onIteration` and the exchange sink, the recorder,
 heartbeat and janitor around them, and where the bus events are — is walked in
 [`lifecycle-and-hooks.md`](lifecycle-and-hooks.md).
 
@@ -184,16 +187,16 @@ on a pipeline.
 
 ### `core/stages/` — the only folder that talks to a model
 
-| File                  | What it does                                                  | Exports                                                                                                                                                                                                 |
-| --------------------- | ------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `shared.ts`           | Stage names, diagnostics, one sample per scoped client.       | `CRITERIA_STAGE`, `PRODUCER_STAGE`, `LENSES_STAGE`, `REFOUND_STAGE`, `diagnostic`, `stageDiagnostic`, `failedDiagnostic`, `overrunDiagnostic`, `skipped`, `sampleUnits`, `planned`                      |
-| `prompting.ts`        | The engine's half of every prompt, section by section.        | `systemPrompt`, `goalSection`, `kindsSection`, `typesSection`, `criteriaSection`, `artifactSection`, `locationsSection`, `validationSection`, `remediationsSection`, `upstreamSections`, `joinSections` |
-| `schemas.ts`          | The only zod a model sees, built per request over real ids.   | `criteriaSchema`, `findingsSchema`, `evaluationSchema`, `enumTuple`                                                                                                                                     |
-| `derive-criteria.ts`  | One structured extraction of criteria from the goal.          | `createCriteriaDeriver`                                                                                                                                                                                 |
-| `llm-producer.ts`     | The generator. Sees criteria and remediations, never a score. | `createLlmProducer`                                                                                                                                                                                     |
-| `llm-critic.ts`       | The defect-oriented lens, enum-locked.                        | `createLlmCritic`                                                                                                                                                                                       |
-| `llm-evaluator.ts`    | The criteria-oriented lens.                                   | `createLlmEvaluator`                                                                                                                                                                                    |
-| `schema-validator.ts` | The one validator every pipeline runs first.                  | `createSchemaValidator`                                                                                                                                                                                 |
+| File                  | What it does                                                                                                                                                                                        | Exports                                                                                                                                                                                                 |
+| --------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `shared.ts`           | Stage names, diagnostics, one sample per scoped client.                                                                                                                                             | `CRITERIA_STAGE`, `PRODUCER_STAGE`, `LENSES_STAGE`, `REFOUND_STAGE`, `diagnostic`, `stageDiagnostic`, `failedDiagnostic`, `overrunDiagnostic`, `skipped`, `sampleUnits`, `planned`                      |
+| `prompting.ts`        | The engine's half of every prompt, section by section.                                                                                                                                              | `systemPrompt`, `goalSection`, `kindsSection`, `typesSection`, `criteriaSection`, `artifactSection`, `locationsSection`, `validationSection`, `remediationsSection`, `upstreamSections`, `joinSections` |
+| `schemas.ts`          | The only zod a model sees, built per request over real ids.                                                                                                                                         | `criteriaSchema`, `findingsSchema`, `evaluationSchema`, `enumTuple`                                                                                                                                     |
+| `derive-criteria.ts`  | One structured extraction of criteria from the goal.                                                                                                                                                | `createCriteriaDeriver`                                                                                                                                                                                 |
+| `llm-producer.ts`     | The generator. Sees criteria and the remediations it is briefed with, never a score; asks for the whole artifact, or on a revise under a declared revise shape for a change it applies to the best. | `createLlmProducer`                                                                                                                                                                                     |
+| `llm-critic.ts`       | The defect-oriented lens, enum-locked.                                                                                                                                                              | `createLlmCritic`                                                                                                                                                                                       |
+| `llm-evaluator.ts`    | The criteria-oriented lens.                                                                                                                                                                         | `createLlmEvaluator`                                                                                                                                                                                    |
+| `schema-validator.ts` | The one validator every pipeline runs first.                                                                                                                                                        | `createSchemaValidator`                                                                                                                                                                                 |
 
 The goal reaches the model through `goalSection` and nowhere else. A failed completion becomes a
 diagnostic, never evidence.

@@ -121,7 +121,10 @@ maxIterations: 1 })`. A loop that refuses rolls the transaction back.
 
 Inside the run, the canvas pipeline's `references` validator repeats the
 studio's three checks, so what the studio refuses and what the loop blocks
-cannot differ. A produced artifact — the coach's — passes the output shape's
+cannot differ. A produced artifact — the coach's — is a change set against the
+best, applied by `applyCanvasChange` (upserts by id in place, removals with the
+node→edge cascade, positional lists replaced whole; the change set is the revise
+shape the pipeline's output declares), and then passes the output shape's
 `normalize` before any validator: `repairSubmission` drops the bindings and
 narrations that name nothing on the graph, so a fan-out never blocks on a
 stale reference; a provided artifact is never repaired. When an iteration is
@@ -152,8 +155,14 @@ of two ways, both under the session lock and the same guards as a submit:
 
 From iteration 2 on the loop's producer — the canvas pipeline's coach
 persona, briefed with the criteria ids so it can bind an unbound one —
-revises against the remediations the controller selected, keeping every
-author id and prefixing what it adds with `ai-`. Reading the run
+revises against the remediations the controller selected (the twelve worst a
+round, validator notes first, under the pipeline's
+`briefing.remediationsPerRound`; the record keeps the whole list), answering
+with a change set against the best rather than a redraw — the elements it adds
+or rewrites whole by id, the ids it removes, the lists it rewrites as they
+should read — keeping every author id and prefixing what it adds with `ai-`;
+why a change set, measured, is in `docs/quality-loop/orchestrators.md` under
+"Is the coach applying the fixes?". Reading the run
 (`GET /sessions/:id/improve/:runId`) resolves it through the `coaching_run`
 row (an adopting run has no revision at `(runId, 1)`) and imports every
 iteration whose score beat all before it as an `assistant` revision

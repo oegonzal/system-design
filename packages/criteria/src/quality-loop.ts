@@ -420,4 +420,14 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
     statement:
       'Every settled run answers its readout on its read (`GET /runs/:id`): whether its best iteration is admitted at the bar the run was held to — the one it asked for, else its pipeline’s — and the locations of its best artifact a reader withholds, each with what withheld it, both read by the loop off engine facts and the pipeline’s own declarations; the readout is null while the run is running, when it recorded no iteration and when its pipeline is no longer registered, so a caller routes by the readout and recomputes neither; the loop clients and the fake answer the same contract.',
   },
+  {
+    id: 'QL-84',
+    statement:
+      'A task may declare a revise shape — the schema of a change against the artifact shown, the ask in its own words, and a pure application of the change to the best — and every revise of a prior asks in that shape and judges and stores `apply(prior, change)`; initial and retry are unaffected; boot refuses an empty ask or a change schema a strict endpoint would refuse.',
+  },
+  {
+    id: 'QL-85',
+    statement:
+      'A policy may cap the remediations a revise or retry is briefed with (`briefing.remediationsPerRound`): every validator note is handed, then the worst of the rest up to the cap in the controller’s order, the prompt names how many of how many when any were kept back, and the decision, the record and every reader keep the whole list; absent, every selected remediation is handed.',
+  },
 ];
