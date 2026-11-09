@@ -1,9 +1,10 @@
+import { appliedGraph } from './canvas-change.graph';
+import { appliedIndexed, appliedKeyed } from './canvas-change.lists';
+import { resolveChangeAddresses } from './canvas-change.resolve';
 import type { CanvasChange } from './canvas-change.schema';
 import {
   DESIGN_BRIEF_VERSION,
   NARRATION_VERSION,
-  type CanvasGraph,
-  type CanvasNode,
   type DesignBrief,
   type DesignNarrative,
   type DesignSubmission,
@@ -14,29 +15,30 @@ import { DESIGN_MODEL_VERSION, type DesignModel } from './model.schema';
  * The best revision with a change set applied: what the loop stores and
  * judges after a revise, so the lenses, the studio and the record never see
  * a change set. Pure and total over a parsed change — it never throws,
- * invents or repairs.
+ * invents or refuses; a coach's slip costs the slip, never the round.
  *
- * Per keyed list, in order: upserts — a known key replaces its item IN
- * PLACE, so the positional ids of untouched elements keep their numbers and
- * last round's citations still land; a new key is appended; a later upsert
- * for one key wins — then removals by key, then the cascade: every edge
- * touching a removed node goes with it, as the studio's `removeElements`
- * drops them, an edge this change set added included. A removal naming
- * nothing on the canvas is a no-op.
+ * In order: every address is resolved against the best
+ * (`canvas-change.resolve.ts`: `node.14` is the 14th node's id); each keyed
+ * list is edited by key and each indexed list by position
+ * (`canvas-change.lists.ts`: in place, so untouched elements keep their
+ * numbers and last round's citations still land); and the graph is wired
+ * (`canvas-change.graph.ts`: the node→edge cascade, a dangling edge or a
+ * self-loop dropped, an undeclared carry dropped from its edge, a repeated
+ * hop read as the kept edge it repeats).
  *
  * A container appears only when the change touches it — a brief for a first
  * binding, a narrative for a first overview, a model for a first entity —
  * with its version literal; a change touching no part of the model leaves
- * `model` exactly as the best had it, absent included. A positional list is
- * replaced whole when named and the overview set when named, an empty value
- * clearing either. What a removal leaves dangling — a binding naming a
- * removed node, a relation to a removed entity — is `repairSubmission`'s to
- * drop, as it drops the editor's; a fault of the graph itself stays for the
- * `references` validator to refuse. The transcript is the studio's, copied
- * from the best.
+ * `model` exactly as the best had it, absent included. Relations, which the
+ * render numbers nowhere, are replaced whole when named; the overview is set
+ * when named; an empty value clears either, and a decisions or assumptions
+ * list edited down to nothing goes the same way. What a removal leaves
+ * dangling elsewhere — a binding naming a removed node, a relation to a
+ * removed entity — is `repairSubmission`'s to drop, as it drops the editor's.
+ * The transcript is the studio's, copied from the best.
  */
 export function applyCanvasChange(best: DesignSubmission, change: CanvasChange): DesignSubmission {
-  const { changes } = change;
+  const { changes } = resolveChangeAddresses(best, change);
   const model = appliedModel(best.model, changes);
   return {
     graph: appliedGraph(best.graph, changes),
@@ -49,56 +51,7 @@ export function applyCanvasChange(best: DesignSubmission, change: CanvasChange):
 
 type Changes = CanvasChange['changes'];
 
-/** What a keyed list is changed by: items to add or rewrite, and keys to remove. */
-interface KeyedChanges<Item> {
-  upsert: readonly Item[];
-  remove: readonly string[];
-}
-
 const byId = (item: { id: string }): string => item.id;
-
-/** A keyed list after its changes: known keys replaced in place, new keys appended, a later upsert for one key winning, then the removals. */
-function appliedKeyed<Item>(
-  items: Item[],
-  changes: KeyedChanges<Item> | undefined,
-  keyOf: (item: Item) => string,
-): Item[] {
-  if (changes === undefined) return items;
-  const next = [...items];
-  const indexByKey = new Map(next.map((item, index) => [keyOf(item), index]));
-  for (const item of changes.upsert) {
-    const index = indexByKey.get(keyOf(item));
-    if (index === undefined) indexByKey.set(keyOf(item), next.push(item) - 1);
-    else next[index] = item;
-  }
-  const removed = new Set(changes.remove);
-  return next.filter((item) => !removed.has(keyOf(item)));
-}
-
-/** A node rewritten without a position keeps the one the best had for its id: the coach may omit it, and the studio laid the node out already. */
-function placedAsBest(nodes: readonly CanvasNode[], node: CanvasNode): CanvasNode {
-  if (node.position !== undefined) return node;
-  const position = nodes.find((placed) => placed.id === node.id)?.position;
-  return position === undefined ? node : { ...node, position };
-}
-
-function appliedGraph(graph: CanvasGraph, { nodes, edges }: Changes): CanvasGraph {
-  if (nodes === undefined && edges === undefined) return graph;
-  const nodeChanges =
-    nodes === undefined
-      ? undefined
-      : {
-          upsert: nodes.upsert.map((node) => placedAsBest(graph.nodes, node)),
-          remove: nodes.remove,
-        };
-  const removedNodes = new Set(nodes?.remove ?? []);
-  return {
-    nodes: appliedKeyed(graph.nodes, nodeChanges, byId),
-    edges: appliedKeyed(graph.edges, edges, byId).filter(
-      (edge) => !removedNodes.has(edge.source) && !removedNodes.has(edge.target),
-    ),
-  };
-}
 
 function appliedBrief(brief: DesignBrief | null, { bindings }: Changes): DesignBrief | null {
   if (bindings === undefined) return brief;
@@ -150,19 +103,29 @@ function appliedNarrative(
     narrations,
     (narration) => narration.criterionId,
   );
-  // A part the change names reads as the change says; an empty value is the
-  // part removed, so the key goes rather than holding nothing.
+  // A part the change names reads as the change says; a part edited down to
+  // nothing is the part removed, so the key goes rather than holding nothing.
   if (overview !== undefined) {
     if (overview.length === 0) delete next.overview;
     else next.overview = overview;
   }
   if (decisions !== undefined) {
-    if (decisions.replace.length === 0) delete next.decisions;
-    else next.decisions = decisions.replace;
+    const kept = appliedIndexed(next.decisions ?? [], {
+      upsertAt: decisions.upsertAt.map(({ at, decision }) => ({ at, item: decision })),
+      removeAt: decisions.removeAt,
+      append: decisions.append,
+    });
+    if (kept.length === 0) delete next.decisions;
+    else next.decisions = kept;
   }
   if (assumptions !== undefined) {
-    if (assumptions.replace.length === 0) delete next.assumptions;
-    else next.assumptions = assumptions.replace;
+    const kept = appliedIndexed(next.assumptions ?? [], {
+      upsertAt: assumptions.upsertAt.map(({ at, text }) => ({ at, item: text })),
+      removeAt: assumptions.removeAt,
+      append: assumptions.append,
+    });
+    if (kept.length === 0) delete next.assumptions;
+    else next.assumptions = kept;
   }
   return next;
 }

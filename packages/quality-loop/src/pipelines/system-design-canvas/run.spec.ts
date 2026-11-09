@@ -7,21 +7,26 @@ import {
   designSubmissionSchema,
   parseLenient,
   repairSubmission,
-  type Binding,
   type CanvasChange,
-  type CanvasEdge,
 } from '@sysdesign/contracts';
 
 import { runPipeline } from '../../core/loop/run-pipeline';
 import { fakeLlm, sequencedLlm } from '../../core/testing';
 import { SYSTEM_DESIGN_CANVAS } from './definition';
 import {
+  brokenChange,
   coachedChange,
+  positionalChange,
   sampleBrief,
   sampleCriteria,
   sampleModel,
   sampleNarrative,
   sampleSubmission,
+  sloppyChange,
+  stalenessDecision,
+  undeclaredCarryChange,
+  unrepairableChange,
+  withBindingUpserts,
 } from './testing';
 
 const GOAL = '# Serve an order history\n\nShoppers see their past orders; two sources feed them.';
@@ -179,50 +184,22 @@ const judges = [
 
 const canned = [...judges, coachedChange()];
 
-/** The change with bindings the coach also rewrote — whole, by criterion id; a later entry for one criterion wins. */
-const withBindingUpserts = (change: CanvasChange, upsert: Binding[]): CanvasChange => ({
-  changes: {
-    ...change.changes,
-    bindings: {
-      upsert: [...(change.changes.bindings?.upsert ?? []), ...upsert],
-      remove: change.changes.bindings?.remove ?? [],
-    },
-  },
-});
+/** The round a change set makes against the sample: the second iteration of a two-round run, every judge answering as above. */
+const revisedBy = async (change: CanvasChange) =>
+  (
+    await runPipeline(
+      SYSTEM_DESIGN_CANVAS,
+      { goal: GOAL, output: sampleSubmission(), criteria: sampleCriteria(), maxIterations: 2 },
+      { llm: fakeLlm(...judges, change), sink: () => undefined, now: () => 0 },
+    )
+  ).iterations[1];
 
-/** What a coach might return: a criterion it invented, one bound criterion rewritten twice in the same change set, and a path that fans out. */
-const sloppyChange = (): CanvasChange => {
-  const [c1, c2] = sampleBrief().bindings;
-  return withBindingUpserts(coachedChange(), [
-    // edge-1 does not start where edge-9 ends: a fan-out tacked onto the walk.
-    { ...c2, path: [...(c2.path ?? []), 'edge-1'] },
-    { criterionId: 'c99', nodeIds: ['service-1'], claim: 'a criterion the rubric never listed' },
-    // Each rewrite replaces the author's c1 binding in place, so the later one
-    // is the binding and nothing is bound twice.
-    { ...c1, claim: 'the earlier rewrite' },
-    { ...c1, claim: 'the later rewrite, which wins' },
-  ]);
-};
-
-/** A coach change the repair cannot save: an edge to a node that is not drawn. */
-const brokenChange = (): CanvasChange => {
-  const coached = coachedChange();
-  const dangling: CanvasEdge = {
-    id: 'ai-edge-9',
-    source: 'service-1',
-    target: 'nowhere',
-    kind: 'sync',
-  };
-  return {
-    changes: {
-      ...coached.changes,
-      edges: {
-        upsert: [...(coached.changes.edges?.upsert ?? []), dangling],
-        remove: coached.changes.edges?.remove ?? [],
-      },
-    },
-  };
-};
+/** What one validator said of an iteration's artifact, by message. */
+const problemsOf = (
+  iteration: { validation: { validatorId: string; problems: { message: string }[] }[] },
+  id: string,
+) =>
+  iteration.validation.find((report) => report.validatorId === id)?.problems.map((p) => p.message);
 
 describe('the system-design-canvas loop', () => {
   it('[QL-21] a provided canvas is judged in one iteration against the supplied rubric, and nothing is derived', async () => {
@@ -382,33 +359,14 @@ describe('the system-design-canvas loop', () => {
     ).toEqual([expect.objectContaining({ message: 'binding references unknown criterion: c99' })]);
   });
 
-  it('[QL-47] a coach revision with a claim past its ceiling is still repaired before judging, and one with an edge to nowhere still blocks', async () => {
+  it('[QL-47] a coach revision with a claim past its ceiling is still repaired before judging, and one with an edge to nowhere is judged without that edge', async () => {
     // Past the ceiling and short of the cut: the seam keeps it whole, so the repair and `references` must read it whole too.
     const long = 'x'.repeat(BINDING_CLAIM_BOUND.ceiling + 105);
     /** The change with c1 rewritten whole, its claim past the ceiling. */
     const wordy = (change: CanvasChange): CanvasChange =>
       withBindingUpserts(change, [{ ...sampleBrief().bindings[0], claim: long }]);
-    const revise = async (change: CanvasChange) =>
-      (
-        await runPipeline(
-          SYSTEM_DESIGN_CANVAS,
-          { goal: GOAL, output: sampleSubmission(), criteria: sampleCriteria(), maxIterations: 2 },
-          {
-            llm: fakeLlm(...judges, change),
-            sink: () => undefined,
-            now: () => 0,
-          },
-        )
-      ).iterations[1];
-    const problemsOf = (
-      iteration: { validation: { validatorId: string; problems: { message: string }[] }[] },
-      id: string,
-    ) =>
-      iteration.validation
-        .find((report) => report.validatorId === id)
-        ?.problems.map((p) => p.message);
 
-    const repaired = await revise(wordy(sloppyChange()));
+    const repaired = await revisedBy(wordy(sloppyChange()));
     expect(problemsOf(repaired, 'references')).toEqual([]);
     const bindings = repaired.artifact?.brief?.bindings ?? [];
     expect(bindings.map((binding) => binding.criterionId)).not.toContain('c99');
@@ -416,11 +374,37 @@ describe('the system-design-canvas loop', () => {
       expect.objectContaining({ claim: long }),
     ]);
 
-    const blocked = await revise(wordy(brokenChange()));
-    expect(problemsOf(blocked, 'references')).toEqual([
-      'edge ai-edge-9 references unknown target node: nowhere',
+    // The wiring drops the edge to nowhere; what is judged holds the rest of the change.
+    const wired = await revisedBy(wordy(brokenChange()));
+    expect(problemsOf(wired, 'references')).toEqual([]);
+    expect(wired.decision.reason).not.toContain('blocked');
+    const edgeIds = wired.artifact?.graph.edges.map((edge) => edge.id) ?? [];
+    expect(edgeIds).not.toContain('ai-edge-9');
+    expect(edgeIds).toEqual(expect.arrayContaining(['ai-edge-1', 'ai-edge-2']));
+  });
+
+  it('[QL-84] a coach may address the canvas by the positions the render printed — resolved to the author’s ids before judging — and a carry nothing declares is dropped rather than refused', async () => {
+    const byPosition = await revisedBy(positionalChange());
+    expect(problemsOf(byPosition, 'references')).toEqual([]);
+    expect(byPosition.decision.reason).not.toContain('blocked');
+    const applied = byPosition.artifact;
+    if (applied === null) throw new Error('the coach must answer');
+    // `node.11` and `node.3` were resolved against the best: the stored edges name the author's ids.
+    expect(applied.graph.edges.filter((edge) => edge.id.startsWith('ai-'))).toEqual(
+      coachedChange().changes.edges?.upsert,
+    );
+    // The first decision was changed at its position; the rest of the narrative is the author's.
+    expect(applied.narrative?.decisions).toEqual([stalenessDecision()]);
+    expect({ ...applied.narrative, decisions: sampleNarrative().decisions }).toEqual(
+      sampleNarrative(),
+    );
+
+    const carried = await revisedBy(undeclaredCarryChange());
+    expect(problemsOf(carried, 'references')).toEqual([]);
+    expect(carried.decision.reason).not.toContain('blocked');
+    expect(carried.artifact?.graph.edges.find((edge) => edge.id === 'ai-edge-2')?.carries).toEqual([
+      'listOrders',
     ]);
-    expect(blocked.decision.reason).toContain('blocked by validator(s) references');
   });
 
   it('[QL-25] after a revision `references` refused, the coach is told why before it revises again', async () => {
@@ -429,7 +413,7 @@ describe('the system-design-canvas loop', () => {
       SYSTEM_DESIGN_CANVAS,
       { goal: GOAL, output: sampleSubmission(), criteria: sampleCriteria(), maxIterations: 3 },
       {
-        llm: sequencedLlm(...judges, brokenChange(), coachedChange()),
+        llm: sequencedLlm(...judges, unrepairableChange(), coachedChange()),
         sink: (exchange) => exchanges.push(exchange),
         now: () => 0,
       },
@@ -440,6 +424,9 @@ describe('the system-design-canvas loop', () => {
       'revise',
       'revise',
     ]);
+    expect(problemsOf(trace.iterations[1], 'references')).toEqual([
+      'node ai-replica-1 declares duplicate operation name: readOrders',
+    ]);
     expect(trace.iterations[1].decision.reason).toContain('blocked by validator(s) references');
     expect(trace.iterations[2].validation.every((report) => report.problems.length === 0)).toBe(
       true,
@@ -448,6 +435,6 @@ describe('the system-design-canvas loop', () => {
     expect(briefings).toHaveLength(2);
     expect(briefings[0].user).not.toContain('refused before any judge');
     expect(briefings[1].user).toContain('refused before any judge');
-    expect(briefings[1].user).toContain('nowhere');
+    expect(briefings[1].user).toContain('declares duplicate operation name: readOrders');
   });
 });

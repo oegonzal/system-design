@@ -14,6 +14,22 @@
  * had named, 22–31 of 34 bindings were rewritten a round, and the reasoning
  * dimension swung 90 → 50 as the parts nobody criticised were re-rolled.
  *
+ * Measured 2026-11-08 on the first change-set rounds (arm C, lane run
+ * 2026-11-08T22-48-49-342-e4eb2d), which failed on how the change set
+ * ADDRESSED the canvas, not on its size: the coach copied the render's
+ * positional refs as ids — edges from `node.14` to `node.38`, nodes whose id
+ * was `node.5` — so the applied canvas carried phantom nodes connected to
+ * nothing and an edge whose carry neither endpoint declared, and
+ * `references` blocked the round (score 0); it replaced all 20 decisions
+ * whole in both rounds, 3 of 20 identical to the best, and the reasoning
+ * dimension fell 60 → 40 as the narrative was re-rolled; and it appended an
+ * edge repeating one already drawn instead of rewriting that edge by its
+ * id. So the instruction below says how an existing element is addressed —
+ * by the author's id, or by the position the render printed, which the
+ * contract resolves against the best — and that a decision or an assumption
+ * is changed one at a time by its position (`canvasChangeSchema`,
+ * `applyCanvasChange`).
+ *
  * Location ids are positional (`node.3`, `binding.1`), never the author's own
  * canvas ids: a lens may cite only what the render printed, and the render
  * prints the author's id beside every positional one so a reader can join
@@ -226,8 +242,11 @@ export const canvasOutput: OutputShape<CanvasSubmission, CanvasChange> = {
    * A coach revision is repaired the way the editor repairs a draft — a
    * binding to a criterion the rubric never listed, a duplicate, a broken
    * path are dropped, not refused — before `references` reads it. The graph
-   * is never touched: an edge to nowhere stays a refusal. The studio stores
-   * what was judged and repairs nothing. The revision is read as the seam
+   * is never touched here: what the change set's wiring left (the
+   * contract's `applyCanvasChange` drops an edge to nowhere, a self-loop and
+   * a carry nothing declares) is what `references` reads, so a graph fault
+   * that survives it — a node declaring one operation twice — stays a
+   * refusal. The studio stores what was judged and repairs nothing. The revision is read as the seam
    * read it, so a claim past its size is no reason to skip the repair; a
    * value with a structural fault is returned as it came, for the schema
    * validator to report.
@@ -340,6 +359,6 @@ export const canvasOutput: OutputShape<CanvasSubmission, CanvasChange> = {
     schema: canvasChangeSchema,
     apply: applyCanvasChange,
     instruction:
-      'Return only a change set against the artifact above: the nodes, edges, entities, bindings, rationales and narrations you add or rewrite — whole, by their ids — the ids you remove, and the decisions, assumptions, model relations or overview as they should read when you rewrite them. Apply every listed remediation. Everything you do not name stays exactly as it is.',
+      "Return only a change set against the artifact above. Address an existing node, edge or entity by the author's id (n-3, e-14, ai-…) or by the position shown ([node.14] is the 14th node); give anything new an id starting with ai-. Rewrite an element whole when you change it; remove by id or position; change a decision or an assumption by its position and leave every other one untouched; rewrite the model's relations as a whole list only when a remediation names them. Apply every listed remediation and nothing else. Everything you do not name stays exactly as it is.",
   },
 };

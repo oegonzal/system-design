@@ -232,11 +232,23 @@ describe('designSubmissionSchema', () => {
     // 4's redraws are in the window: a re-measure over change-set runs alone
     // would leave them unmeasured, so the next window must hold both.
     const unrecorded =
-      "no change set has been recorded yet — the coach's first change sets are measured in the first recorded change sets (none as of 2026-11-08); this exemption is derived from the paths the fixture lacks, so each path is held automatically the day the fixture measures it, with no edit here";
+      'no change set is measured in the fixture yet — the first change-set rounds ran 2026-11-08 (arm C, lane run 2026-11-08T22-48-49-342-e4eb2d) and are not in `measured/canvas.json`; this exemption is derived from the paths the fixture lacks, so each path is held automatically the day the fixture measures it, with no edit here';
     const unmeasuredChangePaths = Object.keys(declaredSizes(canvasChangeSchema)).filter(
       (path) => !Object.hasOwn(measured.fields, path),
     );
     expect(unmeasuredChangePaths.every((path) => path.startsWith('changes.'))).toBe(true);
+    // The index-addressed lists (2026-11-08) joined the schema under the same
+    // derivation: their paths are exempt from the day they were declared.
+    expect(unmeasuredChangePaths).toEqual(
+      expect.arrayContaining([
+        'changes.decisions.upsertAt',
+        'changes.decisions.upsertAt[].decision.choice',
+        'changes.decisions.removeAt',
+        'changes.decisions.append',
+        'changes.assumptions.upsertAt[].text',
+        'changes.assumptions.append[]',
+      ]),
+    );
     expect(
       boundsAgainstMeasured([designSubmissionSchema, canvasChangeSchema], measured.fields, {
         exempt: {
@@ -291,13 +303,21 @@ describe('designSubmissionSchema', () => {
       }
     }
     // The change set's own: what a change leaves alone, what goes with a
-    // removal, which of two entries for one key stands, and what a replaced
-    // list must carry.
+    // removal, which of two entries for one key stands, what a replaced
+    // list must carry — and, since the first change-set rounds (2026-11-08),
+    // how an element is addressed, what the applied graph does with a
+    // reference slip, and how a decision is changed by its position.
     for (const rule of [
       'Everything you do not name stays exactly as it is.',
       'every edge touching a removed node goes with it',
       'a later entry for the same criterion wins',
       'include every one you keep',
+      "Address a node by the author's id (n-3, ai-…) or by the position the artifact above shows ([node.14] means the 14th node); a new node must carry a new id starting with ai-.",
+      "Address an edge by the author's id (e-3, ai-…) or by the position the artifact above shows ([edge.14] means the 14th edge); a new edge must carry a new id starting with ai-.",
+      'An edge whose endpoint does not exist, or a carried operation no endpoint declares, is dropped; so is an edge joining a node to itself. A new edge that repeats an existing source → target of the same kind replaces that edge and keeps its id, unless this change set removes that edge; an existing edge you rewire by its own id stays its own edge, even beside one it then repeats.',
+      'Change one decision by its position; untouched decisions stay exactly as they are. Only replace what a remediation names.',
+      'Change one assumption by its position; untouched assumptions stay exactly as they are. Only replace what a remediation names.',
+      'The 1-based position in the artifact above: [decision.N] is N.',
     ]) {
       expect(schemas['change set'], `the change set never tells the coach: ${rule}`).toContain(
         rule,

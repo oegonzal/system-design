@@ -73,9 +73,10 @@ describe('the system-design-canvas pipeline', () => {
     // the call's time limit. The coach's reply is the contract's change set
     // (`canvasChangeSchema`), written in the submission's own element
     // schemas: the submission's fields are measured and held in
-    // `canvas.schema.spec.ts`, and the change set's own paths, which no
-    // recorded reply has written yet, are exempt there until the first recorded
-    // change sets measure them (none as of 2026-11-08).
+    // `canvas.schema.spec.ts`, and the change set's own paths are exempt
+    // there until recorded change sets are measured into it — the first were
+    // recorded 2026-11-08 (arm C, lane run 2026-11-08T22-48-49-342-e4eb2d)
+    // and `measure:bounds` has not read them yet.
     expect(
       capsAgainstMeasured(SYSTEM_DESIGN_CANVAS, measured.caps, {
         exempt: {

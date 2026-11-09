@@ -305,11 +305,13 @@ export const CANVAS_EDGES_BOUND = bound(300, 'list');
  * nodes and 12–42 edges, and removed 0–4. Generous past that on purpose: a
  * list past its ceiling is trimmed by whole items, and an item trimmed here
  * is a remediation that never reaches the artifact. `canvas.schema.spec.ts`
- * holds these to nothing until the first recorded change sets (none as of 2026-11-08).
+ * holds these to nothing until the fixture measures a change set: the first
+ * change-set rounds ran 2026-11-08 (arm C, lane run
+ * 2026-11-08T22-48-49-342-e4eb2d) and are not in `measured/canvas.json` yet.
  */
 export const CHANGE_NODE_UPSERTS_BOUND = bound(24, 'list');
 export const CHANGE_EDGE_UPSERTS_BOUND = bound(48, 'list');
-/** One bound for the node removals and the edge removals of a change set. */
+/** One bound for every removal list of a change set: nodes and edges removed by id, decisions and assumptions removed by position (`removeAt`). */
 export const CHANGE_REMOVALS_BOUND = bound(24, 'list');
 export const CANVAS_ID_MAX_LENGTH = 64;
 export const NODE_LABEL_BOUND = bound(80);

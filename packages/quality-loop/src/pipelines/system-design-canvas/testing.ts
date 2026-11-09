@@ -6,11 +6,17 @@
  * point-of-sale system polled on a schedule, an owned read model behind a
  * queue and an idempotent indexer (`testing.graph.ts` holds the diagram).
  * `sampleCriteria` is the rubric it answers, and `coachedChange` the change
- * set a coach might return against it — what the loop applies to the best.
+ * set a coach might return against it — what the loop applies to the best —
+ * with the variants the loop specs apply beside it: sloppy, broken,
+ * addressed by position, carrying what nothing declares.
  */
 import type {
+  Binding,
   CanvasChange,
+  CanvasEdge,
+  CanvasNode,
   DesignBrief,
+  DesignDecision,
   DesignModel,
   DesignNarrative,
   SuccessCriterion,
@@ -125,6 +131,16 @@ export const sampleBrief = (): DesignBrief => ({
   ],
 });
 
+/** The one decision the sample records: the read model, defended against querying both sources live. */
+const readModelDecision = (): DesignDecision => ({
+  choice: 'Own a read model fed by both sources rather than query the storefront and the POS live.',
+  alternative: 'Query both sources on every request and merge.',
+  cost: 'Orders can lag their source by up to the batch interval; one more store to operate.',
+  reconsiderWhen:
+    'If both sources ever answer within the latency budget and never go down together.',
+  nodeIds: ['database-1', 'queue-1'],
+});
+
 export const sampleNarrative = (): DesignNarrative => ({
   version: 1,
   overview:
@@ -167,17 +183,7 @@ export const sampleNarrative = (): DesignNarrative => ({
       prose: 'No request path reaches the POS; the importer alone polls it.',
     },
   ],
-  decisions: [
-    {
-      choice:
-        'Own a read model fed by both sources rather than query the storefront and the POS live.',
-      alternative: 'Query both sources on every request and merge.',
-      cost: 'Orders can lag their source by up to the batch interval; one more store to operate.',
-      reconsiderWhen:
-        'If both sources ever answer within the latency budget and never go down together.',
-      nodeIds: ['database-1', 'queue-1'],
-    },
-  ],
+  decisions: [readModelDecision()],
   assumptions: ['A shopper reads only their own history; no cross-customer view is needed.'],
 });
 
@@ -217,6 +223,14 @@ export const sampleSubmission = (overrides: Partial<CanvasSubmission> = {}): Can
   ...overrides,
 });
 
+/** The read replica a coach adds to the sample, its id prefixed `ai-`. */
+const readReplica = (): CanvasNode => ({
+  id: 'ai-replica-1',
+  kind: 'replica',
+  label: 'History read replica',
+  config: [{ key: 'lagMs', value: 200 }],
+});
+
 /**
  * The change set a coach might return against the sample: a read replica —
  * one node and the two edges that wire it, every id prefixed `ai-` — and
@@ -224,17 +238,7 @@ export const sampleSubmission = (overrides: Partial<CanvasSubmission> = {}): Can
  */
 export const coachedChange = (): CanvasChange => ({
   changes: {
-    nodes: {
-      upsert: [
-        {
-          id: 'ai-replica-1',
-          kind: 'replica',
-          label: 'History read replica',
-          config: [{ key: 'lagMs', value: 200 }],
-        },
-      ],
-      remove: [],
-    },
+    nodes: { upsert: [readReplica()], remove: [] },
     edges: {
       upsert: [
         { id: 'ai-edge-1', source: 'database-1', target: 'ai-replica-1', kind: 'async' },
@@ -250,3 +254,115 @@ export const coachedChange = (): CanvasChange => ({
     },
   },
 });
+
+/** The change with bindings the coach also rewrote — whole, by criterion id; a later entry for one criterion wins. */
+export const withBindingUpserts = (change: CanvasChange, upsert: Binding[]): CanvasChange => ({
+  changes: {
+    ...change.changes,
+    bindings: {
+      upsert: [...(change.changes.bindings?.upsert ?? []), ...upsert],
+      remove: change.changes.bindings?.remove ?? [],
+    },
+  },
+});
+
+/** What a coach might return: a criterion it invented, one bound criterion rewritten twice in the same change set, and a path that fans out. */
+export const sloppyChange = (): CanvasChange => {
+  const [c1, c2] = sampleBrief().bindings;
+  return withBindingUpserts(coachedChange(), [
+    // edge-1 does not start where edge-9 ends: a fan-out tacked onto the walk.
+    { ...c2, path: [...(c2.path ?? []), 'edge-1'] },
+    { criterionId: 'c99', nodeIds: ['service-1'], claim: 'a criterion the rubric never listed' },
+    // Each rewrite replaces the author's c1 binding in place, so the later one
+    // is the binding and nothing is bound twice.
+    { ...c1, claim: 'the earlier rewrite' },
+    { ...c1, claim: 'the later rewrite, which wins' },
+  ]);
+};
+
+/** A coach change with an edge to a node that is not drawn — a dangling edge the wiring drops, never a refusal. */
+export const brokenChange = (): CanvasChange => {
+  const coached = coachedChange();
+  const dangling: CanvasEdge = {
+    id: 'ai-edge-9',
+    source: 'service-1',
+    target: 'nowhere',
+    kind: 'sync',
+  };
+  return {
+    changes: {
+      ...coached.changes,
+      edges: {
+        upsert: [...(coached.changes.edges?.upsert ?? []), dangling],
+        remove: coached.changes.edges?.remove ?? [],
+      },
+    },
+  };
+};
+
+/**
+ * A coach change no wiring can mend: the replica declares one operation name
+ * twice, a fault of the node itself, so `references` refuses the revision
+ * and the coach is told why.
+ */
+export const unrepairableChange = (): CanvasChange => ({
+  changes: {
+    ...coachedChange().changes,
+    nodes: {
+      upsert: [
+        {
+          ...readReplica(),
+          operations: [
+            { name: 'readOrders', kind: 'query' },
+            { name: 'readOrders', kind: 'query' },
+          ],
+        },
+      ],
+      remove: [],
+    },
+  },
+});
+
+/** The coached change with each of its edges rewritten by `edit`. */
+const withEdges = (edit: (edge: CanvasEdge) => CanvasEdge): CanvasChange => {
+  const coached = coachedChange();
+  return {
+    changes: {
+      ...coached.changes,
+      edges: { upsert: (coached.changes.edges?.upsert ?? []).map(edit), remove: [] },
+    },
+  };
+};
+
+/** The position the render prints beside an author's node — how a coach reading the render addresses it. */
+const shownPosition = (nodeId: string): string =>
+  `node.${sampleSubmission().graph.nodes.findIndex((node) => node.id === nodeId) + 1}`;
+
+/** The read-model decision with the cost of staleness named, as the sample's reasoning remediation asks. */
+export const stalenessDecision = (): DesignDecision => ({
+  ...readModelDecision(),
+  cost: 'Orders lag their source by up to the batch interval, a bounded staleness a shopper may see; one more store to operate.',
+});
+
+/**
+ * The coached change as a coach reading the render would write it: the
+ * replica's author-side endpoints given as the positions printed beside
+ * them, and the first decision rewritten at its position, every other part
+ * of the narrative unnamed. Measured 2026-11-08 (arm C): a coach copied such
+ * positions as ids and replaced every decision whole.
+ */
+export const positionalChange = (): CanvasChange => {
+  const change = withEdges((edge) => ({ ...edge, source: shownPosition(edge.source) }));
+  return {
+    changes: {
+      ...change.changes,
+      decisions: { upsertAt: [{ at: 1, decision: stalenessDecision() }], removeAt: [], append: [] },
+    },
+  };
+};
+
+/** The coached change whose read edge carries one operation its source declares and one nothing on the canvas declares. */
+export const undeclaredCarryChange = (): CanvasChange =>
+  withEdges((edge) =>
+    edge.kind === 'sync' ? { ...edge, carries: ['listOrders', 'nonesuch'] } : edge,
+  );

@@ -264,8 +264,11 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
     persona: producer,
     // Every turn in that window was a whole-canvas redraw, and a revision is
     // now a change set (`canvasOutput.revise`): the cap holds the redraws it
-    // was sized on until the first change-set replies are measured (none
-    // recorded as of 2026-11-08) and it is re-sized from them.
+    // was sized on until the change-set replies are measured into
+    // `measured.json` and it is re-sized from them. The first two, recorded
+    // 2026-11-08 (arm C, lane run 2026-11-08T22-48-49-342-e4eb2d), wrote
+    // 34k tokens each in 311–322 s where the redraws beside them wrote
+    // 57–63k in 456–501 s; neither is measured yet.
     maxTokens: 69000,
     // A reply must fit one API call. Measured 2026-11-06 on a 39-block
     // canvas, every turn a redraw: the coach thought 50–125k tokens before a
@@ -467,9 +470,12 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
     // criteria short of pass and 2 validator notes — and, answering those
     // 30–35, the coach rewrote 22–31 of 34 bindings and restated 34–64% of
     // each 82–120 KB redraw unchanged while the score ran 67.7 → 72.2 →
-    // 68.5 → 65. Twelve is declared, not yet measured: the first capped
-    // rounds (none recorded as of 2026-11-08) will size it. The record and the route keep the whole list;
-    // only the ask is capped.
+    // 68.5 → 65. Twelve is declared, and the first capped rounds (arm C,
+    // lane run 2026-11-08T22-48-49-342-e4eb2d, 2026-11-08) were briefed with
+    // the 12 worst of 33 as declared; whether twelve is the right size is
+    // not yet measured — those rounds failed on how the change set addressed
+    // the canvas (`output.ts`), not on how much it was asked for. The record
+    // and the route keep the whole list; only the ask is capped.
     briefing: { remediationsPerRound: 12 },
   },
 };
