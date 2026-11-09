@@ -151,5 +151,29 @@ describe('the record as the advisor answers it', () => {
     ]);
     expect(advice.units.some((unit) => unit.identity[0]?.value === 'Other')).toBe(false);
     expect(advice.units.some((unit) => unit.identity[0]?.value === 'Mine Co')).toBe(false);
+
+    // One identity asked for by itself is answered past the advice's bound, keyed as the record keys it;
+    // another subject's company and the asker's own open unit are not on record to it, nor a company never seen.
+    const asker = { kind: 'browser-session' as const, id: 'session-9', label: 'step 3' };
+    const lookup = (company: string) =>
+      source.unitOnRecord({
+        subject: 'Alex Example',
+        asker,
+        facets: ['company'],
+        identity: [{ name: 'company', value: company }],
+      });
+    const last = `Company ${ADVICE_UNITS_BOUND.target + 2}`;
+    expect(advice.units.some((unit) => unit.identity[0]?.value === last)).toBe(false);
+    expect(await lookup(`  ${last.toUpperCase()} `)).toEqual({
+      advisor: 'job-application',
+      unit: {
+        identity: [{ name: 'company', value: last }],
+        stance: 'avoid',
+        note: 'applied 2026-10-05',
+      },
+    });
+    for (const company of ['Other', 'Mine Co', 'Never Seen']) {
+      expect(await lookup(company)).toEqual({ advisor: 'job-application', unit: null });
+    }
   });
 });

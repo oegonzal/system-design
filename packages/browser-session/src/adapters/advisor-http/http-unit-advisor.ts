@@ -7,12 +7,15 @@ import {
   rideOut,
   sendJson,
   unitAdviceSchema,
+  unitLookupSchema,
   type AdvisorDescriptor,
   type JsonAnswer,
   type Recovery,
   type RecoveryClock,
   type UnitAdvice,
   type UnitAdviceRequest,
+  type UnitLookup,
+  type UnitLookupRequest,
 } from '@sysdesign/contracts';
 import type { ZodType } from 'zod';
 
@@ -37,11 +40,11 @@ export interface HttpUnitAdvisorOptions {
 const TRANSIENT: ReadonlySet<AdvisorFaultReason> = new Set(['unreachable', 'timeout', 'failed']);
 
 /**
- * An advisor over HTTP: the descriptor read from its base URL, the advice
- * asked for with the contracts' request and parsed against the contracts'
- * answer, every failure an `AdvisorFaulted` saying which — so the engine
- * decides what a fault means and a bad value from a service never reaches a
- * goal's index.
+ * An advisor over HTTP: the descriptor read from its base URL, the advice and
+ * the lookup asked for with the contracts' requests and parsed against the
+ * contracts' answers, every failure an `AdvisorFaulted` saying which — so the
+ * engine decides what a fault means and a bad value from a service never
+ * reaches a goal's index.
  */
 export class HttpUnitAdvisor implements UnitAdvisorPort {
   private readonly recovery: Recovery;
@@ -75,6 +78,16 @@ export class HttpUnitAdvisor implements UnitAdvisorPort {
       ADVISOR_ROUTES.advice,
       request,
       unitAdviceSchema,
+      options.probe ? NO_RECOVERY : this.recovery,
+    );
+  }
+
+  lookup(request: UnitLookupRequest, options: { probe: boolean }): Promise<UnitLookup> {
+    return this.call(
+      'POST',
+      ADVISOR_ROUTES.lookup,
+      request,
+      unitLookupSchema,
       options.probe ? NO_RECOVERY : this.recovery,
     );
   }

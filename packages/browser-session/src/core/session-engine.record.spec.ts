@@ -9,6 +9,7 @@ import {
 } from '@sysdesign/contracts';
 
 import { advice, decidedAnswers, decidedPlan, ScriptedAdvisor } from './testing';
+import { AdvisorFaulted } from './unit-advice';
 import {
   JOURNEY_ANSWERS as ANSWERS,
   JOURNEY_PLANS as PLANS,
@@ -187,5 +188,78 @@ describe('a taskStart at a unit on record', () => {
     expect(long.detail.tasks).toEqual([]);
     expect(long.logs).toContain('step 2: unit-refused (1 in a row)');
     expect(long.brain.planInputs[2]?.history.at(-1)?.note).toBe(NOTE);
+  });
+
+  it('[BRW-13] a unit the advice counted past its own bound is asked for by identity at taskStart and refused as a named one; the exception lifts it as it lifts a named one; an advisor that faults on the lookup is warned about and the unit opens; and an advice that counted nothing past its bound is never asked', async () => {
+    // Measured 2026-11-09: a record of 255 companies was answered as 200 and 55 counted, and a taskStart
+    // on one of the 55 was refused by nothing.
+    const past = Array.from({ length: 3 }, (_, i) => ({
+      name: 'company',
+      value: `Company ${i}`,
+      stance: 'avoid' as const,
+    }));
+    const acme = {
+      identity: [{ name: ACME.name, value: ACME.value }],
+      stance: ACME.stance,
+      note: ACME.note,
+    };
+    const hiding = (omitted: number, fault: AdvisorFaulted | null = null) => {
+      const port = new ScriptedAdvisor(RECORD, [advice('record', past, omitted)]);
+      port.hidden = [acme];
+      port.lookupFault = fault;
+      const configured: ConfiguredAdvisor[] = [
+        { id: 'record', where: 'record=http://advisor.test', port },
+      ];
+      return { port, configured };
+    };
+
+    const counted = hiding(1);
+    const refused = await session([PLANS.search, opening('Acme'), PLANS.end], {
+      advisors: counted.configured,
+    });
+    expect(refused.detail.tasks).toEqual([]);
+    expect(refused.logs).toContain('step 2: unit-refused (1 in a row)');
+    expect(refused.brain.planInputs[2]?.history.at(-1)?.note).toBe(NOTE);
+    expect(refused.brain.planInputs[2]?.objections.map((objection) => objection.detail)).toEqual([
+      REFUSED,
+    ]);
+    // Asked once, by the claim's identity, under the step's own asker, without a probe while the advisor answers.
+    expect(counted.port.lookups).toEqual([
+      {
+        request: {
+          subject: 'Alex Example',
+          asker: { kind: 'browser-session', id: refused.detail.id, label: 'step 2' },
+          facets: ['company'],
+          identity: [{ name: 'company', value: 'Acme' }],
+        },
+        probe: false,
+      },
+    ]);
+
+    // The plan declaring the mission's exception takes the unit the lookup found, as it takes a named one.
+    const declared = hiding(1);
+    const taken = await session([PLANS.search, opening('Acme', true), PLANS.end], {
+      advisors: declared.configured,
+    });
+    expect(taken.detail.tasks.map((task) => task.label)).toEqual(['Senior Engineer at Acme']);
+    expect(declared.port.lookups).toHaveLength(1);
+
+    // An advisor that cannot answer the lookup is warned about, and the unit opens on the record composed with.
+    const faulting = hiding(1, new AdvisorFaulted('unreachable', 'socket closed'));
+    const opened = await session([PLANS.search, opening('Acme'), PLANS.end], {
+      advisors: faulting.configured,
+    });
+    expect(opened.detail.tasks.map((task) => task.label)).toEqual(['Senior Engineer at Acme']);
+    expect(opened.warnings).toContain(
+      "step 2: advisor record unreachable when asked about a unit past its advice's bound — the unit opens on the record composed with: socket closed",
+    );
+
+    // An advice that counted nothing past its bound holds the whole record already: nothing is asked.
+    const whole = hiding(0);
+    const unasked = await session([PLANS.search, opening('Acme'), PLANS.end], {
+      advisors: whole.configured,
+    });
+    expect(unasked.detail.tasks.map((task) => task.label)).toEqual(['Senior Engineer at Acme']);
+    expect(whole.port.lookups).toEqual([]);
   });
 });

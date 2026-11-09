@@ -1,8 +1,12 @@
-import type {
-  AdvisorDescriptor,
-  SessionEvent,
-  UnitAdvice,
-  UnitAdviceRequest,
+import {
+  matchesRecord,
+  type AdvisorDescriptor,
+  type SessionEvent,
+  type UnitAdvice,
+  type UnitAdviceRequest,
+  type UnitLookup,
+  type UnitLookupRequest,
+  type UnitOnRecord,
 } from '@sysdesign/contracts';
 
 import type { SessionEventsPort } from './session-events';
@@ -14,11 +18,18 @@ import { AdvisorFaulted, type UnitAdvisorPort } from './unit-advice';
  * session published. Neither imports vitest.
  */
 
-/** An advisor answering in turn; past the script it repeats its last answer, so a long journey scripts only what changes. */
+/**
+ * An advisor answering in turn; past the script it repeats its last answer,
+ * so a long journey scripts only what changes. A lookup answers from the last
+ * advice and from `hidden` — the units the advice counted and did not name.
+ */
 export class ScriptedAdvisor implements UnitAdvisorPort {
   readonly requests: { request: UnitAdviceRequest; probe: boolean }[] = [];
+  readonly lookups: { request: UnitLookupRequest; probe: boolean }[] = [];
   described = 0;
   describeFault: AdvisorFaulted | null = null;
+  lookupFault: AdvisorFaulted | null = null;
+  hidden: UnitOnRecord[] = [];
   private readonly answers: (UnitAdvice | AdvisorFaulted)[];
   private last: UnitAdvice | null = null;
 
@@ -42,6 +53,14 @@ export class ScriptedAdvisor implements UnitAdvisorPort {
     if (next !== undefined) this.last = next;
     if (this.last === null) throw new Error('the scripted advisor has no answer to give');
     return this.last;
+  }
+
+  async lookup(request: UnitLookupRequest, options: { probe: boolean }): Promise<UnitLookup> {
+    this.lookups.push({ request, probe: options.probe });
+    if (this.lookupFault !== null) throw this.lookupFault;
+    const known = [...(this.last?.units ?? []), ...this.hidden];
+    const unit = known.find((candidate) => matchesRecord(request.identity, candidate.identity));
+    return { advisor: this.descriptor.id, unit: unit ?? null };
   }
 }
 

@@ -1,10 +1,12 @@
 /**
  * The advisor protocol: how a session asks a domain service what it knows of
- * units beyond this session, and how the service says who it is. Two routes
+ * units beyond this session, and how the service says who it is. Three routes
  * any tenant implements the same way — the descriptor answers who the advisor
  * is and which facts it keeps its record by, the advice answers the units on
- * record for a subject — and nothing in either names a domain: the facts are
- * the mission's declared facets, the stances the engine's, the asker the
+ * record for a subject, bounded and the rest counted, and the lookup answers
+ * for one identity whether it is on record, so a unit past the advice's bound
+ * is still refused at taskStart — and nothing in any names a domain: the facts
+ * are the mission's declared facets, the stances the engine's, the asker the
  * run-opener shape every caller already names itself by.
  */
 import { z } from 'zod';
@@ -16,6 +18,7 @@ import {
   RUN_OPENER_KINDS,
   RUN_OPENER_LABEL_MAX_LENGTH,
 } from '../quality-loop/runs';
+import { unitIdentitySchema } from './identity';
 import { unitOnRecordSchema } from './record';
 import {
   ADVICE_UNITS_BOUND,
@@ -24,8 +27,12 @@ import {
   UNIT_FACETS_BOUND,
 } from './vocab';
 
-/** The two routes on an advisor's base URL. */
-export const ADVISOR_ROUTES = { describe: '/advisor', advice: '/advice' } as const;
+/** The three routes on an advisor's base URL. */
+export const ADVISOR_ROUTES = {
+  describe: '/advisor',
+  advice: '/advice',
+  lookup: '/advice/lookup',
+} as const;
 
 const advisorId = bounded.id(ADVISOR_ID_MAX_LENGTH, { min: 1 });
 const facetNames = bounded.list(
@@ -60,3 +67,16 @@ export const unitAdviceSchema = z.strictObject({
   omitted: z.number().int().nonnegative(),
 });
 export type UnitAdvice = z.infer<typeof unitAdviceSchema>;
+
+/** One identity asked about by itself: the advice request, plus the facets and values a claim carries. */
+export const unitLookupRequestSchema = unitAdviceRequestSchema.extend({
+  identity: unitIdentitySchema,
+});
+export type UnitLookupRequest = z.infer<typeof unitLookupRequestSchema>;
+
+/** What an advisor answers for one identity: the unit on record under it, or null when the record says nothing of it. */
+export const unitLookupSchema = z.strictObject({
+  advisor: advisorId,
+  unit: unitOnRecordSchema.nullable(),
+});
+export type UnitLookup = z.infer<typeof unitLookupSchema>;

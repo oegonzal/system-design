@@ -47,13 +47,27 @@ describe('an advisor over HTTP', () => {
     const { calls, fetchImpl } = scripted([
       { status: 200, body: { data: DESCRIPTOR } },
       { status: 200, body: { data: ADVICE } },
+      { status: 200, body: { data: { advisor: 'record', unit: ADVICE.units[0] } } },
+      { status: 200, body: { data: { advisor: 'record', unit: null } } },
     ]);
     const advisor = new HttpUnitAdvisor('http://advisor.test', { fetchImpl });
     expect(await advisor.describe()).toEqual(DESCRIPTOR);
     expect(await advisor.recall(REQUEST, { probe: false })).toEqual(ADVICE);
+    // A lookup posts the claim's identity with the request, and reads a unit or nothing.
+    const lookup = { ...REQUEST, identity: [{ name: 'company', value: 'Acme' }] };
+    expect(await advisor.lookup(lookup, { probe: false })).toEqual({
+      advisor: 'record',
+      unit: ADVICE.units[0],
+    });
+    expect(await advisor.lookup(lookup, { probe: true })).toEqual({
+      advisor: 'record',
+      unit: null,
+    });
     expect(calls.map((call) => [call.method, call.url, call.body])).toEqual([
       ['GET', 'http://advisor.test/advisor', undefined],
       ['POST', 'http://advisor.test/advice', REQUEST],
+      ['POST', 'http://advisor.test/advice/lookup', lookup],
+      ['POST', 'http://advisor.test/advice/lookup', lookup],
     ]);
   });
 

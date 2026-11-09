@@ -10,6 +10,10 @@ import {
   type AdvisorDescriptor,
   type UnitAdvice,
   type UnitAdviceRequest,
+  type UnitFacet,
+  type UnitLookup,
+  type UnitLookupRequest,
+  type UnitOnRecord,
   type UnitsOnRecord,
 } from '@sysdesign/contracts';
 import { describeError } from '@sysdesign/run-dump';
@@ -27,8 +31,9 @@ import { SESSION_KIND } from './identity';
  * for the planner and the judges, the units it forbids go into the goal's
  * index for the validator to cut, and every unit it answered is held against
  * each taskStart by the session (`refusedOnRecord`), whatever the goal had
- * room to list. The engine compares declared facts by key and never learns
- * what any of them means.
+ * room to list; a unit the advice counted past its own bound is asked for by
+ * identity at taskStart (`lookedUpOnRecord`). The engine compares declared
+ * facts by key and never learns what any of them means.
  */
 
 /** Why an advisor gave no answer; the first three are transient and ridden out. */
@@ -59,6 +64,8 @@ export interface UnitAdvisorPort {
   describe(): Promise<AdvisorDescriptor>;
   /** `probe` asks once, without riding out a restart: what an open streak does each step. */
   recall(request: UnitAdviceRequest, options: { probe: boolean }): Promise<UnitAdvice>;
+  /** One identity asked about by itself: what the advice had no room to name. */
+  lookup(request: UnitLookupRequest, options: { probe: boolean }): Promise<UnitLookup>;
 }
 
 /** An advisor as configured: the id its entry named, or null for one described at boot, and where it was configured, for a refusal to say. */
@@ -297,4 +304,39 @@ export async function recallAdvice(ctx: EngineContext): Promise<AdviceRecord> {
     advisors: outcomes,
     onRecord: merged(advisors),
   };
+}
+
+/**
+ * A claim's identity asked of each advisor whose last advice counted units
+ * past its bound — the only advisors that can be holding one the step's
+ * record does not name — the first unit found standing as one the advice
+ * named. Measured 2026-11-09: a record of 255 companies was answered as 200
+ * and 55 counted, and a taskStart on one of the 55 was refused by nothing.
+ * An advisor that faults on the lookup is warned about and the unit opens on
+ * the record composed with, as it did before the lookup existed; a claim
+ * carrying no facets matches nothing and asks nothing.
+ */
+export async function lookedUpOnRecord(
+  ctx: EngineContext,
+  identity: readonly UnitFacet[],
+): Promise<UnitOnRecord | null> {
+  const { advisors, deps, state, options } = ctx;
+  if (identity.length === 0) return null;
+  for (const advisor of advisors) {
+    if (advisor.lastGood.advice.omitted === 0) continue;
+    const request: UnitLookupRequest = {
+      ...requestOf(options, state.sessionId, advisor.facets, state.step),
+      identity: [...identity],
+    };
+    try {
+      const { unit } = await advisor.port.lookup(request, { probe: advisor.streakOpen });
+      if (unit !== null) return unit;
+    } catch (error) {
+      if (!(error instanceof AdvisorFaulted)) throw error;
+      deps.warn(
+        `step ${state.step}: advisor ${advisor.id} ${error.reason} when asked about a unit past its advice's bound — the unit opens on the record composed with: ${error.detail}`,
+      );
+    }
+  }
+  return null;
 }

@@ -89,7 +89,7 @@ describe('the Units of work section with a record beyond this session', () => {
     expect(textBytes(listed)).toBeLessThanOrEqual(UNITS_ON_RECORD_BYTES_BOUND.target);
     expect(names.length).toBeGreaterThan(200);
     expect(goal).toContain(
-      `  (${300 - names.length} more on record not listed)\n  (7 more on record the advisor counted and did not name)`,
+      `  (${300 - names.length} more on record not listed)\n  (7 more on record the advisor counted and did not name — asked by identity at each taskStart)`,
     );
     expect(goal).toContain('listed above or not, is refused by the session');
     // Units known by other facts are a group of their own, each fact named once.
@@ -124,7 +124,9 @@ describe('the Units of work section with a record beyond this session', () => {
       }),
     );
     expect(counted).not.toContain('more on record not listed');
-    expect(counted).toContain('  (7 more on record the advisor counted and did not name)');
+    expect(counted).toContain(
+      '  (7 more on record the advisor counted and did not name — asked by identity at each taskStart)',
+    );
     const empty = composeStepGoal(stepGoalInput({ mission: MISSION_WITH_IDENTITY }));
     expect(empty).not.toContain('On record from earlier sessions');
     expect(empty).not.toContain('more on record');

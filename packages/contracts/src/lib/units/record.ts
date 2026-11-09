@@ -4,7 +4,8 @@
  * note in the advisor's words. The composer renders a bounded number and
  * counts the rest; the forbidden ones also go into the goal's index for the
  * validator; and the session holds a taskStart to every one of them, listed
- * or not (`refusedOnRecord`).
+ * or not (`refusedOnRecord`), and asks the advisor by identity for one past
+ * the advice's own bound.
  */
 import { z } from 'zod';
 

@@ -2,10 +2,13 @@ import { Inject, Injectable } from '@nestjs/common';
 import {
   ADVICE_UNITS_BOUND,
   COMPANY_FACET,
+  identityKey,
   JOB_APPLICATION_ADVISOR_ID,
   type AdvisorDescriptor,
   type UnitAdvice,
   type UnitAdviceRequest,
+  type UnitLookup,
+  type UnitLookupRequest,
   type UnitOnRecord,
   type UnitStance,
 } from '@sysdesign/contracts';
@@ -133,15 +136,29 @@ export class ApplicationRecordSource implements RecordSource {
   }
 
   async unitsOnRecord(request: UnitAdviceRequest): Promise<UnitAdvice> {
-    const now = this.clock();
-    const applications = (
-      await this.store.since(request.subject, windowStart(this.policy, now))
-    ).filter((application) => !ownOpenUnit(application, request.asker));
-    const units = onRecord(applications, this.policy, now);
+    const units = onRecord(await this.inWindow(request), this.policy, this.clock());
     return {
       advisor: JOB_APPLICATION_ADVISOR_ID,
       units: units.slice(0, ADVICE_UNITS_BOUND.target),
       omitted: Math.max(0, units.length - ADVICE_UNITS_BOUND.target),
     };
+  }
+
+  /** One identity, keyed as the record keys its applications, whatever the advice had room to name. */
+  async unitOnRecord(request: UnitLookupRequest): Promise<UnitLookup> {
+    const key = identityKey(request.identity);
+    const applications = (await this.inWindow(request)).filter(
+      (application) => application.identityKey === key,
+    );
+    const [unit] = onRecord(applications, this.policy, this.clock());
+    return { advisor: JOB_APPLICATION_ADVISOR_ID, unit: unit ?? null };
+  }
+
+  /** The subject's applications within the policy's window, the asker's own open unit left out. */
+  private async inWindow(request: UnitAdviceRequest): Promise<Application[]> {
+    const now = this.clock();
+    return (await this.store.since(request.subject, windowStart(this.policy, now))).filter(
+      (application) => !ownOpenUnit(application, request.asker),
+    );
   }
 }

@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { advisorDescriptorSchema, unitAdviceRequestSchema, unitAdviceSchema } from './advice';
+import {
+  ADVISOR_ROUTES,
+  advisorDescriptorSchema,
+  unitAdviceRequestSchema,
+  unitAdviceSchema,
+  unitLookupRequestSchema,
+  unitLookupSchema,
+} from './advice';
 import { ADVICE_UNITS_BOUND } from './vocab';
 
 const asker = { kind: 'browser-session', id: 'session-1', label: 'step 3' };
@@ -46,5 +53,30 @@ describe('the advisor protocol', () => {
     expect(unitAdviceSchema.safeParse({ advisor: 'record', units: past, omitted: 0 }).success).toBe(
       false,
     );
+  });
+
+  it('[BRW-14] reads a lookup of one identity and its answer, a unit or nothing, on a route of its own', () => {
+    expect(ADVISOR_ROUTES.lookup).not.toBe(ADVISOR_ROUTES.advice);
+    const request = {
+      subject: 'Alex Example',
+      asker,
+      facets: ['company'],
+      identity: unit.identity,
+    };
+    expect(unitLookupRequestSchema.parse(request)).toEqual(request);
+    // A lookup names an identity: without one it is the advice request, which asks for the whole record.
+    expect(unitLookupRequestSchema.safeParse({ ...request, identity: [] }).success).toBe(false);
+    expect(unitLookupRequestSchema.safeParse({ ...request, identity: undefined }).success).toBe(
+      false,
+    );
+    expect(unitLookupSchema.parse({ advisor: 'record', unit })).toEqual({
+      advisor: 'record',
+      unit,
+    });
+    expect(unitLookupSchema.parse({ advisor: 'record', unit: null })).toEqual({
+      advisor: 'record',
+      unit: null,
+    });
+    expect(unitLookupSchema.safeParse({ advisor: 'record' }).success).toBe(false);
   });
 });

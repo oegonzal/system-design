@@ -39,7 +39,11 @@ true` — a declaration the validator cuts while the page lists the control
   in the advisor's words. The session renders a bounded number and counts the
   rest, and checks every unit answered at `taskStart`, rendered or not; the
   bound both sides read is `ADVICE_UNITS_BOUND`, so a request carries no
-  limit.
+  limit. `POST /advice/lookup {subject, asker, facets, identity}` answers
+  `{advisor, unit}` for one identity — the unit on record under it or `null`
+  — which the session asks for a `taskStart` whose unit the advice counted
+  past that bound and could not name, so the record outgrowing the bound
+  refuses no less (measured 2026-11-09: 255 companies, 200 named, 55 counted).
 - **The session's events** (`session.started`, `session.unit.opened`,
   `session.unit.closed`, `session.ended`), declared on the notifications bus
   and carrying the task row's own id, the unit's declared facets and the
@@ -100,6 +104,7 @@ exception is the one way past an avoided company on either.
 | `GET /health`                                                              | `{ status: 'ok' }`                                                           |
 | `GET /advisor`                                                             | `{data: {id: 'job-application', facets: ['company']}}`                       |
 | `POST /advice {subject, asker, facets}`                                    | `{data: UnitAdvice}`; `400` for an asker that does not compare on `company`  |
+| `POST /advice/lookup {subject, asker, facets, identity}`                   | `{data: UnitLookup}` — one identity's unit on record or `null`; same `400`   |
 | `GET /applications?subject&company&status&since&limit&offset`              | `{data: ApplicationDto[]}`, newest first                                     |
 | `GET /companies?subject`                                                   | `{data: CompanyDto[]}`                                                       |
 | `POST /applications {subject, company, label?, url?, status?, appliedAt?}` | `201 {data: ApplicationDto}` — the backfill and the application made by hand |
@@ -152,7 +157,7 @@ second one — writes:
 3. Statuses in the domain's vocabulary, with a one-way initial map from the
    session's outcomes and the later transitions (won, lost; interview, offer)
    the domain's alone.
-4. `GET /advisor` and `POST /advice` over a `RecordSource`, and a subscriber of
+4. `GET /advisor`, `POST /advice` and `POST /advice/lookup` over a `RecordSource`, and a subscriber of
    the four session topics that moves its rows along its own lattice.
 5. A criteria family, a boundaries row, a layers spec with the advisor layer
    naming no domain word.

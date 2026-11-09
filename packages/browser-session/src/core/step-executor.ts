@@ -17,7 +17,9 @@ import {
   type PlanReadout,
   type StepAction,
   type StepPlan,
+  type UnitOnRecord,
   type UnitsOnRecord,
+  type UnitStance,
 } from '@sysdesign/contracts';
 
 import { describeAction, touchedBy } from './action-words';
@@ -36,6 +38,7 @@ import {
 import { timeIsUp, type StepFailureEvent } from './rails';
 import { labelledScreenshot } from './session-dump';
 import { unitClosedEvent, unitOpenedEvent } from './session-events';
+import { lookedUpOnRecord } from './unit-advice';
 import {
   clearObjections,
   pushHistory,
@@ -60,22 +63,33 @@ import {
 /** What a taskStart did: opened a unit or met one open (the plan goes on), was refused by the record, or came once the session's time was up or its stop was asked for. */
 type UnitOpening = 'go-on' | 'refused' | 'out-of-time' | 'stopping';
 
+/** The unit an advisor names for the claim's identity past its advice's bound, held to the same exception the named ones are. */
+async function refusedByLookup(
+  ctx: EngineContext,
+  action: Extract<StepAction, { kind: 'taskStart' }>,
+  declared: readonly UnitStance[],
+): Promise<UnitOnRecord | null> {
+  const unit = await lookedUpOnRecord(ctx, action.facets);
+  return unit === null ? null : refusedOnRecord(action, { units: [unit], omitted: 0 }, declared);
+}
+
 /**
  * A unit opens for the item the plan names — unless the session's time is up
- * or the record the step was composed with refuses it. Every unit the
- * advisors answered is checked, never only the ones the goal had room to
- * list: measured 2026-10-14, a goal rendered 40 of 43 units on record, and
- * the planner opened one of the three cut as "not on the list". A refusal is
- * the plan's to answer on the next page, so it is carried once as an
- * objection, the history keeping the fact.
+ * or the record refuses it. Every unit the advisors answered is checked,
+ * never only the ones the goal had room to list: measured 2026-10-14, a goal
+ * rendered 40 of 43 units on record, and the planner opened one of the three
+ * cut as "not on the list". A unit the advice counted past its own bound is
+ * asked for by identity (`lookedUpOnRecord`) and held as a named one is. A
+ * refusal is the plan's to answer on the next page, so it is carried once as
+ * an objection, the history keeping the fact.
  */
-function openTaskUnlessRefused(
+async function openTaskUnlessRefused(
   ctx: EngineContext,
   action: Extract<StepAction, { kind: 'taskStart' }>,
   label: string,
   position: number,
   onRecord: UnitsOnRecord,
-): UnitOpening {
+): Promise<UnitOpening> {
   const { state, deps, queue } = ctx;
   if (state.tasks.open !== null) {
     pushHistory(state, label, 'not-executed', 'a unit of work is already open');
@@ -102,7 +116,9 @@ function openTaskUnlessRefused(
   }
   // The stances the mission's exception names are the only ones a declaration lifts a refusal for.
   const declared = takenStancesOf(ctx.mission);
-  const refused = refusedOnRecord(action, onRecord, declared);
+  const refused =
+    refusedOnRecord(action, onRecord, declared) ??
+    (onRecord.omitted > 0 ? await refusedByLookup(ctx, action, declared) : null);
   if (refused !== null) {
     pushHistory(state, label, 'not-executed', noteOnRecordRefusal(refused));
     rememberRefused(state, refused);
@@ -262,7 +278,7 @@ async function perform(
       // never opened: they do not run, as nothing runs past a refused click.
       // One after the session's time is up, or after its stop, ends the plan as
       // a stop does: no failure, and the session ends after it.
-      const opening = openTaskUnlessRefused(ctx, action, label, position, onRecord);
+      const opening = await openTaskUnlessRefused(ctx, action, label, position, onRecord);
       if (opening === 'out-of-time' || opening === 'stopping')
         return { failure: null, stopped: true };
       return { failure: opening === 'refused' ? 'unit-refused' : null, stopped: false };

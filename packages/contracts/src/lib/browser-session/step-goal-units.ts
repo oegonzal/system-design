@@ -107,9 +107,9 @@ const groupLines = (units: readonly UnitOnRecord[]): string[] => {
  * advisor's order, weakest stance first to go, are counted, apart from what
  * the advisor itself left out. The bound is the
  * rendering's alone: the session holds a taskStart to every unit on record,
- * listed here or not (`refusedOnRecord`), which the Limits say once
- * (`onRecordLimit`); the heading names the stance in a few words and repeats
- * no rule.
+ * listed here or not (`refusedOnRecord`), and asks the advisor by identity for
+ * one past the advice's bound, which the Limits say once (`onRecordLimit`);
+ * the heading names the stance in a few words and repeats no rule.
  */
 const onRecordLines = (onRecord: UnitsOnRecord): string[] => {
   if (onRecord.units.length === 0 && onRecord.omitted === 0) return [];
@@ -131,9 +131,11 @@ const onRecordLines = (onRecord: UnitsOnRecord): string[] => {
   return [
     ...lines,
     ...(cut > 0 ? [`  (${cut} more on record not listed)`] : []),
-    // What the advisor counted past its own bound it did not name, and nothing here can refuse.
+    // What the advisor counted past its own bound it did not name; the session asks it for each by identity.
     ...(onRecord.omitted > 0
-      ? [`  (${onRecord.omitted} more on record the advisor counted and did not name)`]
+      ? [
+          `  (${onRecord.omitted} more on record the advisor counted and did not name — asked by identity at each taskStart)`,
+        ]
       : []),
   ];
 };
