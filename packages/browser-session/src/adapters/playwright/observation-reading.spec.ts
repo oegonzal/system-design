@@ -212,7 +212,33 @@ describe('one reading as an observation', () => {
     expect(observation.activeScope).toBeNull();
     expect(observation.snapshotRung).toBe('scope');
     expect(observation.ariaSnapshot).toContain('Your application was sent to Acme!');
-    expect(observation.elements.map((e) => e.ref)).toEqual(['e1', 'e5001']);
+    // What the page is saying now is listed first, as the snapshot keeps it whole.
+    expect(observation.elements.map((e) => e.ref)).toEqual(['e5001', 'e1']);
+  });
+
+  it('[BRW-2] lists the controls of a non-modal dialog under the cap, before the content behind it', () => {
+    // Measured 2026-11-08: a results page listed 129 elements of main and 21
+    // of chrome under the bound of 150; the dialog confirming an application
+    // was sent, non-modal and last in the DOM, held the four controls the plan
+    // needed, all past the cap. Three plans found no "Not now" on a page that
+    // did not change, and the stall rail ended the session.
+    const sent = { role: 'dialog' as const, name: '' };
+    const results = Array.from({ length: ELEMENTS_BOUND.target + 10 }, (_, i) =>
+      toObservedElement(node(`e${i + 1}`, 'link', `Result ${i + 1}`), facts(), null, '', 'main'),
+    );
+    const controls = ['Dismiss', 'Not now', 'Update profile', 'Track'].map((name, i) =>
+      toObservedElement(node(`e${9000 + i}`, 'button', name, 2), facts(), sent, ''),
+    );
+    const observation = toObservation(reading({ elements: [...results, ...controls] }), READ);
+    expect(observation.activeScope).toBeNull();
+    expect(observation.elements.slice(0, 4).map((e) => e.name)).toEqual([
+      'Dismiss',
+      'Not now',
+      'Update profile',
+      'Track',
+    ]);
+    expect(observation.elements).toHaveLength(ELEMENTS_BOUND.target);
+    expect(observation.omittedElements).toBe(14);
   });
 
   it('[BRW-2] puts the main landmark\u2019s elements first under the cap, and says when main has rendered nothing', () => {

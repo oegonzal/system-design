@@ -172,21 +172,26 @@ function activeScopeOf(reading: PageReading): ActiveScope | null {
 }
 
 /**
- * Inside the open scope first, then what is visible and enabled in the main
- * landmark, then the rest of what is visible and enabled, then everything
- * else, each in document order — so under the cap the page's content comes
- * before its chrome.
+ * Inside the scope the page is saying now first — the modal in front, else
+ * the last dialog an element sits in, the one the snapshot keeps whole — then
+ * what is visible and enabled in the main landmark, then the rest of what is
+ * visible and enabled, then everything else, each in document order — so
+ * under the cap what the page says comes before its content, and its content
+ * before its chrome. Measured 2026-11-08: a results page listed 129 elements
+ * of main and 21 of chrome under the bound; the dialog confirming an
+ * application was sent, non-modal and last in the DOM, held the four controls
+ * the plan needed, all past the cap, and the stall rail ended the session.
  */
 function ordered(
   elements: readonly ObservedElement[],
-  activeScope: ActiveScope | null,
+  kept: ActiveScope | null,
 ): ObservedElement[] {
   // A file control the page hides is reached by its upload, so it orders with what is shown.
   const reachable = (element: ObservedElement): boolean =>
     (element.visible || element.kind === 'uploadable') && !element.disabled;
   // With no dialog open nothing is "inside the open scope": the page's own order holds.
   const inOpenScope = (element: ObservedElement): boolean =>
-    activeScope !== null && inScope(element, activeScope);
+    kept !== null && inScope(element, kept);
   const inMain = (element: ObservedElement): boolean => element.landmark === 'main';
   return [
     ...elements.filter((element) => reachable(element) && inOpenScope(element)),
@@ -201,7 +206,8 @@ function ordered(
 /** The reading as the contracts see it: what the fingerprint compares, and what `observe` reports. */
 export function toObservation(reading: PageReading, read: ObservationReading): PageObservation {
   const activeScope = activeScopeOf(reading);
-  const all = ordered(reading.elements, activeScope);
+  const kept = snapshotScopeOf(activeScope, reading.elements);
+  const all = ordered(reading.elements, kept);
   const listed = all.slice(0, ELEMENTS_BOUND.target);
   const nothingUnread = reading.unreadElements === 0 && reading.unreadSnapshotLines === 0;
   return {
@@ -216,13 +222,7 @@ export function toObservation(reading: PageReading, read: ObservationReading): P
     // Reduced only where it would not fit what an observation may carry, an
     // open dialog kept whole; the goal composer fits it again to the room the
     // goal actually has.
-    ...snapshotAt(
-      fitSnapshot(
-        reading.snapshot,
-        SNAPSHOT_BOUND.target,
-        snapshotScopeOf(activeScope, reading.elements),
-      ),
-    ),
+    ...snapshotAt(fitSnapshot(reading.snapshot, SNAPSHOT_BOUND.target, kept)),
     reading: read,
   };
 }
