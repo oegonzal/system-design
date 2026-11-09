@@ -394,7 +394,7 @@ advised"):
 - A **forbidden** unit (in progress in another live session) is refused twice
   — by the loop's validator from the index and by the session from the whole
   advice. Two paths to one answer, deliberately: the goal names only the
-  answered units that fit `UNITS_ON_RECORD_BYTES_BOUND`, of up to 200, so a
+  answered units that fit `UNITS_ON_RECORD_BYTES_BOUND`, of up to `ADVICE_UNITS_BOUND`, so a
   validator alone could not hold the record.
 - An **avoid** unit (applied within 90 days) is never a validator fact. It is
   prose for the planner plus the session's refusal, which the shipped mission

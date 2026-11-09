@@ -78,9 +78,14 @@ export const UNIT_FACET_VALUE_MAX_LENGTH = 120;
  * every byte spent on a unit is a byte taken from the page; and measured
  * 2026-11-06, 185 companies on record listed whole by name took 2,952 bytes
  * against 2,520 for the forty lines, while the planner opened companies past
- * the forty and the session refused each, a step lost every time.
+ * the forty and the session refused each, a step lost every time. Resized
+ * 2026-11-09: 262 companies on record in the window took 3,174 bytes of names
+ * against the 3,200 then allowed, and the planner opened one past the listing
+ * in three sessions running, a step lost each; names run about twelve bytes,
+ * so this names some 650 — the record for a while yet — of a 64,000-byte goal
+ * whose composer trims the page by declared rungs before it refuses.
  */
-export const UNITS_ON_RECORD_BYTES_BOUND = bound(3200);
+export const UNITS_ON_RECORD_BYTES_BOUND = bound(10_000);
 /** An advisor's note on a unit: what the record knows, in a few words. */
 export const UNIT_NOTE_BOUND = bound(80);
 /** The most advisors a mission names. */
@@ -90,7 +95,9 @@ export const ADVISOR_ID_MAX_LENGTH = 40;
  * The most units an advisor answers with; the rest it counts as omitted. Both
  * sides read it here, so a request carries no limit of its own: the goal
  * names them within `UNITS_ON_RECORD_BYTES_BOUND` and counts the rest, and the
- * session holds a taskStart to every one of them — a unit the advisor counted
- * past this bound and did not name is one nobody can refuse.
+ * session holds a taskStart to every one of them, asking the advisor by
+ * identity for one it counted past this bound and did not name. Sized with the
+ * bytes bound, so the goal can name the whole record: measured 2026-11-09, 262
+ * companies on record were answered as 200 and 62 counted.
  */
-export const ADVICE_UNITS_BOUND = bound(200, 'list');
+export const ADVICE_UNITS_BOUND = bound(600, 'list');

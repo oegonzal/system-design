@@ -76,7 +76,7 @@ describe('the Units of work section with a record beyond this session', () => {
   it('[BRW-13] names every unit on record within the bytes the record may take, groups units by the facts they are known by, counts the rest, and counts apart what the advisor itself left out; a record with nothing in it renders nothing', () => {
     // Measured 2026-11-06: 185 companies on record, 40 lines rendered with notes, and the planner opened companies
     // past the forty, a refused step each; named by value alone, all 185 take 2,952 bytes against 2,520 for the forty.
-    const units = Array.from({ length: 300 }, (_, i) =>
+    const units = Array.from({ length: 900 }, (_, i) =>
       onRecord(`Company ${i}`, 'avoid', 'applied'),
     );
     const goal = composeStepGoal(
@@ -89,7 +89,7 @@ describe('the Units of work section with a record beyond this session', () => {
     expect(textBytes(listed)).toBeLessThanOrEqual(UNITS_ON_RECORD_BYTES_BOUND.target);
     expect(names.length).toBeGreaterThan(200);
     expect(goal).toContain(
-      `  (${300 - names.length} more on record not listed)\n  (7 more on record the advisor counted and did not name — asked by identity at each taskStart)`,
+      `  (${900 - names.length} more on record not listed)\n  (7 more on record the advisor counted and did not name — asked by identity at each taskStart)`,
     );
     expect(goal).toContain('listed above or not, is refused by the session');
     // Units known by other facts are a group of their own, each fact named once.
