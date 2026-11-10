@@ -63,17 +63,17 @@
   ],
   "recall": {
     "hitsPerFieldType": {
-      "text": 5,
-      "textarea": 10,
-      "number": 5,
-      "date": 3,
-      "select": 5,
-      "radio": 5,
-      "checkbox": 3,
-      "file": 3,
-      "unknown": 3
+      "text": 8,
+      "textarea": 12,
+      "number": 8,
+      "date": 6,
+      "select": 8,
+      "radio": 8,
+      "checkbox": 6,
+      "file": 6,
+      "unknown": 6
     },
-    "maxEvidence": 24,
+    "maxEvidence": 40,
     "concurrency": 4
   }
 }

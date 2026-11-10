@@ -174,22 +174,24 @@ describe('the session settings', () => {
     expect(brain.legend.map((entry) => entry.kind)).toEqual(
       brain.facts.map((role) => brain.binding.registers[role]?.name),
     );
-    // A total table over the field types: free text draws deepest, and a question a short answer settles draws five —
-    // measured 2026-11-07, the dated span a years-of-experience question rests on ranked as deep as fifth once new
-    // standing answers came in; the cap and the fan-out are declared.
+    // A total table over the field types: free text draws deepest, and a question a short answer settles draws
+    // eight — measured 2026-11-10 over 67 answered fields, the deepest cited rank was spread flat across the first
+    // five and a citizenship answer a compound question needed ranked sixth; three more hits per field filled 5 of 20
+    // operator-bound fields a replay had left to the operator. The cap holds a five-field page's eighth ranks, and
+    // the goal's byte budget drops the lowest ranks first on a longer page; the fan-out is declared.
     expect(Object.keys(brain.recall.hitsPerFieldType).sort()).toEqual([...FIELD_TYPES].sort());
     expect(brain.recall.hitsPerFieldType).toEqual({
-      text: 5,
-      textarea: 10,
-      number: 5,
-      date: 3,
-      select: 5,
-      radio: 5,
-      checkbox: 3,
-      file: 3,
-      unknown: 3,
+      text: 8,
+      textarea: 12,
+      number: 8,
+      date: 6,
+      select: 8,
+      radio: 8,
+      checkbox: 6,
+      file: 6,
+      unknown: 6,
     });
-    expect(brain.recall.maxEvidence).toBe(24);
+    expect(brain.recall.maxEvidence).toBe(40);
     expect(brain.recall.concurrency).toBe(4);
     expect(brain.project).toBe('job-assistant');
     expect(brain.binding.recovery).toEqual({ windowMs: 60000, pauseMs: 2000 });

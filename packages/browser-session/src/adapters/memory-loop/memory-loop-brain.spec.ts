@@ -202,8 +202,12 @@ describe('the memory-loop brain', () => {
   it("[BRW-21] takes each question's hits as the declared table gives the kind of control asking, and deals them by rank under the declared cap, one slot per record", async () => {
     const python = 'Tell us about your experience with Python';
     const postgres = 'Tell us about your experience with Postgres';
+    // More facts than a short answer's budget, fewer than free text's: each kind stops where its table says;
+    // the page's cap sits above either, so only two questions together reach it.
+    const FACTS_PER_STEM = 10;
+    const CAP = 11;
     const facts = (stem: string) =>
-      Array.from({ length: 6 }, (_, index) => ({
+      Array.from({ length: FACTS_PER_STEM }, (_, index) => ({
         predicate: `${stem}_${index + 1}`,
         value: `${stem} fact ${index + 1}`,
       }));
@@ -227,7 +231,7 @@ describe('the memory-loop brain', () => {
       policy: DEEP_POLICY,
       settings: {
         ...BRAIN_SETTINGS,
-        recall: { ...BRAIN_SETTINGS.recall, maxEvidence: 7 },
+        recall: { ...BRAIN_SETTINGS.recall, maxEvidence: CAP },
       },
     });
     const seed = async (stem: string) => {
@@ -241,7 +245,7 @@ describe('the memory-loop brain', () => {
     const box = (ref: string, question: string) => field(ref, question);
     const area = (ref: string, question: string) => field(ref, question, { inputType: 'textarea' });
 
-    // Six facts in the space: a textbox takes as many as the table gives it, a textarea every one, up to ten.
+    // Ten facts in the space: a textbox takes as many as the table gives it, a textarea every one, up to twelve.
     await seed('python');
     const asBox = await h.brain.answerFields(fieldsInput([box('e1', python)], null, 20));
     expect(asBox.recall).toMatchObject({
@@ -249,18 +253,18 @@ describe('the memory-loop brain', () => {
       evidence: BRAIN_SETTINGS.recall.hitsPerFieldType.text,
     });
     const asArea = await h.brain.answerFields(fieldsInput([area('e1', python)], null, 21));
-    expect(asArea.recall).toMatchObject({ requests: 1, evidence: 6 });
+    expect(asArea.recall).toMatchObject({ requests: 1, evidence: FACTS_PER_STEM });
     expect(asBox.recall?.evidence ?? 0).toBeLessThan(asArea.recall?.evidence ?? 0);
 
-    // Two textareas, six facts answering each: the cap of seven, dealt by rank — every field's best before any field's second — one slot per record.
+    // Two textareas, ten facts answering each: the cap of eleven, dealt by rank — every field's best before any field's second — one slot per record.
     await seed('postgres');
     const capped = await h.brain.answerFields(
       fieldsInput([area('e1', python), area('e2', postgres)], null, 22),
     );
-    expect(capped.recall).toMatchObject({ requests: 2, evidence: 7 });
+    expect(capped.recall).toMatchObject({ requests: 2, evidence: CAP });
     const listed = readEvidenceItems(h.loop.startRequests[2]?.goal ?? '');
-    expect(listed).toHaveLength(7);
-    expect(new Set(listed.map(({ source }) => source.ref)).size).toBe(7);
+    expect(listed).toHaveLength(CAP);
+    expect(new Set(listed.map(({ source }) => source.ref)).size).toBe(CAP);
     const stems = listed.map(({ text }) => (text.includes('python_') ? 'python' : 'postgres'));
     expect(stems.slice(0, 6)).toEqual([
       'python',
