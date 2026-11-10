@@ -112,8 +112,9 @@ process does finish later, its close reclaims the swept row with the real
 outcome. A value that is not a positive integer of milliseconds refuses to
 boot, by name.
 
-A grade is slow on purpose: seven lenses, two samples each, serially on a
-subscription — minutes per submission. The feedback tab polls the run and
+A grade is slow on purpose: ten lenses — six critics at two samples, four
+evaluators at three — three calls in flight at a time on a subscription —
+minutes per submission. The feedback tab polls the run and
 shows the model calls as they are attributed.
 
 ## Author a prompt from your own assessment

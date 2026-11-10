@@ -15,6 +15,7 @@ import { describe, expect, it } from 'vitest';
 
 import { carryParts } from '../../core/contracts';
 import { describePipeline } from '../../core/describe-pipeline';
+import { STANDARD_SCORING } from '../../core/policy';
 import { validatePipeline } from '../../core/validate-pipeline';
 import { capsAgainstMeasured } from '../../core/testing';
 import { SYSTEM_DESIGN_CANVAS } from './definition';
@@ -37,6 +38,19 @@ describe('the system-design-canvas pipeline', () => {
     // best, and a round briefs the coach with the twelve worst remediations.
     expect(canvasOutput.revise?.schema).toBe(canvasChangeSchema);
     expect(SYSTEM_DESIGN_CANVAS.policy.briefing).toEqual({ remediationsPerRound: 12 });
+    // 2.4.0: the judges read apart — every evaluator beside the critics at
+    // three samples, every critic at two, and the compliance gate the
+    // evaluators' alone, a contradicted finding priced at a third.
+    expect(SYSTEM_DESIGN_CANVAS.version).toBe('2.4.0');
+    for (const evaluator of SYSTEM_DESIGN_CANVAS.evaluators) {
+      expect(evaluator.consumes).toEqual([]);
+      expect(evaluator.samples).toBe(3);
+    }
+    for (const critic of SYSTEM_DESIGN_CANVAS.critics) expect(critic.samples).toBe(2);
+    expect(SYSTEM_DESIGN_CANVAS.policy.evidence.corroboration).toBe('cited');
+    expect(SYSTEM_DESIGN_CANVAS.policy.penalties.contradicted).toBe(
+      STANDARD_SCORING.confidenceWeights.low,
+    );
   });
 
   it('[QL-21] [QL-32] [QL-56] its kinds, its cap and its numbering are the contract’s declarations, and its coach sees the criteria, any lessons its run recalled and what its last revision no better than the best was found wrong with', () => {

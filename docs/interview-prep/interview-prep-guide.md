@@ -1,8 +1,9 @@
 # Lead Software Engineer Interview Prep — System Design and Résumé Defense
 
-*Compiled 2026-11-02 from `docs/interview-prep/prep-material.md` (snapshot sha256 `df3b3791a42a…`). Every line of the source is preserved; the material was re-organised and formatted for print, and the current-project section was added from the repository's code and docs.*
+_Compiled 2026-11-02 from `docs/interview-prep/prep-material.md` (snapshot sha256 `df3b3791a42a…`). Every line of the source is preserved; the material was re-organised and formatted for print, and the current-project section was added from the repository's code and docs._
 
 **How to use this document.** Part I is the résumé defense: for each company and bullet, the interviewer's questions with the answers, ordered as an interviewer would ask them; the table of contents doubles as a question bank for self-testing. Part II is the general system-design reference the questions draw on. Part III is security: a definitions catalog for quick lookup, the authentication and authorization best practices, and the security flows for Frequence, Gala and TicketSocket. Appendix A lists every **[VERIFY]** detail to confirm from memory, Appendix B indexes the material by theme (components, CI/CD, security, diagrams and more), Appendix C maps each bullet of the résumé the company holds to where it is covered, and Appendix D collects every spoken answer into one rehearsal script.
+
 ## Contents
 
 - **Part I — Résumé Defense Playbook**
@@ -370,11 +371,11 @@ I’m covering **every question and follow-up from the previous response**, incl
 
 ## Gala Games & Entertainment — Lead Full Stack SE
 
-*Security flows for this company: Part III › 9. Security by company › Gala — account, wallets, token transactions and scarce digital inventory; definitions in Part III › 7. Security catalog.*
+_Security flows for this company: Part III › 9. Security by company › Gala — account, wallets, token transactions and scarce digital inventory; definitions in Part III › 7. Security catalog._
 
 Your resume has five Gala bullets spanning the Vue/React Native/backend/blockchain surfaces, Gala Film, 10,000+ concurrency, Vision/vector/Sanity automation, and token/ICO launch ownership.
 
-Your resume claims five distinct Gala areas: full-stack collectibles/Film/Web3 work, Gala Film delivery, Node/NestJS scalability to 10,000+ concurrent users, Vision/vector/Sanity automation, and production-critical token/ICO launches. *Oscar Gonzalez - Lead Engineer …*
+Your resume claims five distinct Gala areas: full-stack collectibles/Film/Web3 work, Gala Film delivery, Node/NestJS scalability to 10,000+ concurrent users, Vision/vector/Sanity automation, and production-critical token/ICO launches. _Oscar Gonzalez - Lead Engineer …_
 
 ### 1. Full-stack engineering across Vue, React Native TV, APIs, and blockchain
 
@@ -621,11 +622,7 @@ Good answer:
 For example:
 
 ```ts
-type EntitlementStatus =
-  | 'LOCKED'
-  | 'AVAILABLE'
-  | 'OWNED'
-  | 'PENDING';
+type EntitlementStatus = 'LOCKED' | 'AVAILABLE' | 'OWNED' | 'PENDING';
 ```
 
 Both apps can share that model while implementing different views.
@@ -992,7 +989,7 @@ This is one of the bullets I would expect them to attack hardest.
 
 **Answer**
 
-Your resume supports the 10,000+ concurrent claim, but not every intermediate architecture detail. *Oscar Gonzalez - Lead Engineer …*
+Your resume supports the 10,000+ concurrent claim, but not every intermediate architecture detail. _Oscar Gonzalez - Lead Engineer …_
 
 Use an evidence-driven answer:
 
@@ -1147,12 +1144,14 @@ The general answer pattern:
 Example:
 
 ```js
-db.collectibles.find({
-  userId: "...",
-  status: "OWNED"
-}).sort({
-  createdAt: -1
-})
+db.collectibles
+  .find({
+    userId: '...',
+    status: 'OWNED',
+  })
+  .sort({
+    createdAt: -1,
+  });
 ```
 
 Possible index:
@@ -1269,7 +1268,7 @@ Answer:
 
 **Answer**
 
-Your resume explicitly says AWS/GCP and GCP Vision. *Oscar Gonzalez - Lead Engineer …*
+Your resume explicitly says AWS/GCP and GCP Vision. _Oscar Gonzalez - Lead Engineer …_
 
 A defensible explanation is:
 
@@ -1698,11 +1697,11 @@ That should be acknowledged.
 
 ## Frequence + Madhive — Lead Senior SE
 
-*Security flows for this company: Part III › 9. Security by company › Frequence/Madhive — multi-tenant SaaS security; definitions in Part III › 7. Security catalog.*
+_Security flows for this company: Part III › 9. Security by company › Frequence/Madhive — multi-tenant SaaS security; definitions in Part III › 7. Security catalog._
 
 Your resume contains five bullets here: platform/acquisition maturity, technical direction across 30+ engineers/QAs, Angular framework/widgets, AI-assisted regression testing with measured outcomes, and configurable workflow validation.
 
-Your resume has five separate Frequence/Madhive claims covering acquisition-oriented engineering maturity, leadership across 30+ engineers/QAs, Angular framework architecture, AI-assisted testing with quantified results, and high-variation workflow automation. *Oscar Gonzalez - Lead Engineer …*
+Your resume has five separate Frequence/Madhive claims covering acquisition-oriented engineering maturity, leadership across 30+ engineers/QAs, Angular framework architecture, AI-assisted testing with quantified results, and high-variation workflow automation. _Oscar Gonzalez - Lead Engineer …_
 
 ### 6. Platform execution / engineering maturity
 
@@ -2678,7 +2677,7 @@ This avoids maintaining three completely independent test architectures.
 
 ## TicketSocket & IceCreamSocial — Lead Full Stack SE
 
-*Security flows for this company: Part III › 9. Security by company › TicketSocket — white-label SSO, tenant identity and merchant payment processing; definitions in Part III › 7. Security catalog.*
+_Security flows for this company: Part III › 9. Security by company › TicketSocket — white-label SSO, tenant identity and merchant payment processing; definitions in Part III › 7. Security catalog._
 
 Your resume has five bullets here: AngularJS migration, configurable dashboards, PostgreSQL optimization/event processing, 350→10,000+ concurrency with JWT-based service allocation, and testing/API-documentation improvements.
 
@@ -3629,7 +3628,7 @@ The right discussion is risk coverage, not chasing a number.
 
 The Visa section has exactly two bullets: Angular/D3 infrastructure-risk dashboards and a real-time Angular/Node vendor portal.
 
-Your resume contains two Visa claims: Angular/D3 infrastructure-risk visualization and a real-time Angular/Node vendor portal. *Oscar Gonzalez - Lead Engineer …*
+Your resume contains two Visa claims: Angular/D3 infrastructure-risk visualization and a real-time Angular/Node vendor portal. _Oscar Gonzalez - Lead Engineer …_
 
 ### 16. Angular/D3 risk dashboard
 
@@ -3826,7 +3825,7 @@ Real-time can mean:
 state changes appear without reload
 ```
 
-but interviewer will ask *how*.
+but interviewer will ask _how_.
 
 **[VERIFY exact mechanism].**
 
@@ -4033,16 +4032,16 @@ Each iteration then runs five named steps — produce (or adopt), validate, judg
 
 The driver crowns a best only on a strictly higher overall, publishes the standing through `onIteration` (the host queues a Postgres progress write and never makes the loop wait), and either goes round again in the mode decided or stops for a reason it owns: `accepted`, `rejected`, `escalated`, `plateau`, `max-iterations`, `produce-lost`. At the end the host writes the dump folder once and closes the row in one transaction.
 
-| Stage | Code or model | What it does |
-| --- | --- | --- |
-| derive criteria | model, one call per run | goal → `{kind, statement}` list; the engine assigns `c1..cN` |
-| producer | model, one call per produce (up to 3 attempts inside it) | the artifact; sees goal, criteria if declared, remediations on revise, pitfalls on retry, never a score |
-| validators | code | `block`, `cut` or `warn`; read the artifact and the goal's index, never prose |
-| critics | model, `samples` calls each | defects as enums: type, severity, confidence, fixability, location ids, criterion ids |
-| evaluators | model, `samples` calls each | exactly one result per criterion of their kinds: pass, partial, fail, not_applicable |
-| normaliser | code | reports → ledger: agreement, medians, reconciliation |
-| controller | code, synchronous | scores, four facts, gates, decision, trace |
-| recorder, janitor, dump | code (host) | row, heartbeat, progress, dump, liveness |
+| Stage                   | Code or model                                            | What it does                                                                                            |
+| ----------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| derive criteria         | model, one call per run                                  | goal → `{kind, statement}` list; the engine assigns `c1..cN`                                            |
+| producer                | model, one call per produce (up to 3 attempts inside it) | the artifact; sees goal, criteria if declared, remediations on revise, pitfalls on retry, never a score |
+| validators              | code                                                     | `block`, `cut` or `warn`; read the artifact and the goal's index, never prose                           |
+| critics                 | model, `samples` calls each                              | defects as enums: type, severity, confidence, fixability, location ids, criterion ids                   |
+| evaluators              | model, `samples` calls each                              | exactly one result per criterion of their kinds: pass, partial, fail, not_applicable                    |
+| normaliser              | code                                                     | reports → ledger: agreement, medians, reconciliation                                                    |
+| controller              | code, synchronous                                        | scores, four facts, gates, decision, trace                                                              |
+| recorder, janitor, dump | code (host)                                              | row, heartbeat, progress, dump, liveness                                                                |
 
 Where it lives: `packages/quality-loop/src/core/loop/run-pipeline.ts`, `packages/quality-loop/src/core/loop/iteration.ts`, `packages/quality-loop/src/core/loop/waves.ts`, `packages/quality-loop/src/core/loop/materialize.ts`, `packages/quality-loop/src/core/evidence/normalize.ts`, `packages/quality-loop/src/core/controllers/`, `packages/quality-loop/src/modules/runs/runs.service.ts`, `packages/quality-loop/src/modules/runs/run-admission.ts`, `packages/quality-loop/src/modules/runs/run-request.ts`, `packages/quality-loop/src/modules/runs/run-recorder.ts`, `packages/contracts/src/lib/quality-loop/vocab.ts`; `docs/quality-loop/reference.md`, `docs/quality-loop/lifecycle-and-hooks.md`
 
@@ -4078,6 +4077,8 @@ wave 2   evaluators declaring consumes: ['findings'], shown only
 Fold the three into one judge that says "7/10, revise" and the loop loses what it is built on: nothing structural to count agreement over, so one odd answer sinks a result; no location, so a browser plan cannot be cut at action 3 while actions 1–2 run; no stable identity, so you cannot tell whether a defect persisted; and a verdict that moves with the wording, neither replayable nor holdable to a threshold. The evaluator does write an advisory verdict, but it stays on its report and never reaches the ledger; a build gate fails if a controller reads it.
 
 The split also makes the coupling between judges a declaration, and both directions were measured. Under agreement-based vetoes (agentic-design: `minHits: 2`, four critics at two samples, three evaluators consuming findings), showing evaluators the confirmed findings sharpened them: criteria named by a confirmed finding went from 69/69 pass to 16/74 pass, unnamed criteria stayed 10/10 → 6/6, and every confirmed finding was reconciled to a criterion shortfall, 0/27 → 29/29 (`n = 4` scored runs against their cycle-1 twins; `docs/pipelines/pipeline-steps.md`, undated, last committed 2026-10-16). Under corroboration-based vetoes (browser-step, one sample per lens) the opposite held: shown the critic's finding first, the evaluator failed a stop criterion in 24–41% of runs, only where the critic had raised one and with every such stop absent from the page; judging apart it failed none in 92 runs (2026-10-08, session `2026-10-08T07-39-33`, 23 recorded goals, gpt-4o-mini; `docs/quality-loop/lens-debate.md` §2). One model's hallucination had counted as two witnesses; the fix was one declaration, `consumes: []`, plus a boot check (`checkCorroboration`) that refuses an evaluator of a gating kind consuming findings in any pipeline declaring `corroboration: 'cited'` — the fourteen pipelines under `none` may still show evaluators confirmed findings.
+
+Addition (2026-11-10): since canvas pipeline 2.4.0, system-design-canvas also declares `corroboration: 'cited'` and `penalties.contradicted` at `confidenceWeights.low` (0.33), its evaluators reading apart from the critics at three samples each; the counts above now read 13 of 16 under `none`.
 
 Where it lives: `packages/quality-loop/src/core/stages/llm-critic.ts`, `packages/quality-loop/src/core/stages/llm-evaluator.ts`, `packages/quality-loop/src/core/stages/schemas.ts`, `packages/quality-loop/src/core/loop/waves.ts`, `packages/quality-loop/src/core/validate-pipeline.ts` (`checkCorroboration`), `tooling/quality-loop-guarantees.spec.ts`; `docs/quality-loop/lens-debate.md`, `docs/pipelines/pipeline-steps.md`
 
@@ -4172,7 +4173,11 @@ ledger (ids · enums · counts) + policy
 
 Pricing comes first and is a total function of the ledger, traced whether or not a gate fires. Each declared dimension earns a base from the criteria whose kinds map to it: `100 × Σ(kind weight × result value) / Σ weight`, with pass 1, partial 0.5, fail 0, an unassessed criterion 0 and a `not_applicable` one left out. A dimension with no criteria but findings starts at 100; one with neither is null and drops out of the divisor. Then its findings are charged, worst first — only findings not reconciled to a short criterion, so one shortfall is charged once — at severity points times a confidence weight, each later finding multiplied by 0.7 again, the total scaled so it never exceeds 60 for one dimension; the score is clamped to 0..100 and rounded to a tenth. Under `cited` corroboration a finding the evaluator contradicted (every criterion it cites judged pass or not applicable) is charged at `penalties.contradicted` — browser-step and tool-step set that to 0.33. The overall is the weighted mean over the assessed dimensions. These are `STANDARD_SCORING` defaults every pipeline spreads and may override (source constants at HEAD `9cd3c978`).
 
+Addition (2026-11-10): since canvas pipeline 2.4.0, system-design-canvas also declares `corroboration: 'cited'` and `penalties.contradicted` at `confidenceWeights.low` (0.33), its evaluators reading apart from the critics at three samples each; the counts above now read 13 of 16 under `none`.
+
 Four facts are computed the same way under every controller. `validatorsPassed`: no `block` or `cut` report with a problem above `info`. `evidenceSufficient`: criteria exist and at least `minAssessedShare` (0.75 everywhere today) were assessed. `policyAllowed`: no blocking finding and no failed gating criterion — where "blocking" means a gated type or a severity in `blockingSeverities`, agreed by at least `minHits` samples, and under `cited` corroboration citing a gating criterion the evaluator itself failed. Under `cited` corroboration a finding citing nothing is priced and never a veto; under the default `none` (14 of the 16 pipelines) an agreed finding of a gated type or blocking severity blocks whether or not it cites a criterion.
+
+Addition (2026-11-10): since canvas pipeline 2.4.0, system-design-canvas also declares `corroboration: 'cited'` and `penalties.contradicted` at `confidenceWeights.low` (0.33), its evaluators reading apart from the critics at three samples each; the counts above now read 13 of 16 under `none`.
 
 Then the gates, in the order the controller declares, the first to settle winning and every later one recorded as `skipped`; the route always settles what no gate did. `STANDARD` is artifact → validators → evidence → policy-allowed → accept-threshold → reject-floor → route by remediations. Two consequences are worth saying aloud. No score can rescue a veto, because the policy gate sits before the threshold: the study notes' worked browser-step example scores 77.2 against a 70 bar and is still refused, because a failed safety criterion and a gated finding citing it stand. And `reject` comes from exactly one place, an `unfixable` blocker — the reject floor settles `retry`, not reject, because below the floor editing is not worth it and a fresh attempt is. `escalate` is not a human queue; it stops the loop with `stopReason: escalated` and hands the run back to whatever started it.
 
@@ -4293,21 +4298,21 @@ Session notes cited in this area are files under `~/.claude/projects/-Users-osca
 
 The rule the repository is built to is that a failing run is evidence about the engine, never a licence to special-case its input, and that a change you cannot demonstrate on a run you did not write is not a fix. The engine recorded 3,139 runs between 6 Sep and 18 Oct 2026, 1,940 ending in accept and 2,024 of them browser steps (`docs/features-summary.md`, as of 2026-10-28); your count since then is yours to refresh **[VERIFY]**. Each change below rests on a dated measurement.
 
-| Date | Measured | Changed |
-| --- | --- | --- |
-| 2026-09-07 | system-design `soundness` has no criterion kind, so it starts at 100 and only falls: it hit the 60-point cap in 4 of 4 runs on a byte-identical goal and `compliance` was 100 in all 4, so 23 points of every overall were constant (session note `quality-loop-dead-dimensions`, verified 2026-09-07, for the 4 of 4 and the 23 points; `docs/pipelines/memory-runs.md` §1 for soundness pinned at 40 in every run; `docs/features-summary.md` for the 20% weight) | still open at HEAD for system-design; the canvas pipeline's spec asserts every declared dimension is earnable |
-| 2026-09-07 → 09-09 | the lesson store froze at 6 points: a digest scoring 92.6 then 94.0 was held `revise` by one blocker on its summary and whole-run admission discarded all 8 memories; per-item admission then over-excluded (admitted share ~59% → ~42%) because findings chained through shared aliases | admission = accept, or the artifact, validators and evidence gates with overall ≥ acceptAt, `policyAllowed` deliberately not required; a finding withholds only the items it names; locations became places (session note `quality-loop-memory-frozen`) |
-| undated (code comment) | exact ref-set identity discarded ~60% of every panel's findings over 200 dumped iterations, 88–100% on the one pipeline whose artifact exposes the most locations to cite (`core/evidence/identity.ts` comment, undated) | `sameDefect` = same type and an overlapping location (`core/evidence/identity.ts`) |
-| 2026-09-22 | agentic-design panels: a run agrees with itself within ~4 points when every sample is present (calibration range 3.7; second opinions 4.2 and 0.6), yet one lost critic sample moved a verdict 13.5 and erased a gated blocker — a false accept at 76 | no engine change; recorded as the variance baseline — the panels exist to measure variance before a score is trusted (session note `quality-loop-memory-frozen`, citing `docs/pipelines/orchestrators.md` §6); the 2026-10-01 retry and gate rest on that day's own measurement |
-| 2026-09-22/23 | 15 memory orchestrations over the agentic prompts: target mean 63.5 with recalled lessons in the goal vs 63.6 baseline; injected count uncorrelated with score (r = 0.1) | goal-injection recall judged inert at that store size; the owner chose coach-only recall into the producer (`docs/pipelines/memory-runs.md` §14 for the measurement, §15 for the decision, undated there; the date 2026-10-01 is from session note `coach-recall-decision`, outside the repository) |
-| 2026-10-01 | 324 runs / 4,136 calls: 2.22% of calls failed; 32 of 1,292 multi-sample lenses dropped to one sample; 118 findings in 14 runs discarded `below-min-hits` for a lost sample; the model busy ~100% of wall clock at concurrency 1.84× | retry inside the call (3 attempts), the in-flight gate (8), a lost sample lowers that lens's threshold instead of silencing it, the sample became the scheduling unit (session note `llm-seam-retry-and-gate`) |
-| 2026-10-02 → 10-03 | 4 of 8 coach revise iterations produced no artifact and 0 of 8 retries recovered; 361 replies had been clipped mid-word; after the change 20/20 produced, 16/16 recovered, 0 of 316 calls lost | declared bounds with target and ceiling, the lenient parse, faults named on retry (`docs/features-summary.md`: 20 of 20, 4 of 8; session note `never-throw-work-away`: the 361 clipped replies before commit `9376df1`, 0 of 8 retries; session note `recall-controls-result`: 16/16, 0 of 316) |
-| 2026-10-03 | 5 paired coach runs, recall on vs off: +0.5 points, sd 7.4, about ±9 at 95%; 0 of 80 offered candidates were document points | no claim that recall helps; about 30 pairs needed to see a 4-point effect (session note `recall-controls-result`) |
-| 2026-10-07 | a 20-step session failed 20/20 on `about:blank`: one sample of one critic vetoed a correct navigate; 36 of one critic's 55 findings were the other critic's types; grounding had never been derived in 165 rubrics | `corroboration: 'cited'` with a contradicted discount, the `cut` validator gate, per-critic `findingTypes`, fixed criteria, a stall rail (session note `browser-step-veto-forensics`; `core/pipeline.ts` comments) |
-| 2026-10-08 | evaluator in wave 2 echoed the critic: failed a stop in 24–41% of runs, 0 in 92 beside the critics; before → after on 23 recorded goals: first action ran 52% → 93%, plans refused whole 48% → 7%, vetoed for an absent stop 17% → 0, 25 s → 20 s per run (gpt-4o-mini) | `consumes: []` on browser-step's evaluator and a boot check (`checkCorroboration`) that refuses the shape in any pipeline declaring `corroboration: 'cited'` (`docs/quality-loop/lens-debate.md` §2, §6) |
-| 2026-10-08 | an evaluator bounded only from above answered 10 of 18 criteria in 6 of 23 step runs | the evaluation schema asks for exactly the criteria count (`core/pipeline.ts` comment) |
-| undated | narrowing a mission to help one site raised false refusals from 3/8 to 6/8 | reverted; the date and the mission are yours to name **[VERIFY]** (`CLAUDE.md`, TOP RULE 2) |
-| 2026-10-18 | 9 of 1,840 accepted runs crowned an iteration the controller had not accepted; no verdict would change today | a one-line fix is proposed and waits on your decision (session note `quality-loop-admission-crown-gap` for the 1,840; `docs/features-summary.md` for the 9 and that no verdict changes) |
+| Date                   | Measured                                                                                                                                                                                                                                                                                                                                                                                                                                                            | Changed                                                                                                                                                                                                                                                                                             |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 2026-09-07             | system-design `soundness` has no criterion kind, so it starts at 100 and only falls: it hit the 60-point cap in 4 of 4 runs on a byte-identical goal and `compliance` was 100 in all 4, so 23 points of every overall were constant (session note `quality-loop-dead-dimensions`, verified 2026-09-07, for the 4 of 4 and the 23 points; `docs/pipelines/memory-runs.md` §1 for soundness pinned at 40 in every run; `docs/features-summary.md` for the 20% weight) | still open at HEAD for system-design; the canvas pipeline's spec asserts every declared dimension is earnable                                                                                                                                                                                       |
+| 2026-09-07 → 09-09     | the lesson store froze at 6 points: a digest scoring 92.6 then 94.0 was held `revise` by one blocker on its summary and whole-run admission discarded all 8 memories; per-item admission then over-excluded (admitted share ~59% → ~42%) because findings chained through shared aliases                                                                                                                                                                            | admission = accept, or the artifact, validators and evidence gates with overall ≥ acceptAt, `policyAllowed` deliberately not required; a finding withholds only the items it names; locations became places (session note `quality-loop-memory-frozen`)                                             |
+| undated (code comment) | exact ref-set identity discarded ~60% of every panel's findings over 200 dumped iterations, 88–100% on the one pipeline whose artifact exposes the most locations to cite (`core/evidence/identity.ts` comment, undated)                                                                                                                                                                                                                                            | `sameDefect` = same type and an overlapping location (`core/evidence/identity.ts`)                                                                                                                                                                                                                  |
+| 2026-09-22             | agentic-design panels: a run agrees with itself within ~4 points when every sample is present (calibration range 3.7; second opinions 4.2 and 0.6), yet one lost critic sample moved a verdict 13.5 and erased a gated blocker — a false accept at 76                                                                                                                                                                                                               | no engine change; recorded as the variance baseline — the panels exist to measure variance before a score is trusted (session note `quality-loop-memory-frozen`, citing `docs/pipelines/orchestrators.md` §6); the 2026-10-01 retry and gate rest on that day's own measurement                     |
+| 2026-09-22/23          | 15 memory orchestrations over the agentic prompts: target mean 63.5 with recalled lessons in the goal vs 63.6 baseline; injected count uncorrelated with score (r = 0.1)                                                                                                                                                                                                                                                                                            | goal-injection recall judged inert at that store size; the owner chose coach-only recall into the producer (`docs/pipelines/memory-runs.md` §14 for the measurement, §15 for the decision, undated there; the date 2026-10-01 is from session note `coach-recall-decision`, outside the repository) |
+| 2026-10-01             | 324 runs / 4,136 calls: 2.22% of calls failed; 32 of 1,292 multi-sample lenses dropped to one sample; 118 findings in 14 runs discarded `below-min-hits` for a lost sample; the model busy ~100% of wall clock at concurrency 1.84×                                                                                                                                                                                                                                 | retry inside the call (3 attempts), the in-flight gate (8), a lost sample lowers that lens's threshold instead of silencing it, the sample became the scheduling unit (session note `llm-seam-retry-and-gate`)                                                                                      |
+| 2026-10-02 → 10-03     | 4 of 8 coach revise iterations produced no artifact and 0 of 8 retries recovered; 361 replies had been clipped mid-word; after the change 20/20 produced, 16/16 recovered, 0 of 316 calls lost                                                                                                                                                                                                                                                                      | declared bounds with target and ceiling, the lenient parse, faults named on retry (`docs/features-summary.md`: 20 of 20, 4 of 8; session note `never-throw-work-away`: the 361 clipped replies before commit `9376df1`, 0 of 8 retries; session note `recall-controls-result`: 16/16, 0 of 316)     |
+| 2026-10-03             | 5 paired coach runs, recall on vs off: +0.5 points, sd 7.4, about ±9 at 95%; 0 of 80 offered candidates were document points                                                                                                                                                                                                                                                                                                                                        | no claim that recall helps; about 30 pairs needed to see a 4-point effect (session note `recall-controls-result`)                                                                                                                                                                                   |
+| 2026-10-07             | a 20-step session failed 20/20 on `about:blank`: one sample of one critic vetoed a correct navigate; 36 of one critic's 55 findings were the other critic's types; grounding had never been derived in 165 rubrics                                                                                                                                                                                                                                                  | `corroboration: 'cited'` with a contradicted discount, the `cut` validator gate, per-critic `findingTypes`, fixed criteria, a stall rail (session note `browser-step-veto-forensics`; `core/pipeline.ts` comments)                                                                                  |
+| 2026-10-08             | evaluator in wave 2 echoed the critic: failed a stop in 24–41% of runs, 0 in 92 beside the critics; before → after on 23 recorded goals: first action ran 52% → 93%, plans refused whole 48% → 7%, vetoed for an absent stop 17% → 0, 25 s → 20 s per run (gpt-4o-mini)                                                                                                                                                                                             | `consumes: []` on browser-step's evaluator and a boot check (`checkCorroboration`) that refuses the shape in any pipeline declaring `corroboration: 'cited'` (`docs/quality-loop/lens-debate.md` §2, §6)                                                                                            |
+| 2026-10-08             | an evaluator bounded only from above answered 10 of 18 criteria in 6 of 23 step runs                                                                                                                                                                                                                                                                                                                                                                                | the evaluation schema asks for exactly the criteria count (`core/pipeline.ts` comment)                                                                                                                                                                                                              |
+| undated                | narrowing a mission to help one site raised false refusals from 3/8 to 6/8                                                                                                                                                                                                                                                                                                                                                                                          | reverted; the date and the mission are yours to name **[VERIFY]** (`CLAUDE.md`, TOP RULE 2)                                                                                                                                                                                                         |
+| 2026-10-18             | 9 of 1,840 accepted runs crowned an iteration the controller had not accepted; no verdict would change today                                                                                                                                                                                                                                                                                                                                                        | a one-line fix is proposed and waits on your decision (session note `quality-loop-admission-crown-gap` for the 1,840; `docs/features-summary.md` for the 9 and that no verdict changes)                                                                                                             |
 
 Two measurements that led to no change matter as much: the same input has scored about 9 points apart on byte-identical prompts (8.8 in the coach-recall audit of 2026-10-02, session notes `never-throw-work-away` and `recall-controls-result`; about 9 in `docs/features-summary.md`, as of 2026-10-28), so no single score is trusted without a panel; and the 2026-10-08 browser-step figures were taken on gpt-4o-mini through an openai-compatible config, while the configured provider today is the Claude Code subscription — 975 of the 3,139 runs, on 6–9 Oct 2026, used OpenAI or a local model.
 
@@ -4483,12 +4488,12 @@ Where it lives: `packages/quality-loop/src/orchestrators/memory/` (`steps.ts`, `
 
 Embedding raw text stores what a source says in its own words, and recall then returns passages nobody has checked for truth, transfer or duplication. A digest through the loop stores claims shaped for the reader and already checked: each memory separates the condition it applies under from the lesson or fact, declares a kind, and cites aliases from an Index the engine wrote, so a critic checks a claim against the record by location rather than by impression. Engine, controller and verdict reader are shared; the four pipelines differ only in declared data (kinds, finding types, withholds, personas) and in validators of their own, inside their folders.
 
-| Pipeline | Reads | Yields | Gated finding types |
-| --- | --- | --- | --- |
-| `experience-digest` | a finished run's record | condition-plus-lesson memories with a kind and cited aliases | `misattributed_evidence`, `run_specific` |
-| `document-digest` | a document chunk under a declared scope (subject or unit) | facts, stories and claim boundaries | `invented_fact`, `misread_section`, `misscoped_fact` |
-| `knowledge-digest` | a finished run's record | `fact`, `pattern`, `anti_pattern` and `procedure` items plus finding chunks | `misattributed_evidence`, `ungrounded_fact`, `run_specific` |
-| `register-digest` | a text for a memory space | memories filed into the space's declared registers | `ungrounded_memory`, `misread_section`, `stored_instruction`, `forbidden_content` |
+| Pipeline            | Reads                                                     | Yields                                                                      | Gated finding types                                                               |
+| ------------------- | --------------------------------------------------------- | --------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `experience-digest` | a finished run's record                                   | condition-plus-lesson memories with a kind and cited aliases                | `misattributed_evidence`, `run_specific`                                          |
+| `document-digest`   | a document chunk under a declared scope (subject or unit) | facts, stories and claim boundaries                                         | `invented_fact`, `misread_section`, `misscoped_fact`                              |
+| `knowledge-digest`  | a finished run's record                                   | `fact`, `pattern`, `anti_pattern` and `procedure` items plus finding chunks | `misattributed_evidence`, `ungrounded_fact`, `run_specific`                       |
+| `register-digest`   | a text for a memory space                                 | memories filed into the space's declared registers                          | `ungrounded_memory`, `misread_section`, `stored_instruction`, `forbidden_content` |
 
 In every one the producer proposes, each critic faults one memory per finding, by location, and the evaluators measure criteria a deriver writes for that run. The knowledge digest adds a kinds validator that checks, through the Index, that a `procedure` rests on a finding recorded resolved, a `pattern` on a criterion that held or a finding that resolved, and an `anti_pattern` on a confirmed finding; a `fact` needs only cited evidence, which the references validator already requires.
 
@@ -4516,17 +4521,17 @@ Where it lives: `packages/quality-loop/src/pipelines/experience-digest/`, `packa
 
 The split follows what each store is good at and what must survive the other's loss. Postgres holds everything needed to rebuild: run traces, ledgers, the embedding cache, support rows and, in the agentic tier, the records themselves. Qdrant holds only what is searched by meaning, with a payload rich enough to filter on and to explain a hit.
 
-| Concern | Postgres | Qdrant |
-| --- | --- | --- |
-| Evidence of a memory | `quality_run` traces; `orchestration_run` ledger with reason and counts | nothing; every point names its run |
-| One memory (loop tier) | no row; the digest run is the unit | one point, id a uuid of sha256(runId, ref), chunked under the iteration its evidence cites |
-| Vectors | none | two named cosine vectors, `condition` and `lesson`; 1536 dims, text-embedding-3-small |
-| Provenance and facets | the digest run and the source run, in full | the payload below; 15 keyword indexes ensured at every boot |
-| Scope and unit | agentic tier: `partition` column and jsonb `scope` | loop tier: payload `scope` and `unitKey`; agentic tier mirrors its keys |
-| Embedding cache | `memory_embedding`, unique on (model, contentHash) | the vectors on the points |
-| Reinforcement | `memory_support` rows, unique on (point, source run) | a payload count recomputed from the rows |
-| Record (agentic tier) | `memory_record`: versioned, closed by compare-and-set, never deleted; one current record per (space, register, scope, identity) | projection only: id, one vector, filter payload; rebuilt by the sweep |
-| Collection | none | `quality-memory__v2__<model>__<dims>`, `agentic-memory__v1__<model>__<dims>` |
+| Concern                | Postgres                                                                                                                        | Qdrant                                                                                     |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Evidence of a memory   | `quality_run` traces; `orchestration_run` ledger with reason and counts                                                         | nothing; every point names its run                                                         |
+| One memory (loop tier) | no row; the digest run is the unit                                                                                              | one point, id a uuid of sha256(runId, ref), chunked under the iteration its evidence cites |
+| Vectors                | none                                                                                                                            | two named cosine vectors, `condition` and `lesson`; 1536 dims, text-embedding-3-small      |
+| Provenance and facets  | the digest run and the source run, in full                                                                                      | the payload below; 15 keyword indexes ensured at every boot                                |
+| Scope and unit         | agentic tier: `partition` column and jsonb `scope`                                                                              | loop tier: payload `scope` and `unitKey`; agentic tier mirrors its keys                    |
+| Embedding cache        | `memory_embedding`, unique on (model, contentHash)                                                                              | the vectors on the points                                                                  |
+| Reinforcement          | `memory_support` rows, unique on (point, source run)                                                                            | a payload count recomputed from the rows                                                   |
+| Record (agentic tier)  | `memory_record`: versioned, closed by compare-and-set, never deleted; one current record per (space, register, scope, identity) | projection only: id, one vector, filter payload; rebuilt by the sweep                      |
+| Collection             | none                                                                                                                            | `quality-memory__v2__<model>__<dims>`, `agentic-memory__v1__<model>__<dims>`               |
 
 ```text
 loop-tier point payload (collection.ts, toPayload)
@@ -4850,17 +4855,17 @@ push / PR ─► verify: install → migrate → seed → migrate:check → form
           ─► images: docker build ×5 apps      ─► review: full profile
 ```
 
-| Gate | What it rejects | Where |
-| --- | --- | --- |
-| Typecheck incl. specs | a project whose `typecheck` configs miss any `.ts`/`.tsx` under `src` (specs and stories included) | `tooling/typecheck-coverage.spec.ts` |
-| Zero lint warnings | any ESLint error; a warning in `tooling/` (`--max-warnings=0`); an import against a package's `type:`/`scope:` tags — zero warnings in packages is a convention held at 2026-10-14 (owner's note repo-gates.md), not a cap | `eslint.config.mjs`, `lint:tooling` in `package.json` |
-| 500-line bound | a tracked source file over 500 lines (the review warns at 400) | `tooling/file-size.spec.ts`, `tooling/code-review/rules/file-size.ts` |
-| Inert code | an exported name whose identifier occurs exactly once in the repository; in five guarded packages, one reached only by specs | `tooling/inert-code.spec.ts` |
-| Bound declarations | a raw `.max()` on a string or list in a schema file; a `bounded.*` wrapped by anything but optional/nullable/nullish/default; an exported `*_BOUND` nothing reads | `tooling/bound-declarations.spec.ts` |
-| Measured bounds | an output cap below 1.2× the most its stage measurably wrote; a field target below the measured p99 or a ceiling not above the measured max | `packages/quality-loop/src/core/testing/bounds.ts` (stage caps) and `packages/contracts/src/lib/measured-bounds.ts` (field targets and ceilings), over the `measured.json` fixtures `pnpm measure:bounds` writes |
-| Schema drift | entities that disagree with the migrated schema | `pnpm db:migrate:check` (MikroORM) in `ci.yml` |
-| Pre-commit review and tripwire | staged content matching the branding pattern; a `high` rule or critic finding | `.githooks/pre-commit`, `tooling/code-review/` |
-| Deploy gate | a website deploy from any ref but `main`, or while the repository variable `WEBSITE_DEPLOYS` is not `on` | `.github/workflows/deploy-website.yml` |
+| Gate                           | What it rejects                                                                                                                                                                                                            | Where                                                                                                                                                                                                            |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Typecheck incl. specs          | a project whose `typecheck` configs miss any `.ts`/`.tsx` under `src` (specs and stories included)                                                                                                                         | `tooling/typecheck-coverage.spec.ts`                                                                                                                                                                             |
+| Zero lint warnings             | any ESLint error; a warning in `tooling/` (`--max-warnings=0`); an import against a package's `type:`/`scope:` tags — zero warnings in packages is a convention held at 2026-10-14 (owner's note repo-gates.md), not a cap | `eslint.config.mjs`, `lint:tooling` in `package.json`                                                                                                                                                            |
+| 500-line bound                 | a tracked source file over 500 lines (the review warns at 400)                                                                                                                                                             | `tooling/file-size.spec.ts`, `tooling/code-review/rules/file-size.ts`                                                                                                                                            |
+| Inert code                     | an exported name whose identifier occurs exactly once in the repository; in five guarded packages, one reached only by specs                                                                                               | `tooling/inert-code.spec.ts`                                                                                                                                                                                     |
+| Bound declarations             | a raw `.max()` on a string or list in a schema file; a `bounded.*` wrapped by anything but optional/nullable/nullish/default; an exported `*_BOUND` nothing reads                                                          | `tooling/bound-declarations.spec.ts`                                                                                                                                                                             |
+| Measured bounds                | an output cap below 1.2× the most its stage measurably wrote; a field target below the measured p99 or a ceiling not above the measured max                                                                                | `packages/quality-loop/src/core/testing/bounds.ts` (stage caps) and `packages/contracts/src/lib/measured-bounds.ts` (field targets and ceilings), over the `measured.json` fixtures `pnpm measure:bounds` writes |
+| Schema drift                   | entities that disagree with the migrated schema                                                                                                                                                                            | `pnpm db:migrate:check` (MikroORM) in `ci.yml`                                                                                                                                                                   |
+| Pre-commit review and tripwire | staged content matching the branding pattern; a `high` rule or critic finding                                                                                                                                              | `.githooks/pre-commit`, `tooling/code-review/`                                                                                                                                                                   |
+| Deploy gate                    | a website deploy from any ref but `main`, or while the repository variable `WEBSITE_DEPLOYS` is not `on`                                                                                                                   | `.github/workflows/deploy-website.yml`                                                                                                                                                                           |
 
 Delivery: the only deploy is the website's workflow — on `main` only, and only while the repository variable `WEBSITE_DEPLOYS` is `on` — which uploads the verified build with wrangler and then runs the browser suite against production; no service has a deploy workflow (`.github/workflows/` holds `ci.yml` and this one; PLAT-2). Six more `tooling/` specs fail the build the same way; the two worth naming are `quality-loop-guarantees.spec.ts` (no clock, randomness, filesystem or environment read inside `quality-loop/src/core`) and `test-database-guarantees.spec.ts` (only a database named as disposable can ever be emptied).
 
@@ -5023,7 +5028,7 @@ Where it lives: `docs/issues/platform-and-hygiene.md`, `packages/nest-kit/src/`,
 
 Two product surfaces run on an engine that knows neither of them: the Studio grades and coaches a system-design canvas, and the browser session plans clicks and answers forms. A Lead interviewer probes this to see whether "one shared core" is real — whether a pipeline is really data, what each host owns and what it leaves to the loop — and then asks the question every résumé defense ends on: what did you personally build, and what evidence backs the numbers. This is a solo project; the answers say so and separate what was designed, implemented and measured.
 
-*Disclosure note (added by the compiler of this document, not by the interviewer or the repository).* The browser automation's live use so far has been applying to jobs on your behalf; Q2 below states the dated outcomes because they are the evidence. Decide before the interview how much of that you volunteer to an employer. The engine-level description is accurate on its own and matches the résumé's wording: multi-step browser workflows with an operator in the loop, every planned action judged before it runs, answers recalled and taught per unit, and a record that stops the same target from being opened twice.
+_Disclosure note (added by the compiler of this document, not by the interviewer or the repository)._ The browser automation's live use so far has been applying to jobs on your behalf; Q2 below states the dated outcomes because they are the evidence. Decide before the interview how much of that you volunteer to an employer. The engine-level description is accurate on its own and matches the résumé's wording: multi-step browser workflows with an operator in the loop, every planned action judged before it runs, answers recalled and taught per unit, and a record that stops the same target from being opened twice.
 
 #### Q1. “How does the Studio grade a canvas with this engine?”
 
@@ -5153,9 +5158,9 @@ Where it lives: `CLAUDE.md` (local, not tracked), `docs/features-summary.md` (lo
 
 ## Personal Project — Agentic Engine (the résumé's DAG / graph-search wording, kept for reference)
 
-*Reference block. These are the original interviewer questions and answers for the Agentic Engine bullet as it was first framed (goal → DAG compiler, beam search, XState). The current architecture is described in the section above; use this block to bridge from the résumé's wording to what the engine became.*
+_Reference block. These are the original interviewer questions and answers for the Agentic Engine bullet as it was first framed (goal → DAG compiler, beam search, XState). The current architecture is described in the section above; use this block to bridge from the résumé's wording to what the engine became._
 
-*PERSONAL PROJECT — AGENTIC ENGINE*
+_PERSONAL PROJECT — AGENTIC ENGINE_
 
 Your resume describes a workflow engine that compiles goals into DAGs using LLM critics/evals, strict JSON schemas, beam search, MCP tooling, RAG, XState, TypeScript/Node, and Python.
 
@@ -5649,7 +5654,8 @@ For external actions, use a downstream idempotency key too.
 ---
 
 ## The 10 cross-cutting questions they can ask about any bullet
-*Questions they can use against almost any resume bullet*
+
+_Questions they can use against almost any resume bullet_
 
 After you've answered any of the 18 areas above, expect the Lead interviewer to switch into the same pressure-test sequence:
 
@@ -6183,7 +6189,11 @@ When the Upload Service finishes saving a raw .mp4 file into Object Storage (S3)
 Json
 
 ```json
-{ "eventName": "ObjectCreated:Put", "bucket": "my-raw-videos-bucket", "videoKey": "user-123/my-travel-vlog.mp4" }
+{
+  "eventName": "ObjectCreated:Put",
+  "bucket": "my-raw-videos-bucket",
+  "videoKey": "user-123/my-travel-vlog.mp4"
+}
 ```
 
 ### Why This Design Makes Sense (The Architecture Breakdown)
@@ -6223,24 +6233,24 @@ Instead, a CDN (Content Delivery Network) sits in front of S3. The CDN caches th
 
 ### The problem → component map
 
-| Problem | Component/pattern you should immediately think about |
-|---|---|
-| Too many reads | Cache + read replicas |
-| Too many writes | Partition/shard DB + async writes |
-| Traffic spikes | Load balancer + autoscaling + queue |
-| Slow expensive work | Queue + workers |
-| Huge images/videos | S3 + CDN |
-| Real-time communication | WebSockets |
-| Millions of events | Kafka |
-| Limited inventory | locking + atomic transactions |
-| Duplicate requests | idempotency key |
-| Database too large | sharding |
-| Search | Elasticsearch/OpenSearch |
-| Nearby objects | geospatial index / geohash |
-| Global users | CDN + multi-region |
-| Service failures | timeouts + retries + circuit breakers |
-| Downstream overload | rate limiting + backpressure |
-| System visibility | logs + metrics + traces |
+| Problem                 | Component/pattern you should immediately think about |
+| ----------------------- | ---------------------------------------------------- |
+| Too many reads          | Cache + read replicas                                |
+| Too many writes         | Partition/shard DB + async writes                    |
+| Traffic spikes          | Load balancer + autoscaling + queue                  |
+| Slow expensive work     | Queue + workers                                      |
+| Huge images/videos      | S3 + CDN                                             |
+| Real-time communication | WebSockets                                           |
+| Millions of events      | Kafka                                                |
+| Limited inventory       | locking + atomic transactions                        |
+| Duplicate requests      | idempotency key                                      |
+| Database too large      | sharding                                             |
+| Search                  | Elasticsearch/OpenSearch                             |
+| Nearby objects          | geospatial index / geohash                           |
+| Global users            | CDN + multi-region                                   |
+| Service failures        | timeouts + retries + circuit breakers                |
+| Downstream overload     | rate limiting + backpressure                         |
+| System visibility       | logs + metrics + traces                              |
 
 ## 1. Common components of a scalable system
 
@@ -6248,112 +6258,112 @@ Instead, a CDN (Content Delivery Network) sits in front of S3. The CDN caches th
 
 For a system design interview, think of a scalable system as a set of common building blocks. You usually won't use every component, but you should know what each does, why you'd add it, and when it becomes necessary.
 
-| Component | What it does / why it's used |
-|---|---|
-| Client | Web, mobile, desktop, or another service that sends requests to your system. |
-| DNS | Converts a domain such as api.example.com into the IP/address of your infrastructure. |
-| CDN | Caches static or semi-static content close to users geographically, reducing latency and origin traffic. Examples: CloudFront, Cloudflare. |
-| Edge Network | Runs routing, caching, filtering, authentication, or lightweight computation near users before requests reach your backend. |
-| WAF — Web Application Firewall | Blocks malicious web traffic such as SQL injection, bots, scanners, and suspicious requests. |
-| Load Balancer | Distributes requests across multiple application servers so no single server becomes overloaded. |
-| Reverse Proxy | Sits in front of backend services and handles routing, TLS termination, caching, compression, etc. Nginx is common. |
-| API Gateway | Central entry point for APIs. Handles routing, authentication, rate limiting, quotas, versioning, logging, etc. |
-| Rate Limiter | Restricts how many requests a client/user can make over a period. Protects against abuse and overload. |
-| Application Server | Runs your actual business logic. Usually horizontally scaled across many instances. |
-| Stateless Service | Server that keeps no important user state locally, making it easy to add/remove instances. Preferred for scalable APIs. |
-| Stateful Service | Keeps persistent state locally or tied to a specific instance. Requires more careful scaling and failover. |
-| Microservice | Independently deployable service responsible for a business capability such as users, payments, or orders. |
-| Monolith | Application where many features live in one deployable application. Simpler initially, but may become harder to scale organizationally. |
-| Service Discovery | Allows services to dynamically locate other service instances instead of relying on hard-coded addresses. |
-| Service Mesh | Infrastructure layer controlling service-to-service networking, retries, TLS, observability, traffic policies, etc. Examples: Istio, Linkerd. |
-| Database | Persistent source of truth for application data. |
-| Relational Database / SQL | Structured data with relationships, transactions, and strong consistency. PostgreSQL/MySQL. |
-| NoSQL Database | Optimized for flexible schemas, high throughput, large scale, or specialized access patterns. DynamoDB, MongoDB, Cassandra. |
-| Document Database | Stores JSON-like documents. Useful when data structure varies or maps naturally to objects. |
-| Key-Value Store | Extremely fast lookup by key. Common for caching, sessions, counters, and simple high-scale data. |
-| Wide-Column Database | Designed for enormous horizontally distributed datasets and high write throughput. Cassandra/ScyllaDB. |
-| Graph Database | Stores relationships as nodes and edges. Useful for social networks, recommendations, fraud graphs, etc. |
-| Time-Series Database | Optimized for timestamped measurements such as monitoring metrics, IoT, and financial data. |
-| Search Engine | Provides full-text search, indexing, filtering, and ranking. Elasticsearch/OpenSearch/Solr. |
-| Vector Database | Stores embeddings and retrieves similar vectors. Used for semantic search, recommendation, and RAG/AI systems. |
-| Database Index | Additional data structure that speeds reads at the cost of storage and slower writes. |
-| Read Replica | Copy of a database used primarily for reads, reducing load on the primary database. |
-| Primary/Replica Architecture | Primary handles writes; replicas copy its data and commonly serve reads/failover. |
-| Database Sharding | Splits data across multiple database servers so datasets and traffic can scale beyond one machine. |
-| Partitioning | Divides data into subsets, usually by key, range, geography, or time. |
-| Replication | Maintains multiple copies of data for availability, durability, and sometimes read scalability. |
-| Cache | Stores frequently accessed data in faster storage to reduce database/backend load and latency. Redis/Memcached. |
-| Distributed Cache | Cache shared across many application instances rather than local to one server. |
-| Local/In-Memory Cache | Data stored directly in application memory. Extremely fast but not shared across instances. |
-| Cache Eviction Policy | Determines what gets removed when cache fills, e.g. LRU, LFU, TTL. |
-| Message Queue | Buffers asynchronous jobs so producers don't have to wait for consumers. SQS, RabbitMQ. |
-| Message Broker | Middleware responsible for routing and delivering messages between producers and consumers. |
-| Event Bus | Allows components to publish events that multiple subscribers can independently consume. |
-| Event Stream / Log | Persistent ordered sequence of events optimized for high-throughput event processing. Kafka/Kinesis/Pulsar. |
-| Producer | Service that writes events/messages into a queue or stream. |
-| Consumer / Worker | Background process that reads messages and performs asynchronous work. |
-| Dead-Letter Queue — DLQ | Stores messages that repeatedly fail processing so they can be inspected or retried later. |
-| Job Scheduler | Executes work at specific times or intervals. Cron, Quartz, EventBridge Scheduler. |
-| Background Worker | Performs expensive/non-user-facing tasks asynchronously such as emails, image processing, or report generation. |
-| Object Storage | Stores large blobs such as images, videos, backups, and files. S3/GCS/Azure Blob. |
-| File Storage | Provides filesystem-like persistent storage. EFS/NFS. |
-| Data Warehouse | Stores large historical datasets optimized for analytics instead of transactional workloads. Snowflake, BigQuery, Redshift. |
-| Data Lake | Cheap storage for large amounts of structured and unstructured raw data. Often built on object storage. |
-| ETL / ELT Pipeline | Moves and transforms operational data into analytical systems. |
-| Authentication Service | Determines who the user is. Passwords, OAuth, OIDC, SSO, tokens. |
-| Authorization Service | Determines what the user is allowed to do. RBAC, ABAC, permissions. |
-| Session Store | Stores user login/session state, often in Redis or a database. |
-| Secrets Manager | Securely stores credentials, API keys, database passwords, encryption keys, etc. |
-| KMS — Key Management Service | Generates and manages encryption keys. |
-| TLS/SSL | Encrypts data traveling across networks. |
-| Container | Packages an application and dependencies into an isolated runtime. Docker. |
-| Container Orchestrator | Deploys, restarts, scales, and manages containers across many machines. Kubernetes/ECS. |
-| Virtual Machine | Virtualized server running an operating system. EC2, Compute Engine. |
-| Serverless Function | Executes code on demand without managing servers. Lambda, Cloud Functions. |
-| Autoscaler | Automatically increases/decreases application capacity based on traffic or resource usage. |
-| Horizontal Scaling | Adds more machines/instances. Usually the preferred scaling strategy. |
-| Vertical Scaling | Gives one machine more CPU, RAM, or disk. Easy but has an upper limit. |
-| Health Check | Determines whether an instance is healthy enough to receive traffic. |
-| Heartbeat | Periodic signal showing that a service/node is still alive. |
-| Failover | Automatically moves traffic/work to a healthy backup when a component fails. |
-| Multi-AZ Deployment | Runs infrastructure across multiple availability zones to survive data-center failures. |
-| Multi-Region Deployment | Runs infrastructure geographically across regions for disaster recovery, global latency, or extreme availability. |
-| Circuit Breaker | Stops repeatedly calling an unhealthy downstream service to prevent cascading failures. |
-| Retry | Re-attempts transient failures. Usually combined with exponential backoff and jitter. |
-| Exponential Backoff | Gradually increases delay between retries so recovering services aren't overwhelmed. |
-| Timeout | Stops waiting for a downstream dependency after a bounded period. Essential for preventing resource exhaustion. |
-| Bulkhead | Isolates resources so failure or overload in one subsystem doesn't consume everything. |
-| Idempotency | Ensures retrying the same request doesn't accidentally perform the operation multiple times. Critical for payments/orders. |
-| Distributed Lock | Ensures only one distributed process performs a critical operation at a time. Redis/ZooKeeper/etc. |
-| Leader Election | Selects one node to coordinate work among multiple distributed instances. |
-| Consensus System | Allows distributed machines to agree on shared state despite failures. Raft/Paxos. |
-| Coordination Service | Provides leader election, configuration, locks, membership, etc. ZooKeeper/etcd. |
-| Config Service | Centrally manages application configuration across environments and services. |
-| Feature Flag System | Enables/disables functionality dynamically without redeploying code. |
-| Logging | Records application events and errors for debugging and auditing. |
-| Metrics | Numerical measurements such as request rate, latency, CPU, error rate, and queue depth. |
-| Tracing | Tracks a request across multiple distributed services. |
-| Distributed Tracing | Correlates spans across microservices to identify where latency/errors occur. OpenTelemetry/Jaeger. |
-| Monitoring | Watches infrastructure and application health. |
-| Alerting | Notifies engineers when metrics or failures cross meaningful thresholds. |
-| Observability Platform | Combines logs, metrics, traces, dashboards, and alerts. Datadog/New Relic/Grafana. |
-| Audit Log | Immutable-ish record of important actions, especially security/account/admin operations. |
-| CI/CD Pipeline | Automatically builds, tests, and deploys software. |
-| Container Registry | Stores built container images. ECR, Docker Hub, GCR. |
-| Infrastructure as Code | Defines infrastructure in code so environments are reproducible. Terraform/CloudFormation. |
-| Blue-Green Deployment | Maintains old and new environments and switches traffic between them. |
-| Canary Deployment | Sends a small percentage of traffic to a new version before full rollout. |
-| Rolling Deployment | Gradually replaces old instances with new ones. |
-| Database Migration System | Safely changes database schemas across application versions. |
-| Backup System | Periodically saves persistent data so it can be restored after corruption/failure. |
-| Disaster Recovery | Processes/infrastructure for recovering after catastrophic outages. |
-| API | Defined interface through which clients/services communicate. REST, GraphQL, RPC, etc. |
-| REST | HTTP/resource-oriented API style; simple, ubiquitous, good for public APIs. |
-| GraphQL | Lets clients request exactly the fields they need. Useful for complex frontend data requirements. |
-| RPC / gRPC | Calls remote service methods as if they were functions; efficient for service-to-service communication. |
-| WebSocket | Persistent bidirectional connection. Useful for chat, collaboration, gaming, live dashboards. |
-| Server-Sent Events | Server continuously pushes updates to the browser over one HTTP connection. Simpler than WebSockets for one-way streaming. |
-| Long Polling | Client keeps an HTTP request open until the server has an update. Older/simple approach to real-time communication. |
+| Component                      | What it does / why it's used                                                                                                                  |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Client                         | Web, mobile, desktop, or another service that sends requests to your system.                                                                  |
+| DNS                            | Converts a domain such as api.example.com into the IP/address of your infrastructure.                                                         |
+| CDN                            | Caches static or semi-static content close to users geographically, reducing latency and origin traffic. Examples: CloudFront, Cloudflare.    |
+| Edge Network                   | Runs routing, caching, filtering, authentication, or lightweight computation near users before requests reach your backend.                   |
+| WAF — Web Application Firewall | Blocks malicious web traffic such as SQL injection, bots, scanners, and suspicious requests.                                                  |
+| Load Balancer                  | Distributes requests across multiple application servers so no single server becomes overloaded.                                              |
+| Reverse Proxy                  | Sits in front of backend services and handles routing, TLS termination, caching, compression, etc. Nginx is common.                           |
+| API Gateway                    | Central entry point for APIs. Handles routing, authentication, rate limiting, quotas, versioning, logging, etc.                               |
+| Rate Limiter                   | Restricts how many requests a client/user can make over a period. Protects against abuse and overload.                                        |
+| Application Server             | Runs your actual business logic. Usually horizontally scaled across many instances.                                                           |
+| Stateless Service              | Server that keeps no important user state locally, making it easy to add/remove instances. Preferred for scalable APIs.                       |
+| Stateful Service               | Keeps persistent state locally or tied to a specific instance. Requires more careful scaling and failover.                                    |
+| Microservice                   | Independently deployable service responsible for a business capability such as users, payments, or orders.                                    |
+| Monolith                       | Application where many features live in one deployable application. Simpler initially, but may become harder to scale organizationally.       |
+| Service Discovery              | Allows services to dynamically locate other service instances instead of relying on hard-coded addresses.                                     |
+| Service Mesh                   | Infrastructure layer controlling service-to-service networking, retries, TLS, observability, traffic policies, etc. Examples: Istio, Linkerd. |
+| Database                       | Persistent source of truth for application data.                                                                                              |
+| Relational Database / SQL      | Structured data with relationships, transactions, and strong consistency. PostgreSQL/MySQL.                                                   |
+| NoSQL Database                 | Optimized for flexible schemas, high throughput, large scale, or specialized access patterns. DynamoDB, MongoDB, Cassandra.                   |
+| Document Database              | Stores JSON-like documents. Useful when data structure varies or maps naturally to objects.                                                   |
+| Key-Value Store                | Extremely fast lookup by key. Common for caching, sessions, counters, and simple high-scale data.                                             |
+| Wide-Column Database           | Designed for enormous horizontally distributed datasets and high write throughput. Cassandra/ScyllaDB.                                        |
+| Graph Database                 | Stores relationships as nodes and edges. Useful for social networks, recommendations, fraud graphs, etc.                                      |
+| Time-Series Database           | Optimized for timestamped measurements such as monitoring metrics, IoT, and financial data.                                                   |
+| Search Engine                  | Provides full-text search, indexing, filtering, and ranking. Elasticsearch/OpenSearch/Solr.                                                   |
+| Vector Database                | Stores embeddings and retrieves similar vectors. Used for semantic search, recommendation, and RAG/AI systems.                                |
+| Database Index                 | Additional data structure that speeds reads at the cost of storage and slower writes.                                                         |
+| Read Replica                   | Copy of a database used primarily for reads, reducing load on the primary database.                                                           |
+| Primary/Replica Architecture   | Primary handles writes; replicas copy its data and commonly serve reads/failover.                                                             |
+| Database Sharding              | Splits data across multiple database servers so datasets and traffic can scale beyond one machine.                                            |
+| Partitioning                   | Divides data into subsets, usually by key, range, geography, or time.                                                                         |
+| Replication                    | Maintains multiple copies of data for availability, durability, and sometimes read scalability.                                               |
+| Cache                          | Stores frequently accessed data in faster storage to reduce database/backend load and latency. Redis/Memcached.                               |
+| Distributed Cache              | Cache shared across many application instances rather than local to one server.                                                               |
+| Local/In-Memory Cache          | Data stored directly in application memory. Extremely fast but not shared across instances.                                                   |
+| Cache Eviction Policy          | Determines what gets removed when cache fills, e.g. LRU, LFU, TTL.                                                                            |
+| Message Queue                  | Buffers asynchronous jobs so producers don't have to wait for consumers. SQS, RabbitMQ.                                                       |
+| Message Broker                 | Middleware responsible for routing and delivering messages between producers and consumers.                                                   |
+| Event Bus                      | Allows components to publish events that multiple subscribers can independently consume.                                                      |
+| Event Stream / Log             | Persistent ordered sequence of events optimized for high-throughput event processing. Kafka/Kinesis/Pulsar.                                   |
+| Producer                       | Service that writes events/messages into a queue or stream.                                                                                   |
+| Consumer / Worker              | Background process that reads messages and performs asynchronous work.                                                                        |
+| Dead-Letter Queue — DLQ        | Stores messages that repeatedly fail processing so they can be inspected or retried later.                                                    |
+| Job Scheduler                  | Executes work at specific times or intervals. Cron, Quartz, EventBridge Scheduler.                                                            |
+| Background Worker              | Performs expensive/non-user-facing tasks asynchronously such as emails, image processing, or report generation.                               |
+| Object Storage                 | Stores large blobs such as images, videos, backups, and files. S3/GCS/Azure Blob.                                                             |
+| File Storage                   | Provides filesystem-like persistent storage. EFS/NFS.                                                                                         |
+| Data Warehouse                 | Stores large historical datasets optimized for analytics instead of transactional workloads. Snowflake, BigQuery, Redshift.                   |
+| Data Lake                      | Cheap storage for large amounts of structured and unstructured raw data. Often built on object storage.                                       |
+| ETL / ELT Pipeline             | Moves and transforms operational data into analytical systems.                                                                                |
+| Authentication Service         | Determines who the user is. Passwords, OAuth, OIDC, SSO, tokens.                                                                              |
+| Authorization Service          | Determines what the user is allowed to do. RBAC, ABAC, permissions.                                                                           |
+| Session Store                  | Stores user login/session state, often in Redis or a database.                                                                                |
+| Secrets Manager                | Securely stores credentials, API keys, database passwords, encryption keys, etc.                                                              |
+| KMS — Key Management Service   | Generates and manages encryption keys.                                                                                                        |
+| TLS/SSL                        | Encrypts data traveling across networks.                                                                                                      |
+| Container                      | Packages an application and dependencies into an isolated runtime. Docker.                                                                    |
+| Container Orchestrator         | Deploys, restarts, scales, and manages containers across many machines. Kubernetes/ECS.                                                       |
+| Virtual Machine                | Virtualized server running an operating system. EC2, Compute Engine.                                                                          |
+| Serverless Function            | Executes code on demand without managing servers. Lambda, Cloud Functions.                                                                    |
+| Autoscaler                     | Automatically increases/decreases application capacity based on traffic or resource usage.                                                    |
+| Horizontal Scaling             | Adds more machines/instances. Usually the preferred scaling strategy.                                                                         |
+| Vertical Scaling               | Gives one machine more CPU, RAM, or disk. Easy but has an upper limit.                                                                        |
+| Health Check                   | Determines whether an instance is healthy enough to receive traffic.                                                                          |
+| Heartbeat                      | Periodic signal showing that a service/node is still alive.                                                                                   |
+| Failover                       | Automatically moves traffic/work to a healthy backup when a component fails.                                                                  |
+| Multi-AZ Deployment            | Runs infrastructure across multiple availability zones to survive data-center failures.                                                       |
+| Multi-Region Deployment        | Runs infrastructure geographically across regions for disaster recovery, global latency, or extreme availability.                             |
+| Circuit Breaker                | Stops repeatedly calling an unhealthy downstream service to prevent cascading failures.                                                       |
+| Retry                          | Re-attempts transient failures. Usually combined with exponential backoff and jitter.                                                         |
+| Exponential Backoff            | Gradually increases delay between retries so recovering services aren't overwhelmed.                                                          |
+| Timeout                        | Stops waiting for a downstream dependency after a bounded period. Essential for preventing resource exhaustion.                               |
+| Bulkhead                       | Isolates resources so failure or overload in one subsystem doesn't consume everything.                                                        |
+| Idempotency                    | Ensures retrying the same request doesn't accidentally perform the operation multiple times. Critical for payments/orders.                    |
+| Distributed Lock               | Ensures only one distributed process performs a critical operation at a time. Redis/ZooKeeper/etc.                                            |
+| Leader Election                | Selects one node to coordinate work among multiple distributed instances.                                                                     |
+| Consensus System               | Allows distributed machines to agree on shared state despite failures. Raft/Paxos.                                                            |
+| Coordination Service           | Provides leader election, configuration, locks, membership, etc. ZooKeeper/etcd.                                                              |
+| Config Service                 | Centrally manages application configuration across environments and services.                                                                 |
+| Feature Flag System            | Enables/disables functionality dynamically without redeploying code.                                                                          |
+| Logging                        | Records application events and errors for debugging and auditing.                                                                             |
+| Metrics                        | Numerical measurements such as request rate, latency, CPU, error rate, and queue depth.                                                       |
+| Tracing                        | Tracks a request across multiple distributed services.                                                                                        |
+| Distributed Tracing            | Correlates spans across microservices to identify where latency/errors occur. OpenTelemetry/Jaeger.                                           |
+| Monitoring                     | Watches infrastructure and application health.                                                                                                |
+| Alerting                       | Notifies engineers when metrics or failures cross meaningful thresholds.                                                                      |
+| Observability Platform         | Combines logs, metrics, traces, dashboards, and alerts. Datadog/New Relic/Grafana.                                                            |
+| Audit Log                      | Immutable-ish record of important actions, especially security/account/admin operations.                                                      |
+| CI/CD Pipeline                 | Automatically builds, tests, and deploys software.                                                                                            |
+| Container Registry             | Stores built container images. ECR, Docker Hub, GCR.                                                                                          |
+| Infrastructure as Code         | Defines infrastructure in code so environments are reproducible. Terraform/CloudFormation.                                                    |
+| Blue-Green Deployment          | Maintains old and new environments and switches traffic between them.                                                                         |
+| Canary Deployment              | Sends a small percentage of traffic to a new version before full rollout.                                                                     |
+| Rolling Deployment             | Gradually replaces old instances with new ones.                                                                                               |
+| Database Migration System      | Safely changes database schemas across application versions.                                                                                  |
+| Backup System                  | Periodically saves persistent data so it can be restored after corruption/failure.                                                            |
+| Disaster Recovery              | Processes/infrastructure for recovering after catastrophic outages.                                                                           |
+| API                            | Defined interface through which clients/services communicate. REST, GraphQL, RPC, etc.                                                        |
+| REST                           | HTTP/resource-oriented API style; simple, ubiquitous, good for public APIs.                                                                   |
+| GraphQL                        | Lets clients request exactly the fields they need. Useful for complex frontend data requirements.                                             |
+| RPC / gRPC                     | Calls remote service methods as if they were functions; efficient for service-to-service communication.                                       |
+| WebSocket                      | Persistent bidirectional connection. Useful for chat, collaboration, gaming, live dashboards.                                                 |
+| Server-Sent Events             | Server continuously pushes updates to the browser over one HTTP connection. Simpler than WebSockets for one-way streaming.                    |
+| Long Polling                   | Client keeps an HTTP request open until the server has an update. Older/simple approach to real-time communication.                           |
 
 ### The components that come up most often in interviews
 
@@ -6429,7 +6439,7 @@ That type of requirement → bottleneck → architectural component → tradeoff
 
 ## 2. Ten high-yield architectures, a notification system, and the pattern behind them
 
-> **Original question:** give me 10 more scalable architecture diagrams  like the one above with usecase prompt  to prepare for interview in an hour
+> **Original question:** give me 10 more scalable architecture diagrams like the one above with usecase prompt to prepare for interview in an hour
 
 Below are 10 high-yield system design interview architectures. These cover most patterns you are likely to encounter.
 
@@ -7059,24 +7069,24 @@ Most scalable systems eventually resemble this:
 
 The interviewer then changes which part is difficult.
 
-| Problem | Component/pattern you should immediately think about |
-|---|---|
-| Too many reads | Cache + read replicas |
-| Too many writes | Partition/shard DB + async writes |
-| Traffic spikes | Load balancer + autoscaling + queue |
-| Slow expensive work | Queue + workers |
-| Huge images/videos | S3 + CDN |
-| Real-time communication | WebSockets |
-| Millions of events | Kafka |
-| Limited inventory | locking + atomic transactions |
-| Duplicate requests | idempotency key |
-| Database too large | sharding |
-| Search | Elasticsearch/OpenSearch |
-| Nearby objects | geospatial index / geohash |
-| Global users | CDN + multi-region |
-| Service failures | timeouts + retries + circuit breakers |
-| Downstream overload | rate limiting + backpressure |
-| System visibility | logs + metrics + traces |
+| Problem                 | Component/pattern you should immediately think about |
+| ----------------------- | ---------------------------------------------------- |
+| Too many reads          | Cache + read replicas                                |
+| Too many writes         | Partition/shard DB + async writes                    |
+| Traffic spikes          | Load balancer + autoscaling + queue                  |
+| Slow expensive work     | Queue + workers                                      |
+| Huge images/videos      | S3 + CDN                                             |
+| Real-time communication | WebSockets                                           |
+| Millions of events      | Kafka                                                |
+| Limited inventory       | locking + atomic transactions                        |
+| Duplicate requests      | idempotency key                                      |
+| Database too large      | sharding                                             |
+| Search                  | Elasticsearch/OpenSearch                             |
+| Nearby objects          | geospatial index / geohash                           |
+| Global users            | CDN + multi-region                                   |
+| Service failures        | timeouts + retries + circuit breakers                |
+| Downstream overload     | rate limiting + backpressure                         |
+| System visibility       | logs + metrics + traces                              |
 
 ### For your interview in one hour, memorize this sequence
 
@@ -7159,16 +7169,16 @@ Users
 
 Good use cases:
 
-| Use case | Why SQL |
-|---|---|
-| Payments | ACID transactions |
-| Banking | Strong consistency |
-| Orders / checkout | Transactions across related records |
-| Inventory | Prevent overselling |
-| User/account systems | Structured relationships |
-| SaaS/business applications | Lots of relational data |
-| Ticket reservations | Atomic inventory updates |
-| Reporting requiring JOINs | Relational querying |
+| Use case                   | Why SQL                             |
+| -------------------------- | ----------------------------------- |
+| Payments                   | ACID transactions                   |
+| Banking                    | Strong consistency                  |
+| Orders / checkout          | Transactions across related records |
+| Inventory                  | Prevent overselling                 |
+| User/account systems       | Structured relationships            |
+| SaaS/business applications | Lots of relational data             |
+| Ticket reservations        | Atomic inventory updates            |
+| Reporting requiring JOINs  | Relational querying                 |
 
 Example:
 
@@ -7196,16 +7206,16 @@ Massive scale + simple access patterns + flexible data model
 
 Good use cases:
 
-| Use case | Typical choice |
-|---|---|
-| User sessions | Redis / DynamoDB |
-| Product catalog | MongoDB / DynamoDB |
-| Activity/event data | Cassandra |
-| IoT data | Cassandra / DynamoDB |
-| Huge key-value lookup workload | DynamoDB |
-| Flexible JSON documents | MongoDB |
-| Very high write throughput | Cassandra |
-| Feed/timeline storage | Cassandra/DynamoDB |
+| Use case                       | Typical choice       |
+| ------------------------------ | -------------------- |
+| User sessions                  | Redis / DynamoDB     |
+| Product catalog                | MongoDB / DynamoDB   |
+| Activity/event data            | Cassandra            |
+| IoT data                       | Cassandra / DynamoDB |
+| Huge key-value lookup workload | DynamoDB             |
+| Flexible JSON documents        | MongoDB              |
+| Very high write throughput     | Cassandra            |
+| Feed/timeline storage          | Cassandra/DynamoDB   |
 
 Example document:
 
@@ -7901,16 +7911,16 @@ P2 → inventory-worker-3
 
 This is also likely to come up.
 
-|  | Kafka | SQS/RabbitMQ-style queue |
-|---|---|---|
-| Main abstraction | Event log/stream | Message queue |
-| Message retained after read? | Yes | Usually consumed/deleted |
-| Replay old events? | Yes | Usually not the primary model |
-| Multiple independent consumers | Excellent | Possible, but different model |
-| Huge throughput | Excellent | Good |
-| Ordering | Per partition | Depends on queue/type |
-| Event sourcing/analytics | Excellent | Less suited |
-| Background jobs | Can work | Often simpler/better |
+|                                | Kafka            | SQS/RabbitMQ-style queue      |
+| ------------------------------ | ---------------- | ----------------------------- |
+| Main abstraction               | Event log/stream | Message queue                 |
+| Message retained after read?   | Yes              | Usually consumed/deleted      |
+| Replay old events?             | Yes              | Usually not the primary model |
+| Multiple independent consumers | Excellent        | Possible, but different model |
+| Huge throughput                | Excellent        | Good                          |
+| Ordering                       | Per partition    | Depends on queue/type         |
+| Event sourcing/analytics       | Excellent        | Less suited                   |
+| Background jobs                | Can work         | Often simpler/better          |
 
 Example:
 
@@ -8125,18 +8135,18 @@ know the queries first
 
 ### Cassandra vs PostgreSQL
 
-|  | PostgreSQL | Cassandra |
-|---|---|---|
-| Type | Relational | Wide-column NoSQL |
-| JOINs | Excellent | Generally no |
-| Transactions | Strong ACID | Limited compared with SQL |
-| Complex queries | Excellent | Poor fit |
-| Horizontal scaling | Harder | Built-in |
-| Massive writes | Good | Excellent |
-| Multi-node distribution | Added architecture | Core design |
-| Schema design | Normalize data | Often denormalize |
-| Query flexibility | High | Low |
-| Best for | Business/transaction data | Huge distributed workloads |
+|                         | PostgreSQL                | Cassandra                  |
+| ----------------------- | ------------------------- | -------------------------- |
+| Type                    | Relational                | Wide-column NoSQL          |
+| JOINs                   | Excellent                 | Generally no               |
+| Transactions            | Strong ACID               | Limited compared with SQL  |
+| Complex queries         | Excellent                 | Poor fit                   |
+| Horizontal scaling      | Harder                    | Built-in                   |
+| Massive writes          | Good                      | Excellent                  |
+| Multi-node distribution | Added architecture        | Core design                |
+| Schema design           | Normalize data            | Often denormalize          |
+| Query flexibility       | High                      | Low                        |
+| Best for                | Business/transaction data | Huge distributed workloads |
 
 A useful interview example:
 
@@ -8837,14 +8847,14 @@ because that would invalidate the signature.
 
 It helps to think of tokens as proofs of different facts.
 
-| Token | Proves |
-|---|---|
-| Login/Auth JWT | Who you are |
-| Access token | What APIs you may access |
-| Refresh token | Allows obtaining another access token |
-| Admission token | You passed the waiting room |
+| Token              | Proves                                         |
+| ------------------ | ---------------------------------------------- |
+| Login/Auth JWT     | Who you are                                    |
+| Access token       | What APIs you may access                       |
+| Refresh token      | Allows obtaining another access token          |
+| Admission token    | You passed the waiting room                    |
 | Seat-hold token/ID | You currently own a temporary seat reservation |
-| Payment token | Represents tokenized payment information |
+| Payment token      | Represents tokenized payment information       |
 
 So one checkout might involve several:
 
@@ -9210,7 +9220,7 @@ waitingRoom.status = WAITING
 and the user tries:
 
 ```js
-router.push('/reserve')
+router.push('/reserve');
 ```
 
 A client-side route guard can say:
@@ -9387,7 +9397,7 @@ HttpOnly
 means JavaScript cannot do:
 
 ```js
-document.cookie
+document.cookie;
 ```
 
 and steal/read that cookie.
@@ -9465,14 +9475,14 @@ The Vue/React page sees:
 
 ```json
 {
-   "status": "ADMITTED"
+  "status": "ADMITTED"
 }
 ```
 
 and does:
 
 ```js
-router.replace('/events/123/seats')
+router.replace('/events/123/seats');
 ```
 
 So yes, the client can initiate the navigation once it learns it has been admitted.
@@ -9814,99 +9824,99 @@ One distinction matters throughout this section: some implementation details are
 
 ---
 
-*Security & Identity — quick-reference catalog*
+_Security & Identity — quick-reference catalog_
 
 ### Identity, federation and protocols
 
-| Term | Interview definition | Where it matters in your experience |
-|---|---|---|
-| **Authentication (AuthN)** | Establishes **who the caller is**. | Auth0/TicketSocket SSO, Gala user accounts, Frequence users. |
-| **Authorization (AuthZ)** | Determines **what an authenticated caller may do to a particular resource**. | Tenant isolation, refunds, campaign access, NFT/token actions. |
-| **Identity Provider (IdP)** | System that authenticates a user and asserts their identity. Auth0 can be an IdP or broker other IdPs. | TicketSocket white-label SSO. |
-| **Identity federation** | One system trusts identity established by another organization/system. | A Meow Wolf user signs into the TicketSocket-powered white-label experience without a second set of credentials. |
-| **SSO** | User authenticates once and can enter another trusted application without signing in again. | Merchant → TicketSocket handoff. |
-| **OAuth 2.0** | Framework for delegated authorization/access to APIs. | Access tokens, payment-provider OAuth. |
-| **OIDC** | Authentication protocol built on OAuth 2.0. Adds user identity, ID tokens and discovery. | Auth0 web SSO. |
-| **SAML** | XML-based enterprise federation protocol. Common alternative to OIDC for enterprise IdPs. | Possible enterprise TicketSocket clients **[VERIFY actual client protocols]**. |
-| **Authorization Code + PKCE** | Preferred browser/mobile OAuth/OIDC flow. Browser receives a temporary code rather than exposing credentials/tokens through URLs. PKCE binds the exchange to the initiating client. | White-label SSO. |
+| Term                          | Interview definition                                                                                                                                                                | Where it matters in your experience                                                                              |
+| ----------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **Authentication (AuthN)**    | Establishes **who the caller is**.                                                                                                                                                  | Auth0/TicketSocket SSO, Gala user accounts, Frequence users.                                                     |
+| **Authorization (AuthZ)**     | Determines **what an authenticated caller may do to a particular resource**.                                                                                                        | Tenant isolation, refunds, campaign access, NFT/token actions.                                                   |
+| **Identity Provider (IdP)**   | System that authenticates a user and asserts their identity. Auth0 can be an IdP or broker other IdPs.                                                                              | TicketSocket white-label SSO.                                                                                    |
+| **Identity federation**       | One system trusts identity established by another organization/system.                                                                                                              | A Meow Wolf user signs into the TicketSocket-powered white-label experience without a second set of credentials. |
+| **SSO**                       | User authenticates once and can enter another trusted application without signing in again.                                                                                         | Merchant → TicketSocket handoff.                                                                                 |
+| **OAuth 2.0**                 | Framework for delegated authorization/access to APIs.                                                                                                                               | Access tokens, payment-provider OAuth.                                                                           |
+| **OIDC**                      | Authentication protocol built on OAuth 2.0. Adds user identity, ID tokens and discovery.                                                                                            | Auth0 web SSO.                                                                                                   |
+| **SAML**                      | XML-based enterprise federation protocol. Common alternative to OIDC for enterprise IdPs.                                                                                           | Possible enterprise TicketSocket clients **[VERIFY actual client protocols]**.                                   |
+| **Authorization Code + PKCE** | Preferred browser/mobile OAuth/OIDC flow. Browser receives a temporary code rather than exposing credentials/tokens through URLs. PKCE binds the exchange to the initiating client. | White-label SSO.                                                                                                 |
 
 ### Tokens and claims
 
-| Term | Interview definition | Where it matters in your experience |
-|---|---|---|
-| **JWT** | Signed token format containing claims. JWT is a format, not itself an authentication protocol. | TicketSocket JWT/service allocation; user/service auth. |
-| **ID token** | OIDC token describing the authenticated user. Primarily for the client to establish identity. | SSO/login. |
-| **Access token** | Credential presented to an API to access protected resources. | `Authorization: Bearer ...`. |
-| **Refresh token** | Longer-lived credential used to obtain new access tokens. Highly sensitive. | Long-lived sessions where required. |
-| **Claim** | A field in a signed token: `sub`, `tenant_id`, `role`, `scope`, `aud`, etc. | Multi-tenant authorization. |
-| **`sub`** | Stable subject/user identifier asserted by the issuer. | Maps authenticated identity to application user. |
-| **`iss`** | Token issuer. API verifies that it trusts this issuer. | JWT verification. |
-| **`aud`** | Audience: which application/API the token was issued for. | Prevents a token for App A from being reused against API B. |
-| **Scope** | Capability granted to a token, e.g. `orders:read`. | API-level authorization. |
+| Term              | Interview definition                                                                           | Where it matters in your experience                         |
+| ----------------- | ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| **JWT**           | Signed token format containing claims. JWT is a format, not itself an authentication protocol. | TicketSocket JWT/service allocation; user/service auth.     |
+| **ID token**      | OIDC token describing the authenticated user. Primarily for the client to establish identity.  | SSO/login.                                                  |
+| **Access token**  | Credential presented to an API to access protected resources.                                  | `Authorization: Bearer ...`.                                |
+| **Refresh token** | Longer-lived credential used to obtain new access tokens. Highly sensitive.                    | Long-lived sessions where required.                         |
+| **Claim**         | A field in a signed token: `sub`, `tenant_id`, `role`, `scope`, `aud`, etc.                    | Multi-tenant authorization.                                 |
+| **`sub`**         | Stable subject/user identifier asserted by the issuer.                                         | Maps authenticated identity to application user.            |
+| **`iss`**         | Token issuer. API verifies that it trusts this issuer.                                         | JWT verification.                                           |
+| **`aud`**         | Audience: which application/API the token was issued for.                                      | Prevents a token for App A from being reused against API B. |
+| **Scope**         | Capability granted to a token, e.g. `orders:read`.                                             | API-level authorization.                                    |
 
 ### Access control and tenancy
 
-| Term | Interview definition | Where it matters in your experience |
-|---|---|---|
-| **Role** | User category grouping permissions. | `tenant_admin`, `analyst`, `manager`, etc. |
-| **RBAC** | Role-Based Access Control: permissions assigned to roles. | Frequence SaaS, TicketSocket merchant employees. |
-| **ABAC** | Attribute-Based Access Control: decisions consider user, tenant, resource, amount, status, geography, etc. | “Manager can refund orders in their tenant up to X.” |
-| **Tenant isolation** | Ensures tenant A cannot access tenant B's data. | Frequence and TicketSocket white-label SaaS. |
+| Term                 | Interview definition                                                                                       | Where it matters in your experience                  |
+| -------------------- | ---------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| **Role**             | User category grouping permissions.                                                                        | `tenant_admin`, `analyst`, `manager`, etc.           |
+| **RBAC**             | Role-Based Access Control: permissions assigned to roles.                                                  | Frequence SaaS, TicketSocket merchant employees.     |
+| **ABAC**             | Attribute-Based Access Control: decisions consider user, tenant, resource, amount, status, geography, etc. | “Manager can refund orders in their tenant up to X.” |
+| **Tenant isolation** | Ensures tenant A cannot access tenant B's data.                                                            | Frequence and TicketSocket white-label SaaS.         |
 
 ### Sessions and the browser
 
-| Term | Interview definition | Where it matters in your experience |
-|---|---|---|
-| **Session** | Logical ongoing authenticated interaction. May be server-side state referenced by a browser cookie. | Web applications. |
-| **Cookie** | Small browser-managed value automatically sent to a domain. | Secure browser sessions. |
-| **HttpOnly** | Prevents browser JavaScript from reading a cookie. | Helps reduce token theft through XSS. |
-| **Secure cookie** | Cookie transmitted only through HTTPS. | Browser auth. |
-| **SameSite** | Controls cross-site cookie behavior and helps defend against CSRF. | Browser auth. |
+| Term              | Interview definition                                                                                | Where it matters in your experience   |
+| ----------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------- |
+| **Session**       | Logical ongoing authenticated interaction. May be server-side state referenced by a browser cookie. | Web applications.                     |
+| **Cookie**        | Small browser-managed value automatically sent to a domain.                                         | Secure browser sessions.              |
+| **HttpOnly**      | Prevents browser JavaScript from reading a cookie.                                                  | Helps reduce token theft through XSS. |
+| **Secure cookie** | Cookie transmitted only through HTTPS.                                                              | Browser auth.                         |
+| **SameSite**      | Controls cross-site cookie behavior and helps defend against CSRF.                                  | Browser auth.                         |
 
 ### Strong authentication
 
-| Term | Interview definition | Where it matters in your experience |
-|---|---|---|
-| **MFA** | Requires more than one authentication factor. | High-value Gala account/security operations. |
-| **Step-up authentication** | Requires stronger/recent authentication only for a sensitive operation. | Token purchases, wallet changes, refunds. |
+| Term                       | Interview definition                                                    | Where it matters in your experience          |
+| -------------------------- | ----------------------------------------------------------------------- | -------------------------------------------- |
+| **MFA**                    | Requires more than one authentication factor.                           | High-value Gala account/security operations. |
+| **Step-up authentication** | Requires stronger/recent authentication only for a sensitive operation. | Token purchases, wallet changes, refunds.    |
 
 ### Keys, signatures, replay and integrity
 
-| Term | Interview definition | Where it matters in your experience |
-|---|---|---|
-| **JWKS** | Endpoint exposing an issuer's public verification keys. | Auth0/OIDC JWT verification. |
-| **Key rotation** | Periodically change signing/encryption keys while allowing safe transition from old keys. | JWT infrastructure. |
-| **Nonce** | Single-use unpredictable value used to prevent replay. | OIDC and crypto-wallet proof. |
-| **`state`** | OAuth parameter correlating authorization request/response and protecting against request forgery. | SSO redirect flow. |
-| **Replay attack** | Attacker captures a valid request/signature and submits it again. | Crypto signing, payment webhooks, rewards. |
-| **Idempotency** | Repeating the same operation produces no additional side effect. | Payments, refunds, token purchases, webhook retries. |
-| **Webhook signature** | Cryptographic evidence that an incoming webhook was generated by the expected provider. | Square/payment-provider events. |
+| Term                  | Interview definition                                                                               | Where it matters in your experience                  |
+| --------------------- | -------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
+| **JWKS**              | Endpoint exposing an issuer's public verification keys.                                            | Auth0/OIDC JWT verification.                         |
+| **Key rotation**      | Periodically change signing/encryption keys while allowing safe transition from old keys.          | JWT infrastructure.                                  |
+| **Nonce**             | Single-use unpredictable value used to prevent replay.                                             | OIDC and crypto-wallet proof.                        |
+| **`state`**           | OAuth parameter correlating authorization request/response and protecting against request forgery. | SSO redirect flow.                                   |
+| **Replay attack**     | Attacker captures a valid request/signature and submits it again.                                  | Crypto signing, payment webhooks, rewards.           |
+| **Idempotency**       | Repeating the same operation produces no additional side effect.                                   | Payments, refunds, token purchases, webhook retries. |
+| **Webhook signature** | Cryptographic evidence that an incoming webhook was generated by the expected provider.            | Square/payment-provider events.                      |
 
 ### Secrets, least privilege and infrastructure
 
-| Term | Interview definition | Where it matters in your experience |
-|---|---|---|
-| **Tokenization** | Replace sensitive card data with a provider-generated token. | TicketSocket payment processing / PCI reduction. |
-| **Secret manager** | Secure system for API keys, OAuth tokens and credentials. | Merchant-specific processor credentials. |
-| **KMS/HSM** | Systems that protect cryptographic keys; an HSM performs sensitive cryptographic operations in hardened hardware. | Signing infrastructure, custodial crypto if applicable. |
-| **Least privilege** | Every user/service gets only permissions it actually needs. | IAM, payment service, support roles. |
-| **mTLS** | Both sides of a TLS connection authenticate with certificates. | High-security service-to-service communication. |
-| **Audit log** | Immutable/append-oriented record of who performed a security-sensitive operation. | Refunds, admin changes, token/merchant actions. |
-| **RLS** | PostgreSQL Row-Level Security; DB itself can enforce which rows a tenant/user may access. | Optional defense-in-depth for SaaS. |
+| Term                | Interview definition                                                                                              | Where it matters in your experience                     |
+| ------------------- | ----------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
+| **Tokenization**    | Replace sensitive card data with a provider-generated token.                                                      | TicketSocket payment processing / PCI reduction.        |
+| **Secret manager**  | Secure system for API keys, OAuth tokens and credentials.                                                         | Merchant-specific processor credentials.                |
+| **KMS/HSM**         | Systems that protect cryptographic keys; an HSM performs sensitive cryptographic operations in hardened hardware. | Signing infrastructure, custodial crypto if applicable. |
+| **Least privilege** | Every user/service gets only permissions it actually needs.                                                       | IAM, payment service, support roles.                    |
+| **mTLS**            | Both sides of a TLS connection authenticate with certificates.                                                    | High-security service-to-service communication.         |
+| **Audit log**       | Immutable/append-oriented record of who performed a security-sensitive operation.                                 | Refunds, admin changes, token/merchant actions.         |
+| **RLS**             | PostgreSQL Row-Level Security; DB itself can enforce which rows a tenant/user may access.                         | Optional defense-in-depth for SaaS.                     |
 
 ### Browser boundaries that are not security
 
-| Term | Interview definition | Where it matters in your experience |
-|---|---|---|
-| **CORS** | Browser policy governing which origins can call an API. **It is not authentication or authorization.** | White-label web apps. |
-| **Frontend route guard** | UX mechanism preventing navigation. **It is not security.** Backend must authorize independently. | Angular/Vue/React apps. |
+| Term                     | Interview definition                                                                                   | Where it matters in your experience |
+| ------------------------ | ------------------------------------------------------------------------------------------------------ | ----------------------------------- |
+| **CORS**                 | Browser policy governing which origins can call an API. **It is not authentication or authorization.** | White-label web apps.               |
+| **Frontend route guard** | UX mechanism preventing navigation. **It is not security.** Backend must authorize independently.      | Angular/Vue/React apps.             |
 
 ### Web3 transactions
 
-| Term | Interview definition | Where it matters in your experience |
-|---|---|---|
+| Term                   | Interview definition                                                                                           | Where it matters in your experience    |
+| ---------------------- | -------------------------------------------------------------------------------------------------------------- | -------------------------------------- |
 | **Transaction intent** | Application-specific record/token describing a specific authorized sensitive action. Not a universal protocol. | Useful model for Gala purchases/mints. |
-| **Wallet proof** | User proves control of a crypto wallet by signing a server-generated challenge. | Gala/Web3. |
+| **Wallet proof**       | User proves control of a crypto wallet by signing a server-generated challenge.                                | Gala/Web3.                             |
 
 ### Alphabetical index of terms
 
@@ -10977,7 +10987,7 @@ And the most important security rule is:
 
 ### Frequence/Madhive — multi-tenant SaaS security
 
-Your resume establishes that you helped lead Frequence's configurable Angular framework and workflows, provided technical direction across 30+ engineers/QAs, and worked on a large AdTech platform. *Oscar Gonzalez - Lead Engineer …* Your additional context establishes the white-label/multi-tenant SaaS aspect.
+Your resume establishes that you helped lead Frequence's configurable Angular framework and workflows, provided technical direction across 30+ engineers/QAs, and worked on a large AdTech platform. _Oscar Gonzalez - Lead Engineer …_ Your additional context establishes the white-label/multi-tenant SaaS aspect.
 
 The principal security invariant is:
 
@@ -11145,12 +11155,12 @@ A strong SaaS model combines role with resource context.
 
 Example conceptual matrix:
 
-| Role | Planning | Campaign activation | Reporting | Tenant configuration |
-|---|---:|---:|---:|---:|
-| Viewer/Analyst | Read | No | Read | No |
-| Campaign Manager | Read/write | Allowed | Read | No |
-| Tenant Admin | Read/write | Allowed | Read/write | Allowed |
-| Platform Support | Explicit scoped access only | Explicit | Explicit | Audited |
+| Role             |                    Planning | Campaign activation |  Reporting | Tenant configuration |
+| ---------------- | --------------------------: | ------------------: | ---------: | -------------------: |
+| Viewer/Analyst   |                        Read |                  No |       Read |                   No |
+| Campaign Manager |                  Read/write |             Allowed |       Read |                   No |
+| Tenant Admin     |                  Read/write |             Allowed | Read/write |              Allowed |
+| Platform Support | Explicit scoped access only |            Explicit |   Explicit |              Audited |
 
 Then add attributes:
 
@@ -11253,7 +11263,7 @@ An excellent interview statement:
 
 ### Gala — account, wallets, token transactions and scarce digital inventory
 
-Your resume explicitly supports Web3 launch workflows, digital ownership/NFT collectibles, reward-driven experiences, Node/NestJS services, blockchain application paths and production-critical token/ICO launches. *Oscar Gonzalez - Lead Engineer …*
+Your resume explicitly supports Web3 launch workflows, digital ownership/NFT collectibles, reward-driven experiences, Node/NestJS services, blockchain application paths and production-critical token/ICO launches. _Oscar Gonzalez - Lead Engineer …_
 
 Here you should distinguish **three different identities**:
 
@@ -11688,7 +11698,7 @@ That sounds like a Lead Web3 engineer rather than a generic backend engineer.
 
 ### TicketSocket — white-label SSO, tenant identity and merchant payment processing
 
-Your resume supports white-label partner workflows, PostgreSQL transactional processing, webhooks, JWT-based service allocation, AWS ticketing scale and partner APIs. *Oscar Gonzalez - Lead Engineer …* You have also established in this conversation that Auth0 was used and that different merchants integrated their own processors.
+Your resume supports white-label partner workflows, PostgreSQL transactional processing, webhooks, JWT-based service allocation, AWS ticketing scale and partner APIs. _Oscar Gonzalez - Lead Engineer …_ You have also established in this conversation that Auth0 was used and that different merchants integrated their own processors.
 
 This is the company where I would expect your interviewer to test **authentication, tenant isolation, payments, webhooks and inventory all together**.
 
@@ -12380,15 +12390,15 @@ That is a very strong Lead Engineer answer because it demonstrates that security
 
 This table is useful to memorize because it lets you tailor your answer to the domain rather than giving the same generic JWT explanation every time.
 
-| Company/use case | Most important security invariant | Primary security patterns |
-|---|---|---|
-| **Frequence multi-tenant SaaS** | Tenant A must never access Tenant B's business data. | Trusted tenant context, RBAC/ABAC, tenant-scoped DB queries/cache/events, negative isolation testing. |
-| **Gala Web3** | Only the authorized account/wallet can perform a valid transaction, and scarce/digital assets cannot be duplicated or replayed. | Account auth, MFA/step-up, wallet challenge/signature, nonce, idempotency, transaction state machine, protected keys, authoritative inventory. |
-| **TicketSocket SSO** | Merchant users can seamlessly authenticate without TicketSocket owning/copying the merchant's passwords. | Auth0 federation, OIDC/SAML, authorization code + PKCE, audience-restricted tokens, secure sessions. |
-| **TicketSocket multi-tenant** | Merchant A can never see Merchant B's customers/orders/tickets. | JWT/session tenant identity, RBAC, tenant-bound resource queries. |
-| **TicketSocket payments** | Only authorized merchant actions can charge/refund through the correct merchant processor, exactly once logically. | Tenant-scoped secrets, tokenization, adapter pattern, idempotency, audit logs. |
-| **TicketSocket webhooks** | Only authentic provider events change payment state, and duplicates/out-of-order events cannot corrupt it. | Signature verification, event dedupe, state/version guards, queue, DLQ/reconciliation. |
-| **TicketSocket inventory** | One finite seat cannot be sold twice. | Admission control, atomic hold, strong consistency, TTL, payment Saga. |
+| Company/use case                | Most important security invariant                                                                                               | Primary security patterns                                                                                                                      |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Frequence multi-tenant SaaS** | Tenant A must never access Tenant B's business data.                                                                            | Trusted tenant context, RBAC/ABAC, tenant-scoped DB queries/cache/events, negative isolation testing.                                          |
+| **Gala Web3**                   | Only the authorized account/wallet can perform a valid transaction, and scarce/digital assets cannot be duplicated or replayed. | Account auth, MFA/step-up, wallet challenge/signature, nonce, idempotency, transaction state machine, protected keys, authoritative inventory. |
+| **TicketSocket SSO**            | Merchant users can seamlessly authenticate without TicketSocket owning/copying the merchant's passwords.                        | Auth0 federation, OIDC/SAML, authorization code + PKCE, audience-restricted tokens, secure sessions.                                           |
+| **TicketSocket multi-tenant**   | Merchant A can never see Merchant B's customers/orders/tickets.                                                                 | JWT/session tenant identity, RBAC, tenant-bound resource queries.                                                                              |
+| **TicketSocket payments**       | Only authorized merchant actions can charge/refund through the correct merchant processor, exactly once logically.              | Tenant-scoped secrets, tokenization, adapter pattern, idempotency, audit logs.                                                                 |
+| **TicketSocket webhooks**       | Only authentic provider events change payment state, and duplicates/out-of-order events cannot corrupt it.                      | Signature verification, event dedupe, state/version guards, queue, DLQ/reconciliation.                                                         |
+| **TicketSocket inventory**      | One finite seat cannot be sold twice.                                                                                           | Admission control, atomic hold, strong consistency, TTL, payment Saga.                                                                         |
 
 ---
 
@@ -12470,7 +12480,6 @@ That is the security thread I would weave through your interview tomorrow.
 # Appendix A — Pre-interview checklist: every [VERIFY] marker
 
 Each line below is a detail the answers could not establish from the résumé or the repository. Confirm it from memory before the interview, or soften the claim.
-
 
 **Gala Games & Entertainment — Lead Full Stack SE**
 
@@ -12713,38 +12722,38 @@ Where each theme is discussed, so a topic can be revised across every company an
 
 The question bank in Part I was written against an earlier résumé (17 experience bullets plus one personal project). The résumé the company holds, `docs/ingestion/Resume_2026_c.pdf`, is organised differently, so this map shows where each of its bullets is defended in this document. Wording differs slightly in places; the architecture questions still apply.
 
-| Résumé entry (Resume_2026_c.pdf) | Bullet | Where it is covered |
-|---|---|---|
-| Enfav LLC — Chief Software Engineer (Jul 2026 – Present) | Founded an AI-focused engineering company; own technical strategy, architecture, product delivery, solution design, and business operations… | Part I › Current project › areas 19–22 (the platform as a whole; govcon is one consumer of it) |
-| Enfav LLC | Architected multi-agent workflow engines integrating LLMs, tool calling, API orchestration, contextual memory, and multi-step reasoning… | Part I › Current project › area 19 (the quality loop) and area 20 (memory) |
-| Enfav LLC | Designed modular applications and backend services with TypeScript, Node.js, React, Next.js, PostgreSQL, and AWS… | Part I › Current project › area 21 (platform, delivery) |
-| Enfav LLC | Built RAG systems with vector embeddings, semantic and hybrid search, reranking, and contextual grounding; developed graph-based architecture tooling with AI critics and iterative evaluation. | Part I › Current project › area 20 (digest/recall, Qdrant) and area 22 Q1 (the Studio) |
-| Enfav LLC | Integrated GitHub, Jira, Playwright, and MCP into code analysis, automated testing, and developer workflows; manage federal registration and procurement opportunity identification. | Part I › Current project › area 21 Q2 (CI/CD gates) and area 22 Q2 (browser automation); procurement = the govcon package, mentioned in area 21 Q1 |
-| Madhive — Senior Software Engineer, Contract (Jan 2026 – Jul 2026) | Developed enterprise AdTech applications with TypeScript, Angular, and Node.js; built reusable components and dynamic widgets for complex advertising workflows. | Part I › Frequence + Madhive › 8 (Angular widget framework), 6; Part III › 9 › Frequence/Madhive — multi-tenant SaaS security |
-| Madhive | Drove Claude Code + Playwright E2E automation with Jest, Datadog, and multimodal validation, cutting production bugs 50% and manual QA 60%. | Part I › Frequence + Madhive › 9 |
-| Madhive | Improved CI/CD regression workflows and automated quality checks; used Datadog and application logs to investigate defects and improve production reliability. | Part I › Frequence + Madhive › 9 (Q4, “What did Datadog contribute?”), 10 |
-| Madhive | Partnered with product, design, QA, and engineering on production delivery, code reviews, modular architecture, and platform evolution following Frequence’s acquisition. | Part I › Frequence + Madhive › 6, 7 |
-| Gala Games and Entertainment — Lead Software Engineer (Jun 2024 – Jan 2026) | Owned architecture, implementation, integrations, and production delivery across Gala’s consumer-facing entertainment applications. | Umbrella bullet: Part I › Gala › 1–5 together; “What did YOU own?” follow-up under 1 |
-| Gala | Integrated GCP Vision API, vector search, and Sanity CMS to automate film content ops, static inputs, thumbnail prep, image selection, and release metadata. | Part I › Gala › 4 |
-| Gala | Drove full-stack engineering for Gala collectibles, Film, and Web3 launch workflows across Vue.js web, React Native TV, backend APIs, and blockchain product surfaces. | Part I › Gala › 1 |
-| Gala | Led Gala Film application delivery for creator-to-fan media flows, digital ownership, NFT collectibles, and reward-driven viewer experiences alongside Claude Code. | Part I › Gala › 2 (the “alongside Claude Code” clause is new: be ready to say what the assistant did and did not do); Part III › 9 › Gala — account, wallets, token transactions and scarce digital inventory |
-| Gala | Architected Node.js/NestJS services on AWS/GCP with MongoDB, scaling media, collectibles, user-state, and blockchain workflows to 10,000+ concurrent users. | Part I › Gala › 3 |
-| Gala | Owned production-critical token/ICO launch flows across user experience, backend services, release operations, and blockchain-integrated application paths. | Part I › Gala › 5; Part III › 9 › Gala (transaction intent, replay, inventory, launch CI/CD) |
-| Frequence — Lead Software Engineer (Dec 2020 – Jun 2024) | Helped lead Frequence’s Angular framework, architecting extensible widgets and configurable UI workflows for AdTech automation. | Part I › Frequence + Madhive › 8; Part III › 9 › Frequence/Madhive (RBAC + ABAC, tenant isolation layers) |
-| Frequence | Automated AI-assisted browser regression across high-variation customer paths, improving release confidence for production-critical workflows. | Part I › Frequence + Madhive › 10, 9 |
-| Frequence | Contributed to platform execution and engineering maturity that supported Frequence’s acquisition by Madhive across omnichannel workflow & local CTV infra. | Part I › Frequence + Madhive › 6 |
-| Frequence | Provided technical direction for 30+ engineers/QAs across architecture, testing strategy, design systems, PR standards, offshore coordination, & product breakdown. | Part I › Frequence + Madhive › 7 |
-| TicketSocket & IceCreamSocial — Lead Full Stack Developer (Jun 2017 – Dec 2020) | Migrated AngularJS to React + TypeScript, improving architecture, testability, design-system reuse, and product/design collaboration via Storybook. | Part I › TicketSocket › 11 |
-| TicketSocket | Built configurable dashboards for events, inventory, influencer campaigns, ticketing operations, and white-label partner workflows. | Part I › TicketSocket › 12; Part II › chapter 5 (Auth0, payment processors); Part III › 9 › TicketSocket — white-label SSO, tenant identity and merchant payment processing |
-| TicketSocket | Optimized PostgreSQL data flows with indexing, stored procedures, triggers, webhooks, and transactional event processing. | Part I › TicketSocket › 13; Part III › 9 › TicketSocket (signed webhook verification, out-of-order webhooks, idempotent payment flow) |
-| TicketSocket | Re-architected AWS ticketing services, scaling from 350 to 10,000+ concurrent users with JWT-based service allocation. | Part I › TicketSocket › 14; Part II › chapter 6 (waiting room, admission tokens, sessions); Part III › 9 › TicketSocket (SSO redirect flow, safe JWT handling, tenant isolation after SSO) |
-| TicketSocket | Raised test coverage from near-zero to 70% across a 90,000+ line codebase and created Redocly/Swagger API docs for partner onboarding. | Part I › TicketSocket › 15 |
-| VISA — Full Stack Engineer (Jun 2016 – May 2017) | Built Angular/D3.js risk dashboards with data science teams to surface infrastructure exposure across Visa’s network, reducing incidents by 30%+. | Part I › Visa › 16 |
-| VISA | Developed a real-time Angular/Node vendor portal, cutting third-party tool approval cycles by 80%+. | Part I › Visa › 17 |
-| Triptive — Full Stack Developer (Sep 2015 – May 2016) | Built booking travel app and admin (Django, Python, Javascript, JQuery) | **Not covered** by the question bank. Prepare a two-minute summary (data model, booking flow, admin, what you would change today). |
-| Personal project — Agentic Engine (June 2025 – current) | Workflow engine compiling goals into DAGs using LLM critics/evals, strict JSON schemas, graph search, MCP, RAG, TypeScript, Node, Python. | Part I › Current project › areas 19–20 (the critic/evaluator loop and memory as they exist today) plus the reference block “Personal Project — Agentic Engine” for the DAG/graph-search wording |
-| Personal project — System Design Graph (May 2026 – Present) | Built graph-based system design tooling with intelligent architecture components and LLM critic/evaluation pipelines, enabling iterative design feedback and analysis of scalability and architectural tradeoffs. | Part I › Current project › area 22 Q1 (the Studio) and area 19 |
-| Personal project — Browser-Session Automation (January 2026 – Present) | Developed Playwright-based browser automation integrated with agentic workflows to execute multi-step interactions and validate application behavior across browser sessions. | Part I › Current project › area 22 Q2 |
+| Résumé entry (Resume_2026_c.pdf)                                                | Bullet                                                                                                                                                                                                            | Where it is covered                                                                                                                                                                                           |
+| ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Enfav LLC — Chief Software Engineer (Jul 2026 – Present)                        | Founded an AI-focused engineering company; own technical strategy, architecture, product delivery, solution design, and business operations…                                                                      | Part I › Current project › areas 19–22 (the platform as a whole; govcon is one consumer of it)                                                                                                                |
+| Enfav LLC                                                                       | Architected multi-agent workflow engines integrating LLMs, tool calling, API orchestration, contextual memory, and multi-step reasoning…                                                                          | Part I › Current project › area 19 (the quality loop) and area 20 (memory)                                                                                                                                    |
+| Enfav LLC                                                                       | Designed modular applications and backend services with TypeScript, Node.js, React, Next.js, PostgreSQL, and AWS…                                                                                                 | Part I › Current project › area 21 (platform, delivery)                                                                                                                                                       |
+| Enfav LLC                                                                       | Built RAG systems with vector embeddings, semantic and hybrid search, reranking, and contextual grounding; developed graph-based architecture tooling with AI critics and iterative evaluation.                   | Part I › Current project › area 20 (digest/recall, Qdrant) and area 22 Q1 (the Studio)                                                                                                                        |
+| Enfav LLC                                                                       | Integrated GitHub, Jira, Playwright, and MCP into code analysis, automated testing, and developer workflows; manage federal registration and procurement opportunity identification.                              | Part I › Current project › area 21 Q2 (CI/CD gates) and area 22 Q2 (browser automation); procurement = the govcon package, mentioned in area 21 Q1                                                            |
+| Madhive — Senior Software Engineer, Contract (Jan 2026 – Jul 2026)              | Developed enterprise AdTech applications with TypeScript, Angular, and Node.js; built reusable components and dynamic widgets for complex advertising workflows.                                                  | Part I › Frequence + Madhive › 8 (Angular widget framework), 6; Part III › 9 › Frequence/Madhive — multi-tenant SaaS security                                                                                 |
+| Madhive                                                                         | Drove Claude Code + Playwright E2E automation with Jest, Datadog, and multimodal validation, cutting production bugs 50% and manual QA 60%.                                                                       | Part I › Frequence + Madhive › 9                                                                                                                                                                              |
+| Madhive                                                                         | Improved CI/CD regression workflows and automated quality checks; used Datadog and application logs to investigate defects and improve production reliability.                                                    | Part I › Frequence + Madhive › 9 (Q4, “What did Datadog contribute?”), 10                                                                                                                                     |
+| Madhive                                                                         | Partnered with product, design, QA, and engineering on production delivery, code reviews, modular architecture, and platform evolution following Frequence’s acquisition.                                         | Part I › Frequence + Madhive › 6, 7                                                                                                                                                                           |
+| Gala Games and Entertainment — Lead Software Engineer (Jun 2024 – Jan 2026)     | Owned architecture, implementation, integrations, and production delivery across Gala’s consumer-facing entertainment applications.                                                                               | Umbrella bullet: Part I › Gala › 1–5 together; “What did YOU own?” follow-up under 1                                                                                                                          |
+| Gala                                                                            | Integrated GCP Vision API, vector search, and Sanity CMS to automate film content ops, static inputs, thumbnail prep, image selection, and release metadata.                                                      | Part I › Gala › 4                                                                                                                                                                                             |
+| Gala                                                                            | Drove full-stack engineering for Gala collectibles, Film, and Web3 launch workflows across Vue.js web, React Native TV, backend APIs, and blockchain product surfaces.                                            | Part I › Gala › 1                                                                                                                                                                                             |
+| Gala                                                                            | Led Gala Film application delivery for creator-to-fan media flows, digital ownership, NFT collectibles, and reward-driven viewer experiences alongside Claude Code.                                               | Part I › Gala › 2 (the “alongside Claude Code” clause is new: be ready to say what the assistant did and did not do); Part III › 9 › Gala — account, wallets, token transactions and scarce digital inventory |
+| Gala                                                                            | Architected Node.js/NestJS services on AWS/GCP with MongoDB, scaling media, collectibles, user-state, and blockchain workflows to 10,000+ concurrent users.                                                       | Part I › Gala › 3                                                                                                                                                                                             |
+| Gala                                                                            | Owned production-critical token/ICO launch flows across user experience, backend services, release operations, and blockchain-integrated application paths.                                                       | Part I › Gala › 5; Part III › 9 › Gala (transaction intent, replay, inventory, launch CI/CD)                                                                                                                  |
+| Frequence — Lead Software Engineer (Dec 2020 – Jun 2024)                        | Helped lead Frequence’s Angular framework, architecting extensible widgets and configurable UI workflows for AdTech automation.                                                                                   | Part I › Frequence + Madhive › 8; Part III › 9 › Frequence/Madhive (RBAC + ABAC, tenant isolation layers)                                                                                                     |
+| Frequence                                                                       | Automated AI-assisted browser regression across high-variation customer paths, improving release confidence for production-critical workflows.                                                                    | Part I › Frequence + Madhive › 10, 9                                                                                                                                                                          |
+| Frequence                                                                       | Contributed to platform execution and engineering maturity that supported Frequence’s acquisition by Madhive across omnichannel workflow & local CTV infra.                                                       | Part I › Frequence + Madhive › 6                                                                                                                                                                              |
+| Frequence                                                                       | Provided technical direction for 30+ engineers/QAs across architecture, testing strategy, design systems, PR standards, offshore coordination, & product breakdown.                                               | Part I › Frequence + Madhive › 7                                                                                                                                                                              |
+| TicketSocket & IceCreamSocial — Lead Full Stack Developer (Jun 2017 – Dec 2020) | Migrated AngularJS to React + TypeScript, improving architecture, testability, design-system reuse, and product/design collaboration via Storybook.                                                               | Part I › TicketSocket › 11                                                                                                                                                                                    |
+| TicketSocket                                                                    | Built configurable dashboards for events, inventory, influencer campaigns, ticketing operations, and white-label partner workflows.                                                                               | Part I › TicketSocket › 12; Part II › chapter 5 (Auth0, payment processors); Part III › 9 › TicketSocket — white-label SSO, tenant identity and merchant payment processing                                   |
+| TicketSocket                                                                    | Optimized PostgreSQL data flows with indexing, stored procedures, triggers, webhooks, and transactional event processing.                                                                                         | Part I › TicketSocket › 13; Part III › 9 › TicketSocket (signed webhook verification, out-of-order webhooks, idempotent payment flow)                                                                         |
+| TicketSocket                                                                    | Re-architected AWS ticketing services, scaling from 350 to 10,000+ concurrent users with JWT-based service allocation.                                                                                            | Part I › TicketSocket › 14; Part II › chapter 6 (waiting room, admission tokens, sessions); Part III › 9 › TicketSocket (SSO redirect flow, safe JWT handling, tenant isolation after SSO)                    |
+| TicketSocket                                                                    | Raised test coverage from near-zero to 70% across a 90,000+ line codebase and created Redocly/Swagger API docs for partner onboarding.                                                                            | Part I › TicketSocket › 15                                                                                                                                                                                    |
+| VISA — Full Stack Engineer (Jun 2016 – May 2017)                                | Built Angular/D3.js risk dashboards with data science teams to surface infrastructure exposure across Visa’s network, reducing incidents by 30%+.                                                                 | Part I › Visa › 16                                                                                                                                                                                            |
+| VISA                                                                            | Developed a real-time Angular/Node vendor portal, cutting third-party tool approval cycles by 80%+.                                                                                                               | Part I › Visa › 17                                                                                                                                                                                            |
+| Triptive — Full Stack Developer (Sep 2015 – May 2016)                           | Built booking travel app and admin (Django, Python, Javascript, JQuery)                                                                                                                                           | **Not covered** by the question bank. Prepare a two-minute summary (data model, booking flow, admin, what you would change today).                                                                            |
+| Personal project — Agentic Engine (June 2025 – current)                         | Workflow engine compiling goals into DAGs using LLM critics/evals, strict JSON schemas, graph search, MCP, RAG, TypeScript, Node, Python.                                                                         | Part I › Current project › areas 19–20 (the critic/evaluator loop and memory as they exist today) plus the reference block “Personal Project — Agentic Engine” for the DAG/graph-search wording               |
+| Personal project — System Design Graph (May 2026 – Present)                     | Built graph-based system design tooling with intelligent architecture components and LLM critic/evaluation pipelines, enabling iterative design feedback and analysis of scalability and architectural tradeoffs. | Part I › Current project › area 22 Q1 (the Studio) and area 19                                                                                                                                                |
+| Personal project — Browser-Session Automation (January 2026 – Present)          | Developed Playwright-based browser automation integrated with agentic workflows to execute multi-step interactions and validate application behavior across browser sessions.                                     | Part I › Current project › area 22 Q2                                                                                                                                                                         |
 
 # Appendix D — Rehearsal script: every spoken answer in one place
 
@@ -13085,4 +13094,3 @@ The first-person answers from Parts I and III and the current-project section, i
 **The answer structure I recommend memorizing**
 
 > “Tell me about the TicketSocket scaling work.”
-

@@ -15,8 +15,9 @@ Two facts organise everything below:
    the canvas. Three of its paths start runs; nothing else in it talks to a
    model.
 2. **The model never authors a number.** Every lens answers in a schema of
-   categories and ordinals locked to the ids on the page, two samples must
-   agree, and the loop's deterministic controller prices and decides. What the
+   categories and ordinals locked to the ids on the page, a critic's two samples
+   must agree and an evaluator's three settle a criterion by median, and the
+   loop's deterministic controller prices and decides. What the
    studio shows is the decision and its trace.
 
 ---
@@ -129,10 +130,10 @@ shape the pipeline's output declares), and then passes the output shape's
 narrations that name nothing on the graph, so a fan-out never blocks on a
 stale reference; a provided artifact is never repaired. When an iteration is
 still blocked, its validator notes reach the next produce as a refusals
-section of the briefing. Five critics — requirements, model, structure,
-fitness, explanation — and four evaluators — coverage, design, qualities,
-reasoning — judge with two samples each, and the pipeline's own controller
-decides.
+section of the briefing. Six critics — requirements, model, structure,
+communication, fitness, explanation — at two samples and four evaluators —
+coverage, design, qualities, reasoning — at three, reading the canvas apart from
+the critics, judge it, and the pipeline's own controller decides.
 
 ---
 

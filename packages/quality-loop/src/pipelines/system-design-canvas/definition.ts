@@ -26,7 +26,8 @@
  *    The author writes those defences where the claims are: a trade-off on
  *    each binding, an "instead of" on each rationale, and the decisions
  *    list in the narrative.
- * 2. A finding prices where its critic's kinds earn. The explanation
+ * 2. A finding prices where its critic's kinds earn, when the evaluators
+ *    have not already priced a criterion it cites. The explanation
  *    failures — a claim the diagram does not back, a part nobody explains, a
  *    narration that contradicts the drawing, a decision with no alternative —
  *    price onto reasoning; a defect of the data, the contracts, the seams or
@@ -52,6 +53,15 @@
  * 5. Operations are a quality of the design: the standing evolution row asks
  *    how it is built, delivered, rolled out and back, observed and backed up,
  *    and the delivery, observability and backup roles are what answers it.
+ * 6. The judges read apart: an evaluator judges from the goal and the artifact
+ *    alone, beside the critics, and a confirmed finding reaches the coach and
+ *    the price, never a verdict. Measured 2026-11-10, one design judged five
+ *    times: two critic samples overlap little, so the confirmed set was a
+ *    different random 6–9 of ~47 findings each time, each citing 4–8 criteria,
+ *    and the evaluators, told a named criterion is at most partial, carried
+ *    that draw into 23 of the 25 criteria whose verdict changed. Judged apart,
+ *    four times: 88.4–91.3 (SD 1.1), 4 criteria ever differing, the same wall
+ *    time. A critical finding blocks only by citing a constraint they failed.
  *
  * The studio always provides the artifact, so the producer is the coach: it
  * runs on revise only — the controller never decides retry, because a fresh
@@ -96,7 +106,7 @@ const onPlatform = (persona: string): string => `${persona.trim()}\n\n${platform
 export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   id: CANVAS_PIPELINE_ID,
 
-  version: '2.3.0',
+  version: '2.4.0',
 
   // A goal another program composes; never a route, a target, or a choice in the UI.
 
@@ -244,13 +254,12 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
   // 1.62× their most in the window (communication's 26,131 to model's
   // 19,738); and the deriver's 4,000 is exempt there, since criteria are
   // derived only through POST /criteria, whose dumps are never measured.
-  // The window is 3 runs, 2026-11-06T22:33Z to 2026-11-07T00:32Z: the first
-  // is the low redraw the effort note below measured — 40,616 output tokens
-  // in one API call, finished 35 s before that declaration was committed
-  // (66ff7ea8, 23:15:55Z), so the change ran before its commit — and the
-  // other two are the coach runs that followed (23:17Z, 00:32Z). An earlier
-  // window would hold the coach to the thinking that change removed. Every
-  // one of the window's 6 coach turns fit one API call; the largest wrote
+  // The window is 3 runs, 2026-11-06T22:33Z to 2026-11-07T00:32Z: the low
+  // redraw the effort note below measured (40,616 output tokens in one API
+  // call, run 35 s before its declaration was committed, 66ff7ea8) and the
+  // two coach runs that followed; an earlier window would hold the coach to
+  // the thinking that change removed. Every one of the window's 6 coach turns
+  // fit one API call; the largest wrote
   // 57,362 output tokens, thinking included — a reply that missed its
   // schema, which the measure counts as it counts an answer — and turns of
   // 54,282, 57,017 and 57,362 wrote past the 50,000 then declared and
@@ -264,21 +273,15 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
     persona: producer,
     // Every turn in that window was a whole-canvas redraw, and a revision is
     // now a change set (`canvasOutput.revise`): the cap holds the redraws it
-    // was sized on until the change-set replies are measured into
-    // `measured.json` and it is re-sized from them. The first two, recorded
-    // 2026-11-08 (arm C, lane run 2026-11-08T22-48-49-342-e4eb2d), wrote
-    // 34k tokens each in 311–322 s where the redraws beside them wrote
-    // 57–63k in 456–501 s; neither is measured yet.
+    // was sized on until change-set replies are measured into `measured.json`
+    // (the first two, arm C 2026-11-08, wrote 34k tokens in 311–322 s each).
     maxTokens: 69000,
-    // A reply must fit one API call. Measured 2026-11-06 on a 39-block
-    // canvas, every turn a redraw: the coach thought 50–125k tokens before a
-    // 15–30k-token reply, crossed the per-call ceiling on every turn, and the
-    // resumed call re-emitted the element it was cut in — 7 of 13 replies
-    // lost at that seam, 3 more to the time limit. A fixed thinking budget
-    // was passed and ignored; the effort level is the knob the CLI documents
-    // and honours. Measured on the same redraw: medium thought ~45k and still
-    // crossed the ceiling once (65.6k tokens, 2 calls, 573 s); low fit one
-    // call (336 s).
+    // A reply must fit one API call. Measured 2026-11-06 on a 39-block canvas,
+    // every turn a redraw: the coach thought 50–125k tokens before a 15–30k
+    // reply, crossed the per-call ceiling every turn, and the resumed call
+    // re-emitted the element it was cut in (7 of 13 replies lost, 3 more to
+    // the time limit). A thinking budget was passed and ignored; effort is the
+    // knob honoured: medium still crossed once (65.6k, 2 calls), low fit one.
     effort: 'low',
     consumes: ['criteria', 'memories', 'setbacks'],
   },
@@ -355,36 +358,42 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
 
   // An evaluator with no criteria of its kinds on a prompt is skipped
   // without a call, so a prompt pays only for the competencies it asks for.
+  // Three samples each, beside the critics: a criterion settles on the median
+  // of the applicable results, so while all three answer one sample can
+  // neither drag a verdict down nor fail a gate; a lens short a sample is held
+  // to the two it has left, which settle on the worse (`thresholdOf`).
+  // Simulated 2026-11-10 on the recorded samples: a third sample alone takes
+  // the spread 7.8 → 5.9 and a split pair's chance of blocking 0.36 → 0.10.
   evaluators: [
     {
       id: 'evaluator.coverage',
       persona: onPlatform(evaluatorCoverage),
-      samples: 2,
-      consumes: ['findings'],
+      samples: 3,
+      consumes: [],
       maxTokens: 18100,
       criterionKinds: ['functional', 'constraint'],
     },
     {
       id: 'evaluator.design',
       persona: onPlatform(evaluatorDesign),
-      samples: 2,
-      consumes: ['findings'],
+      samples: 3,
+      consumes: [],
       maxTokens: 19900,
       criterionKinds: ['domain_model', 'interface', 'boundary', 'workflow', 'communication'],
     },
     {
       id: 'evaluator.qualities',
       persona: onPlatform(evaluatorQualities),
-      samples: 2,
-      consumes: ['findings'],
+      samples: 3,
+      consumes: [],
       maxTokens: 19800,
       criterionKinds: ['non_functional', 'scale', 'evolution'],
     },
     {
       id: 'evaluator.reasoning',
       persona: onPlatform(evaluatorReasoning),
-      samples: 2,
-      consumes: ['findings'],
+      samples: 3,
+      consumes: [],
       maxTokens: 15100,
       criterionKinds: ['tradeoff'],
     },
@@ -456,9 +465,21 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
 
     ...STANDARD_SCORING,
 
-    // Two samples on every lens and two hits to confirm: a constraint
-    // violation gates, and one sample must never be able to block a run.
-    evidence: { minHits: 2, minAssessedShare: 0.75 },
+    // A finding the evaluators contradict on every criterion it cites is priced
+    // as a low-confidence one (browser-step's rule): two judges disagreeing on
+    // one fact is not a fact a design is charged in full for.
+    penalties: {
+      ...STANDARD_SCORING.penalties,
+      contradicted: STANDARD_SCORING.confidenceWeights.low,
+    },
+
+    // Two critic samples confirm a finding; a gating constraint fails when two
+    // of three applicable evaluator results fail (two, when one was lost). Under
+    // `cited` the compliance gate is the evaluators' alone: a confirmed finding
+    // never blocks by itself — one citing a constraint they failed only routes
+    // (reject or escalate), one reconciled to a partial or failed criterion is
+    // never priced twice, one they contradicted is priced at a third.
+    evidence: { minHits: 2, minAssessedShare: 0.75, corroboration: 'cited' },
 
     thresholds: { acceptAt: 75, rejectBelow: 30 },
 
@@ -466,16 +487,12 @@ export const SYSTEM_DESIGN_CANVAS: PipelineDefinition<CanvasSubmission> = {
 
     // Twelve of the best's remediations a round, worst first, every validator
     // note among them. Measured 2026-11-07 on coach chain 4 (session
-    // 2681e7b0): each round handed 30–35 at once — 11 findings, 18–23
-    // criteria short of pass and 2 validator notes — and, answering those
-    // 30–35, the coach rewrote 22–31 of 34 bindings and restated 34–64% of
-    // each 82–120 KB redraw unchanged while the score ran 67.7 → 72.2 →
-    // 68.5 → 65. Twelve is declared, and the first capped rounds (arm C,
-    // lane run 2026-11-08T22-48-49-342-e4eb2d, 2026-11-08) were briefed with
-    // the 12 worst of 33 as declared; whether twelve is the right size is
-    // not yet measured — those rounds failed on how the change set addressed
-    // the canvas (`output.ts`), not on how much it was asked for. The record
-    // and the route keep the whole list; only the ask is capped.
+    // 2681e7b0): each round handed 30–35 at once (11 findings, 18–23 criteria
+    // short of pass, 2 validator notes), the coach rewrote 22–31 of 34
+    // bindings and restated 34–64% of each 82–120 KB redraw unchanged, and
+    // the score ran 67.7 → 72.2 → 68.5 → 65. The first capped rounds (arm C,
+    // 2026-11-08) were briefed with the 12 worst of 33; whether twelve is the
+    // right size is not yet measured. The record keeps the whole list.
     briefing: { remediationsPerRound: 12 },
   },
 };

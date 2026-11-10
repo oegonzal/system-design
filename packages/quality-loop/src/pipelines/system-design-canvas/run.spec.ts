@@ -216,8 +216,8 @@ describe('the system-design-canvas loop', () => {
     const scopes = new Set(exchanges.map((exchange) => exchange.scope));
     expect(scopes.has('criteria')).toBe(false);
     expect(scopes.has('producer')).toBe(false);
-    // Ten lenses, two samples each — every one attributed.
-    expect(exchanges).toHaveLength(20);
+    // Ten lenses — six critics at two samples, four evaluators at three — every one attributed.
+    expect(exchanges).toHaveLength(24);
 
     expect(trace.iterations).toHaveLength(1);
     const [only] = trace.iterations;

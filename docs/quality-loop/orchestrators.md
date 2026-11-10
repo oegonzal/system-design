@@ -414,9 +414,13 @@ Three rules hold in every flow below:
 
 - **The judges start from scratch each iteration.** Critics see the goal, the whole rubric, the
   current artifact, its locations and its validation results. Evaluators see the goal, only the
-  criteria of their own kinds, the artifact, its locations, and the findings the critics confirmed
-  in the same iteration: both studio pipelines declare their evaluators `consumes: ['findings']`,
-  so they run as a second wave after the critics. Only critics see validation results. Neither ever
+  criteria of their own kinds, the artifact and its locations. design-prompt's evaluator also sees
+  the findings the critics confirmed in the same iteration (`consumes: ['findings']`, a second wave
+  after the critics); the canvas evaluators read apart from the critics since 2.4.0 (2026-11-10),
+  beside them in the first wave: shown the confirmed set, they had carried its sampling noise into
+  23 of the 25 criteria that changed verdict between five judgings of one unchanged design
+  (67.5–75.3); judged apart four times, the same design scored 88.4–91.3 with 4 criteria ever
+  differing. Only critics see validation results. Neither ever
   sees an earlier iteration, a score, or what the producer was asked to fix.
 - **The rubric is fixed before the quality run starts, except in prompt generation.** A grade or a
   coach is handed the prompt's rubric verbatim and never derives one. That rubric is built once per

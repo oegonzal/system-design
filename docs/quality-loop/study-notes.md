@@ -49,6 +49,8 @@ What browser-step declares
 
 Pipelines with corroboration: 'none' veto on agreement alone. In agentic-design and system-design-canvas, for example, that means two samples of the same critic agreeing on a gated or critical finding.
 
+Correction (2026-11-10): tool-step has declared `corroboration: 'cited'` since 2026-10-16, and system-design-canvas does since 2.4.0, its evaluators reading apart from the critics (`consumes: []`, three samples each, the compliance gate the evaluators' alone).
+
 How the session obeys a veto
 
 The session never re-judges; it reads the decision (routePlan in contracts/.../route-plan.ts):
@@ -293,6 +295,8 @@ For a missed_stop citing c12, the evaluator's verdict on c12 decides:
 
 Under corroboration: 'none' (every other pipeline), the third condition doesn't exist: a gated, agreed finding vetoes on its own.
 
+Correction (2026-11-10): tool-step has declared `corroboration: 'cited'` since 2026-10-16, and system-design-canvas does since 2.4.0, its evaluators reading apart from the critics (`consumes: []`, three samples each, the compliance gate the evaluators' alone).
+
 Refound is browser-step's correction for a page that shows nothing. If the evaluator failed c12 on about:blank, refound rewrites c12 to not_applicable and logs a refounded diagnostic.
 Now c12 can't block, and the missed_stop citing it becomes contradicted (its only cited criterion doesn't apply), so it loses its veto too.
 
@@ -369,6 +373,8 @@ Corroboration works by multiplying two independent probabilities. Using the meas
 Shown "the page says the daily limit is reached", the evaluator's verdict stopped being a second reading and became a copy of the first.
 The rule still asked for two witnesses, but both answers came from one.
 Waves aren't harmful in themselves. In pipelines whose vetoes rest on a critic agreeing with itself (corroboration: 'none'), letting the evaluator read the findings doesn't create finding vetoes.
+
+Correction (2026-11-10): tool-step has declared `corroboration: 'cited'` since 2026-10-16, and system-design-canvas does since 2.4.0, its evaluators reading apart from the critics (`consumes: []`, three samples each, the compliance gate the evaluators' alone).
 The damage came from combining "the evaluator confirms the critic" with "the evaluator reads the critic first".
 
 I'll verify each answer in the code first: where location ids come from in each pipeline, how criterion ids are numbered, and exactly what the deriver is shown.
@@ -654,6 +660,8 @@ A wave is when a lens runs (runLensWaves in core/loop/waves.ts):
 - Wave 1: every critic, plus each evaluator that declares consumes: []. They run in parallel and see only the goal and the plan.
 - Wave 2: evaluators that declare consumes: ['findings']. They run after wave 1, and their prompt includes the critics' confirmed findings under # Confirmed upstream defects.
 
+Correction (2026-11-10): tool-step has declared `corroboration: 'cited'` since 2026-10-16, and system-design-canvas does since 2.4.0, its evaluators reading apart from the critics (`consumes: []`, three samples each, the compliance gate the evaluators' alone).
+
 browser-step's policy declares corroboration: 'cited' with one sample per lens. Under that rule (corroborated in core/controllers/context.ts), a gated finding like missed_stop vetoes only if the evaluator also failed a gating criterion the finding cites. With one critic sample, that second judge is the only thing between a single model's claim and a veto. A second opinion is only worth something if it's formed independently.
 
 What the second wave did
@@ -699,6 +707,8 @@ I checked all ten definitions. Only browser-step declares cited:
 In the other four, a gated finding vetoes on agreement among the critic's own samples, and no rule treats the evaluator as an independent check. Showing it the findings is the intended "critics diagnose, then evaluators measure" design there. The contradiction (a rule that needs independence, plus a layout that removes it) lived in one declaration. So the fix was one line in browser-step (consumes: []), plus a general boot check, checkCorroboration, that refuses this combination in any pipeline. There is no browser-step special case in the engine.
 
 One caveat I didn't measure: in those four pipelines the same echo could fail a gating criterion: constraint in agentic-design and system-design-canvas, scope in design-prompt. That would turn a non-gated finding into a veto. The two with minHits: 2 only ever show findings two samples agreed on, which makes this much weaker. design-prompt shows single-sample findings. Worth measuring if those pipelines veto more than you'd expect.
+
+Correction (2026-11-10): tool-step has declared `corroboration: 'cited'` since 2026-10-16, and system-design-canvas does since 2.4.0, its evaluators reading apart from the critics (`consumes: []`, three samples each, the compliance gate the evaluators' alone).
 
 The lines you quoted
 

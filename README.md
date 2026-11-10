@@ -16,7 +16,7 @@ components that hold it, model the entities it keeps and who owns them, trace
 the path a request takes, say why that mechanism and not another, narrate the
 design and record the decisions it rests on — the choice, the alternative, the
 cost →
-submit → the quality loop judges it with five critics and four evaluators and a
+submit → the quality loop judges it with six critics and four evaluators and a
 deterministic controller → findings point at the exact nodes and edges, results
 sit beside each criterion → iterate, resubmit, or hand the draft to the coach
 and watch its better iterations land in the timeline. A STAR-story repository
@@ -152,10 +152,12 @@ edges to nodes, bindings to criteria, paths that connect), waits for no
 earlier grade of the session to still be in flight, and starts one
 `system-design-canvas` run on those criteria with the canvas, brief and
 narrative as the artifact; the revision row points at that run's iteration.
-Five critic personas (requirements, model, structure, fitness, explanation)
-and four evaluators (coverage, design, qualities, reasoning) judge it with two
-samples each; the deterministic controller prices what they agreed on into
-coverage, design, qualities, reasoning and compliance, and decides. Every
+Six critic personas (requirements, model, structure, communication, fitness,
+explanation) at two samples and four evaluators (coverage, design, qualities,
+reasoning) at three judge it, the evaluators reading the canvas apart from the
+critics; the deterministic controller prices what the critics agreed on and
+what the evaluators settled by median into coverage, design, qualities,
+reasoning and compliance, and decides. Every
 rubric closes with two standing trade-off criteria, so reasoning is earnable
 on every prompt; scale is one criterion kind among ten and earns only what a
 prompt's own figures give it. The studio reads the run back,
