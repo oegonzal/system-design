@@ -32,6 +32,7 @@ One application: from opening a listing's card to the confirmation that the appl
 - The results are a list of about 25 cards to a page. Each card is one button whose name is the card's whole text — job title, company, place, sometimes pay and badges, "Posted …" — ending in "Easy Apply" when the listing takes an Easy Apply application. A card applied to before carries "Applied ·" just before "Posted". Each card also holds a "Dismiss <job title> job" control, which hides the listing.
 - Clicking a card shows its listing in the pane beside the list: the title, the company, and how to apply — a button "Easy Apply" (its visible text reads "Easy Apply"); or, for a listing applied to before, a heading "Application status" over "Application submitted" and its age; or a link "Apply on company website"; or the words "No longer accepting applications".
 - Below the list, buttons "Page 1", "Page 2", … and "Next" page through the results, out of view until the list is scrolled down. The application form's advance button is also named "Next"; that one is inside the dialog.
+- A dialog headed "Messaging" may cover the list once a page has loaded; Escape closes it. After a paging click, press Escape in the same plan, so the next observation reads the new page's cards.
 
 ## The application form
 
