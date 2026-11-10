@@ -10,6 +10,7 @@
  * before calling `bootApp`.
  */
 import type { INestApplication, Type } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { Test } from '@nestjs/testing';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -79,7 +80,7 @@ export async function bootApp(
   const merged = new Map<unknown, unknown>([...DEFAULT_OVERRIDES(), ...overrides]);
   for (const [token, value] of merged) builder = builder.overrideProvider(token).useValue(value);
   const moduleRef = await builder.compile();
-  const app = configureApp(moduleRef.createNestApplication(), env);
+  const app = configureApp(moduleRef.createNestApplication<NestExpressApplication>(), env);
   await app.listen(0);
   return { app, url: await app.getUrl() };
 }

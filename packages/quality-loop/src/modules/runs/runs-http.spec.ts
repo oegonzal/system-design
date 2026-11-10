@@ -168,6 +168,11 @@ describe('the HTTP surface', () => {
     });
   });
 
+  it('parses a body past Express’s default 100 KB: the declared limit answers, and what is wrong with the request is said by name', async () => {
+    const past = await postJson(url, '/runs', { pipeline: 'missing', goal: 'x'.repeat(150_000) });
+    expect(past.status).toBe(404);
+  });
+
   it('[QL-63] records who opened a run, lists it under that opener alone, and refuses an opener it does not declare', async () => {
     const openedBy = { kind: 'browser-session', id: 'session-http', label: 'step 6 · form page' };
     const started = await postJson(url, '/runs', { pipeline: 'tiny', goal: '# Goal', openedBy });

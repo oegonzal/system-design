@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { errorMessage } from '@sysdesign/contracts';
 
 import { preflight } from './boot';
@@ -43,7 +44,7 @@ async function bootstrap(): Promise<void> {
     process.exit(await runCli(argv.slice(1)));
   }
 
-  const app = configureApp(await NestFactory.create(AppModule));
+  const app = configureApp(await NestFactory.create<NestExpressApplication>(AppModule));
   // SIGTERM/SIGINT close the MikroORM pool instead of dropping connections.
   app.enableShutdownHooks();
   const port = process.env['QUALITY_LOOP_PORT']

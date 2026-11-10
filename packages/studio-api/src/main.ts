@@ -1,5 +1,6 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 
 import { configureApp } from './common/configure-app';
 import { AppModule } from './modules/app/app.module';
@@ -10,7 +11,7 @@ async function bootstrap() {
     process.exit(1);
   });
 
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
 
   // Prefix and CORS live in configureApp so the integration tests boot an
   // identically configured app.

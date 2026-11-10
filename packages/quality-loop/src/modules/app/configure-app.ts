@@ -1,5 +1,5 @@
-import type { INestApplication } from '@nestjs/common';
-import { configureCors } from '@sysdesign/nest-kit';
+import type { NestExpressApplication } from '@nestjs/platform-express';
+import { configureBodyLimit, configureCors } from '@sysdesign/nest-kit';
 
 /** The web client runs on 4201; `QUALITY_LOOP_CORS_ORIGIN` points elsewhere. */
 export const CORS_ORIGIN = {
@@ -7,8 +7,8 @@ export const CORS_ORIGIN = {
   defaultOrigin: 'http://localhost:4201',
 } as const;
 
-/** Boots `main.ts` and the integration specs identically. */
-export const configureApp = <T extends INestApplication>(
+/** Boots `main.ts` and the integration specs identically: the CORS origin and the JSON body limit. */
+export const configureApp = <T extends NestExpressApplication>(
   app: T,
   env: NodeJS.ProcessEnv = process.env,
-): T => configureCors(app, CORS_ORIGIN, env);
+): T => configureCors(configureBodyLimit(app), CORS_ORIGIN, env);

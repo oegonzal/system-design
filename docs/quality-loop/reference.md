@@ -354,7 +354,9 @@ list in `index.spec.ts`. Nothing in `core/` changes.
 Boots and configures the served application. `AppModule` imports the database, janitor, runs,
 prompts, memory, router and orchestration modules. `HealthController` answers `GET /health` with the
 bound model, so reaching it proves a model is wired. `configure-app.ts` exports `configureApp` and
-`CORS_ORIGIN`, used by `main.ts` and by the HTTP specs so they boot identically. `ReplayModule` is
+`CORS_ORIGIN`, used by `main.ts` and by the HTTP specs so they boot identically: the CORS origin and
+nest-kit's declared JSON body limit (`JSON_BODY_LIMIT`, 1 MB — Express's default 100 KB refused a
+grade request of one 94 KB canvas with its goal and rubric, measured 2026-11-10). `ReplayModule` is
 the slim context for the replay command: database and pipelines only, no model, no janitor.
 
 ### `modules/http/`

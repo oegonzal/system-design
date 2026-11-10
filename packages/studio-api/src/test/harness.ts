@@ -1,4 +1,5 @@
 import { Test } from '@nestjs/testing';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import type { INestApplication } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { afterAll, beforeAll, beforeEach } from 'vitest';
@@ -46,7 +47,7 @@ async function createHarness(): Promise<Harness> {
     .useValue(loop)
     .compile();
 
-  const app = configureApp(moduleRef.createNestApplication());
+  const app = configureApp(moduleRef.createNestApplication<NestExpressApplication>());
   await app.listen(0);
 
   const em = app.get(EntityManager);
