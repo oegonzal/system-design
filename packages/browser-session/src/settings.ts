@@ -6,6 +6,7 @@ import {
   answeringSettingsSchema,
   channelIdSchema,
   FIELD_TYPES,
+  MAX_EVIDENCE,
   recordScopeSchema,
   recoverySchema,
   type AnsweringSettings,
@@ -229,11 +230,17 @@ const legendEntrySchema = z.strictObject({
  * How deep a page's recall draws: hits per probe by the kind of control
  * asking — a total table over the field types, so a new type is classified or
  * the file refuses — the most items one goal lists, dealt by rank across the
- * fields, and how many recalls run at once.
+ * fields, and how many recalls run at once. The most items is bounded by what
+ * the field goal's index admits: above it the composed index fails its own
+ * schema, the loop reads no index, and every answer on the page goes out
+ * unjudged — measured 2026-11-11, a cap of 40 did that to 20 of 68 pages.
  */
 const recallSettingsSchema = z.strictObject({
   hitsPerFieldType: z.record(z.enum(FIELD_TYPES), positive) satisfies z.ZodType<HitsPerFieldType>,
-  maxEvidence: positive,
+  maxEvidence: positive.max(
+    MAX_EVIDENCE,
+    `is above the ${MAX_EVIDENCE} items a field goal's index admits`,
+  ),
   concurrency: positive,
 });
 

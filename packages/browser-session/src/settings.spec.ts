@@ -2,7 +2,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 import { EngineConfigError } from '@sysdesign/config-kit';
-import { FIELD_TYPES, memoryStrategySchema } from '@sysdesign/contracts';
+import { FIELD_TYPES, MAX_EVIDENCE, memoryStrategySchema } from '@sysdesign/contracts';
 
 import { PACKAGE_ROOT, SessionConfigError } from './config';
 import { readSessionSettings, UNJUDGED_RUN, type MemoryBrainSettings } from './settings';
@@ -174,24 +174,22 @@ describe('the session settings', () => {
     expect(brain.legend.map((entry) => entry.kind)).toEqual(
       brain.facts.map((role) => brain.binding.registers[role]?.name),
     );
-    // A total table over the field types: free text draws deepest, and a question a short answer settles draws
-    // eight — measured 2026-11-10 over 67 answered fields, the deepest cited rank was spread flat across the first
-    // five and a citizenship answer a compound question needed ranked sixth; three more hits per field filled 5 of 20
-    // operator-bound fields a replay had left to the operator. The cap holds a five-field page's eighth ranks, and
-    // the goal's byte budget drops the lowest ranks first on a longer page; the fan-out is declared.
+    // A total table over the field types: free text draws deepest, and a question a short answer settles draws five —
+    // measured 2026-11-07, the dated span a years-of-experience question rests on ranked as deep as fifth once new
+    // standing answers came in; the cap and the fan-out are declared.
     expect(Object.keys(brain.recall.hitsPerFieldType).sort()).toEqual([...FIELD_TYPES].sort());
     expect(brain.recall.hitsPerFieldType).toEqual({
-      text: 8,
-      textarea: 12,
-      number: 8,
-      date: 6,
-      select: 8,
-      radio: 8,
-      checkbox: 6,
-      file: 6,
-      unknown: 6,
+      text: 5,
+      textarea: 10,
+      number: 5,
+      date: 3,
+      select: 5,
+      radio: 5,
+      checkbox: 3,
+      file: 3,
+      unknown: 3,
     });
-    expect(brain.recall.maxEvidence).toBe(40);
+    expect(brain.recall.maxEvidence).toBe(24);
     expect(brain.recall.concurrency).toBe(4);
     expect(brain.project).toBe('job-assistant');
     expect(brain.binding.recovery).toEqual({ windowMs: 60000, pauseMs: 2000 });
@@ -312,6 +310,14 @@ describe('the session settings', () => {
     expect(
       varied((settings) => ({ ...settings, recall: { ...settings.recall, concurrency: 0 } })),
     ).toThrow(/recall\.concurrency: /);
+    // A page dealt more items than the field goal's index admits would compose an index the loop cannot read, and
+    // the loop would judge none of the page's answers: the file refuses the cap instead.
+    expect(
+      varied((settings) => ({
+        ...settings,
+        recall: { ...settings.recall, maxEvidence: MAX_EVIDENCE + 1 },
+      })),
+    ).toThrow(/recall\.maxEvidence: is above the \d+ items a field goal's index admits/);
     // A binding the client cannot read is the client's refusal, by field.
     expect(
       varied((settings) => ({
