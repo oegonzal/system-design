@@ -74,6 +74,20 @@ describe('createCriteriaDeriver', () => {
     expect(calls[0]?.salvage?.overruns).toMatchObject([overrun]);
   });
 
+  it('[QL-2] a room the caller declares caps what is asked for and kept, never above the pipeline’s own', async () => {
+    const three = {
+      criteria: [
+        { kind: 'must', statement: 'a' },
+        { kind: 'must', statement: 'b' },
+        { kind: 'must', statement: 'c' },
+      ],
+    };
+    const capped = await createCriteriaDeriver(task, deriveCriteria, fakeLlm(three))('goal', 2);
+    expect(capped.criteria?.map((item) => item.id)).toEqual(['c1', 'c2']);
+    const whole = await createCriteriaDeriver(task, deriveCriteria, fakeLlm(three))('goal', 99);
+    expect(whole.criteria?.map((item) => item.id)).toEqual(['c1', 'c2', 'c3']);
+  });
+
   it('[QL-2] fixed criteria head the rubric with the first ids, the deriver is told they are already there, and derives into what remains', async () => {
     // A cap a goal's own lines fill crowds out whatever the deriver was also
     // asked for. Measured 2026-10-07: a kind one pipeline declared never once

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
+  CANVAS_MAX_CRITERIA,
+  CANVAS_STANDING_CRITERIA,
   PLATFORM_STANDING_CRITERIA,
   PROMPT_COPY,
   PROMPT_MARKDOWN_BOUND,
@@ -45,7 +47,11 @@ describe('prompts', () => {
         'c12:evolution',
       ]);
       expect(h.loop.criteriaRequests).toEqual([
-        { pipeline: 'system-design-canvas', goal: AUTHORED_MARKDOWN },
+        {
+          pipeline: 'system-design-canvas',
+          goal: AUTHORED_MARKDOWN,
+          room: CANVAS_MAX_CRITERIA - CANVAS_STANDING_CRITERIA.length,
+        },
       ]);
       // Platform-neutral unless one is asked for.
       expect(body.data.platform).toBeNull();
@@ -71,9 +77,16 @@ describe('prompts', () => {
         'c13:constraint',
       ]);
       expect(body.data.criteria[12]?.statement).toBe(PLATFORM_STANDING_CRITERIA[0].statement);
-      // The derivation read the markdown and nothing of the platform.
+      // The derivation read the markdown and nothing of the platform — only the room its standing row leaves.
       expect(h.loop.criteriaRequests).toEqual([
-        { pipeline: 'system-design-canvas', goal: AUTHORED_MARKDOWN },
+        {
+          pipeline: 'system-design-canvas',
+          goal: AUTHORED_MARKDOWN,
+          room:
+            CANVAS_MAX_CRITERIA -
+            CANVAS_STANDING_CRITERIA.length -
+            PLATFORM_STANDING_CRITERIA.length,
+        },
       ]);
       const refused = await author({ ...authoredPrompt(), platform: 'gcp' });
       expect(refused.status).toBe(400);

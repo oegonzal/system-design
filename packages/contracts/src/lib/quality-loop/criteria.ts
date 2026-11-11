@@ -6,6 +6,15 @@ import type { Diagnostic, SuccessCriterion } from './evidence';
 export interface DeriveCriteriaRequest {
   pipeline: string;
   goal: string;
+  /**
+   * The most derived criteria the caller can keep beyond the pipeline's fixed
+   * ones. A caller that closes the rubric with rows of its own asks for what
+   * remains, so the deriver chooses within that room instead of having its
+   * tail cut after the fact; absent, the pipeline's whole room. Measured
+   * 2026-11-10: asked for 34 and cut to 26, three derivations of one prompt
+   * each lost a different tail — its constraints twice, its scale rows once.
+   */
+  room?: number;
 }
 
 /**

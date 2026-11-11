@@ -34,7 +34,8 @@ Two facts organise everything below:
 Beside them, without a run: `POST /prompts` stores markdown the author wrote,
 `POST /prompts/import` copies a document from the loop's library, and both —
 like every written or imported prompt the first time it is read — derive
-their criteria through `POST /criteria`, one model call and no run. A
+their criteria through `POST /criteria`, one model call and no run, asked for the room the
+standing criteria leave. A
 generated prompt's criteria are its draft's own rows and need no call.
 
 ```

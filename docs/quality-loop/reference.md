@@ -447,16 +447,16 @@ pipeline that would be chosen, and why — without running anything.
 The core of the service. Tokens: `QUALITY_LOOP_LLM`, `PIPELINES_TOKEN`, `TRACE_STORE`,
 `RUN_REPOSITORY`, `RUN_DUMP_DIR`, `RUN_RECALL_SLOT` and `RUN_RECALL_RECORDER`.
 
-| File                      | What it does                                                               |
-| ------------------------- | -------------------------------------------------------------------------- |
-| `runs.service.ts`         | Starts and runs a run; `run-recorder.ts` writes what it did and closes it. |
-| `run-admission.ts`        | What every run passes before its row exists, however it was opened.        |
-| `runs.controller.ts`      | `POST /runs` (202), `GET /runs`, `GET /runs/:id`, `POST /runs/evidence`.   |
-| `pipelines.controller.ts` | `GET /pipelines` — the registry as summaries.                              |
-| `criteria.controller.ts`  | `POST /criteria` — one model call, no row, no dump.                        |
-| `run-request.ts`          | The request schemas, including the adopt and output rules.                 |
-| `dump-trace-store.ts`     | The one dump writer. Never throws; a failed write is logged.               |
-| `persistence/*`           | Row types, `toRows`, `fromRows`, `toSummary`, the MikroORM repository.     |
+| File                      | What it does                                                                                                                  |
+| ------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `runs.service.ts`         | Starts and runs a run; `run-recorder.ts` writes what it did and closes it.                                                    |
+| `run-admission.ts`        | What every run passes before its row exists, however it was opened.                                                           |
+| `runs.controller.ts`      | `POST /runs` (202), `GET /runs`, `GET /runs/:id`, `POST /runs/evidence`.                                                      |
+| `pipelines.controller.ts` | `GET /pipelines` — the registry as summaries.                                                                                 |
+| `criteria.controller.ts`  | `POST /criteria` — one model call, no run row, dumped as a folder of its own; `room` caps the derived rows a caller can keep. |
+| `run-request.ts`          | The request schemas, including the adopt and output rules.                                                                    |
+| `dump-trace-store.ts`     | The one dump writer. Never throws; a failed write is logged.                                                                  |
+| `persistence/*`           | Row types, `toRows`, `fromRows`, `toSummary`, the MikroORM repository.                                                        |
 
 A run opens as a `running` header and beats on a ticker of its own. As it goes it records each model
 exchange and, after every iteration, a progress snapshot of the standing iterations. It closes in a

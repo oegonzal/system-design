@@ -1,12 +1,14 @@
 import { ConflictException, Injectable, UnprocessableEntityException } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import {
+  CANVAS_MAX_CRITERIA,
   CANVAS_PIPELINE_ID,
   DEFAULT_PRACTICE_FORMAT,
   PRACTICE_FORMATS,
   practiceFormatForLibraryFolder,
   PROMPT_COPY,
   sectionCount,
+  standingCriteriaFor,
   withStandingCriteria,
   type AuthorPromptRequest,
   type ImportPromptRequest,
@@ -177,7 +179,9 @@ export class PromptsService {
    * source shares, from the markdown alone, closed by the standing criteria
    * every canvas rubric carries and the platform's when the prompt declares
    * one (the loop uses a supplied rubric verbatim, so they are appended here
-   * and never derived).
+   * and never derived). The deriver is asked for the room those leave, so a
+   * prompt that derives more than fits keeps what the deriver chose within
+   * it, never the first rows of a longer list.
    */
   private async rubricFor(
     markdown: string,
@@ -186,6 +190,7 @@ export class PromptsService {
     const derived = await this.loop.deriveCriteria({
       pipeline: CANVAS_PIPELINE_ID,
       goal: markdown,
+      room: CANVAS_MAX_CRITERIA - standingCriteriaFor(platform).length,
     });
     return withStandingCriteria(derived.criteria, platform);
   }

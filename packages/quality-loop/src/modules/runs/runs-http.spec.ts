@@ -439,6 +439,12 @@ describe('the HTTP surface', () => {
     expect(readFileSync(join(DUMP_DIR, 'index.jsonl'), 'utf8')).toContain(data.dumpRunId);
     expect((await postJson(url, '/criteria', { pipeline: 'nope', goal: 'g' })).status).toBe(404);
     expect((await postJson(url, '/criteria', { pipeline: 'tiny', goal: '' })).status).toBe(400);
+    expect(
+      (await postJson(url, '/criteria', { pipeline: 'tiny', goal: 'g', room: 0 })).status,
+    ).toBe(400);
+    expect(
+      (await postJson(url, '/criteria', { pipeline: 'tiny', goal: 'g', room: 1 })).status,
+    ).toBe(200);
   });
 
   it('[QL-20] a derivation the model fails answers 503 with the diagnostic, says what ended the call, and never an empty rubric', async () => {

@@ -118,7 +118,7 @@ export class RunsService {
     const derive = materializeCriteria(definition, this.llm, (exchange) => {
       exchanges.push(exchange);
     });
-    const { criteria, diagnostic } = await derive(request.goal);
+    const { criteria, diagnostic } = await derive(request.goal, request.room);
     const derived = {
       pipeline: request.pipeline,
       criteria: criteria ?? [],

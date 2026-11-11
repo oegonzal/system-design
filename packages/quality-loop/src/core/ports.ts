@@ -177,7 +177,8 @@ export interface DerivedCriteria {
   overruns: Overrun[];
 }
 
-export type CriteriaDeriver = (goal: string) => Promise<DerivedCriteria>;
+/** Derives a goal's criteria; `room`, when given, caps the derived rows below the pipeline's own room. */
+export type CriteriaDeriver = (goal: string, room?: number) => Promise<DerivedCriteria>;
 
 /**
  * The controller: the ledger and the policy in, a decision out. Synchronous

@@ -2,7 +2,8 @@
  * The task contract's criteria: what the pipeline declares for every goal of
  * its kind (`task.fixedCriteria`), then what this goal adds — one structured
  * extraction, classified into the pipeline's kinds, into the room the fixed
- * ones leave. Ids are assigned here, positionally over the whole, so the
+ * ones leave — or the smaller room a caller declares, when it closes the
+ * rubric with rows of its own. Ids are assigned here, positionally over the whole, so the
  * model never authors an identifier and the policy can price a kind without
  * trusting a name. A statement past the task's bound is kept as written and
  * reported as an overrun, never a reason to lose the rubric; only a reply the
@@ -30,7 +31,7 @@ export function createCriteriaDeriver<T>(
   spec: StageSpec,
   llm: LlmClient,
 ): CriteriaDeriver {
-  return async (goal) => {
+  return async (goal, callerRoom) => {
     const kinds = enumTuple(Object.keys(task.criterionKinds));
     if (!kinds) {
       return {
@@ -42,7 +43,8 @@ export function createCriteriaDeriver<T>(
 
     const fixed = task.fixedCriteria ?? [];
     // Boot refuses a pipeline whose fixed criteria leave no room, so this is ≥ 1.
-    const room = task.maxCriteria - fixed.length;
+    const pipelineRoom = task.maxCriteria - fixed.length;
+    const room = callerRoom === undefined ? pipelineRoom : Math.min(callerRoom, pipelineRoom);
     const goalText = goalSection(goal);
     const fixedSection = fixedCriteriaSection(fixed);
     const reply = await asDetailed(llm).completeStructuredDetailed({

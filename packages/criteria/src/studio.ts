@@ -65,7 +65,7 @@ export const STUDIO_CRITERIA: readonly Criterion[] = [
   {
     id: 'GEN-2',
     statement:
-      'A prompt can be written by hand as markdown and is stored verbatim with the rubric the grader derives from it.',
+      'A prompt can be written by hand as markdown and is stored verbatim with the rubric the grader derives from it into the room the standing criteria leave.',
   },
   {
     id: 'GEN-3',

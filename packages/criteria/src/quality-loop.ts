@@ -13,7 +13,7 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-2',
     statement:
-      'Success criteria are derived from the goal text by one structured extraction with engine-assigned ids; the goal reaches only prompts, never scoring code.',
+      'Success criteria are derived from the goal text by one structured extraction with engine-assigned ids, into the room the pipeline’s fixed criteria leave or the smaller room the caller declares; the goal reaches only prompts, never scoring code.',
   },
   {
     id: 'QL-3',
