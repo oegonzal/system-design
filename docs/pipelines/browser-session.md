@@ -79,7 +79,7 @@ pnpm browser-session run --goal packages/browser-session/goals/linkedin-easy-app
 # or the Built In flow, on a profile of its own, with the one document its mission declares:
 pnpm browser-session run --goal packages/browser-session/goals/builtin-apply.md \
   --profile builtin --headed --subject "Your Name" \
-  --url "https://builtin.com/jobs/remote/hybrid?search=Software+Engineering&city=Los+Angeles&state=California&country=USA&allLocations=true" \
+  --url "https://builtin.com/jobs/remote/hybrid?search=Software+Engineer&city=Los+Angeles&state=California&country=USA&allLocations=true" \
   --document resume=<path-to-résumé.pdf> --max-tasks 2 --max-minutes 45
 ```
 
