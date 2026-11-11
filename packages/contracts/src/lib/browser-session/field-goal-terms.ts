@@ -68,7 +68,7 @@ export const FORM_GOAL_TERMS: Readonly<
       '- Answer every listed field exactly once, by its ref, in the order listed.',
       "- A value stays within the field's character limit; a selectable field takes one of its listed options, or where the list counts more the page offers, one of those verbatim; a field you type into that lists options takes an option's exact words, and words it holds that are none of its options are no choice — answer it, never keep them; a number field takes a number.",
       `- A field the page hides is left blank. A value rests on listed evidence, cited by alias, or — declared ${UNCITED_ANSWER_BASES.join(' or ')} — on the section of the goal that kind's meaning below names; with none of these, ask the operator.`,
-      `- Each value declares how it rests, by one word: ${ANSWER_BASES.map((kind) => `${kind} — ${ANSWER_BASIS_MEANINGS[kind]}`).join('; ')}. A value resting on the evidence (${CITING_ANSWER_BASES.join(', ')}) cites it by alias; one resting on ${UNCITED_ANSWER_BASES.join(' or ')} cites none; a mapped value needs options to map onto; a keep, an ask or a blank rests on none.`,
+      `- Each value declares how it rests, by one word: ${ANSWER_BASES.map((kind) => `${kind} — ${ANSWER_BASIS_MEANINGS[kind]}`).join('; ')}. A value resting on the evidence (${CITING_ANSWER_BASES.join(', ')}) cites it by alias; one resting on policy cites the evidence its line's condition rests on, where the line has one, and none where the line names the value outright; one resting on unit cites none; a mapped value needs options to map onto; a keep, an ask or a blank rests on none.`,
       '- Validators check these limits; they are not criteria.',
     ],
   },
