@@ -37,12 +37,15 @@ import { openUnitAnswers, openUnitFilled, openUnitLeftBlank } from './session-st
  * the memory did with each. One decision row per field settled.
  * A fill the page refuses stops the flow where it is — the page may have
  * moved on — so the fields after it are not attempted, and the plan stops
- * with it; the failure is counted once, by the step. The operator's own
- * answer is put back to them first, as the operator settings declare.
+ * with it; the step counts a failure only when no field was filled before
+ * it. The operator's own answer is put back to them first, as the operator
+ * settings declare.
  */
 export interface FieldsOutcome {
   stopped: boolean;
   failed: boolean;
+  /** A field the page refused: the fields after it were not attempted, so the actions planned after them do not run. */
+  refused: boolean;
   note: string;
 }
 
@@ -418,7 +421,7 @@ export async function askFields(
   const blanks = blanksOnPage(openUnitLeftBlank(ctx.state), observation.url);
   const fields = blanks.neededAgain(fieldsOf(refs, observation));
   if (fields.length === 0)
-    return { stopped: false, failed: false, note: 'no listed field matched' };
+    return { stopped: false, failed: false, refused: false, note: 'no listed field matched' };
   const unanswered = openOf(fields, openUnitFilled(ctx.state)).filter(
     (field) => !blanks.blankedByOperator(field),
   );
@@ -448,6 +451,7 @@ export async function askFields(
     failed:
       results.some((outcome) => outcome.outcome === 'failed') &&
       !results.some((outcome) => outcome.outcome === 'ok' && outcome.route === 'fill'),
+    refused: results.some((outcome) => outcome.outcome === 'failed'),
     note: summarize(results, routed),
   };
 }

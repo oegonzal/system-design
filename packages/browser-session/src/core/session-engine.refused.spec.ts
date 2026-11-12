@@ -75,7 +75,7 @@ describe('an answer the page refuses', () => {
     expect(brain.taught[0]?.answers[0]?.answer).toBe('No');
   });
 
-  it('[BRW-3] stands once the declared asks are spent, and the fields after it are not attempted', async () => {
+  it('[BRW-3] stands once the declared asks are spent: the fields after it are not attempted, and the send planned after them does not run', async () => {
     const browser = refusing(new FakeBrowser(journeyPages()), 'select', 'form');
     const { detail, operator, brain, logs } = await run({
       script: script(),
@@ -92,5 +92,12 @@ describe('an answer the page refuses', () => {
     expect(brain.taught).toEqual([]);
     // A refusal after a field was filled is a step that ran, not one failed step toward the limit.
     expect(logs.filter((line) => line.includes('action-failed'))).toEqual([]);
+    // The plan's click would send a form the page has not taken whole: it is held, and the next plan is told so.
+    expect(browser.calls).not.toContain('click e6');
+    expect(brain.planInputs[3]?.lastStep).toEqual({
+      ran: 1,
+      touched: expect.any(Array),
+      held: ['click'],
+    });
   });
 });

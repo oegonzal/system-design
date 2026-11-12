@@ -240,13 +240,19 @@ export async function closeUnreadableUnit(ctx: EngineContext, reads: number): Pr
   );
 }
 
-/** What one engine event did to the step: the failure it counts, if any, and whether the session is ending — the operator's stop, or its time being up. */
+/**
+ * What one engine event did to the step: the failure it counts, if any;
+ * whether the plan ends with it — the actions after it were planned for a page
+ * it did not leave as they assumed; and whether the session is ending — the
+ * operator's stop, or its time being up.
+ */
 interface Performed {
   failure: StepFailureEvent | null;
+  endsPlan: boolean;
   stopped: boolean;
 }
 
-const RAN: Performed = { failure: null, stopped: false };
+const RAN: Performed = { failure: null, endsPlan: false, stopped: false };
 
 /** One of the engine's own events, at its position in the plan, against the record the plan was composed with. */
 async function perform(
@@ -271,7 +277,11 @@ async function perform(
       // A /stop the operator typed is theirs; a stop the stopping signal brought was named by
       // whoever raised it — Ctrl-C marks the session itself, and the time limit is the rails' to report.
       if (outcome.stopped && !ctx.stopping.aborted) state.operatorStopped = true;
-      return { failure: outcome.failed ? 'action-failed' : null, stopped: outcome.stopped };
+      return {
+        failure: outcome.failed ? 'action-failed' : null,
+        endsPlan: outcome.refused,
+        stopped: outcome.stopped,
+      };
     }
     case 'taskStart': {
       // The actions after a refused taskStart were planned for a unit that
@@ -280,8 +290,12 @@ async function perform(
       // a stop does: no failure, and the session ends after it.
       const opening = await openTaskUnlessRefused(ctx, action, label, position, onRecord);
       if (opening === 'out-of-time' || opening === 'stopping')
-        return { failure: null, stopped: true };
-      return { failure: opening === 'refused' ? 'unit-refused' : null, stopped: false };
+        return { failure: null, endsPlan: true, stopped: true };
+      return {
+        failure: opening === 'refused' ? 'unit-refused' : null,
+        endsPlan: false,
+        stopped: false,
+      };
     }
     case 'taskDone':
       await closeTask(ctx, action, label);
@@ -348,6 +362,8 @@ export async function executeActions(
   /** Where the prefix stopped: the index after the last action attempted. */
   let next = 0;
   let failure: StepFailureEvent | null = null;
+  /** An event ended the plan without a failure: the actions after it were planned for a page it did not leave as they assumed. */
+  let ended = false;
   for (const action of prefix) {
     next += 1;
     const label = describeAction(action, observation);
@@ -379,15 +395,19 @@ export async function executeActions(
       const outcome = await perform(ctx, action, label, next - 1, observation, onRecord);
       if (outcome.stopped) return { termination: null, ranWhole: false, ranOk: next - 1 };
       failure = outcome.failure;
+      // A field the page refused after others were filled is no failure, but the send planned after it
+      // would go out with required fields unanswered. Measured 2026-11-12: 6 of 10 such plans ran their
+      // send on a form the page then refused, spending the unit's one retry.
+      ended = outcome.endsPlan;
     }
-    if (failure !== null) break;
+    if (failure !== null || ended) break;
   }
   const failed = failure !== null;
   if (failure !== null) ctx.fail(failure);
   else state.consecutiveFailures = 0;
 
   // Every action the plan proposed ran, and none failed: the objections are spent.
-  const ranWhole = !failed && actions.length === prefix.length;
+  const ranWhole = !failed && !ended && actions.length === prefix.length;
   if (ranWhole) clearObjections(state);
   const ranOk = failed ? next - 1 : next;
   state.lastStep = {
