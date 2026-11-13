@@ -84,6 +84,11 @@ jobs:
       - name: Test tooling
         run: pnpm test:tooling
 
+      # Before the unit tests, not only the end-to-end runs: browser-session's browser specs
+      # launch the bundled Chromium (headless shell) from vitest.
+      - name: Install Playwright chromium
+        run: pnpm exec playwright install --with-deps chromium
+
       - name: Test
         # Serial on purpose: the studio-api and quality-loop integration suites
         # share the one Postgres service and truncate between tests.
@@ -91,9 +96,6 @@ jobs:
 
       - name: Build
         run: pnpm exec nx run-many -t build build-storybook --all
-
-      - name: Install Playwright chromium
-        run: pnpm exec playwright install --with-deps chromium
 
       - name: Storybook smoke
         run: pnpm test:stories
