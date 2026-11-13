@@ -111,8 +111,6 @@ export interface CriticReport {
   findings: RawFinding[];
 }
 
-
-
 // BOOKMARK
 export interface RawCriterionResult {
   criterionId: string;

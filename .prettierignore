@@ -6,3 +6,7 @@ storybook-static
 .next-e2e
 pnpm-lock.yaml
 packages/db/src/migrations
+# Documents kept exactly as written: research notes with tab-aligned tables and an exported
+# interview guide, which prettier would reflow (decided 2026-11-13).
+docs/govcon
+docs/interview-prep
