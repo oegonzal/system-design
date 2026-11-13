@@ -1,0 +1,9 @@
+{
+  "goal": "packages/browser-session/goals/builtin-apply.md",
+  "profile": "builtin",
+  "url": "https://builtin.com/jobs/remote/hybrid?search=Software+Engineer&city=Los+Angeles&state=California&country=USA&allLocations=true",
+  "documents": { "resume": "Resume_2026_c.pdf" },
+  "targetDone": 4,
+  "maxTasks": 8,
+  "maxMinutes": 90
+}

@@ -2,7 +2,7 @@ import { resolve } from 'node:path';
 
 import type { InstanceSettings } from './channels';
 import type { ChannelDefinition } from './channels/port';
-import type { NotificationsSettings } from './settings';
+import type { NotificationsSettings, SettingsChoices } from './settings';
 
 /**
  * The service's configuration, declared once. Every variable it reads is
@@ -10,8 +10,11 @@ import type { NotificationsSettings } from './settings';
  * instance's in the chosen channels file, bound to the keys its kind
  * declares — and read by the one function below, which refuses by name
  * anything it cannot use. Everything else the service is configured with is a
- * file in the package's own `config/`, read by `settings.ts`. Nothing else in
- * the package reads the environment: `config.spec.ts` holds it to that.
+ * file in the package's own `config/`, read by `settings.ts` with the one
+ * choice the environment may make: which channels file runs, so a deployment
+ * carrying one bot runs a file of its own without editing the checked-in
+ * choices. Nothing else in the package reads the environment:
+ * `config.spec.ts` holds it to that.
  */
 
 /** The package itself — `dist/..` as built, `src/..` under test — whose `config/` holds the settings. */
@@ -20,6 +23,8 @@ export const PACKAGE_ROOT = resolve(__dirname, '..');
 /** Every variable the service reads for itself, with the value it takes when unset. */
 export const NOTIFICATIONS_ENV = {
   port: { name: 'NOTIFICATIONS_PORT', fallback: '3005' },
+  /** The channels file to run, by name; unset, `config/engine.json`'s choice stands. */
+  channels: { name: 'NOTIFICATIONS_CHANNELS', fallback: undefined },
 } as const;
 
 export class NotificationsConfigError extends Error {
@@ -88,14 +93,18 @@ function refuseShared(
   }
 }
 
+/** How the settings are read, given the choices the environment makes: `readSettings` over the package's own files. */
+export type ReadSettings = (choices: SettingsChoices) => NotificationsSettings;
+
 /**
- * The one read of the environment: the port, and the variables every chosen
- * instance binds. A port that is not one, an instance missing a variable its
+ * The one read of the environment: the port, the channels file to run, and
+ * the variables every instance that file binds. A port that is not one, a
+ * channels name with no file behind it, an instance missing a variable its
  * kind requires, and two instances reading one value their kind holds
  * distinct are refused here by name — never by value — before anything boots.
  */
 export function notificationsConfigFromEnv(
-  settings: NotificationsSettings,
+  readSettings: ReadSettings,
   definitions: readonly ChannelDefinition[],
   env: NodeJS.ProcessEnv = process.env,
 ): NotificationsConfig {
@@ -105,6 +114,8 @@ export function notificationsConfigFromEnv(
       `${NOTIFICATIONS_ENV.port.name} must be a port number, got ${JSON.stringify(port)}`,
     );
   }
+  const channels = set(env, NOTIFICATIONS_ENV.channels.name) ?? NOTIFICATIONS_ENV.channels.fallback;
+  const settings = readSettings(channels === undefined ? {} : { channels });
   const source = settings.sources.channels;
   const channelEnv: Record<string, Record<string, string | undefined>> = {};
   for (const definition of definitions) {

@@ -1,7 +1,8 @@
 import { DEFAULT_BEHAVIORS } from '../kinds/behaviors';
+import type { VectorIndex } from '../ports';
 import { failingEmbedder, tableEmbedder } from '../testing/fakes';
 import { InMemoryVectorIndex } from '../testing/in-memory-vector-index';
-import { spaceUnderTest } from '../testing/space-under-test';
+import { SPACE_UNDER_TEST, spaceUnderTest } from '../testing/space-under-test';
 import { remember } from '../write/write';
 import { sweep } from './sweep';
 
@@ -66,5 +67,41 @@ describe('the sweep', () => {
     };
     expect(await sweep(moved, DEFAULT_BEHAVIORS)).toMatchObject({ projected: 2 });
     expect(next.ids()).toHaveLength(2);
+  });
+
+  it('[AGM-9] forgets the mark of a closed record projected into a collection that is no longer current, asking nothing of the index', async () => {
+    const { ctx, records, index } = spaceUnderTest();
+    const { record } = await remember(ctx, fact('acme'));
+    expect(index.ids()).toEqual([record.id]);
+    await records.close(record.id, {
+      status: 'invalidated',
+      validTo: new Date(),
+      closedAt: new Date(),
+      reason: 'spec',
+    });
+    // The index after a generation bump: a new collection, every removal it is asked for recorded.
+    const next = new InMemoryVectorIndex('spec__next-model');
+    const removals: string[][] = [];
+    const watched: VectorIndex = {
+      collection: next.collection,
+      upsert: (points) => next.upsert(points),
+      remove: (ids) => {
+        removals.push([...ids]);
+        return next.remove(ids);
+      },
+      search: (query) => next.search(query),
+    };
+    const moved = {
+      ...ctx.ports,
+      index: watched,
+      embedder: tableEmbedder({ model: 'next-model', dimensions: 8 }),
+    };
+    expect(await sweep(moved, DEFAULT_BEHAVIORS)).toMatchObject({ unprojected: 1, projected: 0 });
+    expect(removals).toEqual([]);
+    expect((await records.get(SPACE_UNDER_TEST, record.id))?.projectedInto).toBeNull();
+    // The old collection's point is left where it is: that index is no longer anyone's to call.
+    expect(index.ids()).toEqual([record.id]);
+    // Nothing is due any more: a second sweep reads the record again and forgets nothing twice.
+    expect(await sweep(moved, DEFAULT_BEHAVIORS)).toMatchObject({ unprojected: 0, projected: 0 });
   });
 });

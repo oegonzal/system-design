@@ -35,7 +35,7 @@ export async function bootApp(
     interactions: { ...shipped.interactions, sweepEveryMs: null, ...options.interactions },
     channels: {},
   };
-  const config = notificationsConfigFromEnv(settings, CHANNEL_DEFINITIONS, {});
+  const config = notificationsConfigFromEnv(() => settings, CHANNEL_DEFINITIONS, {});
   const moduleRef = await Test.createTestingModule({ imports: [AppModule.register(config)] })
     .overrideProvider(CHANNELS)
     .useValue(options.channels ?? [])

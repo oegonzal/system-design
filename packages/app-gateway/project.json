@@ -1,0 +1,17 @@
+{
+  "name": "app-gateway",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "packages/app-gateway/src",
+  "projectType": "application",
+  "tags": ["type:app", "scope:node"],
+  "targets": {
+    "typecheck": {
+      "executor": "nx:run-commands",
+      "cache": true,
+      "options": {
+        "cwd": "packages/app-gateway",
+        "commands": ["tsc --noEmit -p tsconfig.app.json", "tsc --noEmit -p tsconfig.spec.json"]
+      }
+    }
+  }
+}

@@ -166,9 +166,9 @@ export class InMemoryRecordStore implements RecordStore {
     );
   }
 
-  unprojectionDue(collection: string, limit: number): Promise<MemoryRecord[]> {
+  unprojectionDue(limit: number): Promise<MemoryRecord[]> {
     return Promise.resolve(
-      this.firstById((row) => row.status !== 'active' && row.projectedInto === collection, limit),
+      this.firstById((row) => row.status !== 'active' && row.projectedInto !== null, limit),
     );
   }
 

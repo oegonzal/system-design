@@ -111,7 +111,7 @@ const SPEC_REACH_GUARDED: readonly string[] = [
   'packages/agentic-memory',
   'packages/agentic-system',
   'packages/browser-session',
-  'packages/qdrant-kit',
+  'packages/pgvector-kit',
   'packages/quality-loop',
 ];
 

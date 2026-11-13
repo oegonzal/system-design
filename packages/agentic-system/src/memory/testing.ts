@@ -115,7 +115,7 @@ export function digestRecord(
 
 /**
  * The memory layer as the module composes it, over the runtime's in-memory
- * ports instead of Postgres and Qdrant, under the runtime's own test policy:
+ * ports instead of Postgres and its vector table, under the runtime's own test policy:
  * the memory service, the space store it keeps spaces in, and the spaces
  * service reading runs from the loop a spec hands in.
  */

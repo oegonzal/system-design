@@ -18,7 +18,8 @@ questions about them with measurements rather than opinion:
 **What this rests on.** The code as it stands in the working tree on 2026-10-02 (branch
 `template/pipelines-with-samgov-systemdesign`; `read-digest.ts`, `ports.ts`, `common.ts` and
 `collection.ts` carry uncommitted edits that are described as they are, and `digest/endorsed.ts` is a
-new untracked file). The live Qdrant collection `quality-memory__v2__text-embedding-3-small__1536`,
+new untracked file). The live collection `quality-memory__v2__text-embedding-3-small__1536` (in
+Qdrant then; a pgvector table in the stack's Postgres since 2026-11-12, carried over point by point),
 386 points when the measurements started and 391 when they ended — a digest stored five lessons
 during the pass. Every run dump under `static/runs`: 105 experience-digest runs (94 reached a judged
 iteration), 98 memory-recall runs (88 judged), and the four coach runs that have recalled so far.
@@ -44,7 +45,7 @@ DIGEST (learning)
                                                                              │
                                chunksOf() · embed both halves · replaceRunChunks()
                                                                              ▼
-                                                 Qdrant point: condition vector + lesson vector + payload
+                                                 pgvector row: condition vector + lesson vector + payload
 
 RECALL (using)
   studio: a coach run starts with recall:true   ──▶  MemoryRunRecall  ──▶  recallMemory()
@@ -221,7 +222,7 @@ appliesWhen }` items against an aliased index; the experience digest binds it to
 index reader in `read-digest.ts`. That generality is new in the working tree and is what the peer's
 document digest will plug into.
 
-### 2.7 Chunking, embedding, storing (`orchestrators/memory/store/`, `modules/memory/qdrant/`)
+### 2.7 Chunking, embedding, storing (`orchestrators/memory/store/`, `modules/memory/pgvector/`)
 
 One chunk per endorsed memory, two texts per chunk:
 
@@ -240,10 +241,12 @@ curator's rule 3 (below) reads that decision. `when` is the calendar day the sou
 
 `indexMemories` embeds every key of every chunk in one batch through `CachedEmbeddings` (Postgres
 table keyed by model and sha256 of the text; a cache that cannot answer degrades to a provider call,
-never a failure), then `replaceRunChunks(sourceRunId, chunks)`: delete every point whose `runId`
-matches, upsert the new ones with `pointId = uuid(sha256("runId|ref"))`, both with `wait: true`.
-The payload is the chunk plus `storedAt`. The collection is one per index generation, model and
-width, cosine distance, with keyword payload indexes on `runId`, `pipeline` and `kind`.
+never a failure), then `replaceRunChunks(sourceRunId, chunks)`: in one transaction, delete every row
+whose `runId` matches and upsert the new ones with `pointId = uuid(sha256("runId|ref"))`. The
+payload is the chunk plus `storedAt`, as jsonb. The collection is one table per index generation,
+model and width (`vec_quality_memory__v2__<model>__<dims>` in the stack's Postgres, since the pgvector
+move of 2026-11-12), with an HNSW cosine index per named vector and an expression index on each field
+a filter narrows by: `runId`, `kind`, `pipeline`, `scope` and `unitKey`.
 
 Two consequences worth stating plainly. The point id is a function of the source run and the memory's
 position, so re-digesting a run **replaces** its lessons wholesale — last writer wins (§3.3). And
@@ -381,7 +384,7 @@ Three things cap the abstraction level:
   it changed_. The rules forbid claiming an effect without a transition (§2.3), so lessons become
   "this defect is caught by the judges" rather than "this change resolved it". Only the eleven multi-
   iteration digests could learn a proven fix. This is a property of the lesson **text** — the `text`,
-  `keys.lesson` and `keys.condition` of the Qdrant point — not of any field: nothing on a stored chunk
+  `keys.lesson` and `keys.condition` of the stored row — not of any field: nothing on a stored chunk
   says whether it came from a transition, and the transitions themselves stay behind in Postgres on
   the source run's row. Two live points show the difference. From a single-iteration source
   (`2026-10-02T21-53-19`, `iteration 1`): _"When summing a per-hop latency budget for a cache-aside
@@ -1288,13 +1291,13 @@ producer only, as the coach does, removes it.
 
 ## 9. Where to look
 
-| Question                                                       | Where                                                                                                                                         |
-| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| did a run's lessons get stored                                 | `GET /orchestrations/:id` → `steps.digest.counts` (`memories`, `kept`) and `steps.store.reason`; `kept` vs `memories` is the admission rate   |
-| what the digest read                                           | the digest run's `01-goal.md` in `static/runs/<digest run id>/`                                                                               |
-| why a memory was excluded                                      | the digest run's `04-iterations/<best>/ledger.json` → `findings[].locationRefs` naming `memory.N`                                             |
-| what is in the store                                           | `curl localhost:6333/collections/quality-memory__v2__text-embedding-3-small__1536/points/scroll` — payload `keys` shows the two indexed texts |
-| what a recall would find, and why                              | `POST /memory/retrieval-report { goal }` — every probe's own ranking beside the fused list                                                    |
-| what a coach producer was handed                               | the coach run's `recall.json`, and `# Lessons from earlier runs (advisory)` in its `05-llm/*.producer.*.user.txt`                             |
-| what the curator dropped and why, and what it said was missing | the recall run's `04-iterations/<best>/artifact.json` → `dropped[]`, `gaps[]`                                                                 |
-| re-embed after an index change                                 | `POST /memory/:orchestrationRunId/reindex` — never re-digest for this                                                                         |
+| Question                                                       | Where                                                                                                                                                                                                                                                                            |
+| -------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| did a run's lessons get stored                                 | `GET /orchestrations/:id` → `steps.digest.counts` (`memories`, `kept`) and `steps.store.reason`; `kept` vs `memories` is the admission rate                                                                                                                                      |
+| what the digest read                                           | the digest run's `01-goal.md` in `static/runs/<digest run id>/`                                                                                                                                                                                                                  |
+| why a memory was excluded                                      | the digest run's `04-iterations/<best>/ledger.json` → `findings[].locationRefs` naming `memory.N`                                                                                                                                                                                |
+| what is in the store                                           | `docker exec sysdesign-db psql -U admin -d sysdesign -c 'select count(*) from "vec_quality_memory__v2__text_embedding_3_small__1536"'` for the count, `POST /memory/retrieval-report { goal }` for what a goal would find; a row's `payload->'keys'` holds the two indexed texts |
+| what a recall would find, and why                              | `POST /memory/retrieval-report { goal }` — every probe's own ranking beside the fused list                                                                                                                                                                                       |
+| what a coach producer was handed                               | the coach run's `recall.json`, and `# Lessons from earlier runs (advisory)` in its `05-llm/*.producer.*.user.txt`                                                                                                                                                                |
+| what the curator dropped and why, and what it said was missing | the recall run's `04-iterations/<best>/artifact.json` → `dropped[]`, `gaps[]`                                                                                                                                                                                                    |
+| re-embed after an index change                                 | `POST /memory/:orchestrationRunId/reindex` — never re-digest for this                                                                                                                                                                                                            |

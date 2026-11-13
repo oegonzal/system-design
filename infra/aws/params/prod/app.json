@@ -1,0 +1,13 @@
+[
+  { "ParameterKey": "TaskCpu", "ParameterValue": "1024" },
+  { "ParameterKey": "TaskMemory", "ParameterValue": "8192" },
+  { "ParameterKey": "CapacityProvider", "ParameterValue": "FARGATE" },
+  { "ParameterKey": "IdleMinutes", "ParameterValue": "15" },
+  { "ParameterKey": "IdleConfirmMinutes", "ParameterValue": "5" },
+  { "ParameterKey": "IdleJobMaxMinutes", "ParameterValue": "240" },
+  { "ParameterKey": "SecretsPrefix", "ParameterValue": "/sysdesign/prod" },
+  { "ParameterKey": "DeploySamGovKey", "ParameterValue": "false" },
+  { "ParameterKey": "DeployOpenAiKey", "ParameterValue": "true" },
+  { "ParameterKey": "JobSchedulesState", "ParameterValue": "DISABLED" },
+  { "ParameterKey": "JobCapacityProvider", "ParameterValue": "FARGATE" }
+]

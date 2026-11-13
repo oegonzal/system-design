@@ -27,7 +27,7 @@
       "dependsOn": ["build"],
       "options": {
         "cwd": "packages/studio-ui",
-        "command": "next start -p 4200"
+        "command": "rm -rf .next/standalone/packages/studio-ui/.next/static && cp -R .next/static .next/standalone/packages/studio-ui/.next/static && PORT=4200 node .next/standalone/packages/studio-ui/server.js"
       }
     },
     "typecheck": {
@@ -39,5 +39,6 @@
       }
     }
   },
-  "// serve": "next dev on 4200 unless --port says otherwise; the e2e suite starts its own UI with --port so it never shares a developer's dev server."
+  "// serve": "next dev on 4200 unless --port says otherwise; the e2e suite starts its own UI with --port so it never shares a developer's dev server.",
+  "// start": "the standalone server a build writes (output: standalone in next.web.js), on 4200; next start only warns and serves without it. The static chunks are copied beside it first, since the build does not trace them in."
 }

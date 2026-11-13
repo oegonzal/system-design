@@ -1,0 +1,391 @@
+# Data stack (sysdesign-prod-data): what must survive a redeploy.
+#
+# What it declares: one Aurora Serverless v2 PostgreSQL cluster that scales to
+# zero (it pauses SecondsUntilAutoPause after the last connection closes and
+# resumes on the next one; since phase 4 it holds the memory tier too, as
+# pgvector tables), its single writer instance, an encrypted EFS file system
+# with two access points — the quality loop's run dumps, which the inspector
+# reads, and the browser session's dumps, both of which an ephemeral task
+# disk would lose — and the files bucket, with a KMS key of its own, that
+# carries the browser session's signed-in state, profile archives and
+# documents from one one-off task to the next.
+#
+# Absent on purpose: a Secrets Manager secret (its rotation would change the
+# password under a long-running task; the password is a SecureString the
+# owner created and the cluster reads through a dynamic reference); a reader
+# instance; Performance Insights; EFS automatic backups (the dumps are
+# diagnostic, the database is what gets backed up); a vector store of its
+# own (pgvector lives in the cluster and is backed up with it). The cluster
+# keeps deletion protection and a Snapshot policy; EFS, the key and the
+# bucket are retained.
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'System Design Studio: Aurora Serverless v2 PostgreSQL, the EFS dump volume, the browser-session files bucket and its key'
+
+Parameters:
+  DatabaseName:
+    Type: String
+    Default: 'sysdesign'
+    Description: 'Database every service connects to (DB_NAME)'
+    AllowedPattern: '^[a-z][a-z0-9_]*$'
+  MasterUsername:
+    Type: String
+    Default: 'sysdesign'
+    Description: 'Master user (DB_USERNAME)'
+    AllowedPattern: '^[a-z][a-z0-9_]*$'
+  DbPasswordParameter:
+    Type: String
+    Default: '/sysdesign/prod/DB_PASSWORD'
+    Description: 'SSM SecureString holding the master password; created by the owner, never by a stack'
+    AllowedPattern: '^/[A-Za-z0-9_./-]+$'
+  DbPasswordVersion:
+    Type: Number
+    Default: 1
+    MinValue: 1
+    Description: 'Version of that SecureString the cluster reads; a rotation writes a new version, then deploys with this raised'
+  EngineVersion:
+    Type: String
+    Default: '16.10'
+    Description: 'Aurora PostgreSQL version; 16.3 or later is what supports a 0 ACU minimum'
+    AllowedPattern: '^16\.[0-9]+$'
+  MinCapacity:
+    Type: Number
+    Default: 0
+    MinValue: 0
+    MaxValue: 1
+    Description: 'ACUs when paused; 0 is what makes an idle month cost nothing'
+  MaxCapacity:
+    Type: Number
+    Default: 2
+    MinValue: 1
+    MaxValue: 8
+    Description: 'ACU ceiling; also the capacity the app stack alarms on'
+  SecondsUntilAutoPause:
+    Type: Number
+    Default: 300
+    MinValue: 300
+    MaxValue: 86400
+    Description: 'Idle seconds before the cluster pauses'
+  BackupRetentionDays:
+    Type: Number
+    Default: 7
+    MinValue: 1
+    MaxValue: 35
+    Description: 'Automated backup retention'
+  LogRetentionDays:
+    Type: Number
+    Default: 14
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365]
+    Description: 'CloudWatch Logs retention for the exported postgresql log'
+
+Resources:
+  # RDS writes the exported postgresql log to a group of this exact name and
+  # creates it without retention when none exists; declared first, so the
+  # cluster finds it and the log expires like every other one.
+  DbLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: !Sub '/aws/rds/cluster/${AWS::StackName}/postgresql'
+      RetentionInDays: !Ref LogRetentionDays
+
+  DbSubnetGroup:
+    Type: AWS::RDS::DBSubnetGroup
+    Properties:
+      DBSubnetGroupName: !Sub '${AWS::StackName}-db'
+      DBSubnetGroupDescription: 'Both public subnets; the instance itself is never publicly addressable'
+      SubnetIds: !Split [',', !ImportValue 'sysdesign-prod-PublicSubnetIds']
+
+  # The password reference names a version, so a rotation is explicit: write
+  # the new SecureString version, then deploy with DbPasswordVersion raised.
+  DbCluster:
+    Type: AWS::RDS::DBCluster
+    DeletionPolicy: Snapshot
+    UpdateReplacePolicy: Snapshot
+    DependsOn: DbLogGroup
+    Properties:
+      DBClusterIdentifier: !Ref AWS::StackName
+      Engine: aurora-postgresql
+      EngineVersion: !Ref EngineVersion
+      DatabaseName: !Ref DatabaseName
+      MasterUsername: !Ref MasterUsername
+      MasterUserPassword: !Sub '{{resolve:ssm-secure:${DbPasswordParameter}:${DbPasswordVersion}}}'
+      Port: 5432
+      ServerlessV2ScalingConfiguration:
+        MinCapacity: !Ref MinCapacity
+        MaxCapacity: !Ref MaxCapacity
+        SecondsUntilAutoPause: !Ref SecondsUntilAutoPause
+      DBSubnetGroupName: !Ref DbSubnetGroup
+      VpcSecurityGroupIds:
+        - !ImportValue 'sysdesign-prod-DbSecurityGroupId'
+      StorageEncrypted: true
+      DeletionProtection: true
+      BackupRetentionPeriod: !Ref BackupRetentionDays
+      CopyTagsToSnapshot: true
+      EnableCloudwatchLogsExports:
+        - postgresql
+      Tags:
+        - Key: Name
+          Value: !Ref AWS::StackName
+
+  # An Aurora instance holds no data of its own (the cluster volume does), so
+  # it is replaced freely; Snapshot is not a valid policy for it.
+  DbWriter:
+    Type: AWS::RDS::DBInstance
+    DeletionPolicy: Delete
+    UpdateReplacePolicy: Delete
+    Properties:
+      DBInstanceIdentifier: !Sub '${AWS::StackName}-writer'
+      DBClusterIdentifier: !Ref DbCluster
+      Engine: aurora-postgresql
+      DBInstanceClass: db.serverless
+      PubliclyAccessible: false
+      AutoMinorVersionUpgrade: true
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-writer'
+
+  RunsFileSystem:
+    Type: AWS::EFS::FileSystem
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Encrypted: true
+      ThroughputMode: elastic
+      PerformanceMode: generalPurpose
+      BackupPolicy:
+        Status: DISABLED
+      LifecyclePolicies:
+        - TransitionToIA: AFTER_7_DAYS
+      FileSystemPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyMountsWithoutTls
+            Effect: Deny
+            Principal:
+              AWS: '*'
+            Action: '*'
+            Resource: '*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+      FileSystemTags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-runs'
+  RunsMountTargetA:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref RunsFileSystem
+      SubnetId: !Select [0, !Split [',', !ImportValue 'sysdesign-prod-PublicSubnetIds']]
+      SecurityGroups:
+        - !ImportValue 'sysdesign-prod-EfsSecurityGroupId'
+  RunsMountTargetB:
+    Type: AWS::EFS::MountTarget
+    Properties:
+      FileSystemId: !Ref RunsFileSystem
+      SubnetId: !Select [1, !Split [',', !ImportValue 'sysdesign-prod-PublicSubnetIds']]
+      SecurityGroups:
+        - !ImportValue 'sysdesign-prod-EfsSecurityGroupId'
+  # uid/gid 1000 is the `node` user the runner image runs as; the access point
+  # pins every mount to that identity and to its own directory.
+  RunsAccessPoint:
+    Type: AWS::EFS::AccessPoint
+    Properties:
+      FileSystemId: !Ref RunsFileSystem
+      PosixUser:
+        Uid: '1000'
+        Gid: '1000'
+      RootDirectory:
+        Path: '/quality-loop-runs'
+        CreationInfo:
+          OwnerUid: '1000'
+          OwnerGid: '1000'
+          Permissions: '0755'
+      AccessPointTags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-runs'
+  # The browser session's dumps, on the same file system under a directory
+  # and an access point of their own: a session task mounts this one, the app
+  # task the runs one, and neither sees the other's files.
+  SessionsAccessPoint:
+    Type: AWS::EFS::AccessPoint
+    Properties:
+      FileSystemId: !Ref RunsFileSystem
+      PosixUser:
+        Uid: '1000'
+        Gid: '1000'
+      RootDirectory:
+        Path: '/browser-session'
+        CreationInfo:
+          OwnerUid: '1000'
+          OwnerGid: '1000'
+          Permissions: '0755'
+      AccessPointTags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-browser-session'
+
+  # The key the files bucket encrypts with: the signed-in browser state, the
+  # profile archives and the documents a session fills forms from are
+  # personal data, so they get a key of their own, rotated yearly. The policy
+  # names the account root alone and so delegates use of the key to IAM (the
+  # session task role's own policy grants it the three actions it needs) and
+  # not the role itself: KMS refuses a key policy that names an IAM role
+  # which does not exist, and the role is the platform stack's, deployed
+  # after this one.
+  FilesKey:
+    Type: AWS::KMS::Key
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      Description: 'Encrypts the browser-session files bucket: signed-in state, profile archives, documents'
+      EnableKeyRotation: true
+      KeyPolicy:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AccountAdministersAndDelegatesToIam
+            Effect: Allow
+            Principal:
+              AWS: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:root'
+            Action: 'kms:*'
+            Resource: '*'
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-files'
+  FilesKeyAlias:
+    Type: AWS::KMS::Alias
+    Properties:
+      AliasName: 'alias/sysdesign-prod-files'
+      TargetKeyId: !Ref FilesKey
+
+  # Where the session's files live between tasks: `state/<profile>.json` (the
+  # storage state exported on the laptop), `profiles/<profile>.tar.gz` (the
+  # Linux profile archived after every run) and `docs/<file>` (the documents a
+  # mission fills forms from). Versioned, so a bad archive rolls back; every
+  # object encrypted with the key above, the bucket key cutting the KMS calls;
+  # old versions expire after 30 days. Retained on stack deletion.
+  FilesBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub '${AWS::StackName}-files-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: 'aws:kms'
+              KMSMasterKeyID: !GetAtt FilesKey.Arn
+            BucketKeyEnabled: true
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-old-versions
+            Status: Enabled
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-files'
+  # S3 has encrypted every object since 2023, so "deny an unencrypted PUT"
+  # would protect nothing; what the policy refuses is a connection without
+  # TLS, an object encrypted with any key but this bucket's, and an object
+  # that asks for another encryption at all (an `AES256` upload, SSE-S3,
+  # carries no key id, so the key check alone would let it through). A PUT
+  # that names neither takes the bucket default and passes.
+  FilesBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FilesBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: DenyInsecureTransport
+            Effect: Deny
+            Principal: '*'
+            Action: 's3:*'
+            Resource:
+              - !GetAtt FilesBucket.Arn
+              - !Sub '${FilesBucket.Arn}/*'
+            Condition:
+              Bool:
+                aws:SecureTransport: 'false'
+          - Sid: DenyAnotherKey
+            Effect: Deny
+            Principal: '*'
+            Action: s3:PutObject
+            Resource: !Sub '${FilesBucket.Arn}/*'
+            Condition:
+              StringNotEqualsIfExists:
+                s3:x-amz-server-side-encryption-aws-kms-key-id: !GetAtt FilesKey.Arn
+          - Sid: DenyAnotherEncryption
+            Effect: Deny
+            Principal: '*'
+            Action: s3:PutObject
+            Resource: !Sub '${FilesBucket.Arn}/*'
+            Condition:
+              StringNotEqualsIfExists:
+                s3:x-amz-server-side-encryption: 'aws:kms'
+
+Outputs:
+  DbEndpoint:
+    Description: 'Writer endpoint (DB_HOST)'
+    Value: !GetAtt DbCluster.Endpoint.Address
+    Export:
+      Name: 'sysdesign-prod-DbEndpoint'
+  DbPort:
+    Description: 'Listening port (DB_PORT)'
+    Value: !GetAtt DbCluster.Endpoint.Port
+    Export:
+      Name: 'sysdesign-prod-DbPort'
+  DbName:
+    Value: !Ref DatabaseName
+    Export:
+      Name: 'sysdesign-prod-DbName'
+  DbUsername:
+    Value: !Ref MasterUsername
+    Export:
+      Name: 'sysdesign-prod-DbUsername'
+  DbClusterIdentifier:
+    Description: 'What the capacity alarm and `aws.sh status` name the cluster by'
+    Value: !Ref DbCluster
+    Export:
+      Name: 'sysdesign-prod-DbClusterIdentifier'
+  DbMaxCapacity:
+    Description: 'The ACU ceiling, so the app stack alarms when the cluster sits at it'
+    Value: !Ref MaxCapacity
+    Export:
+      Name: 'sysdesign-prod-DbMaxCapacity'
+  EfsFileSystemId:
+    Value: !Ref RunsFileSystem
+    Export:
+      Name: 'sysdesign-prod-EfsFileSystemId'
+  EfsAccessPointId:
+    Value: !Ref RunsAccessPoint
+    Export:
+      Name: 'sysdesign-prod-EfsAccessPointId'
+  EfsAccessPointArn:
+    Value: !GetAtt RunsAccessPoint.Arn
+    Export:
+      Name: 'sysdesign-prod-EfsAccessPointArn'
+  SessionsAccessPointId:
+    Description: 'The browser-session dumps directory, mounted by the session task alone'
+    Value: !Ref SessionsAccessPoint
+    Export:
+      Name: 'sysdesign-prod-SessionsAccessPointId'
+  SessionsAccessPointArn:
+    Value: !GetAtt SessionsAccessPoint.Arn
+    Export:
+      Name: 'sysdesign-prod-SessionsAccessPointArn'
+  FilesBucketName:
+    Description: 'Where `aws.sh files` pushes and a session task reads its state, archives and documents'
+    Value: !Ref FilesBucket
+    Export:
+      Name: 'sysdesign-prod-FilesBucketName'
+  FilesKeyArn:
+    Description: 'The key every object of the files bucket is encrypted with; the session task role is granted it'
+    Value: !GetAtt FilesKey.Arn
+    Export:
+      Name: 'sysdesign-prod-FilesKeyArn'

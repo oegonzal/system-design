@@ -1,4 +1,6 @@
 import { randomUUID } from 'node:crypto';
+import { chmodSync, existsSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { MemoryClient } from '@sysdesign/agentic-memory-client';
@@ -20,10 +22,12 @@ import type {
   GoalSource,
   LedgerPort,
   OperatorPort,
+  SessionFiles,
   StopSignal,
   SuppliedDocument,
 } from '../../core/ports';
 import { runSession, type SessionOutcome } from '../../core/session-engine';
+import { assertProfileFree } from '../../core/session-start';
 import { sessionEventsOf, type SessionEventsPort } from '../../core/session-events';
 import { SessionRefused, type ConfiguredAdvisor } from '../../core/unit-advice';
 import {
@@ -37,12 +41,13 @@ import {
   OPERATOR,
   SESSION_CONFIG,
   SESSION_EVENTS,
+  SESSION_FILES,
   STOP_SIGNAL,
   UNIT_ADVISORS,
   type BrainForTenant,
 } from './tokens';
 import { replayFields, type ReplayFieldsOptions, type ReplayFieldsReport } from './replay-fields';
-import { presentDocuments } from './supplied-documents';
+import { checkingDocuments, resolvedDocuments } from './supplied-documents';
 import { subjectFor, teachAgain, type TeachAgainReport } from './teach-again';
 import { SESSION_KIND } from '../../core/identity';
 
@@ -64,16 +69,20 @@ export type RunOptions = Omit<
   | 'untaught'
   | 'answering'
   | 'documents'
+  | 'waitForLoopMinutes'
 > & {
   subject?: string | undefined;
   /** The files for the documents the mission declares, by name; none unless the command line names them. */
   documents?: readonly SuppliedDocument[] | undefined;
+  /** How long to wait for the loop before binding; no wait unless the command line says. */
+  waitForLoopMinutes?: number | undefined;
 };
 
 /**
  * What the command line asks for. `run` is the engine over the bound ports;
  * `login` opens the profile headed at a URL and waits for the operator, so
  * the cookies persist for later sessions; `list` and `show` read the ledger;
+ * `exportState` writes a profile's sign-in for another machine's profile;
  * `replayEvents` publishes a recorded session's events again; `teachAgain`
  * teaches recorded answers again through the brain; `replayFields` replays
  * recorded form pages against the memory. Progress goes to the operator's
@@ -96,6 +105,7 @@ export class SessionService {
     @Inject(UNIT_ADVISORS) private readonly advisors: readonly ConfiguredAdvisor[],
     @Inject(SESSION_EVENTS) private readonly events: SessionEventsPort,
     @Inject(STOP_SIGNAL) private readonly stop: StopSignal,
+    @Inject(SESSION_FILES) private readonly files: SessionFiles,
     @Inject(SESSION_CONFIG) private readonly config: SessionConfig,
     private readonly client: LoopClient,
     /** Bound only under a memory brain; a replay asked without one says so. */
@@ -104,8 +114,10 @@ export class SessionService {
 
   async run(options: RunOptions): Promise<SessionOutcome> {
     const { capture, operator, session, answering, sources } = this.config.settings;
-    // Each supplied file checked to be there before the browser opens or a row is touched.
-    const documents = await presentDocuments(options.documents ?? []);
+    // Each supplied file checked to be there before the browser opens or a row
+    // is touched — once the files beyond this machine are in place, which is
+    // the engine's `documents()` step (`checkingDocuments`).
+    const documents = resolvedDocuments(options.documents ?? []);
     // A configuration read once at boot is invisible afterwards: say which files are in force.
     this.operator.notify(
       `settings: ${Object.entries(sources)
@@ -130,12 +142,15 @@ export class SessionService {
         advisors: this.advisors,
         events: this.events,
         stop: this.stop,
+        files: checkingDocuments(this.files, documents),
+        loop: this.client,
         warn: (text) => this.logger.warn(text),
         log: (text) => this.operator.notify(text),
       },
       {
         ...options,
         documents,
+        waitForLoopMinutes: options.waitForLoopMinutes ?? 0,
         subject: options.subject ?? this.config.subject,
         // Given by the flag, or set in the environment: anything but the declared fallback.
         subjectDeclared:
@@ -152,7 +167,14 @@ export class SessionService {
     );
   }
 
-  /** Open the profile headed at the URL; the operator signs in and presses Enter; the profile keeps the cookies. */
+  /**
+   * Open the profile headed at the URL; the operator signs in and presses
+   * Enter; the profile keeps the cookies — on this disk alone. Nothing is
+   * archived to a bucket: this machine's cookies are encrypted with a key
+   * the task does not hold, and an archive of them would win over the
+   * exported state the next cloud run should seed from. The sign-in reaches
+   * the cloud through `export-state` and nothing else.
+   */
   async login(profile: string, url: string): Promise<void> {
     await this.browser.open(profile, { headed: true, documents: [] });
     try {
@@ -178,6 +200,40 @@ export class SessionService {
     } finally {
       await this.browser.close();
     }
+  }
+
+  /**
+   * The profile's sign-in — cookies, local storage, IndexedDB — written to
+   * `out` as JSON for another machine's fresh profile to be seeded with:
+   * refused by name for a profile this machine does not hold (the browser
+   * would make an empty one and the file would seed the cloud with nothing),
+   * refused while a session holds the profile, and readable by its owner
+   * alone, since the file is the sign-in. The local storage travels for the
+   * `origins` named. How many cookies and origins the file holds, for the
+   * operator to tell a signed-in export from an empty one.
+   */
+  async exportState(
+    profile: string,
+    out: string,
+    origins: readonly string[],
+  ): Promise<{ cookies: number; origins: number }> {
+    const dir = join(this.config.profilesDir, profile);
+    if (!existsSync(dir)) {
+      throw new SessionRefused(
+        `profile ${profile}: no directory at ${dir} — nothing signed in to export; sign in with login first`,
+      );
+    }
+    await assertProfileFree(
+      { ledger: this.ledger },
+      profile,
+      this.config.settings.session.liveness.staleAfterMs,
+      this.clock.now(),
+    );
+    const state = await this.browser.exportState(profile, origins);
+    writeFileSync(out, JSON.stringify(state, null, 2), { mode: 0o600 });
+    // The mode above applies to a file made now; one overwritten keeps its own, so it is set again.
+    chmodSync(out, 0o600);
+    return { cookies: state.cookies.length, origins: state.origins.length };
   }
 
   list(limit: number): Promise<BrowserSessionDto[]> {

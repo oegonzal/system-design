@@ -40,6 +40,12 @@ const TERMINATIONS = [
 @Entity()
 @Index({ properties: ['status'] })
 @Index({ properties: ['startedAt'] })
+/** One running session per profile — the lease the database holds where the engine's check cannot (Migration20261112100002). */
+@Unique({
+  name: 'browser_session_running_profile',
+  properties: ['profile'],
+  where: "status = 'running'",
+})
 @Check({
   name: 'browser_session_status_check',
   expression: `status in (${STATUSES.map((s) => `'${s}'`).join(', ')})`,

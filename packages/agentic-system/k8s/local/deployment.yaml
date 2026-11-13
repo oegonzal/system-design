@@ -21,8 +21,9 @@ spec:
             - containerPort: 3007
           # The loop and the bus by their in-cluster Services: the localhost
           # fallbacks would reach nothing inside the pod. Everything else is the
-          # package's own config/ files; the stores are on the host, Postgres
-          # and Qdrant (QDRANT_URL) both from the local-stores ConfigMap.
+          # package's own config/ files; the store is the host's Postgres, from
+          # the local-stores ConfigMap — the vector index is a table in it
+          # since the pgvector move of 2026-11-12.
           env:
             - name: QUALITY_LOOP_URL
               value: http://quality-loop-service:3003

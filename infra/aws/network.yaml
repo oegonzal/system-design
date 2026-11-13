@@ -1,0 +1,331 @@
+# Network stack (sysdesign-prod-network): the one VPC every other stack joins.
+#
+# What it declares: a dual-stack VPC with two public subnets in two zones, an
+# internet gateway and the routes to it for both address families, an S3
+# gateway endpoint (free, and ECR layers come through it), the five security
+# groups the stacks reference by export (gateway → app → db/efs, in that
+# order of trust, plus the browser-session task's own group, which app, db
+# and efs admit), and the Cloud Map private DNS namespace the gateway and the
+# session task resolve the app task through.
+#
+# Absent on purpose: a NAT gateway ($33/month idle) — the task gets a public
+# IPv4 only while it runs, and the Lambdas reach AWS APIs over IPv6 dual-stack
+# endpoints; private subnets, which would need that NAT; any ingress from the
+# internet (the only public entry is the CloudFront → function URL path, which
+# carries no security group).
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'System Design Studio: dual-stack VPC, public subnets, security groups, Cloud Map namespace'
+
+Parameters:
+  VpcCidr:
+    Type: String
+    Default: '10.40.0.0/16'
+    Description: 'IPv4 block of the VPC; the two subnets take its first two /24s'
+    AllowedPattern: '^([0-9]{1,3}\.){3}[0-9]{1,3}/(1[6-9]|2[0-4])$'
+  AvailabilityZones:
+    Type: List<AWS::EC2::AvailabilityZone::Name>
+    Default: 'us-east-1a,us-east-1b'
+    Description: 'Two zones, one per subnet (RDS and EFS each want two)'
+
+Resources:
+  Vpc:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      Tags:
+        - Key: Name
+          Value: !Ref AWS::StackName
+  VpcIpv6Block:
+    Type: AWS::EC2::VPCCidrBlock
+    Properties:
+      VpcId: !Ref Vpc
+      AmazonProvidedIpv6CidrBlock: true
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Ref AWS::StackName
+  InternetGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref Vpc
+      InternetGatewayId: !Ref InternetGateway
+
+  # MapPublicIpOnLaunch stays off: the ECS service asks for its public IP
+  # itself (AssignPublicIp ENABLED), and nothing else in these subnets should
+  # get one by accident.
+  PublicSubnetA:
+    Type: AWS::EC2::Subnet
+    DependsOn: VpcIpv6Block
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [0, !Ref AvailabilityZones]
+      CidrBlock: !Select [0, !Cidr [!Ref VpcCidr, 2, 8]]
+      Ipv6CidrBlock: !Select [0, !Cidr [!Select [0, !GetAtt Vpc.Ipv6CidrBlocks], 2, 64]]
+      AssignIpv6AddressOnCreation: true
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-public-a'
+  PublicSubnetB:
+    Type: AWS::EC2::Subnet
+    DependsOn: VpcIpv6Block
+    Properties:
+      VpcId: !Ref Vpc
+      AvailabilityZone: !Select [1, !Ref AvailabilityZones]
+      CidrBlock: !Select [1, !Cidr [!Ref VpcCidr, 2, 8]]
+      Ipv6CidrBlock: !Select [1, !Cidr [!Select [0, !GetAtt Vpc.Ipv6CidrBlocks], 2, 64]]
+      AssignIpv6AddressOnCreation: true
+      MapPublicIpOnLaunch: false
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-public-b'
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref Vpc
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-public'
+  PublicRouteIpv4:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: '0.0.0.0/0'
+      GatewayId: !Ref InternetGateway
+  PublicRouteIpv6:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGatewayAttachment
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationIpv6CidrBlock: '::/0'
+      GatewayId: !Ref InternetGateway
+  PublicSubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetA
+      RouteTableId: !Ref PublicRouteTable
+  PublicSubnetBRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnetB
+      RouteTableId: !Ref PublicRouteTable
+
+  S3Endpoint:
+    Type: AWS::EC2::VPCEndpoint
+    Properties:
+      VpcId: !Ref Vpc
+      ServiceName: !Sub 'com.amazonaws.${AWS::Region}.s3'
+      VpcEndpointType: Gateway
+      RouteTableIds:
+        - !Ref PublicRouteTable
+
+  # Egress is declared for both address families on every group because a
+  # declared egress list replaces the implicit IPv4-only allow-all, and the
+  # Lambdas need the IPv6 route to reach dual-stack AWS endpoints.
+  GatewaySecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${AWS::StackName}-gateway'
+      GroupDescription: 'The gateway and idle Lambdas: no inbound, outbound anywhere'
+      VpcId: !Ref Vpc
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: '0.0.0.0/0'
+          Description: 'IPv4 egress'
+        - IpProtocol: '-1'
+          CidrIpv6: '::/0'
+          Description: 'IPv6 egress'
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-gateway'
+  # The browser-session task the job function runs: no inbound, outbound
+  # anywhere (Chromium needs the internet), and a group of its own so the app,
+  # database and EFS groups admit it by name — membership of a group grants
+  # nothing to its other members, so sharing the app group would not do.
+  SessionSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${AWS::StackName}-session'
+      GroupDescription: 'The browser-session task: no inbound, outbound anywhere'
+      VpcId: !Ref Vpc
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: '0.0.0.0/0'
+          Description: 'IPv4 egress'
+        - IpProtocol: '-1'
+          CidrIpv6: '::/0'
+          Description: 'IPv6 egress'
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-session'
+  AppSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${AWS::StackName}-app'
+      GroupDescription: 'The ECS task: the container ports from the gateway, and the four services the session task calls from its group'
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3000
+          ToPort: 3000
+          SourceSecurityGroupId: !Ref GatewaySecurityGroup
+          Description: 'studio-api from the gateway'
+        - IpProtocol: tcp
+          FromPort: 3003
+          ToPort: 3003
+          SourceSecurityGroupId: !Ref GatewaySecurityGroup
+          Description: 'quality-loop from the gateway'
+        - IpProtocol: tcp
+          FromPort: 3004
+          ToPort: 3004
+          SourceSecurityGroupId: !Ref GatewaySecurityGroup
+          Description: 'govcon from the gateway'
+        - IpProtocol: tcp
+          FromPort: 3005
+          ToPort: 3005
+          SourceSecurityGroupId: !Ref GatewaySecurityGroup
+          Description: 'notifications from the gateway'
+        - IpProtocol: tcp
+          FromPort: 4200
+          ToPort: 4202
+          SourceSecurityGroupId: !Ref GatewaySecurityGroup
+          Description: 'the three Next servers from the gateway'
+        - IpProtocol: tcp
+          FromPort: 3003
+          ToPort: 3003
+          SourceSecurityGroupId: !Ref SessionSecurityGroup
+          Description: 'quality-loop from the session task'
+        - IpProtocol: tcp
+          FromPort: 3005
+          ToPort: 3005
+          SourceSecurityGroupId: !Ref SessionSecurityGroup
+          Description: 'notifications from the session task'
+        - IpProtocol: tcp
+          FromPort: 3006
+          ToPort: 3006
+          SourceSecurityGroupId: !Ref SessionSecurityGroup
+          Description: 'job-application from the session task'
+        - IpProtocol: tcp
+          FromPort: 3007
+          ToPort: 3007
+          SourceSecurityGroupId: !Ref SessionSecurityGroup
+          Description: 'agentic-system from the session task'
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: '0.0.0.0/0'
+          Description: 'IPv4 egress'
+        - IpProtocol: '-1'
+          CidrIpv6: '::/0'
+          Description: 'IPv6 egress'
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-app'
+  DbSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${AWS::StackName}-db'
+      GroupDescription: 'Aurora: 5432 from the task, from the session task and from the gateway (which pre-warms it)'
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref AppSecurityGroup
+          Description: 'Postgres from the task'
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref SessionSecurityGroup
+          Description: 'Postgres from the session task (its ledger)'
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          SourceSecurityGroupId: !Ref GatewaySecurityGroup
+          Description: 'Postgres from the gateway (resume touch)'
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: '0.0.0.0/0'
+          Description: 'IPv4 egress'
+        - IpProtocol: '-1'
+          CidrIpv6: '::/0'
+          Description: 'IPv6 egress'
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-db'
+  EfsSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupName: !Sub '${AWS::StackName}-efs'
+      GroupDescription: 'EFS mount targets: NFS from the task and the session task only'
+      VpcId: !Ref Vpc
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref AppSecurityGroup
+          Description: 'NFS from the task'
+        - IpProtocol: tcp
+          FromPort: 2049
+          ToPort: 2049
+          SourceSecurityGroupId: !Ref SessionSecurityGroup
+          Description: 'NFS from the session task (its dumps)'
+      SecurityGroupEgress:
+        - IpProtocol: '-1'
+          CidrIp: '0.0.0.0/0'
+          Description: 'IPv4 egress'
+        - IpProtocol: '-1'
+          CidrIpv6: '::/0'
+          Description: 'IPv6 egress'
+      Tags:
+        - Key: Name
+          Value: !Sub '${AWS::StackName}-efs'
+
+  Namespace:
+    Type: AWS::ServiceDiscovery::PrivateDnsNamespace
+    Properties:
+      Name: 'sysdesign.internal'
+      Description: 'Private DNS the gateway resolves the task through'
+      Vpc: !Ref Vpc
+
+Outputs:
+  PublicSubnetIds:
+    Description: 'Both subnets, comma-separated; consumers split it'
+    Value: !Join [',', [!Ref PublicSubnetA, !Ref PublicSubnetB]]
+    Export:
+      Name: 'sysdesign-prod-PublicSubnetIds'
+  GatewaySecurityGroupId:
+    Value: !Ref GatewaySecurityGroup
+    Export:
+      Name: 'sysdesign-prod-GatewaySecurityGroupId'
+  AppSecurityGroupId:
+    Value: !Ref AppSecurityGroup
+    Export:
+      Name: 'sysdesign-prod-AppSecurityGroupId'
+  DbSecurityGroupId:
+    Value: !Ref DbSecurityGroup
+    Export:
+      Name: 'sysdesign-prod-DbSecurityGroupId'
+  EfsSecurityGroupId:
+    Value: !Ref EfsSecurityGroup
+    Export:
+      Name: 'sysdesign-prod-EfsSecurityGroupId'
+  SessionSecurityGroupId:
+    Description: 'What the job function runs a browser-session task in'
+    Value: !Ref SessionSecurityGroup
+    Export:
+      Name: 'sysdesign-prod-SessionSecurityGroupId'
+  NamespaceId:
+    Value: !Ref Namespace
+    Export:
+      Name: 'sysdesign-prod-NamespaceId'
+  NamespaceName:
+    Value: 'sysdesign.internal'
+    Export:
+      Name: 'sysdesign-prod-NamespaceName'

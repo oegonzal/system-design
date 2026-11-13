@@ -47,7 +47,7 @@ describe('the preflight', () => {
     expect(checkLogin).not.toHaveBeenCalled();
   });
 
-  it('[QL-22] replay needs no login: it calls no model', async () => {
+  it('[QL-22] replay and import-qdrant need no login: neither calls a model', async () => {
     const checkLogin = vi.fn(noLogin);
     await expect(
       preflight(['replay', '--pipeline', 'tiny'], {}, checkLogin, chose()),
@@ -56,6 +56,9 @@ describe('the preflight', () => {
       command: 'replay',
       model: null,
     });
+    await expect(
+      preflight(['import-qdrant', '--dry-run'], {}, checkLogin, chose()),
+    ).resolves.toEqual({ source: null, command: 'import-qdrant', model: null });
     expect(checkLogin).not.toHaveBeenCalled();
   });
 });

@@ -1,8 +1,10 @@
 import { Logger } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import type { VectorIndex } from '@sysdesign/agentic-memory';
 
 import { AppModule } from './app/app.module';
 import { agenticSystemConfigFromEnv, PACKAGE_ROOT } from './config';
+import { VECTOR_INDEX } from './memory';
 import { readSettings } from './settings';
 
 /**
@@ -35,8 +37,10 @@ async function bootstrap(): Promise<void> {
   );
   logger.log(`loop: ${config.loopUrl}, bus: ${config.notificationsUrl}`);
   const embeddings = config.embedder.model ?? `disabled (${config.embedder.reason})`;
+  // The collection the index is bound to — a table in the app's database — or none without a model.
+  const vectors = app.get<VectorIndex>(VECTOR_INDEX).collection ?? 'none';
   logger.log(
-    `memory: ${settings.policySource} (${settings.sources.memory}), embeddings: ${embeddings}, vectors: ${config.qdrantUrl}`,
+    `memory: ${settings.policySource} (${settings.sources.memory}), embeddings: ${embeddings}, vectors: ${vectors}`,
   );
 }
 

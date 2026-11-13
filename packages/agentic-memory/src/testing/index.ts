@@ -1,7 +1,7 @@
 /**
  * The runtime's fakes, for a host's specs: in-memory stores that hold the
- * same contract as Postgres and Qdrant, a table-driven embedder, and the
- * fixtures. Never imported by production code.
+ * same contract as the Postgres stores and the pgvector index, a
+ * table-driven embedder, and the fixtures. Never imported by production code.
  */
 export { InMemoryRecordStore } from './in-memory-record-store';
 export { InMemoryVectorIndex } from './in-memory-vector-index';

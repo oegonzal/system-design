@@ -12,12 +12,17 @@ import { AGENTIC_MEMORY_CRITERIA } from './agentic-memory';
 import { AGENTIC_MEMORY_CLIENT_CRITERIA } from './agentic-memory-client';
 import { AGENTIC_SYSTEM_CRITERIA } from './agentic-system';
 import { BROWSER_SESSION_CRITERIA } from './browser-session';
+import { CLOUD_CRITERIA } from './cloud';
+import { CLOUD_OPS_CRITERIA } from './cloud-ops';
+import { CONFIG_KIT_CRITERIA } from './config-kit';
+import { DB_CRITERIA } from './db';
 import { GMAIL_CRITERIA } from './gmail';
 import { GOOGLE_CALENDAR_CRITERIA } from './google-calendar';
 import { GOOGLE_KIT_CRITERIA } from './google-kit';
 import { GOVCON_CRITERIA } from './govcon';
 import { JOB_APPLICATION_CRITERIA } from './job-application';
 import { NOTIFICATIONS_CRITERIA } from './notifications';
+import { PGVECTOR_KIT_CRITERIA } from './pgvector-kit';
 import { QUALITY_LOOP_CRITERIA } from './quality-loop';
 import { QUALITY_LOOP_CLIENTS_CRITERIA } from './quality-loop-clients';
 import { SITE_CRITERIA } from './site';
@@ -37,6 +42,11 @@ export const CRITERIA: readonly Criterion[] = [
   ...NOTIFICATIONS_CRITERIA,
   ...JOB_APPLICATION_CRITERIA,
   ...SITE_CRITERIA,
+  ...CLOUD_CRITERIA,
+  ...CLOUD_OPS_CRITERIA,
+  ...CONFIG_KIT_CRITERIA,
+  ...DB_CRITERIA,
+  ...PGVECTOR_KIT_CRITERIA,
   ...TOOL_SESSION_CRITERIA,
   ...GMAIL_CRITERIA,
   ...GOOGLE_CALENDAR_CRITERIA,

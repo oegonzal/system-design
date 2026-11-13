@@ -1,0 +1,56 @@
+{
+  "images": {
+    "studio-api": { "kind": "nest", "port": 3000, "health": "/api/health" },
+    "quality-loop": { "kind": "nest", "port": 3003, "health": "/health" },
+    "govcon": { "kind": "nest", "port": 3004, "health": "/health", "command": ["serve"] },
+    "notifications": { "kind": "nest", "port": 3005, "health": "/health" },
+    "job-application": { "kind": "nest", "port": 3006, "health": "/health" },
+    "agentic-system": { "kind": "nest", "port": 3007, "health": "/health" },
+    "studio-ui": {
+      "kind": "next",
+      "port": 4200,
+      "basePath": "",
+      "public": { "NEXT_PUBLIC_API_URL": "/api" }
+    },
+    "quality-loop-ui": {
+      "kind": "next",
+      "port": 4201,
+      "basePath": "/inspector",
+      "public": { "NEXT_PUBLIC_QUALITY_LOOP_URL": "/loop" }
+    },
+    "govcon-ui": {
+      "kind": "next",
+      "port": 4202,
+      "basePath": "/govcon",
+      "public": { "NEXT_PUBLIC_GOVCON_URL": "/govcon-api" }
+    },
+    "db-migrate": { "kind": "migrate" },
+    "browser-session": { "kind": "playwright" }
+  },
+  "localOnly": {
+    "gmail": { "kind": "nest" },
+    "google-calendar": { "kind": "nest" }
+  },
+  "jobs": {
+    "browser-session": {
+      "image": "browser-session",
+      "command": ["run", "--launch", "{launch}", "--headless", "--wait-for-loop", "8"],
+      "launches": {
+        "linkedin": { "schedule": "cron(5 0 * * ? *)" },
+        "builtin": { "schedule": "cron(5 1 * * ? *)" }
+      }
+    }
+  },
+  "routes": [
+    { "prefix": "/api", "port": 3000, "api": true },
+    { "prefix": "/api/health", "port": 3000, "api": true, "public": true },
+    { "prefix": "/loop", "port": 3003, "strip": true, "api": true },
+    { "prefix": "/govcon-api", "port": 3004, "strip": true, "api": true },
+    { "prefix": "/_next/static", "port": 4200, "public": true },
+    { "prefix": "/inspector/_next/static", "port": 4201, "public": true },
+    { "prefix": "/govcon/_next/static", "port": 4202, "public": true },
+    { "prefix": "/inspector", "port": 4201 },
+    { "prefix": "/govcon", "port": 4202 },
+    { "prefix": "/", "port": 4200 }
+  ]
+}

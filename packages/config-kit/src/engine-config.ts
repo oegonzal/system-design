@@ -17,6 +17,11 @@ import { z } from 'zod';
  * root — the repository's own `config/` for the model the loop calls, a
  * package's own for that program's settings — and reads it against the schema
  * its owner hands in; what an unnamed kind runs on is the owner's to say.
+ *
+ * A caller may make the choice for one kind itself — a name it read from its
+ * environment, say, where one deployment runs a file the checked-in choices
+ * do not — and that name wins over the engine file's for that kind alone. It
+ * is held to the same rule: a name, and a file behind it.
  */
 export const CONFIG_DIR = 'config';
 export const ENGINE_FILE = 'engine.json';
@@ -84,7 +89,7 @@ export function readEngineConfig(
 }
 
 export interface ChosenConfig {
-  /** The name the engine file gave, or null where it named none. */
+  /** The name chosen — the caller's, else the engine file's — or null where neither named one. */
   name: string | null;
   /** Where that name points, or null when nothing was chosen. */
   path: string | null;
@@ -92,8 +97,20 @@ export interface ChosenConfig {
   text: string | null;
 }
 
+/** The caller's own name for a kind, held to what a name may be; the engine file's are checked by its schema. */
+function callerChoice(kind: string, choice: string): string {
+  if (!CONFIG_NAME.test(choice)) {
+    throw new EngineConfigError(
+      `${kind} is chosen as ${JSON.stringify(choice)}, which must name a file in ${CONFIG_DIR}/${kind}/, with no path in it`,
+    );
+  }
+  return choice;
+}
+
 /**
- * The configuration chosen for one kind, or nothing chosen at all.
+ * The configuration chosen for one kind, or nothing chosen at all. The
+ * caller's `choice`, where it makes one, is the name; otherwise the engine
+ * file's.
  *
  * A kind nobody named is not an error — a checkout with no `config/` runs on
  * whatever that kind's own default is. A kind named with no file behind it
@@ -104,14 +121,17 @@ export function chosenConfig(
   kind: string,
   root: string = process.cwd(),
   read: ReadFile = (at) => readFileSync(at, 'utf8'),
+  choice?: string,
 ): ChosenConfig {
-  const name = readEngineConfig(root, read)[kind];
+  const chooser = choice === undefined ? `${CONFIG_DIR}/${ENGINE_FILE}` : 'the caller';
+  const name =
+    choice === undefined ? readEngineConfig(root, read)[kind] : callerChoice(kind, choice);
   if (name === undefined) return { name: null, path: null, text: null };
   const path = resolve(root, CONFIG_DIR, kind, `${name}.json`);
   const text = readOrNull(path, read);
   if (text === null) {
     throw new EngineConfigError(
-      `${CONFIG_DIR}/${ENGINE_FILE} chooses ${kind} "${name}", but ${CONFIG_DIR}/${kind}/${name}.json does not exist`,
+      `${chooser} chooses ${kind} "${name}", but ${CONFIG_DIR}/${kind}/${name}.json does not exist`,
     );
   }
   return { name, path, text };
@@ -124,21 +144,23 @@ export interface Chosen<T> {
 }
 
 /**
- * The configuration chosen for one kind, read and checked against the schema
- * its owner hands in, or null where none was chosen. A file that is present
- * and wrong is a refusal naming the file and every field at fault, never a
- * quiet fallback: the whole point of writing the choice down is that what ran
- * is what the file says. The source comes back with it so a program can say
- * which file it is running on — a configuration read once at boot is
- * invisible afterwards.
+ * The configuration chosen for one kind — by the caller's `choice`, else by
+ * the engine file — read and checked against the schema its owner hands in,
+ * or null where none was chosen. A file that is present and wrong is a
+ * refusal naming the file and every field at fault, never a quiet fallback:
+ * the whole point of writing the choice down is that what ran is what the
+ * file says. The source comes back with it so a program can say which file
+ * it is running on — a configuration read once at boot is invisible
+ * afterwards.
  */
 export function readChosen<T>(
   kind: string,
   schema: z.ZodType<T>,
   root: string = process.cwd(),
   read: ReadFile = (at) => readFileSync(at, 'utf8'),
+  choice?: string,
 ): Chosen<T> | null {
-  const chosen = chosenConfig(kind, root, read);
+  const chosen = chosenConfig(kind, root, read, choice);
   if (chosen.name === null || chosen.text === null) return null;
   const source = `${CONFIG_DIR}/${kind}/${chosen.name}.json`;
   let parsed: unknown;

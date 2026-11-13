@@ -47,3 +47,26 @@ export class FixedClock implements Clock {
     }
   }
 }
+
+/**
+ * A clock that jumps to each timer as it is armed and fires it at once, so a
+ * wait between two asks of the loop costs a spec no real time; it moves on
+ * no read, so a deadline is reached by the waits alone.
+ */
+export class JumpingClock implements Clock {
+  private ms: number;
+
+  constructor(start = new Date('2026-10-03T10:00:00.000Z')) {
+    this.ms = start.getTime();
+  }
+
+  now(): Date {
+    return new Date(this.ms);
+  }
+
+  at(when: Date, then: () => void): () => void {
+    this.ms = Math.max(this.ms, when.getTime());
+    then();
+    return () => undefined;
+  }
+}

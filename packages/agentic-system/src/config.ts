@@ -1,7 +1,6 @@
 import { resolve } from 'node:path';
 
 import { createEmbeddingClientFromEnv, type EmbeddingClient } from '@sysdesign/llm';
-import { DEFAULT_QDRANT_URL } from '@sysdesign/qdrant-kit';
 
 import type { AgenticSystemSettings } from './settings';
 
@@ -12,7 +11,8 @@ import type { AgenticSystemSettings } from './settings';
  * package declares and its factory reads, called from that same function.
  * Everything else is a file under the package's own `config/`, read by
  * `settings.ts`; `config.spec.ts` holds the package to reading the environment
- * only here.
+ * only here. The vector index needs no variable of its own: it is a table in
+ * the database the db package's `DB_*` variables name.
  */
 
 /** The package itself — `dist/..` as built, `src/..` under test — whose `config/` holds the settings. */
@@ -25,8 +25,6 @@ export const AGENTIC_SYSTEM_ENV = {
   loopUrl: { name: 'QUALITY_LOOP_URL', fallback: 'http://localhost:3003' },
   /** The bus the service publishes design lifecycle events to. */
   notificationsUrl: { name: 'NOTIFICATIONS_URL', fallback: 'http://localhost:3005' },
-  /** The vector store memory spaces project their records into. */
-  qdrantUrl: { name: 'QDRANT_URL', fallback: DEFAULT_QDRANT_URL },
 } as const;
 
 export class AgenticSystemConfigError extends Error {
@@ -38,7 +36,6 @@ export interface AgenticSystemConfig {
   port: number;
   loopUrl: string;
   notificationsUrl: string;
-  qdrantUrl: string;
   /**
    * What memory spaces embed with. Its variables (OPENAI_API_KEY,
    * OPENAI_EMBEDDING_MODEL) are the llm package's own, so they are not
@@ -82,7 +79,6 @@ export function agenticSystemConfigFromEnv(
     port: Number(port),
     loopUrl: url(env, AGENTIC_SYSTEM_ENV.loopUrl),
     notificationsUrl: url(env, AGENTIC_SYSTEM_ENV.notificationsUrl),
-    qdrantUrl: url(env, AGENTIC_SYSTEM_ENV.qdrantUrl),
     embedder: createEmbeddingClientFromEnv(env),
     settings,
   };

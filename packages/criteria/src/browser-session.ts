@@ -146,6 +146,51 @@ export const BROWSER_SESSION_CRITERIA: readonly Criterion[] = [
     statement:
       'A session out of time starts no unit of work: a taskStart once its maxMinutes have elapsed is not run, nor anything after it in its plan, and the session ends max-minutes; a unit open when the time runs out may finish within the declared unitGraceMinutes — the rail, and the withdrawal of a question waiting on the operator, moving to the grace’s end while it is open, and to the moment it closes when that is past the limit — and the session ends max-minutes once no unit is open past the limit or when the grace runs out, its detail naming the grace; a grace of 0 ends it at the limit as before; and its events carry the limit and the grace together as its lifetime.',
   },
+  {
+    id: 'BRW-29',
+    statement:
+      "A launch file under the package's own launches/, named by --launch, supplies a run's goal, profile, start URL, documents by file name under the documents dir and its target, task and minute limits, read by a declared schema that admits no subject; a flag given beside it wins over the file's field, --goal and --profile are required only without one, and a name no file answers to is refused naming the known launches.",
+  },
+  {
+    id: 'BRW-30',
+    statement:
+      'One session per profile: a run or an export is refused before any row, file or browser exists while a session on the same profile is running and beating inside the declared stale window, naming that session; a session that stopped beating holds nothing.',
+  },
+  {
+    id: 'BRW-31',
+    statement:
+      "A profile's sign-in moves between machines as Playwright's storage state — cookies, local storage and IndexedDB, read from the profile opened on its own — written by export-state as a file readable by its owner alone and refused while a session holds the profile; a run whose files hold a state and no archive seeds a fresh profile with it once, through the browser's own setStorageState, so the sign-in survives where a copied Chrome profile's cookies would not.",
+  },
+  {
+    id: 'BRW-32',
+    statement:
+      "Where the session's files live beyond this machine, the documents are written under the documents dir and the profile is put in place before the browser opens — its archive extracted over any stale directory — and archived again after the browser has closed, on every path a session ends by, with the caches, the crash and metrics spools and the Singleton lock left out; a save that fails is one warning that changes nothing of the outcome, a session whose browser never opened keeps nothing, and where nothing lives beyond this machine the files are the disk's as before.",
+  },
+  {
+    id: 'BRW-33',
+    statement:
+      'Told to wait for the loop, the session asks its health every five seconds for up to the declared minutes before it binds — after the lease and the files, so a loop still waking costs no browser — and refuses by name a loop that stays silent past them; told nothing, it binds at once.',
+  },
+  {
+    id: 'BRW-34',
+    statement:
+      "The lease is the database's as well as the engine's: the lease is checked again on the instant the session's row takes, since minutes pass between the first check and the row — the files, the loop — and a partial unique index admits one running row per profile, so a second row is refused as the session's own refusal (exit 2) with no row, dump or browser of its own; and the row beats once more right before the profile is archived, so the lease outlasts a save longer than the stale window.",
+  },
+  {
+    id: 'BRW-35',
+    statement:
+      "Headless, the browser opens a 1440×900 window with no emulated viewport — Chromium's headless default is 800×600, and the goals are written for the desktop layouts — while a headed browser keeps the laptop's own window.",
+  },
+  {
+    id: 'BRW-36',
+    statement:
+      "With a bucket set, a profile with neither an archive nor an exported sign-in is refused naming both keys and the push command, never run signed out and archived over any state pushed later; an archive that holds no directory of the profile's name is refused naming its key, never restored as nothing and overwritten; and where nothing lives beyond this machine the files still answer that the profile is the disk's.",
+  },
+  {
+    id: 'BRW-37',
+    statement:
+      "export-state refuses by name a profile this machine holds no directory for, rather than opening an empty one and writing a state that seeds the cloud with nothing; and login keeps the sign-in on this disk and archives nothing, since this machine's cookies do not read elsewhere and an archive would win over the exported state.",
+  },
   // Memory ingest (packages/memory-ingest)
   {
     id: 'ING-1',

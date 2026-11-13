@@ -6,7 +6,9 @@ machine. Each step names what to read afterwards; stop at the first that does
 not hold.
 
 Nothing here runs while another session is measuring the store: every digest
-below adds points to `quality-memory__v2__text-embedding-3-small__1536`.
+below adds chunks to `quality-memory__v2__text-embedding-3-small__1536`, the
+loop's memory collection — since the 2026-11 move a pgvector table in the
+stack's own Postgres, not a Qdrant collection.
 
 ## 0. The stack
 
@@ -31,8 +33,10 @@ pnpm memory-ingest status
 ```
 
 Read: the orchestration's `digest` step reports `{kind: 'notes', …}` and
-`counts.kept ≥ 1`; `store` completes with `counts.chunks`; Qdrant's
-`points_count` rose by exactly `kept`; and
+`counts.kept ≥ 1`; `store` completes with `counts.chunks`; the loop's memory
+table holds exactly `kept` more chunks than before (the loop's boot line
+`memory store ready: <collection> (N chunks)` names the collection; count
+its `vec_…` table in the stack's Postgres); and
 
 ```bash
 curl -s -X POST localhost:3003/memory/form-retrieval-report -H 'content-type: application/json' \
@@ -227,3 +231,73 @@ not declare, or a control that is no file control, carries the cut in
 each row of the mission's `## Documents`; the session refuses, before any row,
 a declared document with no file, a file that is not there, or a file no
 section declares.
+
+## 8. In the cloud
+
+The session runs headless as a scheduled Fargate task
+([`docs/aws/deployment.md`](../aws/deployment.md)): the job function starts
+it with `run --launch <name> --headless --wait-for-loop 8`, under
+`BROWSER_CHANNEL=chromium`, `BROWSER_PROFILE_BUCKET=<the files bucket>`,
+`BROWSER_PROFILES_DIR=/app/static/profiles` (the task's own disk — never EFS,
+where Chrome's `SingletonLock` names another host and SQLite's locks do not
+hold), `BROWSER_SESSION_DOCS_DIR=/app/static/docs`,
+`BROWSER_SESSION_DUMP_DIR=/app/static/browser-session/sessions` (EFS, so the
+dumps outlive the task), the loop, bus, advisor and memory-host URLs on the
+app task, `BROWSER_SESSION_SUBJECT` and `MEMORY_TENANT` from SSM, and the
+`DB_*` set with `PGSSLMODE`. The lifecycle, in order:
+
+1. The lease: a `browser_session` row on the profile `running` with a beat
+   younger than the session file's `liveness.staleAfterMs` refuses the task
+   (exit 2), naming that session — one session per profile, before any file
+   is touched.
+2. The bucket's `docs/*` written under the docs dir; the profile put in
+   place: `profiles/<name>.tar.gz` extracted over any stale directory (every
+   run but the first; an archive holding no `<name>/` directory is refused by
+   key), else `state/<name>.json` read, to seed a fresh profile (the first
+   run), else the task is refused (exit 2), naming both keys and the push
+   command: with a bucket set, a run with neither would go ahead signed out
+   and archive that profile over any state pushed later.
+3. The loop waited for: `/health` every 5 s for up to 8 minutes, since the
+   app task may still be waking; silent past that, the task is refused.
+4. The session as on the laptop: the brain bound, the advisors resolved, the
+   documents checked, stale rows closed, the lease checked again on the
+   row's own instant, the dump opened, the row written — refused as the
+   session's own refusal when another task's row took the profile meanwhile,
+   since the database admits one `running` row per profile
+   (`browser_session_running_profile`, since 2026-11-12) — the rubrics
+   derived, the browser opened — seeded with the state when step 2 read one,
+   in a 1440×900 window — and the start URL opened.
+5. Once the browser has closed, on every path out: the row beats once more,
+   then the profile is archived back to `profiles/<name>.tar.gz` without its
+   caches, its crash and metrics spools and the `Singleton*` lock; a failed
+   save is one warning and leaves the exit code alone.
+
+Once, from the laptop — both launches need a sign-in, so both states go up
+before either launch runs; with a bucket set a run refuses until its profile
+has a state or an archive:
+
+```bash
+pnpm browser-session export-state --profile linkedin --out /tmp/linkedin-state.json   # no session running on the profile; the launch's site is visited for its local storage
+pnpm aws:files push /tmp/linkedin-state.json state/linkedin.json && rm /tmp/linkedin-state.json
+pnpm browser-session export-state --profile builtin --out /tmp/builtin-state.json
+pnpm aws:files push /tmp/builtin-state.json state/builtin.json && rm /tmp/builtin-state.json
+pnpm aws:files push docs/ingestion/Resume_2026_c.pdf docs/Resume_2026_c.pdf             # the document the builtin launch names
+pnpm aws:session run builtin                                                           # the first run seeds the profile
+```
+
+Read: the task's log says `profile builtin: fresh, seeded with its exported
+sign-in`, then the session as in §3; the next run's says `profile builtin:
+restored from its archive`, and `pnpm aws:files list profiles/` shows the
+archive with its size. `export-state` refuses a profile this machine holds
+no directory for, so a misspelled name never pushes an empty sign-in.
+
+What the cloud cannot do: a sign-in check on the new device — a "confirm it's
+you", a human check — needs a person; the session ends
+`mission-stop/login-wall` (exit 0) and signs in nothing. Then: sign in again
+on the laptop (`login`, which keeps the sign-in on the laptop's disk and
+archives nothing — the laptop's cookies would not read in the cloud), export
+and push the state again, and
+`pnpm aws:files rm profiles/<name>.tar.gz` so the next run seeds afresh. The
+task's egress IP changes with every run, so expect such a check more than
+once. A question for the operator reaches Telegram alone — a task has no
+terminal — and the prompt expiry and the rails bound the task's life.

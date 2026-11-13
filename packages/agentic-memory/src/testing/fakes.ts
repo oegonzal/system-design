@@ -3,7 +3,7 @@
  * table-driven embedder and a space store in memory — shared by this package's
  * specs and a host's.
  */
-import { hashedUnitVector } from '@sysdesign/qdrant-kit/testing';
+import { hashedUnitVector } from '@sysdesign/pgvector-kit/testing';
 
 import type { Clock, Embedder, Ids, SpaceStore, StoredSpace } from '../ports';
 

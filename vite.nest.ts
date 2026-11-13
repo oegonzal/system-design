@@ -4,7 +4,9 @@ import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 import { TEST_DATABASE_NAME } from './packages/db/src/testing/test-database';
 
 /**
- * Shared Vite build shape for the NestJS apps (studio-api, quality-loop, govcon, notifications).
+ * Shared Vite build shape for every NestJS app (studio-api, quality-loop, govcon,
+ * notifications, job-application, agentic-system, gmail, google-calendar) —
+ * the ones `docker/nest-app.Dockerfile` builds from it.
  *
  * One externals list, maintained once: everything here stays a runtime
  * `require` in the bundled `dist/main.js` and is provided by `node_modules`
@@ -24,9 +26,6 @@ export const NEST_EXTERNALS = [
   /^playwright(\/|$)/,
   /^playwright-core(\/|$)/,
   /^@mikro-orm\//,
-  // The Qdrant client rides on undici; both stay runtime requires.
-  /^@qdrant\//,
-  'undici',
   'reflect-metadata',
   'rxjs',
   /^rxjs\//,

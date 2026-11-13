@@ -169,8 +169,9 @@ The "application" layer; holds everything domain-specific so the engine does not
   node kinds). It names vendors because that is its content; the lenses name none.
 - **Memory spaces** (`memory/`): `POST /spaces { runId }` compiles a finished
   run's strategy into a space the agentic-memory runtime executes — remember,
-  recall, update, invalidate, history and consolidate over Postgres and a Qdrant
-  projection. See [memory-runtime.md](memory-runtime.md).
+  recall, update, invalidate, history and consolidate over Postgres and a
+  pgvector projection in that same database. See
+  [memory-runtime.md](memory-runtime.md).
 
 ---
 
@@ -251,8 +252,9 @@ First end-to-end run on the reframed pipeline, 2026-10-17 (`maxIterations 1`):
 Phase 2 is `packages/agentic-memory`, a library this service mounts at `/spaces`.
 It compiles a strategy's typed declarations — registers, interfaces and the
 consolidation route, never its prose — under a declared policy into a space, and
-runs the typed Memory Service over Postgres, the truth, and a Qdrant projection
-that is rebuilt from it. It is a separate bounded context from the loop's own
+runs the typed Memory Service over Postgres, the truth, and a pgvector projection
+(a table in the same database, since 12 Nov 2026) that is rebuilt from it. It is
+a separate bounded context from the loop's own
 grading memory, which it never reads or widens. How it works:
 [memory-runtime.md](memory-runtime.md).
 

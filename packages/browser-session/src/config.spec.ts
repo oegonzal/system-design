@@ -5,7 +5,9 @@ import {
   advisorEntries,
   flagKey,
   headedOf,
+  minutesOf,
   NO_ADVISORS,
+  NO_PROFILE_BUCKET,
   NO_TENANT,
   parseArgsOptions,
   positiveInteger,
@@ -37,6 +39,9 @@ describe('the session configuration', () => {
       advisors: [],
       memoryUrl: 'http://localhost:3007',
       memoryTenant: 'none',
+      channel: 'chrome',
+      profileBucket: 'none',
+      docsDir: 'docs/ingestion',
     });
     expect(
       sessionConfigFromEnv({
@@ -48,6 +53,9 @@ describe('the session configuration', () => {
         [SESSION_ENV.advisors.name]: 'record=http://advisor.test:3006, http://other.test',
         [SESSION_ENV.memoryUrl.name]: 'http://memory.test:7',
         [SESSION_ENV.memoryTenant.name]: ' verify-2026 ',
+        [SESSION_ENV.channel.name]: 'chromium',
+        [SESSION_ENV.profileBucket.name]: 'sysdesign-prod-files-1',
+        [SESSION_ENV.docsDir.name]: '/app/static/docs',
       }),
     ).toEqual({
       loopUrl: 'http://loop.test:1234',
@@ -61,12 +69,20 @@ describe('the session configuration', () => {
       ],
       memoryUrl: 'http://memory.test:7',
       memoryTenant: 'verify-2026',
+      channel: 'chromium',
+      profileBucket: 'sysdesign-prod-files-1',
+      docsDir: '/app/static/docs',
     });
     // The two values that configure nothing are the declared fallbacks, so a module refuses them by
     // the one name each; what to refuse is the module's decision at boot, not a parse rule here — a
     // brain deciding through the loop alone never reads the tenant.
     expect(SESSION_ENV.advisors.fallback).toBe(NO_ADVISORS);
     expect(SESSION_ENV.memoryTenant.fallback).toBe(NO_TENANT);
+    expect(SESSION_ENV.profileBucket.fallback).toBe(NO_PROFILE_BUCKET);
+    // The browser is one of the two declared: the installed Chrome, or the bundled Chromium the cloud image runs.
+    expect(() => sessionConfigFromEnv({ [SESSION_ENV.channel.name]: 'firefox' })).toThrow(
+      new SessionConfigError('BROWSER_CHANNEL must be chrome or chromium, got "firefox"'),
+    );
     expect(() => sessionConfigFromEnv({ [SESSION_ENV.memoryUrl.name]: 'host' })).toThrow(
       new SessionConfigError('AGENTIC_SYSTEM_URL must be a URL, got "host"'),
     );
@@ -124,7 +140,17 @@ describe('the session configuration', () => {
       out: { type: 'string' },
       // A document is supplied per flag, so the flag collects its values.
       document: { type: 'string', multiple: true },
+      // A run may take its arguments from a launch file, and wait for the loop before it binds.
+      launch: { type: 'string' },
+      'wait-for-loop': { type: 'string' },
     });
+    expect(flagKey('waitForLoop')).toBe('wait-for-loop');
+    expect(minutesOf(undefined, 'waitForLoop')).toBe(0);
+    expect(minutesOf('0', 'waitForLoop')).toBe(0);
+    expect(minutesOf('8', 'waitForLoop')).toBe(8);
+    expect(() => minutesOf('soon', 'waitForLoop')).toThrow(
+      '--wait-for-loop must be a whole number of minutes, got "soon"',
+    );
     expect(flagKey('tenant')).toBe('tenant');
     expect(flagKey('dryRun')).toBe('dry-run');
     expect(Object.keys(parseArgsOptions(every))).toHaveLength(every.length);

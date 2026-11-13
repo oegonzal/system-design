@@ -170,12 +170,12 @@ export class MikroOrmRecordStore implements RecordStore {
     return rows.map(recordOf);
   }
 
-  async unprojectionDue(collection: string, limit: number): Promise<MemoryRecord[]> {
+  async unprojectionDue(limit: number): Promise<MemoryRecord[]> {
     const rows = await this.em
       .fork()
       .find(
         MemoryRecordRow,
-        { status: { $ne: 'active' }, projectedInto: collection },
+        { status: { $ne: 'active' }, projectedInto: { $ne: null } },
         { orderBy: { id: 'asc' }, limit },
       );
     return rows.map(recordOf);

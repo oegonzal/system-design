@@ -40,7 +40,7 @@ export type ProviderOverride = readonly [token: unknown, value: unknown];
 /**
  * What every suite gets unless it says otherwise. A developer's `.env`
  * (OPENAI_API_KEY, CLAUDE_CODE_OAUTH_TOKEN — Nx loads it) must never make a
- * suite reach OpenAI, bind Qdrant or call the model, so the real factories
+ * suite reach OpenAI, bind the memory table or call the model, so the real factories
  * are never invoked under test: a fake model with no answers, disabled
  * embeddings, an in-memory store, and a janitor that sweeps at boot with the
  * production threshold and never on a timer.

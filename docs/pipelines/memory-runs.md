@@ -216,7 +216,7 @@ POST /orchestrations/memory ──► open ──► orchestration_run row ─�
                              │                └──► experience-digest run ──┐
                              │                                             │
                              │  4 store    admitted memories, unfaulted ◄──┘
-                             │                └──► Qdrant upsert, one point per memory,
+                             │                └──► pgvector upsert, one row per memory,
                              │                     carrying a condition and a lesson vector
                              │
                              └──► each step's status, reason, counts and child run id ──► orchestration_run.steps
@@ -376,7 +376,7 @@ is the source of it.
 **The routes.** `src/modules/orchestration/` serves the generic surface;
 `src/modules/memory/` keeps the adapters — embeddings, the vector store, the
 query probes — binds them into the memory orchestrator's ports for the
-orchestration module (which never imports Qdrant), and serves the `/memory`
+orchestration module (which never imports the adapter), and serves the `/memory`
 routes, the tools that need no run.
 
 | Verb     | Path                                     | Code | Body / query                                                    | Answers                                        |
@@ -506,19 +506,27 @@ renaming one would break every client that maps it.
 
 ## 6. The vector store and the embeddings port
 
-Qdrant, as a `docker-compose` service named `vectors`, started, waited for and
-stopped alongside Postgres by `scripts/stack.sh`. It is bound to `127.0.0.1`
-with telemetry off and keeps its data in the named volume `sysdesign-qdrant`.
-The image ships no shell, so readiness is gated from the host on `/readyz`
-rather than by a compose healthcheck.
+pgvector, in the same Postgres the run tables live in — the compose `db` on
+the laptop, Aurora in the cloud — since 2026-11-12. Until then the store was
+a Qdrant server beside Postgres (compose service `vectors`, named volume
+`sysdesign-qdrant`); its collection was carried over point by point with
+`pnpm memory:import-qdrant` (§7), ids kept, so `memory_support.point_id` still
+names every point. The `vector` extension is installed by a migration
+(`Migration20261112100001_vector_extension`); the collection's table and its
+indexes are made sure of by the store at boot.
 
-The adapter is `qdrant/qdrant-memory-store.ts` behind the `MemoryStore` port,
-so the module never imports the client directly:
+The adapter is `pgvector/pgvector-memory-store.ts` behind the `MemoryStore`
+port, over the `SqlExecutor` of `@sysdesign/pgvector-kit` — raw SQL through
+the ORM's connection, since MikroORM has no vector type — so the module
+writes no statement outside it:
 
-- **One collection per generation, model and width**,
-  `quality-memory__<generation>__<model>__<dimensions>`, cosine distance,
-  created on first use. The generation is `INDEX_GENERATION` in
-  `qdrant/collection.ts`, currently `v2`. What is embedded belongs in the
+- **One table per generation, model and width**,
+  `vec_quality_memory__<generation>__<model>__<dimensions>` for the collection
+  `quality-memory__<generation>__<model>__<dimensions>`, with an HNSW cosine
+  index per named vector and an expression index per field a filter narrows
+  by (`runId`, `kind`, `pipeline`, `scope`, `unitKey`), created on first use.
+  The generation is `INDEX_GENERATION` in
+  `pgvector/collection.ts`, currently `v2`. What is embedded belongs in the
   collection's identity exactly as the model and the width do: cosines across
   generations are not comparable, and one collection ranking two
   representations against one query means nothing. Bump it whenever the
@@ -557,8 +565,19 @@ so the module never imports the client directly:
 - **A deterministic point id**, `sha256(sourceRunId|ref)` reshaped as a uuid,
   so the same memory always lands on the same point and re-digesting a run
   replaces its chunks rather than duplicating them. `replaceRunChunks` deletes
-  by `runId` and upserts, both with `wait: true`, so a memory just stored is
+  by `runId` and upserts in one transaction, so a memory just stored is
   searchable by the next run.
+- **One statement per search batch.** Every probe is one parenthesised select
+  joined to the others by `union all`, inside a transaction that first sets
+  `hnsw.iterative_scan = relaxed_order` and `hnsw.ef_search` to the batch's
+  largest fetch, so a filtered probe is refilled from below rather than
+  coming back short; the score is `1 - (column <=> query)`, the cosine Qdrant
+  reported. Measured 2026-11-11 on the carried-over collection (1,455 rows):
+  the five nearest to a stored condition vector agree with Qdrant on ids and
+  on scores to four decimals, raw and through the adapter; at that size the
+  planner reads the table whole (a top-N sort over a sequential scan, 11 ms
+  warm), exactly as Qdrant searched it, and the HNSW indexes (11 MB each)
+  take over as the table grows.
 - **Dedupe on read, twice.** Each search over-fetches three times its limit and
   keeps the best-scoring chunk per `contentHash`; `fuse` then dedupes again
   across probes, keeping the best-scoring copy. So the same lesson learned from
@@ -614,10 +633,21 @@ above about forty-eight chunks. There is deliberately **no score floor** —
 ## 7. Operating it
 
 ```bash
-# the stack: Postgres on 5433 and Qdrant on 6333, started and stopped together
+# the stack: Postgres on 5433 (the runs and the memory table), started and stopped together
 pnpm stack:db
-pnpm db:migrate
-pnpm stack:down                                  # both, data stays in the named volumes
+pnpm db:migrate                                  # installs the vector extension among the rest
+pnpm stack:down                                  # data stays in the named volume
+
+# once, with the loop stopped, before it runs on pgvector and before the old
+# sysdesign-vectors container is removed: the compose service is gone, and that
+# leftover container is what still serves :6333 (`docker start sysdesign-vectors`
+# if it was stopped; once removed, `docker run --rm -d -p 127.0.0.1:6333:6333
+# -v system-design-prep_sysdesign-qdrant:/qdrant/storage qdrant/qdrant:v1.19.1`
+# serves the retained volume again). reads http://localhost:6333 and writes the
+# store's table under the same ids; a table that already holds chunks is refused
+# unless --force, since a later run would bring back refs the loop has since
+# replaced; --dry-run checks every point and writes nothing, not even the table
+pnpm memory:import-qdrant --collection quality-memory__v2__text-embedding-3-small__1536
 
 # the service; Node loads .env, which is where OPENAI_API_KEY lives. The loop
 # runs only on this machine's Claude Code login (or CLAUDE_CODE_OAUTH_TOKEN
@@ -648,8 +678,9 @@ curl -s -X POST localhost:3003/memory/<orchestrationRunId>/reindex   # 200 { chu
 curl -s -X POST localhost:3003/memory/retrieval-report -H 'content-type: application/json' \
   -d '{"goal":"# Prompt …"}'
 
-# what the store holds
-curl -s localhost:6333/collections
+# what the store holds: the table's row count (the retrieval report above says what a goal would find)
+docker exec sysdesign-db psql -U admin -d sysdesign \
+  -c 'select count(*) from "vec_quality_memory__v2__text_embedding_3_small__1536"'
 
 # two controllers on the same evidence, no model: every recorded iteration of a
 # pipeline decided again under each strategy in core/controllers (§13)
@@ -850,7 +881,8 @@ Four bodies of work, each self-contained.
   run.
 - **`f3a7a7b` — the composition.** 49 files: the memory module, the four
   routes, the `memory_run` and `memory_embedding` tables, the
-  `EmbeddingClient` port and its OpenAI adapter, Qdrant in compose, the stack
+  `EmbeddingClient` port and its OpenAI adapter, Qdrant in compose (replaced
+  by pgvector in the database on 2026-11-12, §6), the stack
   script and CI, and criteria `[QL-16]` through `[QL-18]`. The additive edits
   to existing code are four of the five listed in fact 1.
 - **`9372487` — what an adversarial review changed.** Four review dimensions
@@ -888,18 +920,17 @@ run-specific memory reaching the store (§1).
 
 Notes, not fixes. None affects behaviour.
 
-- `qdrant/collection.ts` declares `INDEXED_FIELDS`, each field with the index
-  type its value needs — `runId`, `pipeline`, `kind`, a document memory's
-  `scope` and `unitKey`, the flat facets, and the lineage fields
-  `lineage.judged.runId`, `lineage.adoptedFrom.runId` and `lineage.goalHash`
-  (keyword, at their dotted paths) — and `ensure()` asks for every one on every
-  boot, warning on a refusal, so a collection built before them gains them too.
-  `searchMany` filters only by a probe's declared `ProbeFilter` (kinds,
-  pipelines, runs to leave out, and the unit of work it names) — every search
-  leaving out each memory of a scope bound to a unit (`UNIT_BOUND_SCOPES`) but
-  those of the unit it names, all of them when it names none — and the coach
-  recall's novelty screen reads `lineage` off the hits after fusion, so the
-  lineage indexes are prepared for a filtered search that does not exist yet.
+- `pgvector/collection.ts` declares `INDEXED_FIELDS` — `runId`, `kind`,
+  `pipeline`, a document memory's `scope` and `unitKey`, each an expression
+  index on `payload->>'<field>'` — and `ensure()` makes sure of every one on
+  every boot, so a table built before them gains them too. `searchMany`
+  filters only by a probe's declared `ProbeFilter` (kinds, pipelines, runs to
+  leave out, and the unit of work it names) — every search leaving out each
+  memory of a scope bound to a unit (`UNIT_BOUND_SCOPES`) but those of the
+  unit it names, all of them when it names none — and the coach recall's
+  novelty screen reads `lineage` off the hits after fusion. The facets and
+  the lineage fields had keyword indexes in Qdrant that no probe filtered by;
+  the pgvector move (2026-11-12) did not recreate them (MEM-7, closed).
 - Every payload carries `storedAt` and `keys`; `fromPayload` destructures both
   and discards them. Nothing reads either back.
 - `MemoryStepDto.counts` is an open `Record<string, number>`. The keys

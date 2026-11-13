@@ -8,13 +8,13 @@
 #   tilt up     — start everything
 #   tilt down   — tear down the pods and dev servers; the stores keep running
 #
-# The same stack `pnpm stack:up` starts, with the backends in pods. The stores
-# are the docker-compose services both launchers share, so either one shows
-# the same runs.
+# The same stack `pnpm stack:up` starts, with the backends in pods. The store
+# is the docker-compose Postgres both launchers share — records and, through
+# the pgvector extension, the memories recalled by meaning — so either one
+# shows the same runs.
 #
 # Services:
 #   Postgres        → localhost:5433  (admin/admin, db: sysdesign)  [compose]
-#   Qdrant          → localhost:6333                                [compose]
 #   API             → localhost:3000/api                            [k8s + docker]
 #   Quality loop    → localhost:3003/health                         [k8s + docker]
 #   Govcon          → localhost:3004/health                         [k8s + docker]

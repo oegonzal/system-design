@@ -50,7 +50,7 @@ of re-deriving the problem.
 | MEM-4    | A one-domain store injects little across domains                         | watch    | —        |
 | MEM-5    | Write-time deduplication, measured and not built                         | accepted | —        |
 | MEM-6    | Nothing prunes either store; the embedding cache never expires           | open     | low      |
-| MEM-7    | Prepared but unused: keyword indexes, payload fields, an untyped `using` | accepted | —        |
+| MEM-7    | Prepared but unused: keyword indexes, payload fields, an untyped `using` | closed   | —        |
 | MEM-8    | `reindex` and `retrieval-report` have no specs                           | open     | medium   |
 | MEM-9    | Not built by choice, listed so nobody rediscovers them                   | accepted | —        |
 | MEM-10   | The digest routinely ends `revise` at its iteration cap                  | watch    | —        |
@@ -70,7 +70,7 @@ of re-deriving the problem.
 | STUDIO-7 | Dumps are read by nothing; no incident loop                              | open     | medium   |
 | STUDIO-8 | `EVAL_DETERMINISTIC` grades with rules alone                             | closed   | —        |
 | PLAT-1   | No observability integration                                             | open     | high     |
-| PLAT-2   | Nothing declared or deployed on AWS                                      | open     | medium   |
+| PLAT-2   | Nothing declared or deployed on AWS                                      | closed   | —        |
 | PLAT-3   | Tilt covers the studio but not the vector store or the quality loop      | closed   | —        |
 | PLAT-4   | The quality-loop client has no browser journey                           | open     | low      |
 | PLAT-5   | Stale counts in four places                                              | closed   | —        |
@@ -78,6 +78,15 @@ of re-deriving the problem.
 | PLAT-7   | A tracked note that trips the branding tripwire, already in history      | accepted | —        |
 | PLAT-8   | Not built at single-user scale: review queue, monitors, canary           | accepted | —        |
 | PLAT-9   | No docs index                                                            | open     | low      |
+| PLAT-10  | The synchronous rubric derivation can outlast the edge                   | open     | medium   |
+| PLAT-11  | The memory tier is not deployed                                          | closed   | —        |
+| PLAT-12  | Telegram's one poller per token now spans two machines                   | closed   | —        |
+| PLAT-13  | Govcon's pull and warm run on every wake                                 | open     | low      |
+| PLAT-14  | A sign-in challenge on the cloud's device needs a person                 | open     | medium   |
+| PLAT-15  | Session dumps in the cloud have no reader                                | open     | low      |
+| PLAT-16  | A session task has no hard stop                                          | closed   | —        |
+| PLAT-17  | Each nightly session arrives from a new datacenter address               | watch    | —        |
+| PLAT-18  | A notifications spec races under load                                    | open     | low      |
 
 ## Recommended improvements, by leverage
 
@@ -109,6 +118,13 @@ entry were closed, then by cost. Each points at the entry that specifies it.
    stage.
 10. **A retrieval floor, after re-measuring** — MEM-3. Deferred at six chunks;
     the store is at 287.
+11. **The studio online** — closed: PLAT-2, and with phase 4 PLAT-11 (the
+    memory tier as pgvector in the same database) and PLAT-12 (the browser
+    session as a nightly cloud task, the lanes beside it, one bot per
+    purpose). Declared in `infra/aws` and deployed by `deploy-aws.yml`, not
+    yet run in an account. What it left for later: the rubric derivation
+    against the edge timeout (PLAT-10), the sign-in challenge a cloud session
+    cannot answer (PLAT-14) and the address it arrives from (PLAT-17).
 
 ## Adding an entry
 

@@ -1,5 +1,3 @@
-import { createHash } from 'node:crypto';
-
 import {
   actionRefs,
   elementByRef,
@@ -16,16 +14,12 @@ import {
   type PageObservation,
   type SuccessCriterion,
 } from '@sysdesign/contracts';
-import type { DumpBytes, DumpFile } from '@sysdesign/run-dump';
 
 import {
   causeOf,
   ActionFailed,
   type BrowserAction,
   type BrowserPort,
-  type DumpSink,
-  type DumpStore,
-  type GoalSource,
   type LedgerPort,
   type NewDecision,
   type NewSession,
@@ -35,6 +29,7 @@ import {
   QuestionWithdrawn,
   type SessionClose,
   type PagesClosed,
+  type StorageState,
   type SuppliedDocument,
   type TaskClose,
   type Withdrawal,
@@ -43,6 +38,8 @@ import {
 export * from './testing-runs';
 export * from './testing-journey';
 export * from './testing-advisor';
+export * from './testing-files';
+export * from './testing-stores';
 
 /**
  * The ports as fakes, for the engine's specs and the scripted end-to-end
@@ -103,6 +100,10 @@ export class FakeBrowser implements BrowserPort {
   readonly choices = new Map<string, readonly string[]>();
   opened: { profile: string; headed: boolean; documents: readonly SuppliedDocument[] } | null =
     null;
+  /** The sign-in the browser was opened with, when one was: what a fresh profile is seeded with. */
+  seeded: StorageState | null = null;
+  /** The sign-in `exportState` answers with: a signed-out profile unless a spec says. */
+  state: StorageState = { cookies: [], origins: [] };
   closed = false;
   /** The pages open, oldest first: the one the browser opened with, then each a page opened over it. */
   private stack: ScriptedPage[];
@@ -131,10 +132,16 @@ export class FakeBrowser implements BrowserPort {
 
   async open(
     profile: string,
-    options: { headed: boolean; documents: readonly SuppliedDocument[] },
+    options: { headed: boolean; documents: readonly SuppliedDocument[]; seed?: StorageState },
   ): Promise<void> {
     this.opened = { profile, headed: options.headed, documents: options.documents };
+    this.seeded = options.seed ?? null;
     this.calls.push(`open ${profile} ${options.headed ? 'headed' : 'headless'}`);
+  }
+
+  async exportState(profile: string, origins: readonly string[]): Promise<StorageState> {
+    this.calls.push(`exportState ${profile} ${origins.join(' ')}`.trimEnd());
+    return this.state;
   }
 
   async observe(): Promise<PageObservation> {
@@ -350,6 +357,19 @@ export class InMemoryLedger implements LedgerPort {
     });
   }
 
+  async liveSessionOn(
+    profile: string,
+    after: Date,
+  ): Promise<{ id: string; heartbeatAt: string } | null> {
+    const live = [...this.sessions.values()].find(
+      (s) =>
+        s.profile === profile &&
+        s.status === 'running' &&
+        Date.parse(s.heartbeatAt) > after.getTime(),
+    );
+    return live === undefined ? null : { id: live.id, heartbeatAt: live.heartbeatAt };
+  }
+
   async listSessions(limit: number): Promise<BrowserSessionDto[]> {
     return [...this.sessions.values()]
       .sort((a, b) => b.startedAt.localeCompare(a.startedAt))
@@ -429,46 +449,5 @@ export class ScriptedOperator implements OperatorPort {
 
   notify(text: string): void {
     this.notices.push(text);
-  }
-}
-
-/** A dump that keeps its files in memory, by path. */
-export class InMemoryDumpStore implements DumpStore {
-  readonly files = new Map<string, string | Uint8Array>();
-  readonly index: string[] = [];
-  readonly runId = 'fake-session-dump';
-  /** How many sessions opened a folder here: a refused session opens none. */
-  opened = 0;
-
-  open(): DumpSink {
-    this.opened += 1;
-    return {
-      runId: this.runId,
-      write: (files: readonly (DumpFile | DumpBytes)[]) => {
-        for (const file of files) {
-          this.files.set(file.path, 'bytes' in file ? file.bytes : file.content);
-        }
-      },
-      index: (row: string) => {
-        this.index.push(row);
-      },
-    };
-  }
-
-  text(path: string): string {
-    const file = this.files.get(path);
-    if (typeof file !== 'string') throw new Error(`no text file ${path} in the fake dump`);
-    return file;
-  }
-}
-
-/** Goals by path, hashed the way the filesystem source hashes them. */
-export class InMemoryGoalSource implements GoalSource {
-  constructor(private readonly documents: Record<string, string>) {}
-
-  async read(path: string): Promise<{ path: string; markdown: string; hash: string }> {
-    const markdown = this.documents[path];
-    if (markdown === undefined) throw new Error(`no goal at ${path}`);
-    return { path, markdown, hash: createHash('sha256').update(markdown).digest('hex') };
   }
 }

@@ -17,7 +17,7 @@ jobs:
 
     services:
       postgres:
-        image: postgres:16-alpine
+        image: pgvector/pgvector:0.8.0-pg16
         env:
           POSTGRES_USER: admin
           POSTGRES_PASSWORD: admin
@@ -29,12 +29,6 @@ jobs:
           --health-interval 5s
           --health-timeout 3s
           --health-retries 10
-      qdrant:
-        image: qdrant/qdrant:v1.19.1
-        env:
-          QDRANT__TELEMETRY_DISABLED: 'true'
-        ports:
-          - 6333:6333
 
     env:
       DB_HOST: localhost
@@ -46,7 +40,6 @@ jobs:
       # (packages/db/src/testing/test-database.ts). `db:migrate` and the
       # harnesses create it on the service's server.
       DB_NAME: sysdesign_test
-      QDRANT_URL: http://localhost:6333
       NEXT_TELEMETRY_DISABLED: '1'
 
     steps:
@@ -125,22 +118,105 @@ jobs:
           retention-days: 7
           if-no-files-found: ignore
 
+  image-matrix:
+    # The image matrix, from the one declaration of what is deployed
+    # (infra/aws/apps.json) through the one script the deploy workflow derives
+    # its matrix with, so CI and the deploy build the same images the same way
+    # and neither names an image (tooling/aws-deploy.spec.ts holds both to it).
+    # CI alone adds the declaration's local-only Nest apps, the ones that run on
+    # the laptop and never deploy: the bare-checkout guard covers every app.
+    name: Image matrix
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      images: ${{ steps.matrix.outputs.images }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Derive the image matrix from infra/aws/apps.json
+        id: matrix
+        run: echo "images=$(node infra/aws/bin/image-matrix.js --with-local-only)" >> "$GITHUB_OUTPUT"
+
   images:
     # Regression guard for the "builds from a bare checkout" guarantee: no
-    # host-side dist/, no lockfile drift, every image always constructible.
-    name: Docker images
-    runs-on: ubuntu-latest
+    # host-side dist/, no lockfile drift, every image — deployed or local-only —
+    # always constructible. Built for the runner's own platform and never
+    # pushed; the deploy workflow builds the ARM images it ships with the same
+    # matrix entry.
+    name: Docker image ${{ matrix.image }}
+    needs: image-matrix
+    runs-on: ubuntu-24.04
     timeout-minutes: 20
+    permissions:
+      contents: read
     strategy:
-      matrix:
-        app: [studio-api, quality-loop, govcon, notifications, job-application]
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.image-matrix.outputs.images) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
-      - name: Build ${{ matrix.app }}
-        run: docker build -f docker/nest-app.Dockerfile --build-arg APP=${{ matrix.app }} -t ${{ matrix.app }}:ci .
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          target: ${{ matrix.target }}
+          build-args: ${{ matrix.build_args }}
+          provenance: false
+          push: false
+
+  infra:
+    # The CloudFormation templates, linted and held to the repository's guard
+    # rules before any of them can deploy: what `pnpm aws:lint` runs, with both
+    # tools pinned (docs/aws/deployment.md).
+    name: Infrastructure templates
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    env:
+      CFN_LINT_VERSION: 1.46.0
+      CFN_GUARD_VERSION: 3.2.1
+      # sha256 of release 3.2.1's cfn-guard-v3-x86_64-ubuntu-latest.tar.gz, read 2026-11-11.
+      CFN_GUARD_SHA256: 09c2b8cfd81d513374a8da89d4805dc55006a3da52bbf598e272022d4d198e94
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: '3.12'
+
+      - name: Install cfn-lint
+        run: python -m pip install --disable-pip-version-check "cfn-lint==$CFN_LINT_VERSION"
+
+      # The release binary, by version and checksum: the official GitHub action
+      # still runs on node20, which the runners dropped on 2026-09-23.
+      - name: Install cfn-guard
+        run: |
+          archive="$RUNNER_TEMP/cfn-guard.tar.gz"
+          curl --fail --silent --show-error --location --output "$archive" \
+            "https://github.com/aws-cloudformation/cloudformation-guard/releases/download/$CFN_GUARD_VERSION/cfn-guard-v3-x86_64-ubuntu-latest.tar.gz"
+          echo "$CFN_GUARD_SHA256  $archive" | sha256sum --check --strict
+          tar -xzf "$archive" -C "$RUNNER_TEMP"
+          echo "$RUNNER_TEMP/cfn-guard-v3-x86_64-ubuntu-latest" >> "$GITHUB_PATH"
+
+      - name: Lint the templates
+        run: cfn-lint infra/aws/*.yaml
+
+      - name: Hold the templates to the guard rules
+        run: |
+          for template in infra/aws/*.yaml; do
+            cfn-guard validate --rules infra/aws/guard/sysdesign.guard --data "$template" --show-summary fail
+          done
 
   review:
     name: Code review

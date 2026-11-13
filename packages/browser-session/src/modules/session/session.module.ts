@@ -1,4 +1,10 @@
 import {
+  GetObjectCommand,
+  ListObjectsV2Command,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
+import {
   Inject,
   Injectable,
   Logger,
@@ -21,12 +27,14 @@ import { MemoryLoopBrain } from '../../adapters/memory-loop/memory-loop-brain';
 import { MikroOrmLedger } from '../../adapters/mikro-orm/mikro-orm-ledger';
 import { BusSessionEvents } from '../../adapters/notifications-http/bus-session-events';
 import { NotificationsOperator } from '../../adapters/notifications-http/notifications-operator';
-import { CHROME_CHANNEL, PlaywrightBrowser } from '../../adapters/playwright/playwright-browser';
+import { localSessionFiles } from '../../adapters/local-files/local-session-files';
+import { PlaywrightBrowser } from '../../adapters/playwright/playwright-browser';
+import { s3SessionFiles, type SendCommand } from '../../adapters/s3-files/s3-session-files';
 import { TerminalOperator } from '../../adapters/terminal-operator/terminal-operator';
-import { SESSION_FLAGS, type SessionConfig } from '../../config';
+import { NO_PROFILE_BUCKET, SESSION_FLAGS, type SessionConfig } from '../../config';
 import { FirstAnswer } from '../../core/first-answer';
 import { SESSION_KIND } from '../../core/identity';
-import type { BrainPort, Clock, OperatorChannel, StopSignal } from '../../core/ports';
+import type { BrainPort, Clock, OperatorChannel, SessionFiles, StopSignal } from '../../core/ports';
 import { SessionRefused, type ConfiguredAdvisor } from '../../core/unit-advice';
 import type { BrainSettings } from '../../settings';
 import { SessionService } from './session.service';
@@ -41,6 +49,7 @@ import {
   OPERATOR,
   SESSION_CONFIG,
   SESSION_EVENTS,
+  SESSION_FILES,
   STOP_SIGNAL,
   TERMINAL,
   UNIT_ADVISORS,
@@ -177,6 +186,38 @@ function memoryClientProviders(config: SessionConfig): Provider[] {
   ];
 }
 
+/**
+ * Where the profiles, the exported sign-in states and the documents live
+ * between runs: on this disk, or in the bucket the environment names, reached
+ * through the SDK's client — which reads its region and credentials from the
+ * task's environment, as the SDK does. What moved is said where the session's
+ * own progress is said.
+ */
+function sessionFilesOf(config: SessionConfig, log: (text: string) => void): SessionFiles {
+  if (config.profileBucket === NO_PROFILE_BUCKET) return localSessionFiles();
+  return s3SessionFiles({
+    bucket: config.profileBucket,
+    profilesDir: config.profilesDir,
+    docsDir: config.docsDir,
+    send: sendThrough(new S3Client({})),
+    log,
+  });
+}
+
+/**
+ * The client's `send`, one call per command class: the client's generic takes
+ * one command type, never the union of the four. A put answers nothing the
+ * adapter reads.
+ */
+const sendThrough =
+  (client: S3Client): SendCommand =>
+  (command) => {
+    if (command instanceof GetObjectCommand) return client.send(command);
+    if (command instanceof PutObjectCommand) return client.send(command).then(() => ({}));
+    if (command instanceof ListObjectsV2Command) return client.send(command);
+    return client.send(command);
+  };
+
 /** The terminal's reader released at shutdown, so the process ends as it would without one. */
 @Injectable()
 class TerminalLifecycle implements OnModuleDestroy {
@@ -232,12 +273,18 @@ export class SessionModule {
           useFactory: () =>
             new PlaywrightBrowser({
               profilesDir: config.profilesDir,
-              channel: CHROME_CHANNEL,
+              channel: config.channel,
               observe: config.settings.observe,
             }),
         },
         { provide: LEDGER, useClass: MikroOrmLedger },
         { provide: TERMINAL, useFactory: () => new TerminalOperator() },
+        {
+          provide: SESSION_FILES,
+          useFactory: (terminal: TerminalOperator) =>
+            sessionFilesOf(config, (text) => terminal.notify(text)),
+          inject: [TERMINAL],
+        },
         {
           provide: OPERATOR,
           useFactory: (terminal: TerminalOperator) =>

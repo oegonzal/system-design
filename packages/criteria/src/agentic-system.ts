@@ -25,7 +25,7 @@ export const AGENTIC_SYSTEM_CRITERIA: readonly Criterion[] = [
   {
     id: 'AGS-5',
     statement:
-      'Every variable the service reads is declared once with its default and read nowhere else — QDRANT_URL among them, and the embedding client built in that same read by the llm package’s own factory, disabled without a key — and the design and memory settings come from the package config, the memory policy beside its sweep schedule and named by the choice it was read under, a root whose engine.json leaves either kind unchosen refused at boot by name.',
+      'Every variable the service reads is declared once with its default and read nowhere else — the port and the two service URLs, no store of its own since the vector index is a table in the database the db package names, and the embedding client built in that same read by the llm package’s own factory, disabled without a key — and the design and memory settings come from the package config, the memory policy beside its sweep schedule and named by the choice it was read under, a root whose engine.json leaves either kind unchosen refused at boot by name.',
   },
   {
     id: 'AGS-6',

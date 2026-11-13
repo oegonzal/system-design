@@ -8,7 +8,7 @@ import {
 } from '@sysdesign/contracts';
 
 import type { CapturePolicy } from './engine-context';
-import type { StopSignal, SuppliedDocument } from './ports';
+import type { LoopProbe, StopSignal, SuppliedDocument } from './ports';
 import { runSession, type SessionOutcome } from './session-engine';
 import {
   FakeBrowser,
@@ -16,7 +16,9 @@ import {
   InMemoryGoalSource,
   InMemoryLedger,
   RecordingEvents,
+  RecordingSessionFiles,
   ScriptedBrain,
+  ScriptedLoopProbe,
   ScriptedOperator,
   type BrainScript,
 } from './testing';
@@ -100,6 +102,12 @@ export interface Scenario {
   startUrl?: string;
   /** The files supplied for the documents the mission declares; none unless a scenario says. */
   documents?: readonly SuppliedDocument[];
+  /** The session's files beyond this machine; a recording no-op unless a scenario says. */
+  files?: RecordingSessionFiles;
+  /** The loop as the session probes it before binding; one that answers at once unless a scenario says. */
+  loop?: LoopProbe;
+  /** How long the session waits for the loop; none unless a scenario says. */
+  waitForLoopMinutes?: number;
   capture?: CapturePolicy;
   /** How many times a refused answer is put back; the shipped settings' once unless a scenario says. */
   asksAfterRefusal?: number;
@@ -121,6 +129,7 @@ export async function runScripted(scenario: Scenario) {
   const dumps = scenario.dumps ?? new InMemoryDumpStore();
   const events = scenario.events ?? new RecordingEvents();
   const stop = scenario.stop ?? new FakeStopSignal();
+  const files = scenario.files ?? new RecordingSessionFiles();
   const warnings: string[] = [];
   const logs: string[] = [];
   const outcome: SessionOutcome = await runSession(
@@ -136,6 +145,8 @@ export async function runScripted(scenario: Scenario) {
       advisors: scenario.advisors ?? [],
       events,
       stop,
+      files,
+      loop: scenario.loop ?? new ScriptedLoopProbe(),
       warn: (text) => warnings.push(text),
       log: (text) => logs.push(text),
     },
@@ -156,9 +167,23 @@ export async function runScripted(scenario: Scenario) {
       untaught: scenario.untaught ?? [],
       answering: scenario.answering ?? answeringFixture(['inferred']),
       settingsSources: {},
+      waitForLoopMinutes: scenario.waitForLoopMinutes ?? 0,
     },
   );
   const detail = await ledger.getSession(outcome.sessionId);
   if (detail === null) throw new Error('the session row is gone');
-  return { outcome, browser, brain, ledger, operator, dumps, events, stop, warnings, logs, detail };
+  return {
+    outcome,
+    browser,
+    brain,
+    ledger,
+    operator,
+    dumps,
+    events,
+    stop,
+    files,
+    warnings,
+    logs,
+    detail,
+  };
 }

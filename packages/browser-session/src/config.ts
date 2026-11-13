@@ -32,6 +32,15 @@ import type { SessionSettings } from './settings';
  * memories in a space asks the host at `AGENTIC_SYSTEM_URL`, for the tenant
  * `MEMORY_TENANT` names — the settings say which brain, the environment only
  * where and for whom.
+ *
+ * Where the session runs beyond this machine, three more rows say how:
+ * `BROWSER_CHANNEL` which browser opens the profile — the Chrome installed on
+ * this machine, or the Chromium Playwright bundles, the one build Linux arm64 has —
+ * `BROWSER_PROFILE_BUCKET` the bucket the profiles, the exported sign-in
+ * states and the documents move through between runs, and
+ * `BROWSER_SESSION_DOCS_DIR` where those documents land; and a run may take
+ * its arguments from a launch file by name (`--launch`) and wait for the loop
+ * to wake before it binds (`--wait-for-loop`).
  */
 
 /** The package itself — `dist/..` as built, `src/..` under test — whose `config/` holds the settings. */
@@ -44,7 +53,7 @@ export const SESSION_FLAGS = {
   url: {
     name: '--url',
     valued: true,
-    help: 'where to open the browser: the sign-in page for login, the start page for run',
+    help: 'where to open the browser: the sign-in page for login, the start page for run; for export-state, a site whose local storage travels with the cookies',
   },
   headed: { name: '--headed', valued: false, help: 'show the browser' },
   headless: { name: '--headless', valued: false, help: 'run without a window' },
@@ -108,7 +117,21 @@ export const SESSION_FLAGS = {
     valued: true,
     help: 'close this many of the records a replay recalled, in the tenant replayed against, and recall again: the retraction measure; none unless given',
   },
-  out: { name: '--out', valued: true, help: 'the folder a replay writes its report under' },
+  out: {
+    name: '--out',
+    valued: true,
+    help: 'where to write: the folder a replay writes its report under, the file an export writes the state to',
+  },
+  launch: {
+    name: '--launch',
+    valued: true,
+    help: 'a launch file under launches/, by name: its goal, profile, url, documents and limits stand where no flag does',
+  },
+  waitForLoop: {
+    name: '--wait-for-loop',
+    valued: true,
+    help: 'minutes to wait for the loop to answer before the session binds, asked every 5 s and refused when it stays silent; 0 waits not at all',
+  },
 } as const;
 export type SessionFlag = keyof typeof SESSION_FLAGS;
 
@@ -122,10 +145,24 @@ export const SESSION_ENV = {
   advisors: { name: 'UNIT_ADVISOR_URLS', fallback: 'none' },
   memoryUrl: { name: 'AGENTIC_SYSTEM_URL', fallback: 'http://localhost:3007' },
   memoryTenant: { name: 'MEMORY_TENANT', fallback: 'none' },
+  channel: { name: 'BROWSER_CHANNEL', fallback: 'chrome' },
+  profileBucket: { name: 'BROWSER_PROFILE_BUCKET', fallback: 'none' },
+  docsDir: { name: 'BROWSER_SESSION_DOCS_DIR', fallback: 'docs/ingestion' },
 } as const;
 
 /** The value that configures no advisor: a mission naming one is then refused by name, never run blind. */
 export const NO_ADVISORS = 'none';
+
+/**
+ * The browsers a session may drive: the Chrome installed on this machine, or
+ * the Chromium Playwright bundles — the one build that runs on Linux arm64,
+ * where no Chrome ships, and the cloud image's choice.
+ */
+export const BROWSER_CHANNELS = ['chrome', 'chromium'] as const;
+export type BrowserChannel = (typeof BROWSER_CHANNELS)[number];
+
+/** The value that names no bucket: the profiles and the documents are then this machine's, moved nowhere. */
+export const NO_PROFILE_BUCKET = 'none';
 
 /**
  * The value that names no tenant: a brain that keeps memories in a space is
@@ -150,6 +187,12 @@ export interface SessionEnv {
   memoryUrl: string;
   /** The tenant that brain reads and writes for — the partition every request names; `none` when nobody chose one. */
   memoryTenant: string;
+  /** Which browser opens the profile; `chromium` in the cloud image, where Chrome has no Linux arm64 build. */
+  channel: BrowserChannel;
+  /** The S3 bucket the profiles, the exported sign-in states and the documents move through between runs; `none` keeps them on this disk. */
+  profileBucket: string;
+  /** Where a launch file's documents are read from, and where a bucket's `docs/` objects are written before a run. */
+  docsDir: string;
 }
 
 /**
@@ -189,6 +232,21 @@ const url = (env: NodeJS.ProcessEnv, variable: { name: string; fallback: string 
     throw new SessionConfigError(`${variable.name} must be a URL, got ${JSON.stringify(value)}`);
   }
   return value;
+};
+
+/** A variable that must name one of the declared browsers, or a refusal naming it. */
+const channel = (
+  env: NodeJS.ProcessEnv,
+  variable: { name: string; fallback: string },
+): BrowserChannel => {
+  const value = nonEmpty(env, variable);
+  const known = BROWSER_CHANNELS.find((candidate) => candidate === value);
+  if (known === undefined) {
+    throw new SessionConfigError(
+      `${variable.name} must be ${BROWSER_CHANNELS.join(' or ')}, got ${JSON.stringify(value)}`,
+    );
+  }
+  return known;
 };
 
 /** `<id>=<url>`: whatever stands before the first `=` with no sign of being a URL itself is the id, held to the mission's grammar below. */
@@ -254,7 +312,21 @@ export function sessionConfigFromEnv(env: NodeJS.ProcessEnv = process.env): Sess
     advisors: advisorEntries(env, SESSION_ENV.advisors),
     memoryUrl: url(env, SESSION_ENV.memoryUrl),
     memoryTenant: nonEmpty(env, SESSION_ENV.memoryTenant),
+    channel: channel(env, SESSION_ENV.channel),
+    profileBucket: nonEmpty(env, SESSION_ENV.profileBucket),
+    docsDir: nonEmpty(env, SESSION_ENV.docsDir),
   };
+}
+
+/** A flag's value as a whole number of minutes — none meaning no wait — or a refusal naming the flag. */
+export function minutesOf(raw: string | undefined, flag: SessionFlag): number {
+  if (raw === undefined) return 0;
+  if (!/^\d+$/.test(raw.trim())) {
+    throw new SessionConfigError(
+      `${SESSION_FLAGS[flag].name} must be a whole number of minutes, got ${JSON.stringify(raw)}`,
+    );
+  }
+  return Number(raw);
 }
 
 /** A flag's value as a positive integer, or a refusal naming the flag. */

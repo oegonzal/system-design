@@ -39,7 +39,11 @@ function collectSpecFiles(dir: string, found: string[] = []): string[] {
 }
 
 describe('criteria coverage', () => {
-  const specs = collectSpecFiles(join(WORKSPACE, 'packages'));
+  // The packages, and the repo-wide gates under tooling/, which claim what they prove too.
+  const specs = [
+    ...collectSpecFiles(join(WORKSPACE, 'packages')),
+    ...collectSpecFiles(join(WORKSPACE, 'tooling')),
+  ];
   const corpus = specs.map((path) => readFileSync(path, 'utf8')).join('\n');
 
   it('finds a meaningful number of spec files to scan', () => {

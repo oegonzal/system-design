@@ -18,8 +18,11 @@ async function bootstrap(): Promise<void> {
     console.error(error);
     process.exit(1);
   });
-  const settings = readSettings(PACKAGE_ROOT);
-  const config = notificationsConfigFromEnv(settings, CHANNEL_DEFINITIONS);
+  const config = notificationsConfigFromEnv(
+    (choices) => readSettings(PACKAGE_ROOT, undefined, choices),
+    CHANNEL_DEFINITIONS,
+  );
+  const { settings } = config;
   const app = await NestFactory.create(AppModule.register(config));
   // SIGTERM/SIGINT release waiting pulls, stop the channels and close the pool.
   app.enableShutdownHooks();

@@ -26,48 +26,74 @@ volume** — which is what the durable local stack guarantees.
 
 There is one local stack, whichever launcher starts it:
 
-- **The stores.** The `docker-compose` services are the one definition of
-  each: `db` (image `postgres:16-alpine`, **named volume** `sysdesign-pgdata`,
-  host port **5433**) and `vectors` (Qdrant, image `qdrant/qdrant:v1.19.1`,
-  **named volume** `sysdesign-qdrant`, host port **6333**, `QDRANT_URL`), both
-  `restart: unless-stopped`. `pnpm stack:db` brings them up and waits until
-  both answer (`pg_isready`, then `GET /readyz` on Qdrant); both launchers
-  begin with that same step.
+- **The store.** The `docker-compose` service `db` is the one definition of
+  the database: image `sysdesign/postgres-pgvector:16-0.8.0`, which compose
+  builds from `docker/postgres-pgvector.Dockerfile` (`postgres:16-alpine` plus
+  the pgvector 0.8.0 extension, so the memory tier's vector tables sit beside
+  every other table), **named volume** `sysdesign-pgdata`, host port
+  **5433**, `restart: unless-stopped`. `pnpm stack:db` brings it up — the
+  first time it builds the image, under a minute (17 s measured on
+  2026-11-11) — and waits until it answers (`pg_isready`); both launchers
+  begin with that same step. The image stays Alpine because the volume was
+  initialised by the Alpine image: a glibc server on the same files would
+  mis-sort the text indexes (collation), so there is no `REINDEX` and no
+  dump-and-restore to do. A change to the Dockerfile needs
+  `docker compose build db`; `up` reuses the tagged image.
 - **The schema and reference data.** `pnpm db:migrate` applies any pending
   migrations and `pnpm db:seed` re-seeds the reference experiences; both are
   idempotent, and the seed never touches your sessions.
 - **The apps.** The API (3000), the quality loop (3003), govcon (3004),
   notifications (3005), job-application (3006), agentic-system (3007), gmail
   (3008), google-calendar (3009) and the three web clients (4200, 4201, 4202)
-  find the stores and one another at their defaults, so no connection variable
+  find the store and one another at their defaults, so no connection variable
   is set.
 
 The launchers differ only in where the apps run:
 
 ```bash
 # from the repo root, with the repo's Node on PATH
-pnpm stack:up   # stores → migrate → seed → the API, the loop and the studio UI as local processes
-tilt up         # stores → migrate → seed → the API, the loop, govcon and notifications as pods; the web clients locally
+pnpm stack:up   # store → migrate → seed → the API, the loop and the studio UI as local processes
+tilt up         # store → migrate → seed → the API, the loop, govcon and notifications as pods; the web clients locally
 ```
 
 `pnpm stack:up` runs `scripts/stack.sh` and keeps the studio in the
 foreground (Ctrl-C stops it); `pnpm govcon:start` and
 `pnpm quality-loop-ui:serve` add the rest. Its loop runs on this machine's
-Claude Code login. Under `tilt up` the pods reach the stores on the host
+Claude Code login. Under `tilt up` the pods reach the store on the host
 through `host.docker.internal` (the `local-stores` ConfigMap in
 `tilt/stores/`), and `tilt down` removes the pods and the dev servers but
-never stops the stores — so either launcher shows the same runs.
+never stops the store — so either launcher shows the same runs.
 
-`pnpm stack:down` stops both containers; the data stays in the named volumes.
-The quality loop's memory runs need the vector store and, for live
+`pnpm stack:down` stops the container; the data stays in the named volume.
+The quality loop's memories are pgvector tables in that same database (the
+`vector` extension by migration, one table per collection created at the
+loop's boot), so a memory run needs nothing but the database and, for live
 embeddings, `OPENAI_API_KEY` in `.env` (Node loads the file on `serve` and
 `quality-loop:run`; under Tilt it rides in the loop's Secret, below); without
-either, memory steps skip with a stated reason and the target pipeline still
+the key, memory steps skip with a stated reason and the target pipeline still
 runs.
 
-Because the volumes are named and the containers have `restart: unless-stopped`,
-the database and the vector store return on their own after a Docker or machine
-restart; either launcher then just re-attaches the apps. Your sessions are
+Until 2026-11-12 the memories lived in a Qdrant container (`sysdesign-vectors`,
+compose service `vectors`, volume `sysdesign-qdrant`). A checkout that still
+has it carries the quality loop's collection over once, after
+`pnpm stack:db && pnpm db:migrate` has started and migrated the database (not
+`pnpm stack:up`, which goes on to run the apps in the foreground, so nothing
+typed after it runs): `pnpm memory:import-qdrant` scrolls the collection and
+writes every point into the pgvector table with its id kept (the
+`memory_support` rows point at those ids). The old container must still be
+running — `docker ps --filter name=sysdesign-vectors` lists it; if it is gone,
+its volume brings it back:
+`docker run --rm -d --name sysdesign-vectors -p 127.0.0.1:6333:6333 -v system-design-prep_sysdesign-qdrant:/qdrant/storage qdrant/qdrant:v1.19.1`.
+agentic-memory's index needs no import — its truth is `memory_record`, and the
+sweep re-projects it into the new collection. After the import the old
+container (under its own restart rule, or under `--rm` above) and its volume
+can go by hand: `docker rm -f sysdesign-vectors`, then
+`docker volume rm system-design-prep_sysdesign-qdrant` (compose prefixed the
+volume with the project name; `docker volume ls` shows it).
+
+Because the volume is named and the container has `restart: unless-stopped`,
+the database returns on its own after a Docker or machine restart; either
+launcher then just re-attaches the apps. Your sessions and memories are
 exactly where you left them.
 
 ## Grading needs a model
@@ -729,7 +755,14 @@ Telegram takes one poller per bot token: run the service under Tilt or with
 `pnpm notifications:serve`, never both at once — the second is refused, and
 the service logs it and waits. Two bots bound to one token refuse boot for
 the same reason. A prompt nobody withdraws expires at the time
-its asker gave it; the bot then edits its message to say so.
+its asker gave it; the bot then edits its message to say so. A deployment that
+must not poll these bots runs `config/channels/telegram-cloud.json` instead
+(`NOTIFICATIONS_CHANNELS=telegram-cloud`): two instances, `telegram.govcon` and
+`telegram.job-application`, bound to the same variable names, which the studio
+on AWS fills from SSM — a govcon bot of its own, and the job-application bot
+that moves to the cloud with the browser session, so its instance comes out of
+this file at cutover (`docs/aws/deployment.md`, setup step 4 and "Moving the
+laptop's data and lanes to the cloud").
 
 ## Your mailbox and calendar as tools: the Google services
 
@@ -820,3 +853,46 @@ recipe, with what to read after each step, is
 - One-time migration of pre-existing runs into the named volume:
   `docker exec <old-container> pg_dump -U admin -d sysdesign --clean --if-exists`
   piped into `psql postgresql://admin:admin@localhost:5433/sysdesign`.
+- On AWS (`docs/aws/deployment.md`) the secrets reach the task through SSM
+  parameters under `/sysdesign/prod/`, read by ARN when the task starts and
+  never set as plain environment (`tooling/aws-deploy.spec.ts` and the guard
+  rules hold every token-, key-, password- or secret-named variable to
+  `Secrets`). A value replaced in SSM reaches the containers only with a new
+  task: `pnpm aws:sleep && pnpm aws:wake`. The database password is the
+  exception: the cluster reads a named version of it, so a rotation is
+  `put-parameter --overwrite` (a new version N), then
+  `aws.sh deploy-stack data DbPasswordVersion=N`, then the sleep and wake —
+  in that order, and with `DbPasswordVersion` committed in
+  `infra/aws/params/prod/data.json`, or the next deploy sets version 1 back.
+- The cloud loop runs on a `claude setup-token` token that lasts about a year;
+  the yearly renewal is the same `put-parameter --overwrite` plus a sleep and
+  a wake. The boot check proves the token is present and the subscription's,
+  not that it is still valid, so an expired one shows as failed model calls
+  (the recorded exchange carries `authentication_failed`), not as a container
+  that refuses to start, and `/health` never re-checks it — put the reminder
+  in the calendar eleven months out.
+- The idle function never stops a running run: every five minutes it reads
+  the gateway's invocations over the last 15 minutes and, when there were
+  none twice in a row (the first quiet run only writes
+  `/sysdesign/prod/idle-state`; CloudWatch's metric arrives minutes late, so
+  one empty read proves nothing), asks the loop
+  `GET /runs?status=running&limit=1`; only `meta.total` 0 stops the task, and
+  a loop that cannot be asked keeps it. So a sleep comes 20–25 minutes after
+  the last request, never 15. A deploy, or `pnpm aws:sleep`, while a run is
+  in flight does lose it.
+- The cloud loop's dumps land on EFS, mounted at `/app/static/runs`, and
+  outlive every sleep. ECS Exec (`pnpm aws:exec`) is a terminal, not a file
+  channel: copy a run out with `tar -czf - <run id> | base64` inside the
+  session and `base64 -d | tar -xzf -` here.
+- Telegram's one-poller rule now has a cloud side: the cloud notifications
+  runs `channels/telegram-cloud.json` — a govcon bot of its own, its token in
+  `/sysdesign/prod/notifications/GOVCON_TELEGRAM_API_KEY`, and the
+  job-application bot, whose token moves to
+  `/sysdesign/prod/notifications/JOBAPPLICATION_TELEGRAM_API_KEY` and whose
+  instance leaves this machine's `telegram.json`. Give the cloud the token of a
+  bot this machine still polls and both services conflict (409) and wait.
+- Through the edge a request has 120 s (CloudFront's origin read timeout, the
+  most the account allows without a quota request; the gateway's 110 s
+  upstream timeout under it). The five studio-api routes that
+  derive a rubric synchronously can exceed it (measured 8–61 s, once 195 s);
+  the derivation still completes and is stored, and a reload shows it.

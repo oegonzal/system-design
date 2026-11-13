@@ -10,11 +10,13 @@ import {
 } from '@sysdesign/contracts';
 import { chromium, type BrowserContext, type Locator, type Page } from 'playwright';
 
+import type { BrowserChannel } from '../../config';
 import {
   ActionFailed,
   type BrowserAction,
   type BrowserPort,
   type PagesClosed,
+  type StorageState,
   type SuppliedDocument,
 } from '../../core/ports';
 import { performAction } from './action-performer';
@@ -46,12 +48,24 @@ import { actionFailureOf } from './playwright-errors';
  */
 export interface PlaywrightBrowserOptions {
   profilesDir: string;
-  /** `chrome` for the installed Chrome; undefined for the Chromium Playwright bundles (the specs). */
-  channel: string | undefined;
+  /**
+   * `chrome` for the Chrome installed on this machine; `chromium` for the Chromium
+   * Playwright bundles as a full browser — the cloud image's choice, since no
+   * Chrome runs on Linux arm64; undefined for the same bundles' headless
+   * shell (the specs).
+   */
+  channel: BrowserChannel | undefined;
   observe: ObservePolicy;
 }
 
-export const CHROME_CHANNEL = 'chrome';
+/**
+ * The window a headless browser opens. Chromium's headless default is
+ * 800×600, and the goals are written against the desktop layouts a laptop
+ * window shows — a listing beside the item it opened, a page of cards — which
+ * a window that small folds away. A desktop size, then; the page follows the
+ * window (no emulated viewport) headless as it does headed.
+ */
+const HEADLESS_WINDOW_ARGS = ['--window-size=1440,900'];
 
 /**
  * How the browser is launched. The session owns its own end: Ctrl-C and a
@@ -69,9 +83,13 @@ export const launchOptions = (
   channel: options.channel,
   headless: !headed,
   viewport: null,
+  args: headed ? [] : HEADLESS_WINDOW_ARGS,
   handleSIGINT: false,
   handleSIGTERM: false,
 });
+
+/** What an export serves for each origin it visits: a page with nothing on it, from this machine. */
+const BLANK_PAGE = '<!doctype html><html><head><title>export</title></head><body></body></html>';
 
 export class PlaywrightBrowser implements BrowserPort {
   private context: BrowserContext | null = null;
@@ -94,16 +112,53 @@ export class PlaywrightBrowser implements BrowserPort {
 
   async open(
     profile: string,
-    { headed, documents }: { headed: boolean; documents: readonly SuppliedDocument[] },
+    {
+      headed,
+      documents,
+      seed,
+    }: { headed: boolean; documents: readonly SuppliedDocument[]; seed?: StorageState },
   ): Promise<void> {
     this.documents = new Map(documents.map((document) => [document.name, document.path]));
     this.context = await chromium.launchPersistentContext(
       join(this.options.profilesDir, profile),
       launchOptions(this.options, headed),
     );
+    // A sign-in exported elsewhere, set into the profile: it clears and
+    // replaces every cookie, local storage and IndexedDB entry the profile
+    // holds, so only a fresh profile is ever given one.
+    if (seed !== undefined) await this.context.setStorageState(seed);
     this.context.setDefaultTimeout(this.options.observe.actionTimeoutMs);
     if (this.context.pages().length === 0) await this.context.newPage();
     this.kept = new Set(this.context.pages());
+  }
+
+  /**
+   * The profile's sign-in state — cookies, local storage and IndexedDB —
+   * read from the profile opened headless on its own and closed again: what
+   * seeds a fresh profile on another machine, where the profile's own cookie
+   * files would not decrypt. Playwright reports the local storage and
+   * IndexedDB of the origins the context has visited and no other (the
+   * cookies come whole from the profile's store), so each site named is
+   * visited first, on a blank page the export serves itself: no request
+   * leaves this machine.
+   */
+  async exportState(profile: string, origins: readonly string[]): Promise<StorageState> {
+    const context = await chromium.launchPersistentContext(
+      join(this.options.profilesDir, profile),
+      launchOptions(this.options, false),
+    );
+    try {
+      const page = context.pages()[0] ?? (await context.newPage());
+      for (const origin of origins) {
+        await page.route(`${origin}/**`, (route) =>
+          route.fulfill({ contentType: 'text/html', body: BLANK_PAGE }),
+        );
+        await page.goto(`${origin}/`);
+      }
+      return await context.storageState({ indexedDB: true });
+    } finally {
+      await context.close();
+    }
   }
 
   /** The page in front: the newest, so a link that opened a tab is followed. */

@@ -19,14 +19,14 @@ const JOURNEY = {
   lines: ['Yes'],
 };
 
-/** A session another process opened, which last beat at `lastBeat`. */
-const leftRunning = (id: string, lastBeat: Date): NewSession => ({
+/** A session another process opened on `profile`, which last beat at `lastBeat`. */
+const leftRunning = (id: string, lastBeat: Date, profile = 'spec'): NewSession => ({
   id,
   dumpRunId: `dump-${id}`,
   goalPath: 'goals/test.md',
   goalHash: 'h',
   goalMarkdown: '# another mission',
-  profile: 'spec',
+  profile,
   subject: SPEC_SUBJECT,
   headed: false,
   limits: SPEC_RAILS,
@@ -37,7 +37,8 @@ describe('a session that starts', () => {
   it('[BRW-19] closes every session another process left running and then stopped beating for, as interrupted and finished at its last beat, says so, and never touches one alive beside it', async () => {
     const ledger = new InMemoryLedger();
     await ledger.openSession(leftRunning('dead', new Date(START.getTime() - 3_600_000)));
-    await ledger.openSession(leftRunning('alive', new Date(START.getTime() - 10_000)));
+    // Alive on another profile: one alive on this profile would hold it, and refuse the session instead.
+    await ledger.openSession(leftRunning('alive', new Date(START.getTime() - 10_000), 'another'));
 
     const { outcome, logs } = await run({ ...JOURNEY, ledger });
     expect(outcome.status).toBe('complete');

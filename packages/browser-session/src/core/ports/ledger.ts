@@ -110,6 +110,13 @@ export interface LedgerPort {
    * from a stopped process overwrites the row with what ended it.
    */
   failStale(before: Date): Promise<number>;
+  /**
+   * The running session on the profile that beat after `after`, by id and
+   * last beat, or null: the lease another process holds on the profile. A
+   * row that stopped beating earlier holds nothing — the next session closes
+   * it as interrupted.
+   */
+  liveSessionOn(profile: string, after: Date): Promise<{ id: string; heartbeatAt: string } | null>;
   listSessions(limit: number): Promise<BrowserSessionDto[]>;
   getSession(id: string): Promise<BrowserSessionDetailDto | null>;
 }

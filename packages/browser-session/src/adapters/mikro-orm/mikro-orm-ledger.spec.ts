@@ -8,6 +8,7 @@ import {
   truncateTestTables,
 } from '@sysdesign/db';
 
+import { SessionRefused } from '../../core/unit-advice';
 import { MikroOrmLedger } from './mikro-orm-ledger';
 
 const RAILS = {
@@ -269,14 +270,15 @@ describe('the ledger in Postgres', () => {
   it('[BRW-19] closes as interrupted every running session whose beat is older than the line drawn, finished at its last beat, leaves one beating and one already closed as they were, and a close that later arrives from the stopped process is the record', async () => {
     await truncateTestTables(orm.em, [BrowserSession, BrowserTask, BrowserDecision]);
     const ledger = new MikroOrmLedger(orm.em);
-    const open = (id: string, startedAt: Date) =>
+    // Each on a profile of its own: the database admits one running row per profile.
+    const open = (id: string, profile: string, startedAt: Date) =>
       ledger.openSession({
         id,
         dumpRunId: `dump-${id.slice(0, 8)}`,
         goalPath: 'goals/test.md',
         goalHash: 'h',
         goalMarkdown: '# mission',
-        profile: 'spec',
+        profile,
         subject: 'Alex Example',
         headed: false,
         limits: RAILS,
@@ -285,10 +287,10 @@ describe('the ledger in Postgres', () => {
     const dead = '7c9e6679-7425-40de-944b-e07fc1f90ae7';
     const alive = '0b6c3b1a-8f2e-4c4b-9a8e-3f4b2c1d0e9f';
     const done = '5d2f1e3c-6b7a-4c8d-9e0f-1a2b3c4d5e6f';
-    await open(dead, at(0));
-    await open(alive, at(0));
+    await open(dead, 'spec', at(0));
+    await open(alive, 'another', at(0));
     await ledger.heartbeat(alive, at(170), 4);
-    await open(done, at(0));
+    await open(done, 'third', at(0));
     await ledger.closeSession(done, {
       status: 'complete',
       termination: { reason: 'target-reached', detail: 'two done' },
@@ -326,5 +328,101 @@ describe('the ledger in Postgres', () => {
       terminationDetail: 'out of time',
       finishedAt: '2026-10-03T10:06:40.000Z',
     });
+  });
+
+  it('[BRW-30] names the running session that beat on a profile after the line drawn, and none for a stale, a closed or another profile’s', async () => {
+    await truncateTestTables(orm.em, [BrowserSession, BrowserTask, BrowserDecision]);
+    const ledger = new MikroOrmLedger(orm.em);
+    const open = (id: string, profile: string) =>
+      ledger.openSession({
+        id,
+        dumpRunId: `dump-${id.slice(0, 8)}`,
+        goalPath: 'goals/test.md',
+        goalHash: 'h',
+        goalMarkdown: '# mission',
+        profile,
+        subject: 'Alex Example',
+        headed: false,
+        limits: RAILS,
+        startedAt: T0,
+      });
+    const held = '1d4c6a2e-5b3f-4a7c-9e1d-2f3a4b5c6d7e';
+    const stale = '2e5d7b3f-6c4a-4b8d-8f2e-3a4b5c6d7e8f';
+    const closed = '3f6e8c4a-7d5b-4c9e-9a3f-4b5c6d7e8f9a';
+    await open(held, 'linkedin');
+    await ledger.heartbeat(held, at(170), 3);
+    await open(stale, 'builtin');
+    await open(closed, 'smoke');
+    await ledger.heartbeat(closed, at(175), 2);
+    await ledger.closeSession(closed, {
+      status: 'complete',
+      termination: { reason: 'target-reached', detail: 'done' },
+      steps: 2,
+      finishedAt: at(180),
+      error: null,
+    });
+
+    expect(await ledger.liveSessionOn('linkedin', at(120))).toEqual({
+      id: held,
+      heartbeatAt: at(170).toISOString(),
+    });
+    expect(await ledger.liveSessionOn('builtin', at(120))).toBeNull();
+    expect(await ledger.liveSessionOn('smoke', at(120))).toBeNull();
+    expect(await ledger.liveSessionOn('other', at(120))).toBeNull();
+    // The line moved past the beat: the lease is gone.
+    expect(await ledger.liveSessionOn('linkedin', at(170))).toBeNull();
+  });
+
+  it('[BRW-34] admits one running row per profile: a second is refused by name as the session’s own refusal, another profile’s opens, and once the first is closed — by its own close or as interrupted — a new one opens', async () => {
+    await truncateTestTables(orm.em, [BrowserSession, BrowserTask, BrowserDecision]);
+    const ledger = new MikroOrmLedger(orm.em);
+    const open = (id: string, profile: string) =>
+      ledger.openSession({
+        id,
+        dumpRunId: `dump-${id.slice(0, 8)}`,
+        goalPath: 'goals/test.md',
+        goalHash: 'h',
+        goalMarkdown: '# mission',
+        profile,
+        subject: 'Alex Example',
+        headed: false,
+        limits: RAILS,
+        startedAt: T0,
+      });
+    const first = '4a7f9d5b-8e6c-4d0f-8b4a-5c6d7e8f9a0b';
+    const second = '5b8a0e6c-9f7d-4e1a-9c5b-6d7e8f9a0b1c';
+    const other = '6c9b1f7d-0a8e-4f2b-8d6c-7e8f9a0b1c2d';
+    const third = '7d0c2a8e-1b9f-4a3c-9e7d-8f9a0b1c2d3e';
+    const fourth = '8e1d3b9f-2c0a-4b4d-8f8e-9a0b1c2d3e4f';
+    await open(first, 'linkedin');
+
+    const refused = open(second, 'linkedin');
+    await expect(refused).rejects.toThrow(SessionRefused);
+    await expect(refused).rejects.toThrow(
+      'profile linkedin is held by another session whose row was written first: one session per profile — wait for it to end, or stop it',
+    );
+    expect(await ledger.getSession(second)).toBeNull();
+    await expect(open(other, 'builtin')).resolves.toBeUndefined();
+
+    await ledger.closeSession(first, {
+      status: 'complete',
+      termination: { reason: 'target-reached', detail: 'done' },
+      steps: 2,
+      finishedAt: at(60),
+      error: null,
+    });
+    await expect(open(third, 'linkedin')).resolves.toBeUndefined();
+
+    // Closed as interrupted by the sweep, the row holds nothing either.
+    expect(await ledger.failStale(at(3_600))).toBe(2);
+    await expect(open(fourth, 'linkedin')).resolves.toBeUndefined();
+    expect((await ledger.listSessions(10)).map((row) => [row.id, row.status]).sort()).toEqual(
+      [
+        [first, 'complete'],
+        [other, 'failed'],
+        [third, 'failed'],
+        [fourth, 'running'],
+      ].sort(),
+    );
   });
 });

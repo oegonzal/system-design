@@ -1,9 +1,11 @@
 load('../toolchain.Tiltfile', 'tool_env')
 
-# The stores are the docker-compose services, the one definition of Postgres
-# and Qdrant: `tilt up` and `pnpm stack:up` share the same containers, volumes
-# and data. Tilt only brings them up (a no-op when they already run) and waits
-# until both answer; a local_resource leaves nothing for `tilt down` to stop.
+# The store is the docker-compose `db` service, the one definition of Postgres
+# — records and, through the pgvector extension, the memories recalled by
+# meaning: `tilt up` and `pnpm stack:up` share the same container, volume and
+# data. Tilt only brings it up (a no-op when it already runs; the first time,
+# compose builds the image) and waits until it answers; a local_resource
+# leaves nothing for `tilt down` to stop.
 local_resource(
     'stores',
     cmd='bash scripts/stack.sh db',
@@ -12,7 +14,7 @@ local_resource(
     labels=['database']
 )
 
-# Where a pod finds them.
+# Where a pod finds it.
 k8s_yaml(['./stores.yaml'])
 
 k8s_resource(

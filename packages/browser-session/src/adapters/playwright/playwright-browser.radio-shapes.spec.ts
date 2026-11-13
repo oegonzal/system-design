@@ -78,7 +78,8 @@ const OVERLAPPING = page(
     .wide { position: relative; display: inline-block; width: 260px; height: 40px; line-height: 40px; vertical-align: top; }
     .wide + .wide { margin-left: -150px; }
     .wide span { display: inline-block; padding: 0 8px; background: #fff; }
-    .cover { position: absolute; left: 0; top: 0; width: 600px; height: 120px; background: #fff; }
+    /* Spans the whole row: the row's own centre is among the points a click is aimed at, and the row is as wide as the window the browser opened. */
+    .cover { position: absolute; left: 0; top: 0; width: 100%; height: 120px; background: #fff; }
   </style>
   <p>Are you legally authorized to work in this country?*</p>
   <div role="radiogroup">

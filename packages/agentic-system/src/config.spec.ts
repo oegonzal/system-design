@@ -20,19 +20,24 @@ describe('the service configuration', () => {
   const shipped = readSettings(PACKAGE_ROOT);
 
   it('[AGS-5] declares every variable once with its default and reads them nowhere else', () => {
+    // The exact rows: the vector index is a table in the database the db package names, so no store variable stands here.
+    expect(Object.values(AGENTIC_SYSTEM_ENV).map(({ name }) => name)).toEqual([
+      'AGENTIC_SYSTEM_PORT',
+      'QUALITY_LOOP_URL',
+      'NOTIFICATIONS_URL',
+    ]);
     expect(agenticSystemConfigFromEnv(shipped, {})).toMatchObject({
       port: 3007,
       loopUrl: 'http://localhost:3003',
       notificationsUrl: 'http://localhost:3005',
-      qdrantUrl: 'http://localhost:6333',
     });
     expect(
       agenticSystemConfigFromEnv(shipped, {
         [AGENTIC_SYSTEM_ENV.port.name]: ' 3107 ',
         [AGENTIC_SYSTEM_ENV.loopUrl.name]: 'http://loop:1',
-        [AGENTIC_SYSTEM_ENV.qdrantUrl.name]: 'http://vectors:6333',
+        [AGENTIC_SYSTEM_ENV.notificationsUrl.name]: 'http://bus:2',
       }),
-    ).toMatchObject({ port: 3107, loopUrl: 'http://loop:1', qdrantUrl: 'http://vectors:6333' });
+    ).toMatchObject({ port: 3107, loopUrl: 'http://loop:1', notificationsUrl: 'http://bus:2' });
     expect(() =>
       agenticSystemConfigFromEnv(shipped, { [AGENTIC_SYSTEM_ENV.port.name]: 'many' }),
     ).toThrow(
@@ -42,8 +47,8 @@ describe('the service configuration', () => {
       agenticSystemConfigFromEnv(shipped, { [AGENTIC_SYSTEM_ENV.notificationsUrl.name]: 'nope' }),
     ).toThrow(new AgenticSystemConfigError('NOTIFICATIONS_URL must be a URL, got "nope"'));
     expect(() =>
-      agenticSystemConfigFromEnv(shipped, { [AGENTIC_SYSTEM_ENV.qdrantUrl.name]: 'vectors' }),
-    ).toThrow(new AgenticSystemConfigError('QDRANT_URL must be a URL, got "vectors"'));
+      agenticSystemConfigFromEnv(shipped, { [AGENTIC_SYSTEM_ENV.loopUrl.name]: 'loop' }),
+    ).toThrow(new AgenticSystemConfigError('QUALITY_LOOP_URL must be a URL, got "loop"'));
 
     const readers = sources(__dirname)
       .filter((path) => readFileSync(path, 'utf8').includes('process.env'))

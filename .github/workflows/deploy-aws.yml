@@ -1,0 +1,414 @@
+# Production deploys of the studio to AWS: the images in infra/aws/apps.json are
+# built and pushed to ECR, then the CloudFormation stacks are deployed through
+# infra/aws/bin/aws.sh in dependency order — network, data, platform, then the
+# database migration, then app and edge — and what the edge serves is
+# verified. infra/aws/apps.json declares what is deployed and infra/aws/*.yaml
+# how; this workflow only carries them. Setup, rollback and validation:
+# docs/aws/deployment.md.
+name: Deploy AWS
+
+on:
+  # Only a commit CI has passed deploys: the run that tested main's tip, when it
+  # succeeded. A CI run for a pull request has the pull request's head branch
+  # and never matches this filter; what excludes a fork branch named main is
+  # the `resolve` job's `workflow_run.event == 'push'` guard, since a fork's
+  # pull request CI run carries that branch name but is a pull_request event.
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  # Redeploys main's tip, or rolls back: with `image_tag` set to a tag ECR already
+  # holds (a commit SHA), the images are not rebuilt and that commit's templates,
+  # gateway and images are deployed again.
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'An image tag already in ECR to deploy again (a commit SHA); empty deploys the tip of main'
+        required: false
+        default: ''
+        type: string
+
+permissions: {}
+
+# One production deploy at a time: a running deploy always finishes, and a newer
+# pending run replaces an older one. Not keyed by ref: every run here deploys
+# main, so a rollback dispatched while a deploy runs waits for it.
+concurrency:
+  group: deploy-aws-main
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  resolve:
+    name: Resolve what deploys
+    # Deploys stay off until the owner sets the repository variable AWS_DEPLOYS
+    # to `on`; unsetting it is the pause switch (docs/aws/deployment.md). Only
+    # this job reads it: every later job needs this one, so a run that starts
+    # with the switch on finishes its deploy, and a flip takes effect on the
+    # next run.
+    if: >-
+      vars.AWS_DEPLOYS == 'on' && github.ref == 'refs/heads/main' &&
+      (github.event_name == 'workflow_dispatch' ||
+       (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push'))
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+    outputs:
+      # The commit whose images, templates and gateway deploy: the one CI tested,
+      # or the tag a rollback names.
+      sha: ${{ steps.commit.outputs.sha }}
+      # Whether the images are built: never for a rollback, whose tag ECR holds.
+      build_images: ${{ steps.commit.outputs.build_images }}
+      images: ${{ steps.matrix.outputs.images }}
+    steps:
+      # First attempts need no such check: concurrency already orders them. A
+      # re-run keeps its original commit, so it must not deploy over a newer one.
+      # A rollback names an older commit on purpose and is exempt.
+      - name: Refuse a re-run of a superseded commit
+        if: github.run_attempt != '1' && inputs.image_tag == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOYING: ${{ github.event.workflow_run.head_sha || github.sha }}
+        run: |
+          tip="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
+          if [ "$tip" != "$DEPLOYING" ]; then
+            echo "::error title=Superseded re-run::This run is for $DEPLOYING but main is at $tip; re-running it would deploy older code. Use Run workflow on main instead."
+            exit 1
+          fi
+
+      - name: Name the commit to deploy
+        id: commit
+        env:
+          IMAGE_TAG: ${{ inputs.image_tag }}
+          TESTED: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if [ -n "$IMAGE_TAG" ]; then
+            if ! [[ "$IMAGE_TAG" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "::error title=Not an image tag::image_tag must be the full commit SHA an earlier deploy pushed (docs/aws/deployment.md, Rollback); got '$IMAGE_TAG'."
+              exit 1
+            fi
+            echo "sha=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
+            echo "build_images=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "sha=${TESTED:-$GITHUB_SHA}" >> "$GITHUB_OUTPUT"
+            echo "build_images=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ steps.commit.outputs.sha }}
+          persist-credentials: false
+
+      # The image matrix, from the one declaration of what is deployed: each
+      # entry carries the Dockerfile, its target and its build arguments, so the
+      # images job has one build step and knows no image by name. CI derives its
+      # matrix with the same script.
+      - name: Derive the image matrix from infra/aws/apps.json
+        id: matrix
+        run: echo "images=$(node infra/aws/bin/image-matrix.js)" >> "$GITHUB_OUTPUT"
+
+  gateway:
+    name: Build the gateway
+    needs: resolve
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v5.0.0
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The one bundle the app stack packages (packages/app-gateway/dist); built
+      # here, in a job that holds no credentials, and handed to the deploy.
+      - name: Build the gateway bundle
+        run: pnpm exec nx run app-gateway:build
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: app-gateway-dist
+          path: packages/app-gateway/dist
+          if-no-files-found: error
+          retention-days: 7
+
+  images:
+    name: Build and push ${{ matrix.image }}
+    needs: resolve
+    if: needs.resolve.outputs.build_images == 'true'
+    # ARM, like the task: a native build, no emulation.
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    environment:
+      name: production
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.resolve.outputs.images) }}
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+    steps:
+      # The same guard as `resolve`: a re-run of this job alone keeps the commit
+      # `resolve` named, which main may have moved past since.
+      - name: Refuse a re-run of a superseded commit
+        if: github.run_attempt != '1' && inputs.image_tag == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOYING: ${{ needs.resolve.outputs.sha }}
+        run: |
+          tip="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
+          if [ "$tip" != "$DEPLOYING" ]; then
+            echo "::error title=Superseded re-run::This run is for $DEPLOYING but main is at $tip; re-running it would deploy older code. Use Run workflow on main instead."
+            exit 1
+          fi
+
+      - name: Refuse to run without the deploy variables
+        env:
+          AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+        run: |
+          missing=()
+          [ -n "$AWS_DEPLOY_ROLE_ARN" ] || missing+=(AWS_DEPLOY_ROLE_ARN)
+          [ -n "$AWS_REGION" ] || missing+=(AWS_REGION)
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error title=Missing variables::Set ${missing[*]} as variables of the production environment (docs/aws/deployment.md)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - uses: aws-actions/amazon-ecr-login@03f1aad4c6c7ffd436567f42f9384779290529bd # v2.1.7
+        id: ecr
+
+      # Tags are immutable and name the commit, so an image already pushed for this
+      # commit (a re-run, a redeploy of the tip) is the image; only its absence is a
+      # reason to build. Any other answer from ECR is an error, never "absent".
+      - name: Check whether ECR already holds the tag
+        id: held
+        env:
+          IMAGE: ${{ matrix.image }}
+          TAG: ${{ needs.resolve.outputs.sha }}
+        run: |
+          if output="$(aws ecr describe-images --repository-name "sysdesign/$IMAGE" --image-ids "imageTag=$TAG" 2>&1)"; then
+            echo "held=true" >> "$GITHUB_OUTPUT"
+          elif grep -q ImageNotFoundException <<< "$output"; then
+            echo "held=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "$output"
+            echo "::error title=ECR unreadable::sysdesign/$IMAGE could not be read; the repositories are created by the bootstrap stack (docs/aws/deployment.md, One-time setup)."
+            exit 1
+          fi
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+        if: steps.held.outputs.held != 'true'
+
+      - uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        if: steps.held.outputs.held != 'true'
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          target: ${{ matrix.target }}
+          build-args: ${{ matrix.build_args }}
+          platforms: linux/arm64
+          provenance: false
+          push: true
+          tags: ${{ steps.ecr.outputs.registry }}/sysdesign/${{ matrix.image }}:${{ needs.resolve.outputs.sha }}
+          cache-from: type=gha,scope=${{ matrix.image }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.image }}
+
+  deploy:
+    name: Deploy the stacks
+    needs: [resolve, gateway, images]
+    # After a rollback's skipped image build as much as after a real one.
+    if: >-
+      !cancelled() &&
+      needs.resolve.result == 'success' && needs.gateway.result == 'success' &&
+      (needs.images.result == 'success' || needs.images.result == 'skipped')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    environment:
+      name: production
+      url: ${{ steps.site.outputs.url }}
+    env:
+      AWS_REGION: ${{ vars.AWS_REGION }}
+      IMAGE_TAG: ${{ needs.resolve.outputs.sha }}
+    outputs:
+      # What a rollback returns to: the tag the app stack carried before this run.
+      previous: ${{ steps.previous.outputs.tag }}
+      site_url: ${{ steps.site.outputs.url }}
+    steps:
+      # The same guard as `resolve`: a re-run of this job alone keeps the commit
+      # `resolve` named, which main may have moved past since.
+      - name: Refuse a re-run of a superseded commit
+        if: github.run_attempt != '1' && inputs.image_tag == ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEPLOYING: ${{ needs.resolve.outputs.sha }}
+        run: |
+          tip="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
+          if [ "$tip" != "$DEPLOYING" ]; then
+            echo "::error title=Superseded re-run::This run is for $DEPLOYING but main is at $tip; re-running it would deploy older code. Use Run workflow on main instead."
+            exit 1
+          fi
+
+      - name: Refuse to run without the deploy variables and secrets
+        env:
+          AWS_DEPLOY_ROLE_ARN: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          AWS_ORIGIN_SECRET: ${{ secrets.AWS_ORIGIN_SECRET }}
+        run: |
+          missing=()
+          [ -n "$AWS_DEPLOY_ROLE_ARN" ] || missing+=(AWS_DEPLOY_ROLE_ARN)
+          [ -n "$AWS_REGION" ] || missing+=(AWS_REGION)
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error title=Missing variables::Set ${missing[*]} as variables of the production environment (docs/aws/deployment.md)."
+            exit 1
+          fi
+          if [ -z "$AWS_ORIGIN_SECRET" ]; then
+            echo "::error title=Missing secret::Set AWS_ORIGIN_SECRET as a secret of the production environment (docs/aws/deployment.md)."
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ needs.resolve.outputs.sha }}
+          persist-credentials: false
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: app-gateway-dist
+          path: packages/app-gateway/dist
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      # Every image the task will pull, before any stack changes: a rollback to a
+      # tag the lifecycle policy has since expired must fail here, not in the
+      # service's circuit breaker. Only ImageNotFoundException means "missing";
+      # any other answer from ECR is an error, never a missing image.
+      - name: Confirm ECR holds every image at this tag
+        run: |
+          missing=()
+          for image in $(node -e 'process.stdout.write(Object.keys(require("./infra/aws/apps.json").images).join(" "))'); do
+            if output="$(aws ecr describe-images --repository-name "sysdesign/$image" --image-ids "imageTag=$IMAGE_TAG" 2>&1)"; then
+              continue
+            elif grep -q ImageNotFoundException <<< "$output"; then
+              missing+=("$image")
+            else
+              echo "$output"
+              echo "::error title=ECR unreadable::sysdesign/$image could not be read; the repositories are created by the bootstrap stack (docs/aws/deployment.md, One-time setup)."
+              exit 1
+            fi
+          done
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error title=Images missing::ECR holds no $IMAGE_TAG for ${missing[*]}; a rollback can only name a tag the repositories still keep (docs/aws/deployment.md, Rollback)."
+            exit 1
+          fi
+
+      # What a rollback returns to. The first deploy finds no app stack, which is
+      # the one failure that means nothing; any other failure to read it stops
+      # the run, so a rollback target is never unknown by accident.
+      - name: Read the tag serving before this run
+        id: previous
+        run: |
+          if output="$(aws cloudformation describe-stacks --stack-name sysdesign-prod-app --query "Stacks[0].Parameters[?ParameterKey=='ImageTag'].ParameterValue" --output text 2>&1)"; then
+            echo "tag=$output" >> "$GITHUB_OUTPUT"
+          elif grep -q 'does not exist' <<< "$output"; then
+            echo "tag=" >> "$GITHUB_OUTPUT"
+          else
+            echo "$output"
+            echo "::error title=App stack unreadable::sysdesign-prod-app could not be described, so the tag to roll back to is unknown and nothing was deployed (docs/aws/deployment.md, Troubleshooting)."
+            exit 1
+          fi
+
+      # The stacks in dependency order; aws.sh asserts each one completes. The
+      # platform stack registers the migrate task definition at this tag, so the
+      # migration runs on the new image before the service rolls to it.
+      - name: Deploy network, data and platform
+        run: |
+          bash infra/aws/bin/aws.sh deploy-stack network
+          bash infra/aws/bin/aws.sh deploy-stack data
+          bash infra/aws/bin/aws.sh deploy-stack platform "ImageTag=$IMAGE_TAG"
+
+      - name: Migrate the database
+        run: bash infra/aws/bin/aws.sh migrate
+
+      # aws.sh waits for the service's new deployment to roll out on this tag.
+      # The origin secret reaches the two stacks that share it through the
+      # environment, never the log.
+      - name: Deploy app
+        env:
+          AWS_ORIGIN_SECRET: ${{ secrets.AWS_ORIGIN_SECRET }}
+        run: bash infra/aws/bin/aws.sh deploy-stack app "ImageTag=$IMAGE_TAG" "OriginSecret=$AWS_ORIGIN_SECRET"
+
+      - name: Deploy edge
+        env:
+          AWS_ORIGIN_SECRET: ${{ secrets.AWS_ORIGIN_SECRET }}
+        run: bash infra/aws/bin/aws.sh deploy-stack edge "OriginSecret=$AWS_ORIGIN_SECRET"
+
+      - name: Read the site URL
+        id: site
+        run: |
+          url="$(aws cloudformation describe-stacks --stack-name sysdesign-prod-edge --query "Stacks[0].Outputs[?OutputKey=='SiteUrl'].OutputValue" --output text)"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      # Wakes the service, then polls /api/health through CloudFront until it answers.
+      - name: Verify production
+        env:
+          SITE_URL: ${{ steps.site.outputs.url }}
+        run: bash infra/aws/bin/aws.sh verify "$SITE_URL"
+
+  summary:
+    name: Summarize the deploy
+    needs: [resolve, gateway, images, deploy]
+    if: always() && needs.resolve.result == 'success'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions: {}
+    env:
+      OUTCOME: ${{ needs.deploy.result }}
+      GATEWAY: ${{ needs.gateway.result }}
+      IMAGES: ${{ needs.images.result }}
+      IMAGE_TAG: ${{ needs.resolve.outputs.sha }}
+      PREVIOUS: ${{ needs.deploy.outputs.previous }}
+      SITE_URL: ${{ needs.deploy.outputs.site_url }}
+    steps:
+      - name: Write the summary
+        run: |
+          {
+            echo "### AWS deploy: $OUTCOME"
+            echo ""
+            echo "- Image tag and commit: \`$IMAGE_TAG\` (gateway: $GATEWAY, images: $IMAGES)"
+            echo "- Serving before this run: \`${PREVIOUS:-none}\`"
+            echo "- Site: ${SITE_URL:-unknown}"
+            if [ -n "$PREVIOUS" ]; then
+              echo "- Roll back: \`gh workflow run deploy-aws.yml --ref main -f image_tag=$PREVIOUS\`"
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"

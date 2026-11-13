@@ -1,4 +1,4 @@
-import { existsSync, readdirSync, readFileSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
 import type { TestingModule } from '@nestjs/testing';
@@ -14,11 +14,14 @@ import {
 } from '@sysdesign/contracts';
 
 import { LoopBrain } from '../../adapters/loop-http/loop-brain';
-import { JOURNEY_ANSWERS } from '../../core/testing';
+import type { LedgerPort } from '../../core/ports';
+import { JOURNEY_ANSWERS, RecordingSessionFiles } from '../../core/testing';
+import { SessionRefused } from '../../core/unit-advice';
 import {
   bootJourney,
   emptyJourneyTables,
   JOURNEY_RAILS,
+  JOURNEY_SUBJECT,
   journeyConfig,
   journeyFakes,
   journeyHome,
@@ -27,6 +30,7 @@ import {
   type JourneyFakes,
 } from './session-journey.testing';
 import { SessionService } from './session.service';
+import { LEDGER, SESSION_FILES } from './tokens';
 
 /**
  * The scripted end-to-end dry run under the brain the package ships — the
@@ -38,6 +42,8 @@ describe('the session service, end to end', () => {
   let home: string;
   let moduleRef: TestingModule;
   let fakes: JourneyFakes;
+  /** The session's files beyond this machine, recording what the service asked of them. */
+  const files = new RecordingSessionFiles();
 
   const settle = (): void => {
     settlePlans(fakes);
@@ -72,6 +78,7 @@ describe('the session service, end to end', () => {
       journeyConfig(home, journeySettings('loop')),
       fakes,
       new LoopBrain(fakes.client, { pollEveryMs: 0, sleep: async () => settle() }),
+      (builder) => builder.overrideProvider(SESSION_FILES).useValue(files),
     );
   });
 
@@ -229,5 +236,66 @@ describe('the session service, end to end', () => {
     expect(await service.replayEvents(outcome.sessionId)).toBe(4);
     expect(events.published).toHaveLength(8);
     expect(await service.replayEvents(crypto.randomUUID())).toBeNull();
+  });
+
+  it('[BRW-31] [BRW-37] writes a profile’s exported sign-in as a file readable by its owner alone, refuses the export of a profile this machine does not hold or that a session holds, and a login archives nothing', async () => {
+    const service = moduleRef.get(SessionService);
+    // The run above kept its profile once; nothing else has asked the files for anything.
+    expect(files.calls).toEqual(['documents', 'profile spec', 'saveProfile spec']);
+
+    // A profile nobody signed in to on this machine: the browser would make an empty one, and the file would seed the cloud with nothing.
+    const missing = service.exportState('nobody', join(home, 'nobody-state.json'), []);
+    await expect(missing).rejects.toThrow(SessionRefused);
+    await expect(missing).rejects.toThrow(
+      `profile nobody: no directory at ${join(home, 'profiles', 'nobody')} — nothing signed in to export`,
+    );
+    expect(fakes.browser.calls.filter((call) => call.startsWith('exportState'))).toEqual([]);
+
+    mkdirSync(join(home, 'profiles', 'linkedin'), { recursive: true });
+    fakes.browser.state = {
+      cookies: [
+        {
+          name: 'li_at',
+          value: 'secret',
+          domain: '.jobs.test',
+          path: '/',
+          expires: 1_800_000_000,
+          httpOnly: true,
+          secure: true,
+          sameSite: 'Lax',
+        },
+      ],
+      origins: [],
+    };
+    const out = join(home, 'linkedin-state.json');
+    expect(await service.exportState('linkedin', out, ['https://jobs.test'])).toEqual({
+      cookies: 1,
+      origins: 0,
+    });
+    expect(statSync(out).mode & 0o777).toBe(0o600);
+    expect(JSON.parse(readFileSync(out, 'utf8'))).toEqual(fakes.browser.state);
+    expect(fakes.browser.calls).toContain('exportState linkedin https://jobs.test');
+
+    // Another process runs a session on the profile, beating now: the export is refused by name.
+    await moduleRef.get<LedgerPort>(LEDGER).openSession({
+      id: crypto.randomUUID(),
+      dumpRunId: 'dump-held-by-export-spec',
+      goalPath: 'goals/test.md',
+      goalHash: 'h',
+      goalMarkdown: '# mission',
+      profile: 'linkedin',
+      subject: JOURNEY_SUBJECT,
+      headed: false,
+      limits: JOURNEY_RAILS,
+      startedAt: new Date(),
+    });
+    const refused = service.exportState('linkedin', out, []);
+    await expect(refused).rejects.toThrow(SessionRefused);
+    await expect(refused).rejects.toThrow('profile linkedin is held by session');
+
+    // A login keeps the sign-in on this disk and archives nothing: this machine's cookies would not read in the cloud, and an archive wins over the state.
+    await service.login('smoke', 'https://sign-in.test/');
+    expect(fakes.browser.calls.slice(-2)).toEqual(['navigate https://sign-in.test/', 'close']);
+    expect(files.calls).toEqual(['documents', 'profile spec', 'saveProfile spec']);
   });
 });

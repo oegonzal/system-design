@@ -1,7 +1,7 @@
 # Memory and retrieval — `MEM`
 
 Scope: the `memory-recall` and `experience-digest` pipelines, the memory
-module (`modules/memory`), admission, the Qdrant store and the embedding
+module (`modules/memory`), admission, the pgvector store and the embedding
 cache. Conventions and the index are in [README.md](./README.md). The page
 these entries cite most is [../pipelines/memory-runs.md](../pipelines/memory-runs.md).
 
@@ -79,7 +79,7 @@ dimension, and the prompts used.
 
 ### MEM-3 · No retrieval score floor; RRF trades sharpness for breadth
 
-**Status** open (was blocked on data) · **Severity** medium · **Where** `modules/memory/qdrant`, `modules/memory/query-probes/`, the fusion in `orchestrators/memory/recall/fusion.ts`
+**Status** open (was blocked on data) · **Severity** medium · **Where** `modules/memory/pgvector`, `modules/memory/query-probes/`, the fusion in `orchestrators/memory/recall/fusion.ts`
 
 **What.** Retrieval returns the top candidates by reciprocal-rank fusion
 over the goal and up to six model-derived probes, with no score floor.
@@ -128,7 +128,7 @@ run, against the store size at the time.
 
 ### MEM-5 · Write-time deduplication, measured and not built
 
-**Status** accepted · **Where** `modules/memory/qdrant`
+**Status** accepted · **Where** `modules/memory/pgvector`
 
 **What.** The store dedupes only on exact `contentHash`, so two runs that
 learn the same lesson in different words both persist.
@@ -146,7 +146,7 @@ the shape of the distribution is the thing to watch, not any one number.
 
 ### MEM-6 · Nothing prunes either store; the embedding cache never expires
 
-**Status** open · **Severity** low · **Where** `modules/memory/qdrant`, the embedding cache table
+**Status** open · **Severity** low · **Where** `modules/memory/pgvector`, the embedding cache table
 
 **What.** `replaceRunChunks` deletes only by run id; no retention rule exists
 for lessons or for cached embeddings.
@@ -161,7 +161,7 @@ points.
 
 ### MEM-7 · Prepared but unused: keyword indexes, payload fields, an untyped `using`
 
-**Status** accepted · **Where** `qdrant/collection.ts`, `fromPayload`, `RetrievalProbeDto`
+**Status** closed 2026-11-12 for the indexes; the payload fields and the untyped `using` stay as noted · **Where** `pgvector/collection.ts`, `fromPayload`, `RetrievalProbeDto`
 
 **What.** Every payload carries `storedAt` and `keys` and nothing reads
 them back; `RetrievalProbeDto.found[].using` is `string` because `contracts`
@@ -169,14 +169,16 @@ cannot import the module's `VECTOR_NAMES`. The lineage indexes —
 `lineage.judged.runId`, `lineage.adoptedFrom.runId`, `lineage.goalHash`,
 declared in `INDEXED_FIELDS` and asked for on every boot beside the facets'
 — were added for the coach recall's novelty screen, which reads `lineage`
-off the hits after fusion instead; no probe filters by them, so they are
-unused until a filtered search needs them.
+off the hits after fusion instead; no probe filtered by them.
 
 **Evidence.** memory-runs §11.
 
-**Recommendation.** Remove the indexes or use them with the filtered search
-in MEM-9; the untyped `using` is the one place the named-vector vocabulary is
-not type-linked and is worth a `satisfies` when contracts next changes.
+**Resolution.** Since the pgvector move only the filtered fields are indexed:
+`INDEXED_FIELDS` is `runId`, `kind`, `pipeline`, `scope` and `unitKey`, each
+an expression index the store makes sure of at boot, and neither the facet
+nor the lineage indexes were recreated. The untyped `using` is still the one
+place the named-vector vocabulary is not type-linked and is worth a
+`satisfies` when contracts next changes.
 
 ---
 

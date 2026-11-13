@@ -1,0 +1,12 @@
+[
+  { "ParameterKey": "DatabaseName", "ParameterValue": "sysdesign" },
+  { "ParameterKey": "MasterUsername", "ParameterValue": "sysdesign" },
+  { "ParameterKey": "DbPasswordParameter", "ParameterValue": "/sysdesign/prod/DB_PASSWORD" },
+  { "ParameterKey": "DbPasswordVersion", "ParameterValue": "1" },
+  { "ParameterKey": "EngineVersion", "ParameterValue": "16.10" },
+  { "ParameterKey": "MinCapacity", "ParameterValue": "0" },
+  { "ParameterKey": "MaxCapacity", "ParameterValue": "2" },
+  { "ParameterKey": "SecondsUntilAutoPause", "ParameterValue": "300" },
+  { "ParameterKey": "BackupRetentionDays", "ParameterValue": "7" },
+  { "ParameterKey": "LogRetentionDays", "ParameterValue": "14" }
+]

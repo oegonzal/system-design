@@ -17,8 +17,10 @@ import type {
   GoalSource,
   Ids,
   LedgerPort,
+  LoopProbe,
   NewDecision,
   OperatorPort,
+  SessionFiles,
   StopSignal,
   Termination,
   SuppliedDocument,
@@ -49,6 +51,10 @@ export interface SessionDeps {
   /** Where the session says what happened, for whoever keeps a record of its units beyond it. */
   events: SessionEventsPort;
   stop: StopSignal;
+  /** The profile, its exported sign-in and the documents, wherever they live beyond this machine. */
+  files: SessionFiles;
+  /** The loop, asked whether it is there when a session is told to wait for it. */
+  loop: LoopProbe;
   /** A write that did not land, a beat that was missed: reported, never thrown. */
   warn(text: string): void;
   log(text: string): void;
@@ -91,6 +97,8 @@ export interface RunSessionOptions {
   answering: AnsweringSettings;
   /** The settings files in force, by kind, as the manifest records them. */
   settingsSources: Readonly<Record<string, string>>;
+  /** How many minutes the session waits for the loop to answer before it binds; 0 binds at once. */
+  waitForLoopMinutes: number;
 }
 
 /** The rubric derived once per session, by the role each pipeline plays. */

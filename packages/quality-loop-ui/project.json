@@ -7,23 +7,36 @@
   "targets": {
     "serve": {
       "executor": "nx:run-commands",
-      "options": { "cwd": "packages/quality-loop-ui", "command": "next dev -p 4201" }
+      "options": {
+        "cwd": "packages/quality-loop-ui",
+        "command": "next dev -p 4201"
+      }
     },
     "build": {
       "executor": "nx:run-commands",
       "cache": true,
       "outputs": ["{projectRoot}/.next"],
-      "options": { "cwd": "packages/quality-loop-ui", "command": "next build" }
+      "options": {
+        "cwd": "packages/quality-loop-ui",
+        "command": "next build"
+      }
     },
     "start": {
       "executor": "nx:run-commands",
       "dependsOn": ["build"],
-      "options": { "cwd": "packages/quality-loop-ui", "command": "next start -p 4201" }
+      "options": {
+        "cwd": "packages/quality-loop-ui",
+        "command": "rm -rf .next/standalone/packages/quality-loop-ui/.next/static && cp -R .next/static .next/standalone/packages/quality-loop-ui/.next/static && PORT=4201 node .next/standalone/packages/quality-loop-ui/server.js"
+      }
     },
     "typecheck": {
       "executor": "nx:run-commands",
       "cache": true,
-      "options": { "cwd": "packages/quality-loop-ui", "command": "tsc --noEmit -p tsconfig.json" }
+      "options": {
+        "cwd": "packages/quality-loop-ui",
+        "command": "tsc --noEmit -p tsconfig.json"
+      }
     }
-  }
+  },
+  "// start": "the standalone server a build writes (output: standalone in next.web.js), on 4201; next start only warns and serves without it. The static chunks are copied beside it first, since the build does not trace them in."
 }

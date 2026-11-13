@@ -1,0 +1,4 @@
+[
+  { "ParameterKey": "LogRetentionDays", "ParameterValue": "14" },
+  { "ParameterKey": "SecretsPrefix", "ParameterValue": "/sysdesign/prod" }
+]

@@ -1,11 +1,11 @@
 /**
  * In-memory stand-ins for the memory module's adapters: an embedding client
- * with deterministic vectors, a store that ranks by cosine the way Qdrant
+ * with deterministic vectors, a store that ranks by cosine the way pgvector
  * does, and a cache. Pure helpers only — no vitest imports.
  */
 import { isUnitBound, type MemoryStoreAvailabilityDto } from '@sysdesign/contracts';
 import type { EmbeddingClient } from '@sysdesign/llm';
-import { cosine, hashedUnitVector } from '@sysdesign/qdrant-kit/testing';
+import { cosine, hashedUnitVector } from '@sysdesign/pgvector-kit/testing';
 
 import { CachedEmbeddings } from '../../orchestrators/memory/embeddings';
 import type {
@@ -21,7 +21,7 @@ import type {
   StoredChunk,
 } from '../../orchestrators/memory/ports';
 import { FAKE_MODEL } from '../../orchestrators/memory/testing';
-import { collectionName, pointId } from './qdrant/collection';
+import { collectionName, pointId } from './pgvector/collection';
 
 /** Deterministic vectors from the text's hash: equal texts embed equally, others differ. */
 export function fakeEmbeddings(
@@ -71,13 +71,13 @@ export const mutedEmbeddings = (): CachedEmbeddings =>
   );
 
 /**
- * The adapter's declared filter, applied the way Qdrant applies it: each field
+ * The adapter's declared filter, applied the way the adapter compiles it: each field
  * narrows, an empty list narrows nothing, and a memory bound to a unit of work
  * passes only a search naming the unit it was recorded for — whatever else the
  * search narrows by, or with no filter at all. This fake is a hand-written
  * mirror of the adapter, so a rule added to one and not the other passes every
  * fast spec and diverges only in production — which is why it lives beside the
- * cosine, and why a spec holds the two to the same hits on a real Qdrant.
+ * cosine, and why a spec holds the two to the same hits on a real pgvector table.
  */
 const passes = (chunk: StoredChunk, filter: ProbeFilter | undefined): boolean => {
   const within = (values: readonly string[] | undefined, value: string): boolean =>
@@ -175,8 +175,14 @@ export class InMemoryMemoryStore implements MemoryStore {
       const owned = scope === undefined || scope.kinds.includes(chunk.source.kind);
       if (chunk.source.runId === sourceRunId && owned) this.points.delete(id);
     }
-    for (const chunk of chunks) this.points.set(pointId(sourceRunId, chunk.source.ref), chunk);
-    return Promise.resolve(chunks.length);
+    // One point per id, the later chunk winning, as the adapter writes one row per id.
+    const ids = new Set<string>();
+    for (const chunk of chunks) {
+      const id = pointId(sourceRunId, chunk.source.ref);
+      ids.add(id);
+      this.points.set(id, chunk);
+    }
+    return Promise.resolve(ids.size);
   }
 
   retractRun(sourceRunId: string): Promise<number> {

@@ -21,7 +21,7 @@ import {
 import { LoopClient } from '@sysdesign/loop-client';
 import { FakeLoop, FakeLoopClient } from '@sysdesign/studio-testing';
 
-import { NO_TENANT, PACKAGE_ROOT, type SessionConfig } from '../../config';
+import { NO_PROFILE_BUCKET, NO_TENANT, PACKAGE_ROOT, type SessionConfig } from '../../config';
 import type { BrainPort } from '../../core/ports';
 import {
   FakeBrowser,
@@ -117,6 +117,9 @@ export function journeyConfig(
     profilesDir: join(home, 'profiles'),
     subject: JOURNEY_SUBJECT,
     advisors: [],
+    channel: 'chrome',
+    profileBucket: NO_PROFILE_BUCKET,
+    docsDir: join(home, 'docs'),
     settings: { ...settings, answering: answeringFixture(['inferred']) },
   };
 }

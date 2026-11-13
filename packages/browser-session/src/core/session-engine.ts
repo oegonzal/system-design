@@ -26,6 +26,7 @@ import {
 import { timeIsUp, timeLimitOf } from './rails';
 import { closeInterrupted, closeSession, warnOf } from './session-close';
 import { rubricsFile } from './session-dump';
+import { assertProfileFree, awaitLoop } from './session-start';
 import { createSessionEvents, startedEvent } from './session-events';
 import { createState, pushHistory, railStateOf, type SessionState } from './session-state';
 import { step } from './step-flow';
@@ -110,6 +111,19 @@ export async function runSession(
 ): Promise<SessionOutcome> {
   const goal = await deps.goals.read(options.goalPath);
   const sessionId = deps.ids();
+  // One session per profile, settled before any of the profile's files are
+  // touched; then the files that live beyond this machine put in place — the
+  // documents, the profile or the sign-in a fresh one is seeded with — and the
+  // loop waited for, when the session was told to, before anything binds.
+  await assertProfileFree(deps, options.profile, options.liveness.staleAfterMs, deps.clock.now());
+  await deps.files.documents();
+  const restore = await deps.files.profile(options.profile);
+  if (restore.kind !== 'none') {
+    deps.log(
+      `profile ${options.profile}: ${restore.kind === 'archived' ? 'restored from its archive' : 'fresh, seeded with its exported sign-in'}`,
+    );
+  }
+  await awaitLoop(deps, options.waitForLoopMinutes);
   // The brain bound to whatever it keeps its memories in, every declared
   // section parsed and every advisor the mission names resolved and asked
   // once, before a row, a beat or a dump folder exists: a space that does not
@@ -120,6 +134,12 @@ export async function runSession(
   resolveDocuments(goal.markdown, options.documents);
   const startedAt = deps.clock.now();
   await closeInterrupted(deps, startedAt, options.liveness.staleAfterMs);
+  // The lease once more, on the row's own instant: minutes may have passed
+  // since the first check — the files, the loop — and a session that started
+  // meanwhile holds the profile now. What this check cannot see, the ledger
+  // refuses as its row is written: the database admits one running row per
+  // profile.
+  await assertProfileFree(deps, options.profile, options.liveness.staleAfterMs, startedAt);
   const dump = deps.dumps.open(startedAt);
   const state = createState({ sessionId, dumpRunId: dump.runId, startedAt });
   // The one awaited write: a ledger that refuses the row stops the session before the browser opens.
@@ -186,6 +206,8 @@ export async function runSession(
 
   let termination: Termination = { reason: 'error', detail: 'the session ended before deciding' };
   let error: { name: string; message: string } | null = null;
+  // Whether the browser opened on the profile: only then is there anything of this run's to keep.
+  let opened = false;
   try {
     const rubrics = await deriveRubrics(deps, goal.markdown);
     ctx.criteria = Object.fromEntries(
@@ -202,7 +224,9 @@ export async function runSession(
     await deps.browser.open(options.profile, {
       headed: options.headed,
       documents: options.documents,
+      seed: restore.kind === 'seed' ? restore.state : undefined,
     });
+    opened = true;
     // Open where the work begins, so the loop never plans on about:blank — the
     // one reliably contentless page, where the judges read "no listings" as a
     // limit and gate the navigate that would leave it. Engine setup, not a
@@ -244,7 +268,29 @@ export async function runSession(
     deadline.cancel();
     // A beat in flight is let finish before the session's closing writes.
     await ticker.stop();
-    await deps.browser.close().catch((caught: unknown) => warn('browser not closed', caught));
+    const closed = await deps.browser.close().then(
+      () => true,
+      (caught: unknown) => {
+        warn('browser not closed', caught);
+        return false;
+      },
+    );
+    // The profile kept for the next run only once the browser let go of it —
+    // on every path out, a fault included — and never when it never opened:
+    // the archive of the run before then stands. The row beats once more
+    // first: the ticker is stopped, and an archive of tens of MB can take
+    // longer than what the stale window leaves of the last beat — another
+    // session would pass the lease meanwhile and restore the archive from
+    // before this run. A save that fails is one warning; what the session did
+    // is already on the record.
+    if (opened && closed) {
+      await deps.ledger
+        .heartbeat(state.sessionId, deps.clock.now(), state.step)
+        .catch((caught: unknown) => warn('heartbeat not written', caught));
+      await deps.files
+        .saveProfile(options.profile)
+        .catch((caught: unknown) => warn('profile not saved', caught));
+    }
   }
   return closeSession(ctx, { goal, startedAt, termination, error });
 }

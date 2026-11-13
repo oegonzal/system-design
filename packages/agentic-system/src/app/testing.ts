@@ -18,7 +18,6 @@ const testConfig = (): AgenticSystemConfig => ({
   port: 0,
   loopUrl: 'http://loop.test',
   notificationsUrl: 'http://bus.test',
-  qdrantUrl: 'http://vectors.test',
   embedder: { ...tableEmbedder(EMBEDDER), enabled: true, reason: null },
   settings: {
     design: {
@@ -38,9 +37,9 @@ const testConfig = (): AgenticSystemConfig => ({
  * The service as `main` composes it, on a free port over the test database,
  * with the loop faked as `loopOptions` scripts it — the runs that hold an artifact,
  * the steps a digest settles with — and memory projected into an index in
- * memory, so the HTTP surface is specced without reaching the loop, Qdrant or
- * a model. Records, spaces and applied digests are the real Postgres stores.
- * A database that is not a test one is refused here first.
+ * memory, so the HTTP surface is specced without reaching the loop, a vector
+ * table or a model. Records, spaces and applied digests are the real Postgres
+ * stores. A database that is not a test one is refused here first.
  */
 export async function bootApp(loopOptions: FakeLoopOptions = {}): Promise<{
   app: INestApplication;

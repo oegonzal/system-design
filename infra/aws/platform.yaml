@@ -1,0 +1,559 @@
+# Platform stack (sysdesign-prod-platform): what the app stack runs on and
+# what outlives any one revision of it. Deployed after data, before app.
+#
+# What it declares: the ECS cluster, the three IAM roles the tasks run with
+# (execution: pull, log, read secrets; task: ECS Exec and the dump volume,
+# plus the migrate task's read of a database import; session task: ECS Exec,
+# the session dumps and the files bucket), the six log groups the app task,
+# the migrate task, the gateway, the idle function, the browser-session task
+# and the job function write to, the one-off db-migrate task definition the
+# deploy runs before the app service rolls (so a schema is never older than
+# the code that reads it), the browser-session task definition the app
+# stack's job function runs once per launch, the Cognito user pool (one
+# owner, created by hand; no self sign-up) and the public client the gateway
+# signs in against with the USER_PASSWORD_AUTH and REFRESH_TOKEN_AUTH flows,
+# and the SNS topic the app stack's alarms publish to.
+#
+# Absent on purpose: a hosted-UI domain, OAuth flows and callback URLs (the
+# gateway renders its own sign-in page and calls the cognito-idp API, which
+# the VPC Lambda reaches over IPv6; the hosted UI is not reliably reachable
+# that way); a client secret (a public client needs none and the gateway
+# would have to hold it); any secret value (the SecureStrings under
+# SecretsPrefix are created by the owner); the app task definition and
+# service, which change on every tag and live in app.yaml.
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'System Design Studio: ECS cluster and roles, log groups, migrate and session tasks, Cognito user pool, alerts topic'
+
+Parameters:
+  ImageTag:
+    Type: String
+    Description: 'Git SHA the db-migrate and browser-session images are tagged with'
+    AllowedPattern: '^[0-9a-f]{7,40}$'
+  LogRetentionDays:
+    Type: Number
+    Default: 14
+    AllowedValues: [1, 3, 5, 7, 14, 30, 60, 90, 120, 150, 180, 365]
+    Description: 'CloudWatch Logs retention for every log group here'
+  SecretsPrefix:
+    Type: String
+    Default: '/sysdesign/prod'
+    Description: 'SSM path the containers read their secrets under (created by the owner)'
+    AllowedPattern: '^/[A-Za-z0-9_./-]+[^/]$'
+  AlertEmail:
+    Type: String
+    Default: ''
+    Description: 'Address the alerts topic emails; empty leaves the topic without a subscription'
+
+Conditions:
+  HasAlertEmail: !Not [!Equals [!Ref AlertEmail, '']]
+
+Resources:
+  Cluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName: !Ref AWS::StackName
+      CapacityProviders:
+        - FARGATE
+        - FARGATE_SPOT
+      ClusterSettings:
+        - Name: containerInsights
+          Value: disabled
+
+  AppLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: '/sysdesign/prod/app'
+      RetentionInDays: !Ref LogRetentionDays
+  MigrateLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: '/sysdesign/prod/migrate'
+      RetentionInDays: !Ref LogRetentionDays
+  GatewayLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: '/sysdesign/prod/gateway'
+      RetentionInDays: !Ref LogRetentionDays
+  IdleLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: '/sysdesign/prod/idle'
+      RetentionInDays: !Ref LogRetentionDays
+  SessionLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: '/sysdesign/prod/session'
+      RetentionInDays: !Ref LogRetentionDays
+  JobLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: '/sysdesign/prod/job'
+      RetentionInDays: !Ref LogRetentionDays
+
+  # What the ECS agent needs to start a task: pull the images, write the logs,
+  # read the SecureStrings. Nothing the containers themselves can use.
+  TaskExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-task-execution'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: start-task
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: EcrLogin
+                Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: '*'
+              - Sid: EcrPull
+                Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:GetDownloadUrlForLayer
+                Resource: !Sub 'arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/sysdesign/*'
+              - Sid: WriteLogs
+                Effect: Allow
+                Action:
+                  - logs:CreateLogStream
+                  - logs:PutLogEvents
+                Resource:
+                  - !GetAtt AppLogGroup.Arn
+                  - !GetAtt MigrateLogGroup.Arn
+                  - !GetAtt SessionLogGroup.Arn
+              - Sid: ReadSecrets
+                Effect: Allow
+                Action: ssm:GetParameters
+                Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPrefix}/*'
+              - Sid: DecryptSecretsThroughSsm
+                Effect: Allow
+                Action: kms:Decrypt
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    kms:ViaService: !Sub 'ssm.${AWS::Region}.amazonaws.com'
+
+  # What the running containers may do: accept an ECS Exec session, mount the
+  # dump volume through its access point, and (the migrate task runs with this
+  # role too) read a database dump `aws.sh db-import` uploaded.
+  TaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-task'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: run-task
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: EcsExec
+                Effect: Allow
+                Action:
+                  - ssmmessages:CreateControlChannel
+                  - ssmmessages:CreateDataChannel
+                  - ssmmessages:OpenControlChannel
+                  - ssmmessages:OpenDataChannel
+                Resource: '*'
+              - Sid: MountRuns
+                Effect: Allow
+                Action:
+                  - elasticfilesystem:ClientMount
+                  - elasticfilesystem:ClientWrite
+                Resource: !Sub
+                  - 'arn:${AWS::Partition}:elasticfilesystem:${AWS::Region}:${AWS::AccountId}:file-system/${FileSystemId}'
+                  - FileSystemId: !ImportValue 'sysdesign-prod-EfsFileSystemId'
+                Condition:
+                  StringEquals:
+                    elasticfilesystem:AccessPointArn: !ImportValue 'sysdesign-prod-EfsAccessPointArn'
+              # `aws.sh db-import` uploads a whole-database dump under the
+              # artifacts bucket's imports/ prefix and runs the migrate task
+              # definition with a restore command that reads it back.
+              - Sid: ReadImports
+                Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub
+                  - 'arn:${AWS::Partition}:s3:::${ArtifactsBucket}/imports/*'
+                  - ArtifactsBucket: !ImportValue 'sysdesign-prod-ArtifactsBucket'
+
+  # What a browser-session task may do: accept an ECS Exec session, mount its
+  # dumps directory through the sessions access point, and read and write the
+  # three prefixes of the files bucket (state/, profiles/, docs/) with the
+  # bucket's key. Its name is `sysdesign-prod-platform-session-task`, which
+  # the app stack's job function passes to every session task.
+  SessionTaskRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-session-task'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ecs-tasks.amazonaws.com
+            Action: sts:AssumeRole
+      Policies:
+        - PolicyName: run-session
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: EcsExec
+                Effect: Allow
+                Action:
+                  - ssmmessages:CreateControlChannel
+                  - ssmmessages:CreateDataChannel
+                  - ssmmessages:OpenControlChannel
+                  - ssmmessages:OpenDataChannel
+                Resource: '*'
+              - Sid: MountSessions
+                Effect: Allow
+                Action:
+                  - elasticfilesystem:ClientMount
+                  - elasticfilesystem:ClientWrite
+                Resource: !Sub
+                  - 'arn:${AWS::Partition}:elasticfilesystem:${AWS::Region}:${AWS::AccountId}:file-system/${FileSystemId}'
+                  - FileSystemId: !ImportValue 'sysdesign-prod-EfsFileSystemId'
+                Condition:
+                  StringEquals:
+                    elasticfilesystem:AccessPointArn: !ImportValue 'sysdesign-prod-SessionsAccessPointArn'
+              - Sid: ReadWriteFiles
+                Effect: Allow
+                Action:
+                  - s3:GetObject
+                  - s3:PutObject
+                  - s3:DeleteObject
+                Resource:
+                  - !Sub
+                    - 'arn:${AWS::Partition}:s3:::${Bucket}/profiles/*'
+                    - Bucket: !ImportValue 'sysdesign-prod-FilesBucketName'
+                  - !Sub
+                    - 'arn:${AWS::Partition}:s3:::${Bucket}/state/*'
+                    - Bucket: !ImportValue 'sysdesign-prod-FilesBucketName'
+                  - !Sub
+                    - 'arn:${AWS::Partition}:s3:::${Bucket}/docs/*'
+                    - Bucket: !ImportValue 'sysdesign-prod-FilesBucketName'
+              # Unconditioned on purpose: S3 answers 404 for a missing object
+              # only to a caller allowed to list the bucket, and 403 otherwise,
+              # and a HEAD carries no s3:prefix for a prefix condition to
+              # match — so a conditioned grant would turn "no archive yet" into
+              # Forbidden, which the session's S3 adapter reads as a failure
+              # rather than as "not yet". The bucket holds only the three
+              # prefixes the statement above lets the task read anyway.
+              - Sid: ListFiles
+                Effect: Allow
+                Action: s3:ListBucket
+                Resource: !Sub
+                  - 'arn:${AWS::Partition}:s3:::${Bucket}'
+                  - Bucket: !ImportValue 'sysdesign-prod-FilesBucketName'
+              - Sid: UseFilesKey
+                Effect: Allow
+                Action:
+                  - kms:GenerateDataKey
+                  - kms:Decrypt
+                  - kms:Encrypt
+                Resource: !ImportValue 'sysdesign-prod-FilesKeyArn'
+
+  # Runs the migrations and the seed once per deploy, before the app service
+  # rolls; the same DB settings as the services, and the same execution role.
+  # The stream prefix equals the container name, which is how `aws.sh migrate`
+  # finds the task's log stream. ARTIFACTS_BUCKET is read only by the restore
+  # command `aws.sh db-import` overrides the container with.
+  MigrateTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub '${AWS::StackName}-migrate'
+      Cpu: 512
+      Memory: 1024
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      RuntimePlatform:
+        CpuArchitecture: ARM64
+        OperatingSystemFamily: LINUX
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt TaskRole.Arn
+      ContainerDefinitions:
+        - Name: db-migrate
+          Image: !Sub
+            - '${Registry}/sysdesign/db-migrate:${ImageTag}'
+            - Registry: !ImportValue 'sysdesign-prod-EcrRegistry'
+          Essential: true
+          Environment:
+            - Name: DB_HOST
+              Value: !ImportValue 'sysdesign-prod-DbEndpoint'
+            - Name: DB_PORT
+              Value: !ImportValue 'sysdesign-prod-DbPort'
+            - Name: DB_USERNAME
+              Value: !ImportValue 'sysdesign-prod-DbUsername'
+            - Name: DB_NAME
+              Value: !ImportValue 'sysdesign-prod-DbName'
+            - Name: PGSSLMODE
+              Value: 'verify-full'
+            - Name: NODE_EXTRA_CA_CERTS
+              Value: '/etc/ssl/certs/rds-global-bundle.pem'
+            # The restore command's S3 client reads its region from the
+            # environment; Fargate usually sets it, the template states it.
+            - Name: AWS_REGION
+              Value: !Ref AWS::Region
+            - Name: ARTIFACTS_BUCKET
+              Value: !ImportValue 'sysdesign-prod-ArtifactsBucket'
+          Secrets:
+            - Name: DB_PASSWORD
+              ValueFrom: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPrefix}/DB_PASSWORD'
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref MigrateLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: db-migrate
+
+  # The browser session as a one-off task, run by the app stack's job
+  # function (a schedule, or `aws.sh session run`) with the launch's command
+  # as a container override — so no Command here. 2 vCPU / 4 GB for one
+  # headless Chromium is a starting size, to be measured; ARM64 like every
+  # image. The dumps directory is EFS, so a session's record outlives the
+  # task; the profiles and documents directories are the task's own disk,
+  # restored from the files bucket at start (a Chrome profile must not live
+  # on NFS). The init process reaps Chromium's children; 120 s of stop
+  # timeout lets the engine archive the profile when the task is stopped.
+  # The stream prefix is the container name, which is how `aws.sh session
+  # logs` finds the stream. The session reaches the app task by its Cloud Map
+  # name on the four ports the network stack admits from the session group.
+  SessionTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub '${AWS::StackName}-session'
+      Cpu: 2048
+      Memory: 4096
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      RuntimePlatform:
+        CpuArchitecture: ARM64
+        OperatingSystemFamily: LINUX
+      ExecutionRoleArn: !GetAtt TaskExecutionRole.Arn
+      TaskRoleArn: !GetAtt SessionTaskRole.Arn
+      Volumes:
+        - Name: sessions
+          EFSVolumeConfiguration:
+            FilesystemId: !ImportValue 'sysdesign-prod-EfsFileSystemId'
+            TransitEncryption: ENABLED
+            AuthorizationConfig:
+              AccessPointId: !ImportValue 'sysdesign-prod-SessionsAccessPointId'
+              IAM: ENABLED
+      ContainerDefinitions:
+        - Name: browser-session
+          Image: !Sub
+            - '${Registry}/sysdesign/browser-session:${ImageTag}'
+            - Registry: !ImportValue 'sysdesign-prod-EcrRegistry'
+          Essential: true
+          StopTimeout: 120
+          LinuxParameters:
+            InitProcessEnabled: true
+          MountPoints:
+            - SourceVolume: sessions
+              ContainerPath: '/app/static/browser-session'
+              ReadOnly: false
+          Environment:
+            - Name: QUALITY_LOOP_URL
+              Value: !Sub
+                - 'http://app.${Namespace}:3003'
+                - Namespace: !ImportValue 'sysdesign-prod-NamespaceName'
+            - Name: NOTIFICATIONS_URL
+              Value: !Sub
+                - 'http://app.${Namespace}:3005'
+                - Namespace: !ImportValue 'sysdesign-prod-NamespaceName'
+            - Name: UNIT_ADVISOR_URLS
+              Value: !Sub
+                - 'job-application=http://app.${Namespace}:3006'
+                - Namespace: !ImportValue 'sysdesign-prod-NamespaceName'
+            - Name: AGENTIC_SYSTEM_URL
+              Value: !Sub
+                - 'http://app.${Namespace}:3007'
+                - Namespace: !ImportValue 'sysdesign-prod-NamespaceName'
+            - Name: BROWSER_CHANNEL
+              Value: 'chromium'
+            - Name: BROWSER_SESSION_DUMP_DIR
+              Value: '/app/static/browser-session/sessions'
+            - Name: BROWSER_PROFILES_DIR
+              Value: '/app/static/profiles'
+            - Name: BROWSER_SESSION_DOCS_DIR
+              Value: '/app/static/docs'
+            - Name: BROWSER_PROFILE_BUCKET
+              Value: !ImportValue 'sysdesign-prod-FilesBucketName'
+            - Name: DB_HOST
+              Value: !ImportValue 'sysdesign-prod-DbEndpoint'
+            - Name: DB_PORT
+              Value: !ImportValue 'sysdesign-prod-DbPort'
+            - Name: DB_USERNAME
+              Value: !ImportValue 'sysdesign-prod-DbUsername'
+            - Name: DB_NAME
+              Value: !ImportValue 'sysdesign-prod-DbName'
+            - Name: PGSSLMODE
+              Value: 'verify-full'
+            - Name: NODE_EXTRA_CA_CERTS
+              Value: '/etc/ssl/certs/rds-global-bundle.pem'
+            # The session's S3 client reads its region from the environment;
+            # Fargate usually sets it, the template states it.
+            - Name: AWS_REGION
+              Value: !Ref AWS::Region
+          Secrets:
+            - Name: DB_PASSWORD
+              ValueFrom: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPrefix}/DB_PASSWORD'
+            - Name: BROWSER_SESSION_SUBJECT
+              ValueFrom: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPrefix}/browser-session/SUBJECT'
+            - Name: MEMORY_TENANT
+              ValueFrom: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPrefix}/browser-session/MEMORY_TENANT'
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !Ref SessionLogGroup
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: browser-session
+
+  UserPool:
+    Type: AWS::Cognito::UserPool
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      UserPoolName: !Sub '${AWS::StackName}-users'
+      UsernameAttributes:
+        - email
+      AutoVerifiedAttributes:
+        - email
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 12
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          TemporaryPasswordValidityDays: 7
+      MfaConfiguration: 'OFF'
+      AccountRecoverySetting:
+        RecoveryMechanisms:
+          - Name: verified_email
+            Priority: 1
+      UserPoolTags:
+        project: sysdesign
+        env: prod
+
+  # Public client for the gateway's own sign-in page: the password flow for
+  # the form, the refresh flow for the session cookie. No OAuth, no callback,
+  # no domain — nothing here is reached through a browser redirect.
+  UserPoolClient:
+    Type: AWS::Cognito::UserPoolClient
+    Properties:
+      ClientName: !Sub '${AWS::StackName}-gateway'
+      UserPoolId: !Ref UserPool
+      GenerateSecret: false
+      SupportedIdentityProviders:
+        - COGNITO
+      ExplicitAuthFlows:
+        - ALLOW_USER_PASSWORD_AUTH
+        - ALLOW_REFRESH_TOKEN_AUTH
+      PreventUserExistenceErrors: ENABLED
+      TokenValidityUnits:
+        IdToken: hours
+        AccessToken: hours
+        RefreshToken: days
+      IdTokenValidity: 1
+      AccessTokenValidity: 1
+      RefreshTokenValidity: 30
+
+  AlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      TopicName: !Sub '${AWS::StackName}-alerts'
+  AlertsSubscription:
+    Type: AWS::SNS::Subscription
+    Condition: HasAlertEmail
+    Properties:
+      TopicArn: !Ref AlertsTopic
+      Protocol: email
+      Endpoint: !Ref AlertEmail
+
+Outputs:
+  ClusterName:
+    Value: !Ref Cluster
+    Export:
+      Name: 'sysdesign-prod-ClusterName'
+  TaskExecutionRoleArn:
+    Value: !GetAtt TaskExecutionRole.Arn
+    Export:
+      Name: 'sysdesign-prod-TaskExecutionRoleArn'
+  TaskRoleArn:
+    Value: !GetAtt TaskRole.Arn
+    Export:
+      Name: 'sysdesign-prod-TaskRoleArn'
+  AppLogGroupName:
+    Description: 'Where every container of the app task writes, one stream prefix per container'
+    Value: !Ref AppLogGroup
+    Export:
+      Name: 'sysdesign-prod-AppLogGroupName'
+  GatewayLogGroupName:
+    Value: !Ref GatewayLogGroup
+    Export:
+      Name: 'sysdesign-prod-GatewayLogGroupName'
+  IdleLogGroupName:
+    Value: !Ref IdleLogGroup
+    Export:
+      Name: 'sysdesign-prod-IdleLogGroupName'
+  SessionLogGroupName:
+    Description: 'Where a browser-session task writes, stream browser-session/browser-session/<task id>'
+    Value: !Ref SessionLogGroup
+    Export:
+      Name: 'sysdesign-prod-SessionLogGroupName'
+  JobLogGroupName:
+    Value: !Ref JobLogGroup
+    Export:
+      Name: 'sysdesign-prod-JobLogGroupName'
+  MigrateTaskDefinitionArn:
+    Description: 'The revision `aws.sh migrate` runs; carries the current ImageTag'
+    Value: !Ref MigrateTaskDefinition
+    Export:
+      Name: 'sysdesign-prod-MigrateTaskDefinitionArn'
+  # The family, never the revision ARN: the app stack imports this value, and
+  # an export another stack imports cannot change, while the revision changes
+  # with every ImageTag — the platform stack could never be updated again.
+  # RunTask with a family runs its latest ACTIVE revision, which this stack's
+  # deploy keeps current (and deregisters the one it replaced).
+  SessionTaskFamily:
+    Description: 'The task definition family the job function runs a launch with; its latest ACTIVE revision carries the current ImageTag'
+    Value: !Sub '${AWS::StackName}-session'
+    Export:
+      Name: 'sysdesign-prod-SessionTaskFamily'
+  SessionTaskRoleArn:
+    Description: 'What the job function passes to every session task'
+    Value: !GetAtt SessionTaskRole.Arn
+    Export:
+      Name: 'sysdesign-prod-SessionTaskRoleArn'
+  UserPoolId:
+    Description: 'Where the owner creates the one user (aws cognito-idp admin-create-user); the gateway verifies ID tokens against it'
+    Value: !Ref UserPool
+    Export:
+      Name: 'sysdesign-prod-UserPoolId'
+  UserPoolClientId:
+    Description: 'The client the gateway signs in through'
+    Value: !Ref UserPoolClient
+    Export:
+      Name: 'sysdesign-prod-UserPoolClientId'
+  AlertsTopicArn:
+    Description: 'What the app stack alarms publish to'
+    Value: !Ref AlertsTopic
+    Export:
+      Name: 'sysdesign-prod-AlertsTopicArn'

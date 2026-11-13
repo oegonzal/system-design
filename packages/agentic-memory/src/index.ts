@@ -11,4 +11,4 @@ export type { SweepReport } from './lifecycle/sweep';
 export type { Embedder, MemoryPorts, VectorIndex } from './ports';
 export { MikroOrmRecordStore } from './adapters/mikro-orm/mikro-orm-record-store';
 export { MikroOrmSpaceStore } from './adapters/mikro-orm/mikro-orm-space-store';
-export { QdrantVectorIndex } from './adapters/qdrant/qdrant-vector-index';
+export { PgvectorVectorIndex } from './adapters/pgvector/pgvector-vector-index';

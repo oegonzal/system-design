@@ -1,13 +1,13 @@
 import { Logger, Module } from '@nestjs/common';
 import { MikroOrmModule } from '@mikro-orm/nestjs';
-import { MemoryEmbedding, MemorySupport } from '@sysdesign/db';
+import { EntityManager } from '@mikro-orm/postgresql';
+import { MemoryEmbedding, MemorySupport, mikroOrmExecutor } from '@sysdesign/db';
 import {
   createEmbeddingClientFromEnv,
   embeddingAvailability,
   type EmbeddingClient,
   type LlmClient,
 } from '@sysdesign/llm';
-import { DEFAULT_QDRANT_URL, qdrantClient } from '@sysdesign/qdrant-kit';
 
 import { CachedEmbeddings } from '../../orchestrators/memory/embeddings';
 import type { KnowledgePorts, SupportStore } from '../../orchestrators/knowledge/ports';
@@ -26,7 +26,7 @@ import { MemoryService } from './memory.service';
 import { MikroOrmEmbeddingCache } from './persistence/mikro-orm-embedding-cache';
 import { MikroOrmMemorySupport } from './persistence/mikro-orm-memory-support';
 import { LlmQueryProbes } from './query-probes/llm-query-probes';
-import { QdrantMemoryStore } from './qdrant/qdrant-memory-store';
+import { PgvectorMemoryStore } from './pgvector/pgvector-memory-store';
 import {
   EMBEDDING_CACHE,
   EMBEDDING_CLIENT,
@@ -39,18 +39,13 @@ import {
 
 const logger = new Logger('Memory');
 
-/** The store is bound to the embedding client's model and width at boot. */
-const qdrantStore = (client: EmbeddingClient): QdrantMemoryStore =>
-  new QdrantMemoryStore(
-    qdrantClient({
-      url: process.env['QDRANT_URL'] || DEFAULT_QDRANT_URL,
-      apiKey: process.env['QDRANT_API_KEY'] || undefined,
-    }),
-    client.model,
-    client.dimensions,
-    () => new Date(),
-    (message) => logger.warn(message),
-  );
+/**
+ * The store is bound to the embedding client's model and width at boot, over
+ * the same database connection the run tables use: the collection is a
+ * table beside them, so there is no second server to name or reach.
+ */
+const pgvectorStore = (em: EntityManager, client: EmbeddingClient): PgvectorMemoryStore =>
+  new PgvectorMemoryStore(mikroOrmExecutor(em), client.model, client.dimensions);
 
 /** The memory orchestrator's ports, bound once from the adapters this module built. */
 const memoryPorts = (
@@ -92,7 +87,7 @@ const memoryPorts = (
     { provide: EMBEDDING_CLIENT, useFactory: createEmbeddingClientFromEnv },
     { provide: EMBEDDING_CACHE, useClass: MikroOrmEmbeddingCache },
     { provide: MEMORY_SUPPORT, useClass: MikroOrmMemorySupport },
-    { provide: MEMORY_STORE, useFactory: qdrantStore, inject: [EMBEDDING_CLIENT] },
+    { provide: MEMORY_STORE, useFactory: pgvectorStore, inject: [EntityManager, EMBEDDING_CLIENT] },
     // The same client the runs module uses.
     {
       provide: QUERY_PROBES,

@@ -1,7 +1,10 @@
-import { resolve } from 'node:path';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
 
+import type { SessionFiles } from '../../core/ports';
 import { SessionRefused } from '../../core/unit-advice';
-import { presentDocuments } from './supplied-documents';
+import { checkingDocuments, presentDocuments } from './supplied-documents';
 
 describe('the documents the command line supplies', () => {
   it('[BRW-26] resolves each file and refuses, before any row, a document whose file is not there', async () => {
@@ -25,5 +28,41 @@ describe('the documents the command line supplies', () => {
       resolve('docs/missing.pdf'),
     ]);
     await expect(presentDocuments([], present)).resolves.toEqual([]);
+  });
+
+  it('[BRW-32] [BRW-26] looks for the supplied files only once the files beyond this machine are in place: one those files write passes, one still missing refuses by name, and the rest of the port passes through', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'browser-session-docs-'));
+    try {
+      const written = join(dir, 'Resume.pdf');
+      const calls: string[] = [];
+      const files: SessionFiles = {
+        async profile(name) {
+          calls.push(`profile ${name}`);
+          return { kind: 'none' };
+        },
+        async saveProfile(name) {
+          calls.push(`saveProfile ${name}`);
+        },
+        async documents() {
+          calls.push('documents');
+          writeFileSync(written, '%PDF');
+        },
+      };
+      const checking = checkingDocuments(files, [{ name: 'resume', path: written }]);
+      await expect(checking.documents()).resolves.toBeUndefined();
+      await expect(checking.profile('p')).resolves.toEqual({ kind: 'none' });
+      await checking.saveProfile('p');
+      expect(calls).toEqual(['documents', 'profile p', 'saveProfile p']);
+
+      const missing = join(dir, 'missing.pdf');
+      const refusing = checkingDocuments(files, [{ name: 'cover-letter', path: missing }]);
+      await expect(refusing.documents()).rejects.toThrow(
+        `document cover-letter: no file at ${missing}`,
+      );
+      // The files were asked first: a bucket's documents are written before any is looked for.
+      expect(calls).toEqual(['documents', 'profile p', 'saveProfile p', 'documents']);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

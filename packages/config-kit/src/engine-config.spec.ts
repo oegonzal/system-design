@@ -12,7 +12,7 @@ const disk = (files: Record<string, string>) => (at: string) => {
 };
 
 describe('choosing a configuration by name', () => {
-  it('[QL-22] reads a kind’s choice as the name of a file, so switching is one word and the file is complete', () => {
+  it('[CFG-1] reads a kind’s choice as the name of a file, so switching is one word and the file is complete', () => {
     const chosen = chosenConfig(
       'llm',
       '/repo',
@@ -34,7 +34,7 @@ describe('choosing a configuration by name', () => {
     );
   });
 
-  it('[QL-22] a kind nobody named chooses nothing, and a name with no file behind it is refused', () => {
+  it('[CFG-1] a kind nobody named chooses nothing, and a name with no file behind it is refused', () => {
     const none = chosenConfig('llm', '/repo', disk({}));
     expect(none).toEqual({ name: null, path: null, text: null });
     const other = chosenConfig(
@@ -53,7 +53,7 @@ describe('choosing a configuration by name', () => {
     );
   });
 
-  it('[QL-22] refuses a file it cannot read, and a name that is a path rather than a name', () => {
+  it('[CFG-1] refuses a file it cannot read, and a name that is a path rather than a name', () => {
     expect(() => readEngineConfig('/repo', disk({ 'config/engine.json': 'not json' }))).toThrow(
       /is not JSON/,
     );
@@ -70,7 +70,50 @@ describe('choosing a configuration by name', () => {
     ).toEqual({ llm: 'qwen-local.v2' });
   });
 
-  it('[QL-22] reads the chosen file against its owner’s schema, naming the file and every field at fault, and nothing for a kind nobody named', () => {
+  it('[CFG-1] a choice the caller makes wins over the engine file for that kind alone, and is held to the same rule', () => {
+    const files = disk({
+      'config/engine.json': '{"llm":"openai","store":"qdrant"}',
+      'config/llm/openai.json': '{"provider":"openai-compatible"}',
+      'config/llm/ollama.json': '{"provider":"ollama"}',
+      'config/store/qdrant.json': '{}',
+    });
+    const chosen = chosenConfig('llm', '/repo', files, 'ollama');
+    expect(chosen.name).toBe('ollama');
+    expect(chosen.path).toMatch(/config\/llm\/ollama\.json$/);
+    expect(chosen.text).toContain('"ollama"');
+    // The other kinds still read as the engine file says, and so does this
+    // one when the caller makes no choice.
+    expect(chosenConfig('store', '/repo', files, undefined).name).toBe('qdrant');
+    expect(chosenConfig('llm', '/repo', files).name).toBe('openai');
+    // A caller may choose a kind the engine file never named at all.
+    expect(
+      chosenConfig('llm', '/repo', disk({ 'config/llm/ollama.json': '{}' }), 'ollama'),
+    ).toEqual({
+      name: 'ollama',
+      path: expect.stringMatching(/config\/llm\/ollama\.json$/),
+      text: '{}',
+    });
+
+    // The caller's name is held to what a name may be, and to a file behind it.
+    expect(() => chosenConfig('llm', '/repo', files, 'missing')).toThrow(
+      /the caller chooses llm "missing", but config\/llm\/missing\.json does not exist/,
+    );
+    for (const bad of ['../secrets', 'a/b', '/etc/passwd', '']) {
+      expect(() => chosenConfig('llm', '/repo', files, bad)).toThrow(EngineConfigError);
+      expect(() => chosenConfig('llm', '/repo', files, bad)).toThrow(
+        /must name a file in config\/llm\//,
+      );
+    }
+
+    // And `readChosen` carries the choice through to the schema read.
+    const schema = z.strictObject({ provider: z.string() });
+    expect(readChosen('llm', schema, '/repo', files, 'ollama')).toEqual({
+      config: { provider: 'ollama' },
+      source: 'config/llm/ollama.json',
+    });
+  });
+
+  it('[CFG-1] reads the chosen file against its owner’s schema, naming the file and every field at fault, and nothing for a kind nobody named', () => {
     const schema = z.strictObject({ after: z.array(z.string()), failures: z.boolean() });
     const files = (body: string) =>
       disk({ 'config/engine.json': '{"capture":"entries"}', 'config/capture/entries.json': body });

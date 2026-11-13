@@ -1,6 +1,6 @@
 /**
  * The ports the memory orchestrator runs over. Adapters live in the memory
- * module — Qdrant for the store, MikroORM for the cache, a model for the
+ * module — pgvector for the store, MikroORM for the cache, a model for the
  * probes — and specs hand in in-memory fakes. The chunk vocabulary is the
  * memory-recall pipeline's own `ChunkSource`, so a stored chunk is a valid
  * recall candidate without conversion.

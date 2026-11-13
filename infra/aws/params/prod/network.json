@@ -1,0 +1,4 @@
+[
+  { "ParameterKey": "VpcCidr", "ParameterValue": "10.40.0.0/16" },
+  { "ParameterKey": "AvailabilityZones", "ParameterValue": "us-east-1a,us-east-1b" }
+]

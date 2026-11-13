@@ -11,14 +11,13 @@ import {
   MemoryService,
   MikroOrmRecordStore,
   MikroOrmSpaceStore,
-  QdrantVectorIndex,
+  PgvectorVectorIndex,
   type Embedder,
   type VectorIndex,
 } from '@sysdesign/agentic-memory';
 import { startPeriodic, type Periodic } from '@sysdesign/contracts';
-import { MemoryRecord, MemorySpace, MemorySpaceDigest } from '@sysdesign/db';
+import { MemoryRecord, MemorySpace, MemorySpaceDigest, mikroOrmExecutor } from '@sysdesign/db';
 import { HttpLoopClient, LoopClient } from '@sysdesign/loop-client';
-import { qdrantClient } from '@sysdesign/qdrant-kit';
 
 import { CLOCK, type Clock } from '../common/clock';
 import { IDS, type Ids } from '../common/ids';
@@ -30,10 +29,9 @@ import { MemoryController } from './memory.controller';
 import { policyOf, type MemorySettings } from './settings';
 import { SpacesService } from './spaces.service';
 
-/** What the memory spaces are wired from: the two service URLs, the host's embedder, and the declared settings. */
+/** What the memory spaces are wired from: the loop's URL, the host's embedder, and the declared settings. */
 interface MemoryModuleOptions {
   loopUrl: string;
-  qdrantUrl: string;
   /** Built where the environment is read and handed in; this layer constructs no model client. */
   embedder: Embedder;
   memory: MemorySettings;
@@ -41,7 +39,7 @@ interface MemoryModuleOptions {
   policySource: string;
 }
 
-/** Where a space's records are projected for recall by meaning: Qdrant, in production. */
+/** Where a space's records are projected for recall by meaning: a pgvector table in the app's database, in production. */
 export const VECTOR_INDEX = Symbol('VECTOR_INDEX');
 
 const logger = new Logger('Memory');
@@ -79,11 +77,12 @@ class MemorySweep implements OnModuleInit, OnModuleDestroy {
 /**
  * Memory spaces wired to their ports: records and spaces in Postgres through
  * the runtime's MikroORM stores (the `memory_record` and `memory_space`
- * tables), their projection in Qdrant bound to the embedder's model and width,
- * the loop client a space's run is read and its digests are run through, the
- * ledger each digest's apply is recorded in once (the `memory_space_digest`
- * table), and the sweep on its schedule. A recovered fault the runtime
- * reports goes to the log.
+ * tables), their projection in a pgvector table of that same database bound
+ * to the embedder's model and width — raw SQL through the ORM's entity
+ * manager, since the ORM has no vector type — the loop client a space's run
+ * is read and its digests are run through, the ledger each digest's apply is
+ * recorded in once (the `memory_space_digest` table), and the sweep on its
+ * schedule. A recovered fault the runtime reports goes to the log.
  */
 @Module({})
 export class MemoryModule {
@@ -95,13 +94,9 @@ export class MemoryModule {
         { provide: LoopClient, useFactory: () => new HttpLoopClient(options.loopUrl) },
         {
           provide: VECTOR_INDEX,
-          useFactory: (): VectorIndex =>
-            new QdrantVectorIndex(
-              qdrantClient({ url: options.qdrantUrl }),
-              options.embedder,
-              options.memory.scopeKeys,
-              warn,
-            ),
+          useFactory: (em: EntityManager): VectorIndex =>
+            new PgvectorVectorIndex(mikroOrmExecutor(em), options.embedder),
+          inject: [EntityManager],
         },
         {
           provide: MemoryService,

@@ -35,7 +35,7 @@ export const AGENTIC_MEMORY_CRITERIA: readonly Criterion[] = [
   {
     id: 'AGM-7',
     statement:
-      'A memory is visible only to a request whose scope contains its own — a tenant’s to its users, a user’s to that user alone — identically in the record store and in the vector filter.',
+      'A memory is visible only to a request whose scope contains its own — a tenant’s to its users, a user’s to that user alone — identically in the record store and in the pgvector index’s filter.',
   },
   {
     id: 'AGM-8',
@@ -45,12 +45,12 @@ export const AGENTIC_MEMORY_CRITERIA: readonly Criterion[] = [
   {
     id: 'AGM-9',
     statement:
-      'The sweep expires short-term records by the clock it is handed, removes the points of records that closed, and projects every current record not in the current collection, so a failed write is projected later and a new embedding model fills a new collection.',
+      'The sweep expires short-term records by the clock it is handed, removes the points of records that closed — forgetting, with no index call, the mark of a closed record whose collection is no longer current, as every record closed before a generation bump is marked — and projects every current record not in the current collection — the pgvector index’s table, bound to the index generation, the embedding model and its width and made with its indexes on first use — so a failed write is projected later and a new embedding model fills a new collection.',
   },
   {
     id: 'AGM-10',
     statement:
-      'The Postgres record and space stores and the Qdrant index honour the same contract as the in-memory fakes the runtime’s specs run on.',
+      'The Postgres record and space stores and the pgvector index honour the same contract as the in-memory fakes the runtime’s specs run on.',
   },
   {
     id: 'AGM-11',

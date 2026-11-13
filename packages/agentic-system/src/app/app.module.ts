@@ -29,7 +29,6 @@ export class AppModule {
         }),
         MemoryModule.register({
           loopUrl: config.loopUrl,
-          qdrantUrl: config.qdrantUrl,
           embedder: config.embedder,
           memory: config.settings.memory,
           policySource: config.settings.policySource,

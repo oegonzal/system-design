@@ -8,8 +8,8 @@ memory-design capability: it takes a memory brief, runs the loop's
 the finished run to the `memory-design` orchestrator to digest and store as
 memory. A settled run's strategy then becomes a space the
 `@sysdesign/agentic-memory` runtime executes — its registers the stores, its
-declared interfaces the only verbs it serves — over Postgres, with a Qdrant
-projection for recall by meaning.
+declared interfaces the only verbs it serves — over Postgres, with a pgvector
+projection in that same database for recall by meaning.
 
 Nothing here judges or grades — that is the quality loop's engine — and nothing
 here executes a strategy — that is the runtime. This service is the domain: the
@@ -99,12 +99,17 @@ only that, once, recording the apply. How it is checked, what a caller owns and
 what stays open: `docs/agentic-system/memory-runtime.md` §9–§10.
 
 Postgres (`memory_space`, `memory_record`, and each digest's apply in
-`memory_space_digest`) is the truth; Qdrant holds a rebuildable projection, its
-collection bound to the embedding model and width.
+`memory_space_digest`) is the truth; the vector index is a rebuildable
+projection in a pgvector table of that same database
+(`vec_agentic_memory__v2__<model>__<width>`, made with its indexes on first
+use — raw SQL through the ORM's entity manager, since MikroORM has no vector
+type), its collection bound to the index generation, the embedding model and
+width. `memory_record.projected_into` names the collection, not the table.
 A sweep runs on the declared schedule across every space: it expires
-short-term records, removes the points of closed ones, and projects every
-current record not yet in the current collection — a write whose projection
-failed, or every record after the model changed. Without an embedding key the
+short-term records, removes the points of closed ones (and forgets the mark of
+a closed record whose collection is no longer current, asking nothing of the
+index), and projects every current record not yet in the current collection —
+a write whose projection failed, or every record after the model changed. Without an embedding key the
 service still serves its spaces: recall by meaning is skipped and says so
 (`embedder_disabled`), while exact and temporal recall still run.
 
@@ -137,12 +142,14 @@ name none.
   numbers are unmeasured starting values.
 
 Environment, read only in `src/config.ts`: `AGENTIC_SYSTEM_PORT` (3007),
-`QUALITY_LOOP_URL`, `NOTIFICATIONS_URL`, `QDRANT_URL` (`http://localhost:6333`).
-The embedder is built there too, by the llm package's own factory from its own
-variables, `OPENAI_API_KEY` and `OPENAI_EMBEDDING_MODEL`; without a key it is
-disabled and the boot log says why. The pod gets those two from the
+`QUALITY_LOOP_URL`, `NOTIFICATIONS_URL`. The vector index needs no variable of
+its own: it is a table in the database the db package's `DB_*` variables name
+(`QDRANT_URL` went with the move to pgvector on 2026-11-12). The embedder is
+built there too, by the llm package's own factory from its own variables,
+`OPENAI_API_KEY` and `OPENAI_EMBEDDING_MODEL`; without a key it is disabled and
+the boot log says why. The pod gets those two from the
 `agentic-system-embeddings` Secret the Tiltfile builds from the shell or
-`.env`, and `QDRANT_URL` from the `local-stores` ConfigMap.
+`.env`, and the database's host from the `local-stores` ConfigMap.
 
 ## Notifications
 
@@ -155,6 +162,13 @@ dedicated Telegram instance `telegram.agentic-system`
 (`AGENTICSYSTEM_TELEGRAM_API_KEY`, `AGENTICSYSTEM_TELEGRAM_BOT_ID`). Without one
 the prompt is still recorded on the bus, just not pushed.
 
-Run: `pnpm agentic-system:serve` (needs the quality loop on `QUALITY_LOOP_URL`,
-Postgres migrated with `pnpm db:migrate`, and Qdrant on `QDRANT_URL` for recall
-by meaning).
+Run: `pnpm agentic-system:serve` (needs the quality loop on `QUALITY_LOOP_URL`
+and Postgres migrated with `pnpm db:migrate`, which installs the `vector`
+extension the index's table is declared with; recall by meaning needs an
+embedding key besides). The boot line names the collection the index is bound
+to — `vectors: agentic-memory__v2__text-embedding-3-small__1536` — or `none`
+without a model. The table is made on the first write or search, not at boot.
+pgvector's HNSW index takes a `vector` column of at most 2,000 dimensions
+(checked on pgvector 0.8.0, 2026-11-11), so a wider embedding model, such as
+the 3,072-wide `text-embedding-3-large`, would fail the table's setup and the
+index would refuse every write until a narrower width is chosen.

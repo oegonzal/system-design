@@ -1,5 +1,7 @@
 import type { LandmarkRole, PageObservation, StepAction } from '@sysdesign/contracts';
 
+import type { StorageState } from './infra';
+
 /** The plan actions a browser performs; the rest are the engine's own events. */
 export const BROWSER_ACTION_KINDS = [
   'navigate',
@@ -41,11 +43,24 @@ export interface PagesClosed {
 }
 
 export interface BrowserPort {
-  /** The documents are the files an `upload` puts into a file control, by name; the browser alone reads them. */
+  /**
+   * The documents are the files an `upload` puts into a file control, by
+   * name; the browser alone reads them. A `seed` is a sign-in exported from
+   * another machine's profile, set into this one once it is open — it
+   * replaces every cookie, local storage and IndexedDB entry the profile
+   * holds, so only a fresh profile is ever seeded.
+   */
   open(
     profile: string,
-    options: { headed: boolean; documents: readonly SuppliedDocument[] },
+    options: { headed: boolean; documents: readonly SuppliedDocument[]; seed?: StorageState },
   ): Promise<void>;
+  /**
+   * The profile's sign-in state, read from the profile opened on its own,
+   * headless, and closed again: what moves it to another machine. The
+   * cookies are the profile's whole; the local storage and IndexedDB are
+   * those of the `origins` named, each visited on a blank page first.
+   */
+  exportState(profile: string, origins: readonly string[]): Promise<StorageState>;
   /** The page as it is now; the refs it lists resolve only until the next `observe`. */
   observe(): Promise<PageObservation>;
   /** What the page the last `observe` read states inside one landmark — each node's words in document order, from that observation's tree, never a new read; none when it lays out no such landmark. */

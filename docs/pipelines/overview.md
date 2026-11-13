@@ -259,8 +259,8 @@ only `brief` pipelines, the router never routes to a composed one, and no
 orchestrator takes one as a target but `form-memory`, whose target is the form
 pipeline its goal was composed for. It has its own Postgres tables
 (`quality_run` and its children, `orchestration_run` and its children,
-`memory_embedding`) and its own vector store (Qdrant, the
-`vectors` compose service); the dump remains the full audit trail beside them.
+`memory_embedding`, and the memory tier's pgvector tables, one per
+collection, created at boot); the dump remains the full audit trail beside them.
 
 A run may adopt a recorded iteration of an earlier run:
 `POST /runs { adopt: { runId, iteration }, criteria, … }`, exclusive with

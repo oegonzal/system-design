@@ -3,8 +3,8 @@
  * index its rebuildable projection (`VectorIndex`); the host hands in the
  * embedder, the clock and the ids — the runtime constructs no model client,
  * reads no environment and keeps no time of its own. The engine depends on
- * these alone. The Postgres and Qdrant adapters implement them, and so do the
- * fakes in `testing/`, which hold the same contract.
+ * these alone. The Postgres and pgvector adapters implement them, and so do
+ * the fakes in `testing/`, which hold the same contract.
  */
 import type { RecordScope, RecordStatus, RegisterKind } from '@sysdesign/contracts';
 
@@ -121,8 +121,13 @@ export interface RecordStore {
     kinds: readonly RegisterKind[],
     limit: number,
   ): Promise<MemoryRecord[]>;
-  /** At most `limit` closed records whose point is still in this collection, in id order. */
-  unprojectionDue(collection: string, limit: number): Promise<MemoryRecord[]>;
+  /**
+   * At most `limit` closed records still marked as projected — into any
+   * collection — in id order. A closed record carries no mark: the sweep
+   * removes its point when the mark names the current collection and forgets
+   * the mark when it names one that is no longer current.
+   */
+  unprojectionDue(limit: number): Promise<MemoryRecord[]>;
   /** Where these records' points now live. Never guarded by status, so a record closed mid-projection is still found. */
   markProjected(ids: readonly string[], collection: string | null): Promise<void>;
 }

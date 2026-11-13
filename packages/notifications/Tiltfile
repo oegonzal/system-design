@@ -12,6 +12,7 @@ docker_build(
         './nx.json',
         './tsconfig.base.json',
         './vite.nest.ts',
+        './docker/rds-global-bundle.pem',
         './packages/contracts',
         './packages/db',
         './packages/nest-kit',

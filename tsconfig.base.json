@@ -15,8 +15,8 @@
         "./packages/agentic-memory-client/src/testing.ts"
       ],
       "@sysdesign/config-kit": ["./packages/config-kit/src/index.ts"],
-      "@sysdesign/qdrant-kit": ["./packages/qdrant-kit/src/index.ts"],
-      "@sysdesign/qdrant-kit/testing": ["./packages/qdrant-kit/src/testing.ts"],
+      "@sysdesign/pgvector-kit": ["./packages/pgvector-kit/src/index.ts"],
+      "@sysdesign/pgvector-kit/testing": ["./packages/pgvector-kit/src/testing.ts"],
       "@sysdesign/contracts": ["./packages/contracts/src/index.ts"],
       "@sysdesign/criteria": ["./packages/criteria/src/index.ts"],
       "@sysdesign/db": ["./packages/db/src/index.ts"],

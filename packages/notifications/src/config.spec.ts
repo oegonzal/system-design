@@ -1,6 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs';
 import { join } from 'node:path';
 
+import { EngineConfigError } from '@sysdesign/config-kit';
 import { z } from 'zod';
 
 import type { ChannelSettings } from './channels';
@@ -11,7 +12,7 @@ import {
   NotificationsConfigError,
   PACKAGE_ROOT,
 } from './config';
-import { readSettings } from './settings';
+import { readSettings, type SettingsChoices } from './settings';
 
 const sources = (dir: string): string[] =>
   readdirSync(dir).flatMap((entry) => {
@@ -33,8 +34,10 @@ const PAGER: ChannelDefinition = {
   },
 };
 
-const shipped = readSettings(PACKAGE_ROOT);
-const running = (channels: ChannelSettings) => ({ ...shipped, channels });
+/** The package's own files, read as the service reads them, with whatever the environment chose. */
+const packaged = (choices: SettingsChoices) => readSettings(PACKAGE_ROOT, undefined, choices);
+const shipped = packaged({});
+const running = (channels: ChannelSettings) => (): typeof shipped => ({ ...shipped, channels });
 /** Pager instances by id, each binding its own token and room. */
 const pagers = (instances: Record<string, { token: string; room: string }>) =>
   running({
@@ -48,11 +51,13 @@ const pagers = (instances: Record<string, { token: string; room: string }>) =>
 
 describe('the service configuration', () => {
   it('[NTF-9] declares its variables once with their fallbacks, and reads them nowhere else', () => {
-    expect(notificationsConfigFromEnv(shipped, [], {}).port).toBe(3005);
+    expect(notificationsConfigFromEnv(packaged, [], {}).port).toBe(3005);
     expect(
-      notificationsConfigFromEnv(shipped, [], { [NOTIFICATIONS_ENV.port.name]: ' 4105 ' }).port,
+      notificationsConfigFromEnv(packaged, [], { [NOTIFICATIONS_ENV.port.name]: ' 4105 ' }).port,
     ).toBe(4105);
-    expect(() => notificationsConfigFromEnv(shipped, [], { NOTIFICATIONS_PORT: 'eighty' })).toThrow(
+    expect(() =>
+      notificationsConfigFromEnv(packaged, [], { NOTIFICATIONS_PORT: 'eighty' }),
+    ).toThrow(
       new NotificationsConfigError('NOTIFICATIONS_PORT must be a port number, got "eighty"'),
     );
 
@@ -60,6 +65,36 @@ describe('the service configuration', () => {
       .filter((path) => readFileSync(path, 'utf8').includes('process.env'))
       .map((path) => path.slice(__dirname.length + 1));
     expect(readers).toEqual(['config.ts']);
+  });
+
+  it('[NTF-9] runs the channels file the environment names, else the one the engine file chooses, and refuses a name with no file behind it', () => {
+    const engineChoice = JSON.parse(
+      readFileSync(join(PACKAGE_ROOT, 'config', 'engine.json'), 'utf8'),
+    ) as Record<string, string>;
+    expect(notificationsConfigFromEnv(packaged, [], {}).settings.sources.channels).toMatch(
+      new RegExp(`config/channels/${engineChoice['channels']}\\.json$`),
+    );
+    const named = notificationsConfigFromEnv(packaged, [], {
+      [NOTIFICATIONS_ENV.channels.name]: ' telegram-cloud ',
+    });
+    expect(named.settings.sources.channels).toMatch(/config\/channels\/telegram-cloud\.json$/);
+    expect(Object.keys(named.settings.channels['telegram']?.instances ?? {})).toEqual([
+      'telegram.govcon',
+      'telegram.job-application',
+    ]);
+    // An empty value is no choice, like an unset one.
+    expect(
+      notificationsConfigFromEnv(packaged, [], { NOTIFICATIONS_CHANNELS: '' }).settings.sources
+        .channels,
+    ).toBe(shipped.sources.channels);
+    expect(() =>
+      notificationsConfigFromEnv(packaged, [], { NOTIFICATIONS_CHANNELS: 'carrier-pigeon' }),
+    ).toThrow(EngineConfigError);
+    expect(() =>
+      notificationsConfigFromEnv(packaged, [], { NOTIFICATIONS_CHANNELS: 'carrier-pigeon' }),
+    ).toThrow(
+      /chooses channels "carrier-pigeon", but config\/channels\/carrier-pigeon\.json does not exist/,
+    );
   });
 
   it('[NTF-9] reads the variables each instance binds, under the keys its kind declares, and refuses a missing one by name', () => {

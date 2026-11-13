@@ -1,10 +1,11 @@
 /**
  * A vector index in memory: cosine similarity over the points of one
- * collection, filtered by the same visibility a Qdrant filter states — the
- * partition, then every OTHER policy scope key either unset on the point or
- * equal to the request's, and a key the request does not name unset.
+ * collection, filtered by the same visibility the pgvector filter compiles —
+ * the partition, then every OTHER policy scope key either unset on the point
+ * or equal to the request's, and a key the request does not name unset. The
+ * pgvector index's live spec holds the two to the same answers.
  */
-import { cosine } from '@sysdesign/qdrant-kit/testing';
+import { cosine } from '@sysdesign/pgvector-kit/testing';
 
 import { byText } from '../order';
 import type { PointPayload, VectorIndex, VisibilityFilter } from '../ports';

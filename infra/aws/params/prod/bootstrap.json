@@ -1,0 +1,8 @@
+[
+  { "ParameterKey": "GitHubOwner", "ParameterValue": "oegonzal" },
+  { "ParameterKey": "GitHubOwnerId", "ParameterValue": "6849844" },
+  { "ParameterKey": "GitHubRepo", "ParameterValue": "system-design" },
+  { "ParameterKey": "GitHubRepoId", "ParameterValue": "1357821224" },
+  { "ParameterKey": "ProductionEnvironmentName", "ParameterValue": "production" },
+  { "ParameterKey": "MonthlyBudgetUsd", "ParameterValue": "15" }
+]

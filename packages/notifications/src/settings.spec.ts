@@ -41,6 +41,25 @@ describe('the service settings', () => {
     }
   });
 
+  it('[NTF-9] a choice the caller makes wins over the engine file for that kind alone, and needs a file behind it', () => {
+    const chosen = readSettings(PACKAGE_ROOT, choosing(STANDARD), { channels: 'telegram-cloud' });
+    expect(chosen.sources.channels).toMatch(/config\/channels\/telegram-cloud\.json$/);
+    expect(chosen.sources.bus).toMatch(/config\/bus\/standard\.json$/);
+    expect(Object.keys(chosen.channels['telegram']?.instances ?? {})).toEqual([
+      'telegram.govcon',
+      'telegram.job-application',
+    ]);
+    // The caller's choice stands even where the engine file chose nothing for that kind.
+    expect(
+      readSettings(PACKAGE_ROOT, choosing({ bus: 'standard', interactions: 'standard' }), {
+        channels: 'none',
+      }).sources.channels,
+    ).toMatch(/config\/channels\/none\.json$/);
+    expect(() =>
+      readSettings(PACKAGE_ROOT, choosing(STANDARD), { channels: 'carrier-pigeon' }),
+    ).toThrow(EngineConfigError);
+  });
+
   it('[NTF-9] refuses a kind left unchosen, a field no schema declares, and a subscriber asking past the bus', () => {
     expect(() =>
       readSettings(PACKAGE_ROOT, choosing({ bus: 'standard', interactions: 'standard' })),

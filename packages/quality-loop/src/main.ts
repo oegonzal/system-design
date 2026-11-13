@@ -4,6 +4,7 @@ import type { NestExpressApplication } from '@nestjs/platform-express';
 import { errorMessage } from '@sysdesign/contracts';
 
 import { preflight } from './boot';
+import { importQdrantCli } from './cli/import-qdrant';
 import { replayCli } from './cli/replay';
 import { runCli } from './cli/run';
 import { AppModule } from './modules/app/app.module';
@@ -12,15 +13,17 @@ import { configureApp } from './modules/app/configure-app';
 const DEFAULT_PORT = 3003;
 
 /**
- * The quality loop, three ways: `main.js run …` runs one pipeline from the
+ * The quality loop, four ways: `main.js run …` runs one pipeline from the
  * command line and exits; `main.js replay …` decides every recorded iteration
- * of a pipeline again under each controller and exits; anything else serves
- * the HTTP surface — runs, pipelines, criteria, prompts, orchestrations, the
- * memory and router tools, and `/health` (the README lists the routes).
+ * of a pipeline again under each controller and exits; `main.js import-qdrant …`
+ * carries the memory collection over from the Qdrant that held it before the
+ * pgvector move and exits; anything else serves the HTTP surface — runs,
+ * pipelines, criteria, prompts, orchestrations, the memory and router tools,
+ * and `/health` (the README lists the routes).
  *
  * `serve` and `run` refuse to start without a Claude Code subscription login —
- * exit 1 saying how to get one, before any module boots. `replay` calls no
- * model and boots a slimmer context.
+ * exit 1 saying how to get one, before any module boots. `replay` and
+ * `import-qdrant` call no model and boot a slimmer context.
  */
 async function bootstrap(): Promise<void> {
   process.on('uncaughtException', (error) => {
@@ -39,6 +42,9 @@ async function bootstrap(): Promise<void> {
 
   if (checked.command === 'replay') {
     process.exit(await replayCli(argv.slice(1)));
+  }
+  if (checked.command === 'import-qdrant') {
+    process.exit(await importQdrantCli(argv.slice(1)));
   }
   if (checked.command === 'run') {
     process.exit(await runCli(argv.slice(1)));

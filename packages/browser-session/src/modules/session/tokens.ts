@@ -26,3 +26,5 @@ export const DUMP_STORE = Symbol('DUMP_STORE');
 export const UNIT_ADVISORS = Symbol('UNIT_ADVISORS');
 export const SESSION_EVENTS = Symbol('SESSION_EVENTS');
 export const STOP_SIGNAL = Symbol('STOP_SIGNAL');
+/** The profile, its exported sign-in and the documents, wherever they live beyond this machine. */
+export const SESSION_FILES = Symbol('SESSION_FILES');

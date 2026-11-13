@@ -1,0 +1,109 @@
+# Edge stack (sysdesign-prod-edge): the public hostname.
+#
+# What it declares: the CloudFront distribution whose only origin is the
+# gateway function URL; the secret origin header is what lets the gateway
+# tell CloudFront from the open internet, and the hashed Next static assets
+# are the only thing cached (public JavaScript that carries no session).
+#
+# Absent on purpose: any sign-in resource (the user pool and its client live
+# in the platform stack; the gateway renders the sign-in page itself); an
+# origin access control (OAC signing would make the browser hash every POST
+# body); caching on anything but the static assets; a custom domain (the
+# *.cloudfront.net name costs nothing and needs no zone); a 503 cache, so a
+# "starting" page is never served stale.
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'System Design Studio: CloudFront distribution in front of the gateway'
+
+Parameters:
+  OriginSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 32
+    Description: 'Value CloudFront sends as x-origin-verify; the same value the app stack was deployed with'
+  OriginReadTimeout:
+    Type: Number
+    Default: 120
+    MinValue: 1
+    MaxValue: 120
+    Description: 'Seconds CloudFront waits for the gateway: 1–120 as the account comes; more needs a quota request'
+
+# The CloudFront managed policies, by their fixed ids (docs: "Use managed
+# cache policies" / "Use managed origin request policies").
+Mappings:
+  CloudFront:
+    CachePolicy:
+      CachingDisabled: '4135ea2d-6df8-44a3-9df3-4b5a84be39ad'
+      CachingOptimized: '658327ea-f89d-4fab-a63d-7e88639e58f6'
+    OriginRequestPolicy:
+      AllViewerExceptHostHeader: 'b689b0a8-53d0-40ab-baf2-68738e2966ac'
+
+Resources:
+  Distribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Comment: !Ref AWS::StackName
+        Enabled: true
+        HttpVersion: http2and3
+        IPV6Enabled: true
+        PriceClass: PriceClass_100
+        ViewerCertificate:
+          CloudFrontDefaultCertificate: true
+        Origins:
+          # The function URL is https://<id>.lambda-url.<region>.on.aws/; the
+          # host is the third piece once split on '/'.
+          - Id: gateway
+            DomainName: !Select [2, !Split ['/', !ImportValue 'sysdesign-prod-GatewayFunctionUrl']]
+            CustomOriginConfig:
+              OriginProtocolPolicy: https-only
+              OriginSSLProtocols:
+                - TLSv1.2
+              OriginReadTimeout: !Ref OriginReadTimeout
+              OriginKeepaliveTimeout: 5
+            OriginCustomHeaders:
+              - HeaderName: x-origin-verify
+                HeaderValue: !Ref OriginSecret
+        DefaultCacheBehavior:
+          TargetOriginId: gateway
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS, PUT, PATCH, POST, DELETE]
+          CachedMethods: [GET, HEAD]
+          Compress: true
+          CachePolicyId: !FindInMap [CloudFront, CachePolicy, CachingDisabled]
+          OriginRequestPolicyId:
+            !FindInMap [CloudFront, OriginRequestPolicy, AllViewerExceptHostHeader]
+        CacheBehaviors:
+          - PathPattern: '/_next/static/*'
+            TargetOriginId: gateway
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            CachePolicyId: !FindInMap [CloudFront, CachePolicy, CachingOptimized]
+          - PathPattern: '/inspector/_next/static/*'
+            TargetOriginId: gateway
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            CachePolicyId: !FindInMap [CloudFront, CachePolicy, CachingOptimized]
+          - PathPattern: '/govcon/_next/static/*'
+            TargetOriginId: gateway
+            ViewerProtocolPolicy: redirect-to-https
+            AllowedMethods: [GET, HEAD]
+            CachedMethods: [GET, HEAD]
+            Compress: true
+            CachePolicyId: !FindInMap [CloudFront, CachePolicy, CachingOptimized]
+        CustomErrorResponses:
+          - ErrorCode: 503
+            ErrorCachingMinTTL: 0
+      Tags:
+        - Key: project
+          Value: sysdesign
+        - Key: env
+          Value: prod
+
+Outputs:
+  SiteUrl:
+    Description: 'Where the studio is; the production environment URL in GitHub'
+    Value: !Sub 'https://${Distribution.DomainName}/'

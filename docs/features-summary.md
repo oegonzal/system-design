@@ -1,6 +1,6 @@
 # What has been built so far
 
-_As of 28 Oct 2026 (UTC): 845 commits since 27 Aug 2026, plus one landing of 27 Oct not yet committed; 35 packages._
+_As of 28 Oct 2026 (UTC): 845 commits since 27 Aug 2026, plus one landing of 27 Oct not yet committed; 36 packages._
 
 This page explains, in plain words, what this repository can do today. Two labels show how far each feature has been proven:
 
@@ -12,11 +12,11 @@ This page explains, in plain words, what this repository can do today. Two label
 - **Interview practice.** The Studio lets you draw a system design for an interview prompt, get it scored 0–100 and explained by a panel of AI reviewers, and let an AI coach improve it.
 - **One shared AI engine.** Every AI task in the apps runs through the quality loop: one AI drafts, other AIs check, and fixed rules in plain code decide. It recorded 3,139 runs between 6 Sep and 18 Oct 2026.
 - **Memory.** The engine keeps lessons from past runs and facts about you from your documents and answers. Separately, the engine can design memory for an AI agent, and a newer memory engine runs that design as a live service. Since 27 Oct 2026 a program can ask that service for a space by name, and the job assistant has one, `job-assistant`, being filled and checked under a test tenant before anything live uses it.
-- **Job applications.** A supervised Chrome applies to LinkedIn Easy Apply jobs, fills forms from your record, asks you the rest and skips companies you applied to in the last 90 days. At least 77 applications went in between 10 and 16 Oct 2026.
+- **Job applications.** A supervised Chrome, or, in the cloud, a headless one on a schedule, applies to LinkedIn Easy Apply jobs, fills forms from your record, asks you the rest and skips companies you applied to in the last 90 days. At least 77 applications went in between 10 and 16 Oct 2026.
 - **Your phone and Google.** Five Telegram bots bring you questions and alerts. The AI can use your Gmail and Google Calendar as tools; it has no way to send mail, and it is built to ask for your yes before any calendar change.
 - **Government contracting.** govcon finds federal contract notices for Enfav on SAM.gov, ranks them, studies government spending on USAspending and sends a daily Telegram digest.
 - **The Enfav website.** enfav.com has been live since 14 Oct 2026. Its tests stop any page from stating a company fact that is not on one declared list.
-- **The foundation.** One repository of 33 packages, one local stack, one database changed only by numbered migrations, and automatic checks on every commit.
+- **The foundation.** One repository of 36 packages, one local stack, one database changed only by numbered migrations, and automatic checks on every commit.
 
 ## The big picture
 
@@ -37,17 +37,17 @@ This page explains, in plain words, what this repository can do today. Two label
         | AI tasks           | records
         v                    v
   +-------------------+  +--------------------------------+
-  | QUALITY LOOP      |->| STORES                         |
+  | QUALITY LOOP      |->| STORE                          |
   | port 3003         |  |  PostgreSQL (port 5433):       |
-  | the shared engine |  |    records, runs, history      |
-  | asks Claude, then |  |  Qdrant (port 6333):           |
-  | decides by rules  |  |    memories, found by meaning  |
+  | the shared engine |  |    records, runs, history,     |
+  | asks Claude, then |  |    and memories found by       |
+  | decides by rules  |  |    meaning (pgvector tables)   |
   +-------------------+  +--------------------------------+
 
   Public, on its own: the Enfav website at enfav.com, served by Cloudflare
 ```
 
-You work in three places: web pages, terminal commands and Telegram on your phone. Every app that needs AI hands the work to one shared engine, the quality loop, which asks Claude through your Claude Code login and then decides by fixed rules. Records and memories live in two local stores: PostgreSQL for records, and Qdrant for memories found by meaning. Search by meaning needs an OpenAI key, because Claude offers no model for it; without the key, the engine skips its memory steps and still runs. All of it runs on your own computer except the website.
+You work in three places: web pages, terminal commands and Telegram on your phone. Every app that needs AI hands the work to one shared engine, the quality loop, which asks Claude through your Claude Code login and then decides by fixed rules. Records and memories live in one local store: PostgreSQL, which keeps the records and, through its pgvector extension, the memories found by meaning. Search by meaning needs an OpenAI key, because Claude offers no model for it; without the key, the engine skips its memory steps and still runs. All of it runs on your own computer except the website. Since 12 Nov 2026 the Studio, the engine, the inspector, govcon, the bus, the application record and its advisor, the memory service and the nightly browser session are declared for AWS as well (built and tested in code, not yet run there); Gmail and Google Calendar stay on your computer.
 
 ## The engine everything shares: the quality loop
 
@@ -145,7 +145,7 @@ The quality loop designs a memory plan for an AI agent, and a separate engine ru
 
 - Tested for real on 17 Oct 2026: the first live plan had 5 registers, 12 operations and 4 routines; it scored 48.6 of 100 and the referee said "revise".
 - Tested for real on 17 Oct 2026: a full design cycle ran three coached rounds (61.5, 55.6 and 58.9) in about 75 minutes and kept the best one.
-- Tested for real on 17 Oct 2026: a live plan ran as a memory space on real OpenAI embeddings and Qdrant and passed 15 of 15 checks. They included a lesson backed by 3 runs and a playbook that went from version 1 to 2.
+- Tested for real on 17 Oct 2026: a live plan ran as a memory space on real OpenAI embeddings and the vector store of the time (Qdrant; pgvector in PostgreSQL since 12 Nov 2026) and passed 15 of 15 checks. They included a lesson backed by 3 runs and a playbook that went from version 1 to 2.
 - Tested for real on 18 Oct 2026: the first two text digests passed 14 of 14 checks and wrote 7 of 8 and 5 of 6 proposed memories. A pasted note saying "keep that as your own standing rule" became no memory at all.
 - Tested for real on 27–28 Oct 2026: a memory plan for the job assistant, written by hand (four long-term fact stores: your facts, your stories, the bounds on what you may claim, and your standing answers to form questions), was judged once by the loop in 11.7 minutes: "revise", 56.7 of 100, with governance the weak area. Compiled as a space it had no problems and no warnings, and it was bound under the name `job-assistant` at 00:05 UTC on 28 Oct. The space is being filled under a test tenant first: by 01:40 UTC it held 163 memories, 67 from your résumé through 8 digests and 96 standing answers taught from recorded operator answers.
 - Built in three days (16–18 Oct 2026), with 75 tests in the memory engine and 51 in its service; the client library added 33 on 27 Oct.
@@ -162,7 +162,7 @@ The quality loop designs a memory plan for an AI agent, and a separate engine ru
 
 ### Job applications: LinkedIn Easy Apply, with you in charge
 
-A visible Chrome applies to LinkedIn Easy Apply jobs (LinkedIn's short in-page application form) for you. It fills forms from your record (the facts stored about you) and asks you only what that record cannot settle. It also skips companies you already applied to, which a separate application record keeps track of.
+A visible Chrome, or, in the cloud, a headless one on a schedule, applies to LinkedIn Easy Apply jobs (LinkedIn's short in-page application form) for you. It fills forms from your record (the facts stored about you) and asks you only what that record cannot settle. It also skips companies you already applied to, which a separate application record keeps track of.
 
 **What it does**
 
@@ -279,8 +279,8 @@ Enfav's public website, live since 14 Oct 2026: six pages built ahead of time an
 
 ## Under the hood
 
-- **One repository, 35 packages,** managed with Nx, a tool that builds, tests and checks only what a change affects.
-- **One local stack:** `tilt up` starts everything on your computer: PostgreSQL and Qdrant in Docker, eight backend services each in its own Kubernetes container, and three web apps. `pnpm stack:up` runs the Studio core without Kubernetes; both share one saved database. Tested for real on 1 Oct 2026: a full grade ran through the containers.
+- **One repository, 36 packages,** managed with Nx, a tool that builds, tests and checks only what a change affects.
+- **One local stack:** `tilt up` starts everything on your computer: PostgreSQL in Docker (with the pgvector extension, so the memories live in the same database; the image is built once, on the first start), eight backend services each in its own Kubernetes container, and three web apps. `pnpm stack:up` runs the Studio core without Kubernetes; both share one saved database. Tested for real on 1 Oct 2026: a full grade ran through the containers.
 - **Database changes by migration:** one PostgreSQL database with 40 tables, changed only by 88 numbered, hand-written migration files (two of them, from 27 Oct, not yet committed). A drift check fails if the code and the database disagree.
 - **Tests cannot touch your data:** they may only empty a database named as a test database. The guard landed hours after a test run erased the practice data on 2 Oct 2026.
 - **Checks on every commit:** automatic formatting, a banned-names check, code-style and type checks for the packages touched, then an AI readability reviewer plus fixed rules (file size, package boundaries, theme use).
@@ -289,42 +289,45 @@ Enfav's public website, live since 14 Oct 2026: six pages built ahead of time an
 - **One look:** a shared design system (24 components, two chart types, colour contrast checked by tests) and a Storybook catalog that renders every example.
 - **Claude only through your subscription:** the engine reaches Claude through your Claude Code login, checked before it starts; no Claude API key is used.
 - **Not there yet:**
-  - GitHub's copy of `main` stops at 3 Sep 2026, so CI (GitHub re-running every check) has not checked recent work. It also builds container images for only 5 of the 8 backend services.
-  - No monitoring, nothing deployed to AWS and no scheduled backup.
+  - GitHub's copy of `main` stops at 3 Sep 2026, so CI (GitHub re-running every check) has not checked recent work. Since 12 Nov 2026 CI builds a container image for everything the AWS declaration deploys — the 6 cloud backend services, the 3 web apps, the database-migration task and the browser-session image — plus the 2 laptop-only backends the same declaration lists as local-only, from the same list the deploy builds from, and lints the AWS templates.
+  - No monitoring, and no scheduled backup of the local database.
+  - The AWS deployment is built and tested in code, not yet tested for real: `infra/aws` declares it (one container task behind one web address with its own sign-in page, a database that pauses when idle, the whole thing asleep after 15 idle minutes confirmed twice, and a browser-session task that runs headless on a nightly schedule), `.github/workflows/deploy-aws.yml` deploys it from `main`, and [its runbook](aws/deployment.md) says how to set it up; no AWS account has run it yet.
   - Several Claude sessions share one checkout, so saving a shared package or `.env` restarts the servers watching it and stops runs in flight.
 
 ## Where each part runs
 
 Full start-up steps are in [the README](../README.md) and [the RUNBOOK](../RUNBOOK.md). AI work needs this computer signed in with `claude login`, and memory search needs `OPENAI_API_KEY` in `.env`.
 
-| Part                                         | How to open or start it                                                                                         |
-| -------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Everything at once                           | `bash scripts/setup.sh`, then `tilt up`                                                                         |
-| Studio core: stores, API, engine, Studio     | `pnpm stack:up` (`pnpm stack:down` stops the stores)                                                            |
-| Studio                                       | http://localhost:4200                                                                                           |
-| Studio API                                   | http://localhost:3000/api                                                                                       |
-| Quality loop (the engine)                    | `pnpm quality-loop:serve`, then http://localhost:3003/health                                                    |
-| Run page and run inspector                   | `pnpm quality-loop-ui:serve`, then http://localhost:4201 and /inspect                                           |
-| govcon                                       | `pnpm govcon:start`: web app http://localhost:4202, service port 3004                                           |
-| Notifications bus and Telegram bots          | `pnpm notifications:serve`, then http://localhost:3005/health                                                   |
-| Application record                           | `pnpm job-application:serve` (port 3006)                                                                        |
-| Job applications in Chrome                   | `pnpm browser-session run …` (full command in the RUNBOOK)                                                      |
-| Agentic memory service                       | `pnpm agentic-system:serve`, then http://localhost:3007/health                                                  |
-| Gmail tools                                  | `pnpm gmail:serve`, then http://localhost:3008/tools                                                            |
-| Google Calendar tools                        | `pnpm google-calendar:serve`, then http://localhost:3009/tools                                                  |
-| Your documents into memory                   | `pnpm memory-ingest ingest <file> --subject "<name>"` (into a memory space instead: `MEMORY_INGEST_SINK=space`) |
-| A memory space, read back                    | `pnpm memory-ingest recall`, `history` or `forget`, with `--space <name> --tenant <tenant>`                     |
-| Recorded form pages replayed against a space | `pnpm browser-session replay-fields --sessions static/sessions --tenant <tenant>`                               |
-| PostgreSQL and Qdrant only                   | `pnpm stack:db` (localhost:5433 and http://localhost:6333)                                                      |
-| Storybook catalog                            | `pnpm exec nx run storybook:storybook`, then http://localhost:6006                                              |
-| Enfav website                                | https://enfav.com live; `pnpm website:serve` for http://localhost:4203                                          |
+| Part                                                                                                                 | How to open or start it                                                                                                                                                                                                         |
+| -------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Everything at once                                                                                                   | `bash scripts/setup.sh`, then `tilt up`                                                                                                                                                                                         |
+| Studio core: stores, API, engine, Studio                                                                             | `pnpm stack:up` (`pnpm stack:down` stops the stores)                                                                                                                                                                            |
+| Studio                                                                                                               | http://localhost:4200                                                                                                                                                                                                           |
+| Studio API                                                                                                           | http://localhost:3000/api                                                                                                                                                                                                       |
+| Quality loop (the engine)                                                                                            | `pnpm quality-loop:serve`, then http://localhost:3003/health                                                                                                                                                                    |
+| Run page and run inspector                                                                                           | `pnpm quality-loop-ui:serve`, then http://localhost:4201 and /inspect                                                                                                                                                           |
+| govcon                                                                                                               | `pnpm govcon:start`: web app http://localhost:4202, service port 3004                                                                                                                                                           |
+| Notifications bus and Telegram bots                                                                                  | `pnpm notifications:serve`, then http://localhost:3005/health                                                                                                                                                                   |
+| Application record                                                                                                   | `pnpm job-application:serve` (port 3006)                                                                                                                                                                                        |
+| Job applications in Chrome                                                                                           | `pnpm browser-session run …` (full command in the RUNBOOK)                                                                                                                                                                      |
+| Agentic memory service                                                                                               | `pnpm agentic-system:serve`, then http://localhost:3007/health                                                                                                                                                                  |
+| Gmail tools                                                                                                          | `pnpm gmail:serve`, then http://localhost:3008/tools                                                                                                                                                                            |
+| Google Calendar tools                                                                                                | `pnpm google-calendar:serve`, then http://localhost:3009/tools                                                                                                                                                                  |
+| Your documents into memory                                                                                           | `pnpm memory-ingest ingest <file> --subject "<name>"` (into a memory space instead: `MEMORY_INGEST_SINK=space`)                                                                                                                 |
+| A memory space, read back                                                                                            | `pnpm memory-ingest recall`, `history` or `forget`, with `--space <name> --tenant <tenant>`                                                                                                                                     |
+| Recorded form pages replayed against a space                                                                         | `pnpm browser-session replay-fields --sessions static/sessions --tenant <tenant>`                                                                                                                                               |
+| PostgreSQL only (records and memories)                                                                               | `pnpm stack:db` (localhost:5433)                                                                                                                                                                                                |
+| Memories carried over from the old Qdrant service                                                                    | `pnpm memory:import-qdrant`, once, after `pnpm stack:db` and `pnpm db:migrate` (since 12 Nov 2026 the memories live in PostgreSQL)                                                                                              |
+| Storybook catalog                                                                                                    | `pnpm exec nx run storybook:storybook`, then http://localhost:6006                                                                                                                                                              |
+| Enfav website                                                                                                        | https://enfav.com live; `pnpm website:serve` for http://localhost:4203                                                                                                                                                          |
+| Online, on AWS (Studio, engine, inspector, govcon, bus, application record, memory service, nightly browser session) | Not yet deployed. `pnpm aws:deploy` runs the pipeline from `main` once the one-time setup in [the AWS runbook](aws/deployment.md) is done; the site address is the deploy's summary, `pnpm aws:status` says whether it is awake |
 
 ## By the numbers
 
 | What                                                | Count                                                        |
 | --------------------------------------------------- | ------------------------------------------------------------ |
 | Commits                                             | 845 since 27 Aug 2026, plus one uncommitted landing (27 Oct) |
-| Packages                                            | 35                                                           |
+| Packages                                            | 36                                                           |
 | Pipelines and orchestrators                         | 16 and 9                                                     |
 | Quality-loop runs recorded                          | 3,139 (6 Sep–18 Oct 2026), 1,940 ended in "accept"           |
 | …of them browser steps                              | 2,024                                                        |
@@ -342,32 +345,32 @@ Full start-up steps are in [the README](../README.md) and [the RUNBOOK](../RUNBO
 
 ## Words you'll see
 
-| Word                  | What it means                                                                                                                                                                                                    |
-| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Quality loop          | The shared AI engine: one AI drafts, other AIs check, and plain code decides.                                                                                                                                    |
-| Pipeline              | A recipe written as data: what to produce, who judges it and the scoring rules. There are 16.                                                                                                                    |
-| Orchestrator          | A fixed chain of pipeline runs, such as recall, then run, then digest, then store. There are 9.                                                                                                                  |
-| Run                   | One trip through a pipeline, from goal to decision, saved with every prompt and reply.                                                                                                                           |
-| Round (iteration)     | One draft, judge and decide pass inside a run. "Revise" or "retry" starts another, up to a set limit.                                                                                                            |
-| Producer              | The AI "writer" that drafts the thing being judged.                                                                                                                                                              |
-| Critic                | An AI reviewer that only hunts for defects, each picked from a fixed list of defect types.                                                                                                                       |
-| Evaluator             | An AI grader that marks each checklist item pass, partial or fail.                                                                                                                                               |
-| Controller            | Plain code, never AI, that turns the evidence into a score and a decision by fixed rules.                                                                                                                        |
-| Checklist (criteria)  | The items c1, c2 … drawn from the goal before judging starts, so every reviewer grades the same list.                                                                                                            |
-| Lesson and fact       | A lesson is advice learned from a graded run. A fact is something true about you, from your documents or answers.                                                                                                |
-| Your record           | All the facts stored about you. Job forms are filled from it, and each answer you give is added to it.                                                                                                           |
-| Application record    | A separate list of the companies you have applied to (port 3006). It stops a second application to the same company within 90 days.                                                                              |
-| Digest                | An AI run that boils something finished (a run, a document chunk, an answer) into a few short memories, each checked before it is stored. govcon's daily Telegram "digest" is different: just a summary message. |
-| Recall                | Searching memory for what fits a new task.                                                                                                                                                                       |
-| Vector store (Qdrant) | The database that keeps each memory as a list of numbers (an embedding), so it can find texts with a similar meaning, not just the same words.                                                                   |
-| Memory space          | A live memory service made from one memory plan. It saves, finds, updates and forgets memories. Since 27 Oct 2026 a program can ask for one by name, such as `job-assistant`.                                    |
-| Tenant and unit       | Inside a space, the tenant is whose memories they are (every request names one), and a unit is one piece of work, such as one employer's posting, that an answer may be kept for alone.                          |
-| Brain (job assistant) | Which decision-maker a job-application session uses, chosen in its settings: `loop` (today) or `memory` (reads the `job-assistant` space, then has the loop judge).                                              |
-| Register              | One labelled store for one kind of memory in a plan: working (the task in hand), episodic (what happened), semantic (facts), procedural (how-to) or relational (how things connect).                             |
-| Migration             | A numbered, hand-written change to the database's structure. Applying them in order makes every copy identical.                                                                                                  |
-| Port                  | The number after `localhost:` in an address. Each service listens on its own, such as 3003 for the quality loop.                                                                                                 |
-| Telegram bot          | A chat account a service uses to message you on Telegram. There is one per purpose.                                                                                                                              |
-| Event bus             | A shared message board where services post what happened and others read it in order.                                                                                                                            |
+| Word                    | What it means                                                                                                                                                                                                                 |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Quality loop            | The shared AI engine: one AI drafts, other AIs check, and plain code decides.                                                                                                                                                 |
+| Pipeline                | A recipe written as data: what to produce, who judges it and the scoring rules. There are 16.                                                                                                                                 |
+| Orchestrator            | A fixed chain of pipeline runs, such as recall, then run, then digest, then store. There are 9.                                                                                                                               |
+| Run                     | One trip through a pipeline, from goal to decision, saved with every prompt and reply.                                                                                                                                        |
+| Round (iteration)       | One draft, judge and decide pass inside a run. "Revise" or "retry" starts another, up to a set limit.                                                                                                                         |
+| Producer                | The AI "writer" that drafts the thing being judged.                                                                                                                                                                           |
+| Critic                  | An AI reviewer that only hunts for defects, each picked from a fixed list of defect types.                                                                                                                                    |
+| Evaluator               | An AI grader that marks each checklist item pass, partial or fail.                                                                                                                                                            |
+| Controller              | Plain code, never AI, that turns the evidence into a score and a decision by fixed rules.                                                                                                                                     |
+| Checklist (criteria)    | The items c1, c2 … drawn from the goal before judging starts, so every reviewer grades the same list.                                                                                                                         |
+| Lesson and fact         | A lesson is advice learned from a graded run. A fact is something true about you, from your documents or answers.                                                                                                             |
+| Your record             | All the facts stored about you. Job forms are filled from it, and each answer you give is added to it.                                                                                                                        |
+| Application record      | A separate list of the companies you have applied to (port 3006). It stops a second application to the same company within 90 days.                                                                                           |
+| Digest                  | An AI run that boils something finished (a run, a document chunk, an answer) into a few short memories, each checked before it is stored. govcon's daily Telegram "digest" is different: just a summary message.              |
+| Recall                  | Searching memory for what fits a new task.                                                                                                                                                                                    |
+| Vector store (pgvector) | The part of the PostgreSQL database that keeps each memory as a list of numbers (an embedding), so it can find texts with a similar meaning, not just the same words. Until 12 Nov 2026 this was a separate service (Qdrant). |
+| Memory space            | A live memory service made from one memory plan. It saves, finds, updates and forgets memories. Since 27 Oct 2026 a program can ask for one by name, such as `job-assistant`.                                                 |
+| Tenant and unit         | Inside a space, the tenant is whose memories they are (every request names one), and a unit is one piece of work, such as one employer's posting, that an answer may be kept for alone.                                       |
+| Brain (job assistant)   | Which decision-maker a job-application session uses, chosen in its settings: `loop` (today) or `memory` (reads the `job-assistant` space, then has the loop judge).                                                           |
+| Register                | One labelled store for one kind of memory in a plan: working (the task in hand), episodic (what happened), semantic (facts), procedural (how-to) or relational (how things connect).                                          |
+| Migration               | A numbered, hand-written change to the database's structure. Applying them in order makes every copy identical.                                                                                                               |
+| Port                    | The number after `localhost:` in an address. Each service listens on its own, such as 3003 for the quality loop.                                                                                                              |
+| Telegram bot            | A chat account a service uses to message you on Telegram. There is one per purpose.                                                                                                                                           |
+| Event bus               | A shared message board where services post what happened and others read it in order.                                                                                                                                         |
 
 ## Where to read more
 
@@ -380,4 +383,5 @@ Full start-up steps are in [the README](../README.md) and [the RUNBOOK](../RUNBO
 - **Phone and Google tools:** [tool sessions](pipelines/tool-session.md), [the notifications bus](../packages/notifications/README.md), [Gmail](../packages/gmail/README.md) and [Google Calendar](../packages/google-calendar/README.md).
 - **govcon:** [overview](govcon/overview.md), [spending research](govcon/spending.md) and [Enfav's federal demand and prospects](govcon/enfav-prospects.md).
 - **The website:** [building, deploying and running enfav.com](enfav/website.md).
+- **The studio on AWS:** [declaring, deploying and operating it](aws/deployment.md).
 - **Known issues:** [the issues index](issues/README.md) (a few entries are out of date).

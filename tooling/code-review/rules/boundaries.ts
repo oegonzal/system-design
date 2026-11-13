@@ -13,9 +13,9 @@ import type { ChangedFile } from './index';
  *
  *   contracts      -> (nothing)         the shared vocabulary; the root of the graph
  *   criteria       -> contracts         completion criteria as data
- *   db             -> contracts         MikroORM entities and migrations
+ *   pgvector-kit   -> contracts         a vector collection's table name, its SQL literals, the executor port and the boot-time ensure, for every store over pgvector
+ *   db             -> contracts, pgvector-kit   MikroORM entities and migrations, and the kit's SqlExecutor over an EntityManager
  *   config-kit     -> (nothing)         a program's configuration chosen by name from its config folder
- *   qdrant-kit     -> contracts         a Qdrant collection's name, client and boot-time ensure, for every store over Qdrant
  *   llm            -> contracts, config-kit   provider adapters
  *   run-dump       -> (nothing)         run-folder plumbing for pipeline dumps
  *   nest-kit       -> contracts, db     the Nest apps' shared plumbing (zod pipe, db root, cors, health)
@@ -29,7 +29,7 @@ import type { ChangedFile } from './index';
  *   google-kit     -> contracts         Google's OAuth consent and refresh, the token file, and the authorized request
  *   studio-testing -> contracts, loop-client   the quality loop as a scriptable fake, shared by studio-api's specs and the e2e stub
  *   studio-api     -> contracts, db, nest-kit, loop-client, studio-testing (specs and the test folder only)
- *   quality-loop   -> contracts, db, llm, run-dump, nest-kit, qdrant-kit
+ *   quality-loop   -> contracts, db, llm, run-dump, nest-kit, pgvector-kit
  *   govcon         -> contracts, db, nest-kit, notifications-client, loop-client, studio-testing (specs)   SAM.gov opportunities: search, store, rank; introductions through the loop
  *   notifications-client -> contracts   the notifications bus as one port, its HTTP adapter, and asking a person through it
  *   tool-session   -> contracts, nest-kit, loop-client, notifications-client, db (the test-database guard only)   a mission run as tool calls the loop decides, for any program that declares tools
@@ -37,12 +37,13 @@ import type { ChangedFile } from './index';
  *   memory-ingest  -> contracts, loop-client, agentic-memory-client, studio-testing (specs only)   documents chunked and handed to the loop, or digested into a memory space
  *   notifications  -> contracts, db, nest-kit, config-kit   the event bus, and the channels that put prompts to people
  *   job-application -> contracts, db, nest-kit, config-kit, notifications-client   the record of units a session applied to, and the advisor over it
- *   agentic-memory -> contracts, db, qdrant-kit   a memory strategy executed: typed writes, hybrid recall, consolidation and the sweep, over Postgres and a Qdrant projection
+ *   agentic-memory -> contracts, db, pgvector-kit   a memory strategy executed: typed writes, hybrid recall, consolidation and the sweep, over Postgres and a pgvector projection in the same database
  *   agentic-memory-client -> contracts, agentic-memory (the in-process test adapter in testing.ts alone; the production barrel reaches contracts alone)   the memory host as one port for every agent that keeps memories in a space: its HTTP adapter, the errors both raise, and the binding an agent declares
- *   agentic-system -> contracts, db, nest-kit, config-kit, loop-client, notifications-client, agentic-memory, llm (the embedding client only; completions stay on the loop), qdrant-kit   designs agentic-memory strategies on the loop, keeps the cycle table, learns from the runs, announces each cycle on the bus, and serves memory spaces
+ *   agentic-system -> contracts, db, nest-kit, config-kit, loop-client, notifications-client, agentic-memory, llm (the embedding client only; completions stay on the loop)   designs agentic-memory strategies on the loop, keeps the cycle table, learns from the runs, announces each cycle on the bus, and serves memory spaces
  *   gmail          -> contracts, nest-kit, config-kit, google-kit, tool-session, loop-client, notifications-client, db (the test-database guard only)   the mailbox as tools, and missions over them
  *   google-calendar -> contracts, nest-kit, config-kit, google-kit, tool-session, loop-client, notifications-client, db (the test-database guard only)   the calendar as tools, and missions over them
  *   website        -> (nothing)         the Enfav marketing site, statically built with Astro; it imports no workspace package
+ *   app-gateway    -> (nothing)         the Lambda in front of the Fargate apps: Cognito sign-in, wake, idle sleep, scheduled jobs
  *   storybook      -> (anything)        the catalog host legitimately sees both sides
  *   studio-e2e     -> (anything)        drives the whole stack by definition
  *   website-e2e    -> (anything)        drives the built site through a browser, as studio-e2e drives the stack, and reads the company and founder data the site declares
@@ -52,9 +53,9 @@ import type { ChangedFile } from './index';
 export const ALLOWED: Record<string, readonly string[] | null> = {
   contracts: [],
   criteria: ['contracts'],
-  db: ['contracts'],
+  'pgvector-kit': ['contracts'],
+  db: ['contracts', 'pgvector-kit'],
   'config-kit': [],
-  'qdrant-kit': ['contracts'],
   llm: ['contracts', 'config-kit'],
   'run-dump': [],
   'nest-kit': ['contracts', 'db'],
@@ -67,12 +68,12 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
   'loop-client': ['contracts'],
   'google-kit': ['contracts'],
   'notifications-client': ['contracts'],
-  'agentic-memory': ['contracts', 'db', 'qdrant-kit'],
+  'agentic-memory': ['contracts', 'db', 'pgvector-kit'],
   'agentic-memory-client': ['contracts', 'agentic-memory'],
   'tool-session': ['contracts', 'nest-kit', 'loop-client', 'notifications-client', 'db'],
   'studio-testing': ['contracts', 'loop-client'],
   'studio-api': ['contracts', 'db', 'nest-kit', 'loop-client', 'studio-testing'],
-  'quality-loop': ['contracts', 'db', 'llm', 'run-dump', 'nest-kit', 'qdrant-kit'],
+  'quality-loop': ['contracts', 'db', 'llm', 'run-dump', 'nest-kit', 'pgvector-kit'],
   govcon: ['contracts', 'db', 'nest-kit', 'notifications-client', 'loop-client', 'studio-testing'],
   'browser-session': [
     'contracts',
@@ -97,7 +98,6 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
     'notifications-client',
     'agentic-memory',
     'llm',
-    'qdrant-kit',
   ],
   gmail: [
     'contracts',
@@ -120,6 +120,7 @@ export const ALLOWED: Record<string, readonly string[] | null> = {
     'db',
   ],
   website: [],
+  'app-gateway': [],
   storybook: null,
   'studio-e2e': null,
   'website-e2e': null,

@@ -1,8 +1,8 @@
 # Canonical local-dev database for System Design Studio.
 #
 # Durable and self-restarting, so practice runs (sessions, designs, evaluations)
-# survive a shutdown or reboot and come back with `pnpm stack:up` or `tilt up`,
-# which both start these same services:
+# and the memories recalled by meaning survive a shutdown or reboot and come
+# back with `pnpm stack:up` or `tilt up`, which both start this same service:
 #   - a NAMED volume (`sysdesign-pgdata`) keeps the data on disk, reproducibly
 #     from this repo — unlike an ad-hoc container's anonymous volume;
 #   - `restart: unless-stopped` brings the server back after a Docker/machine
@@ -11,14 +11,27 @@
 # Port 5433, the credentials and the db name are the app's connection defaults
 # (`packages/db/src/connection.ts`); 5433 also avoids a stale :5432 on this machine.
 #
-# `vectors` is the quality loop's memory store (Qdrant): the same named-volume
-# and restart rules apply, it is started and stopped together with `db` by
-# `scripts/stack.sh`, and the app reaches it at `QDRANT_URL` (default :6333).
-# The image ships no shell tools, so readiness is gated from the host
-# (`stack.sh` waits on `/readyz`) rather than by a compose healthcheck.
+# The image is built here, from `docker/postgres-pgvector.Dockerfile`: the
+# official `postgres:16-alpine` plus the pgvector 0.8.0 extension, so the
+# quality loop's and agentic-memory's vector tables live in this one database
+# (the extension is created by a migration, the tables at each app's boot).
+# Compose builds it on the first `up` (under a minute) and keeps it under the
+# `image:` tag; after a change to the Dockerfile, `docker compose build db`
+# rebuilds it. The base stays Alpine because this volume was initialised by
+# the Alpine image — the Dockerfile says why that matters.
+#
+# Until 2026-11-12 a `vectors` service (Qdrant) held the memories, on the
+# named volume `sysdesign-qdrant`. Once `pnpm memory:import-qdrant` has copied
+# the quality loop's collection into Postgres, the old container (still
+# running under its own restart rule) and the volume can be removed by hand —
+# compose prefixed the volume with the project name, so on this machine:
+#   docker rm -f sysdesign-vectors && docker volume rm system-design-prep_sysdesign-qdrant
 services:
   db:
-    image: postgres:16-alpine
+    build:
+      context: .
+      dockerfile: docker/postgres-pgvector.Dockerfile
+    image: sysdesign/postgres-pgvector:16-0.8.0
     container_name: sysdesign-db
     environment:
       POSTGRES_USER: admin
@@ -35,17 +48,5 @@ services:
       timeout: 5s
       retries: 20
 
-  vectors:
-    image: qdrant/qdrant:v1.19.1
-    container_name: sysdesign-vectors
-    environment:
-      QDRANT__TELEMETRY_DISABLED: 'true'
-    ports:
-      - '127.0.0.1:6333:6333'
-    volumes:
-      - sysdesign-qdrant:/qdrant/storage
-    restart: unless-stopped
-
 volumes:
   sysdesign-pgdata:
-  sysdesign-qdrant:

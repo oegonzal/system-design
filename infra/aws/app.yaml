@@ -1,0 +1,1074 @@
+# App stack (sysdesign-prod-app): everything that runs, redeployed on every tag.
+#
+# What it declares: the one Fargate service that holds the whole studio as
+# one task (nine containers from apps.json — the studio and its API, the
+# loop, govcon, notifications, the two lanes the browser session calls and
+# the three web apps — every localhost default intact) in the platform
+# stack's cluster, with its roles and log group; the Cloud Map service the
+# gateway and the session task resolve the task through; the app-gateway
+# Lambda behind a function URL (the only entry; it signs the owner in against
+# the platform's user pool and wakes the service when the task is gone); the
+# idle Lambda on a five-minute schedule, with the SSM String it keeps its
+# last quiet observation in (it stops the service after IdleMinutes without
+# requests, confirmed on a second observation, with no run and no session
+# task in flight, and stops a session task that has run past
+# IdleJobMaxMinutes); the job Lambda that runs a browser-session launch as a
+# one-off task of the platform's session task definition, waking the service
+# first and refusing a launch whose task is still running, with one
+# EventBridge schedule per declared launch (created disabled) and Lambda's
+# own retry of a failed start bounded to an hour; and the alarms on the
+# platform's alerts topic.
+#
+# The deploy runs the platform stack's db-migrate task before this stack
+# rolls, so the service never starts on a schema older than its code.
+#
+# Absent on purpose: DesiredCount on the service — set once at creation,
+# then owned by the gateway and the job function (wake) and the idle
+# function (sleep), so a deploy while asleep registers the new revision
+# without starting a task; a load balancer (the function URL has no 30 s cap
+# and costs nothing idle); any secret value (the containers read them from
+# SSM by ARN at start); the Claude API key (the loop runs on the subscription
+# token, nothing else is accepted); a NAT gateway.
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'System Design Studio: ECS service, gateway, idle and job Lambdas, idle state, session schedules, alarms'
+
+Parameters:
+  ImageTag:
+    Type: String
+    Description: 'Git SHA every container image is tagged with'
+    AllowedPattern: '^[0-9a-f]{7,40}$'
+  OriginSecret:
+    Type: String
+    NoEcho: true
+    MinLength: 32
+    Description: 'Value CloudFront sends as x-origin-verify; the gateway refuses requests without it'
+  GatewayRoutes:
+    Type: String
+    Default: '[{"prefix":"/api","port":3000,"api":true},{"prefix":"/api/health","port":3000,"api":true,"public":true},{"prefix":"/loop","port":3003,"strip":true,"api":true},{"prefix":"/govcon-api","port":3004,"strip":true,"api":true},{"prefix":"/_next/static","port":4200,"public":true},{"prefix":"/inspector/_next/static","port":4201,"public":true},{"prefix":"/govcon/_next/static","port":4202,"public":true},{"prefix":"/inspector","port":4201},{"prefix":"/govcon","port":4202},{"prefix":"/","port":4200}]'
+    Description: 'The routes array of infra/aws/apps.json, minified; the gateway reads it as GATEWAY_ROUTES'
+  TaskCpu:
+    Type: Number
+    Default: 1024
+    AllowedValues: [512, 1024, 2048, 4096]
+    Description: 'Fargate CPU units for the app task'
+  TaskMemory:
+    Type: Number
+    Default: 8192
+    Description: 'Fargate memory (MiB) for the app task; three Next servers, the Claude CLI subprocesses and the two lane services'
+  CapacityProvider:
+    Type: String
+    Default: 'FARGATE'
+    AllowedValues: ['FARGATE', 'FARGATE_SPOT']
+    Description: 'Spot is ~36% of on-demand but an interruption fails the run in flight'
+  IdleMinutes:
+    Type: Number
+    Default: 15
+    MinValue: 5
+    MaxValue: 1440
+    Description: 'Minutes without a gateway invocation before the idle function stops the service'
+  IdleConfirmMinutes:
+    Type: Number
+    Default: 5
+    MinValue: 2
+    MaxValue: 60
+    Description: 'The idle schedule interval; a stop needs two quiet observations this far apart, because CloudWatch metrics arrive minutes late'
+  IdleJobMaxMinutes:
+    Type: Number
+    Default: 240
+    MinValue: 30
+    MaxValue: 1440
+    Description: 'Minutes a session task may run before the idle function stops it; above the longest launch (120) plus the grace a unit in flight gets, so only a task the engine lost is ever stopped'
+  SecretsPrefix:
+    Type: String
+    Default: '/sysdesign/prod'
+    Description: 'SSM path the containers read their secrets under (created by the owner)'
+    AllowedPattern: '^/[A-Za-z0-9_./-]+[^/]$'
+  DeploySamGovKey:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: 'Whether govcon receives SAM_GOV_API_KEY from SSM (the parameter must then exist)'
+  DeployOpenAiKey:
+    Type: String
+    Default: 'true'
+    AllowedValues: ['true', 'false']
+    Description: 'Whether quality-loop and agentic-system receive OPENAI_API_KEY from SSM, which the memory tier embeds with (the parameter must then exist)'
+  JobSchedulesState:
+    Type: String
+    Default: 'DISABLED'
+    AllowedValues: ['ENABLED', 'DISABLED']
+    Description: 'Whether the browser-session schedules fire; DISABLED until the owner has run a launch by hand and flips it'
+  JobCapacityProvider:
+    Type: String
+    Default: 'FARGATE'
+    AllowedValues: ['FARGATE', 'FARGATE_SPOT']
+    Description: 'What a session task runs on; Spot is ~36% of on-demand and an interruption ends the session mid-form'
+
+Conditions:
+  HasSamGovKey: !Equals [!Ref DeploySamGovKey, 'true']
+  HasOpenAiKey: !Equals [!Ref DeployOpenAiKey, 'true']
+
+Resources:
+  # The nine containers of apps.json. Shared DB settings repeat per container
+  # because a task definition has no shared block; the values are all exports.
+  AppTaskDefinition:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      Family: !Sub '${AWS::StackName}-app'
+      Cpu: !Ref TaskCpu
+      Memory: !Ref TaskMemory
+      NetworkMode: awsvpc
+      RequiresCompatibilities:
+        - FARGATE
+      RuntimePlatform:
+        CpuArchitecture: ARM64
+        OperatingSystemFamily: LINUX
+      ExecutionRoleArn: !ImportValue 'sysdesign-prod-TaskExecutionRoleArn'
+      TaskRoleArn: !ImportValue 'sysdesign-prod-TaskRoleArn'
+      Volumes:
+        - Name: runs
+          EFSVolumeConfiguration:
+            FilesystemId: !ImportValue 'sysdesign-prod-EfsFileSystemId'
+            TransitEncryption: ENABLED
+            AuthorizationConfig:
+              AccessPointId: !ImportValue 'sysdesign-prod-EfsAccessPointId'
+              IAM: ENABLED
+      ContainerDefinitions:
+        - Name: studio-api
+          Image: !Sub
+            - '${Registry}/sysdesign/studio-api:${ImageTag}'
+            - Registry: !ImportValue 'sysdesign-prod-EcrRegistry'
+          Essential: true
+          PortMappings:
+            - ContainerPort: 3000
+              Protocol: tcp
+          Environment:
+            - Name: PORT
+              Value: '3000'
+            - Name: DB_HOST
+              Value: !ImportValue 'sysdesign-prod-DbEndpoint'
+            - Name: DB_PORT
+              Value: !ImportValue 'sysdesign-prod-DbPort'
+            - Name: DB_USERNAME
+              Value: !ImportValue 'sysdesign-prod-DbUsername'
+            - Name: DB_NAME
+              Value: !ImportValue 'sysdesign-prod-DbName'
+            - Name: PGSSLMODE
+              Value: 'verify-full'
+            - Name: NODE_EXTRA_CA_CERTS
+              Value: '/etc/ssl/certs/rds-global-bundle.pem'
+          Secrets:
+            - Name: DB_PASSWORD
+              ValueFrom: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPrefix}/DB_PASSWORD'
+          HealthCheck:
+            Command: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3000/api/health || exit 1']
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 90
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !ImportValue 'sysdesign-prod-AppLogGroupName'
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: studio-api
+              mode: non-blocking
+              max-buffer-size: 25m
+        - Name: quality-loop
+          Image: !Sub
+            - '${Registry}/sysdesign/quality-loop:${ImageTag}'
+            - Registry: !ImportValue 'sysdesign-prod-EcrRegistry'
+          Essential: true
+          # Long enough for a run's shutdown hooks to close the pools and
+          # the CLI subprocesses to end before the task is killed.
+          StopTimeout: 120
+          PortMappings:
+            - ContainerPort: 3003
+              Protocol: tcp
+          MountPoints:
+            - SourceVolume: runs
+              ContainerPath: '/app/static/runs'
+              ReadOnly: false
+          Environment:
+            - Name: QUALITY_LOOP_PORT
+              Value: '3003'
+            - Name: QUALITY_LOOP_DUMP_DIR
+              Value: '/app/static/runs'
+            - Name: DB_HOST
+              Value: !ImportValue 'sysdesign-prod-DbEndpoint'
+            - Name: DB_PORT
+              Value: !ImportValue 'sysdesign-prod-DbPort'
+            - Name: DB_USERNAME
+              Value: !ImportValue 'sysdesign-prod-DbUsername'
+            - Name: DB_NAME
+              Value: !ImportValue 'sysdesign-prod-DbName'
+            - Name: PGSSLMODE
+              Value: 'verify-full'
+            - Name: NODE_EXTRA_CA_CERTS
+              Value: '/etc/ssl/certs/rds-global-bundle.pem'
+            - Name: DISABLE_AUTOUPDATER
+              Value: '1'
+            - Name: CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC
+              Value: '1'
+            - Name: CLAUDE_CODE_DISABLE_AUTO_MEMORY
+              Value: '1'
+            - Name: USE_BUILTIN_RIPGREP
+              Value: '0'
+          Secrets:
+            - Name: DB_PASSWORD
+              ValueFrom: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPrefix}/DB_PASSWORD'
+            - Name: CLAUDE_CODE_OAUTH_TOKEN
+              ValueFrom: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPrefix}/CLAUDE_CODE_OAUTH_TOKEN'
+            - !If
+              - HasOpenAiKey
+              - Name: OPENAI_API_KEY
+                ValueFrom: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPrefix}/OPENAI_API_KEY'
+              - !Ref AWS::NoValue
+          HealthCheck:
+            Command: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3003/health || exit 1']
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 90
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !ImportValue 'sysdesign-prod-AppLogGroupName'
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: quality-loop
+              mode: non-blocking
+              max-buffer-size: 25m
+        - Name: govcon
+          Image: !Sub
+            - '${Registry}/sysdesign/govcon:${ImageTag}'
+            - Registry: !ImportValue 'sysdesign-prod-EcrRegistry'
+          Essential: true
+          Command: ['serve']
+          PortMappings:
+            - ContainerPort: 3004
+              Protocol: tcp
+          Environment:
+            - Name: GOVCON_PORT
+              Value: '3004'
+            - Name: NOTIFICATIONS_URL
+              Value: 'http://localhost:3005'
+            - Name: DB_HOST
+              Value: !ImportValue 'sysdesign-prod-DbEndpoint'
+            - Name: DB_PORT
+              Value: !ImportValue 'sysdesign-prod-DbPort'
+            - Name: DB_USERNAME
+              Value: !ImportValue 'sysdesign-prod-DbUsername'
+            - Name: DB_NAME
+              Value: !ImportValue 'sysdesign-prod-DbName'
+            - Name: PGSSLMODE
+              Value: 'verify-full'
+            - Name: NODE_EXTRA_CA_CERTS
+              Value: '/etc/ssl/certs/rds-global-bundle.pem'
+          Secrets:
+            - Name: DB_PASSWORD
+              ValueFrom: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPrefix}/DB_PASSWORD'
+            - !If
+              - HasSamGovKey
+              - Name: SAM_GOV_API_KEY
+                ValueFrom: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPrefix}/SAM_GOV_API_KEY'
+              - !Ref AWS::NoValue
+          HealthCheck:
+            Command: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3004/health || exit 1']
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 90
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !ImportValue 'sysdesign-prod-AppLogGroupName'
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: govcon
+              mode: non-blocking
+              max-buffer-size: 25m
+        - Name: notifications
+          Image: !Sub
+            - '${Registry}/sysdesign/notifications:${ImageTag}'
+            - Registry: !ImportValue 'sysdesign-prod-EcrRegistry'
+          Essential: true
+          PortMappings:
+            - ContainerPort: 3005
+              Protocol: tcp
+          Environment:
+            - Name: NOTIFICATIONS_PORT
+              Value: '3005'
+            - Name: NOTIFICATIONS_CHANNELS
+              Value: 'telegram-cloud'
+            - Name: DB_HOST
+              Value: !ImportValue 'sysdesign-prod-DbEndpoint'
+            - Name: DB_PORT
+              Value: !ImportValue 'sysdesign-prod-DbPort'
+            - Name: DB_USERNAME
+              Value: !ImportValue 'sysdesign-prod-DbUsername'
+            - Name: DB_NAME
+              Value: !ImportValue 'sysdesign-prod-DbName'
+            - Name: PGSSLMODE
+              Value: 'verify-full'
+            - Name: NODE_EXTRA_CA_CERTS
+              Value: '/etc/ssl/certs/rds-global-bundle.pem'
+          Secrets:
+            - Name: DB_PASSWORD
+              ValueFrom: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPrefix}/DB_PASSWORD'
+            - Name: GOVCON_TELEGRAM_API_KEY
+              ValueFrom: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPrefix}/notifications/GOVCON_TELEGRAM_API_KEY'
+            - Name: GOVCON_TELEGRAM_BOT_ID
+              ValueFrom: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPrefix}/notifications/GOVCON_TELEGRAM_BOT_ID'
+            - Name: JOBAPPLICATION_TELEGRAM_API_KEY
+              ValueFrom: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPrefix}/notifications/JOBAPPLICATION_TELEGRAM_API_KEY'
+            - Name: JOBAPPLICATION_TELEGRAM_BOT_ID
+              ValueFrom: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPrefix}/notifications/JOBAPPLICATION_TELEGRAM_BOT_ID'
+            - Name: TELEGRAM_CHAT_ID
+              ValueFrom: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPrefix}/notifications/TELEGRAM_CHAT_ID'
+          HealthCheck:
+            Command: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3005/health || exit 1']
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 90
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !ImportValue 'sysdesign-prod-AppLogGroupName'
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: notifications
+              mode: non-blocking
+              max-buffer-size: 25m
+        # The two lanes a browser session calls — the advisor and the memory
+        # host — joined the task in phase 4, so a session task reaches them
+        # at app.<namespace> on their ports; nothing routes them from the edge.
+        - Name: job-application
+          Image: !Sub
+            - '${Registry}/sysdesign/job-application:${ImageTag}'
+            - Registry: !ImportValue 'sysdesign-prod-EcrRegistry'
+          Essential: true
+          PortMappings:
+            - ContainerPort: 3006
+              Protocol: tcp
+          Environment:
+            - Name: JOB_APPLICATION_PORT
+              Value: '3006'
+            - Name: NOTIFICATIONS_URL
+              Value: 'http://localhost:3005'
+            - Name: DB_HOST
+              Value: !ImportValue 'sysdesign-prod-DbEndpoint'
+            - Name: DB_PORT
+              Value: !ImportValue 'sysdesign-prod-DbPort'
+            - Name: DB_USERNAME
+              Value: !ImportValue 'sysdesign-prod-DbUsername'
+            - Name: DB_NAME
+              Value: !ImportValue 'sysdesign-prod-DbName'
+            - Name: PGSSLMODE
+              Value: 'verify-full'
+            - Name: NODE_EXTRA_CA_CERTS
+              Value: '/etc/ssl/certs/rds-global-bundle.pem'
+          Secrets:
+            - Name: DB_PASSWORD
+              ValueFrom: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPrefix}/DB_PASSWORD'
+          HealthCheck:
+            Command: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3006/health || exit 1']
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 90
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !ImportValue 'sysdesign-prod-AppLogGroupName'
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: job-application
+              mode: non-blocking
+              max-buffer-size: 25m
+        - Name: agentic-system
+          Image: !Sub
+            - '${Registry}/sysdesign/agentic-system:${ImageTag}'
+            - Registry: !ImportValue 'sysdesign-prod-EcrRegistry'
+          Essential: true
+          PortMappings:
+            - ContainerPort: 3007
+              Protocol: tcp
+          Environment:
+            - Name: AGENTIC_SYSTEM_PORT
+              Value: '3007'
+            - Name: QUALITY_LOOP_URL
+              Value: 'http://localhost:3003'
+            - Name: NOTIFICATIONS_URL
+              Value: 'http://localhost:3005'
+            - Name: DB_HOST
+              Value: !ImportValue 'sysdesign-prod-DbEndpoint'
+            - Name: DB_PORT
+              Value: !ImportValue 'sysdesign-prod-DbPort'
+            - Name: DB_USERNAME
+              Value: !ImportValue 'sysdesign-prod-DbUsername'
+            - Name: DB_NAME
+              Value: !ImportValue 'sysdesign-prod-DbName'
+            - Name: PGSSLMODE
+              Value: 'verify-full'
+            - Name: NODE_EXTRA_CA_CERTS
+              Value: '/etc/ssl/certs/rds-global-bundle.pem'
+          Secrets:
+            - Name: DB_PASSWORD
+              ValueFrom: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPrefix}/DB_PASSWORD'
+            - !If
+              - HasOpenAiKey
+              - Name: OPENAI_API_KEY
+                ValueFrom: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPrefix}/OPENAI_API_KEY'
+              - !Ref AWS::NoValue
+          HealthCheck:
+            Command: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:3007/health || exit 1']
+            Interval: 30
+            Timeout: 5
+            Retries: 3
+            StartPeriod: 90
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !ImportValue 'sysdesign-prod-AppLogGroupName'
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: agentic-system
+              mode: non-blocking
+              max-buffer-size: 25m
+        - Name: studio-ui
+          Image: !Sub
+            - '${Registry}/sysdesign/studio-ui:${ImageTag}'
+            - Registry: !ImportValue 'sysdesign-prod-EcrRegistry'
+          Essential: true
+          PortMappings:
+            - ContainerPort: 4200
+              Protocol: tcp
+          Environment:
+            - Name: PORT
+              Value: '4200'
+            - Name: HOSTNAME
+              Value: '0.0.0.0'
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !ImportValue 'sysdesign-prod-AppLogGroupName'
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: studio-ui
+              mode: non-blocking
+              max-buffer-size: 25m
+        - Name: quality-loop-ui
+          Image: !Sub
+            - '${Registry}/sysdesign/quality-loop-ui:${ImageTag}'
+            - Registry: !ImportValue 'sysdesign-prod-EcrRegistry'
+          Essential: true
+          PortMappings:
+            - ContainerPort: 4201
+              Protocol: tcp
+          Environment:
+            - Name: PORT
+              Value: '4201'
+            - Name: HOSTNAME
+              Value: '0.0.0.0'
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !ImportValue 'sysdesign-prod-AppLogGroupName'
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: quality-loop-ui
+              mode: non-blocking
+              max-buffer-size: 25m
+        - Name: govcon-ui
+          Image: !Sub
+            - '${Registry}/sysdesign/govcon-ui:${ImageTag}'
+            - Registry: !ImportValue 'sysdesign-prod-EcrRegistry'
+          Essential: true
+          PortMappings:
+            - ContainerPort: 4202
+              Protocol: tcp
+          Environment:
+            - Name: PORT
+              Value: '4202'
+            - Name: HOSTNAME
+              Value: '0.0.0.0'
+          LogConfiguration:
+            LogDriver: awslogs
+            Options:
+              awslogs-group: !ImportValue 'sysdesign-prod-AppLogGroupName'
+              awslogs-region: !Ref AWS::Region
+              awslogs-stream-prefix: govcon-ui
+              mode: non-blocking
+              max-buffer-size: 25m
+
+  CloudMapService:
+    Type: AWS::ServiceDiscovery::Service
+    Properties:
+      Name: app
+      Description: 'The app task, as app.sysdesign.internal'
+      NamespaceId: !ImportValue 'sysdesign-prod-NamespaceId'
+      DnsConfig:
+        RoutingPolicy: MULTIVALUE
+        DnsRecords:
+          - Type: A
+            TTL: 10
+      HealthCheckCustomConfig:
+        FailureThreshold: 1
+
+  # No DesiredCount: ECS starts one task at creation, and from then on the
+  # gateway and the job function (wake) and the idle function (sleep) own the
+  # count. Min 0 / max 100 means a deploy stops the old task before starting
+  # the new one, so two tasks never bill at once; the circuit breaker rolls a
+  # failing revision back, which the deploy script reads from the stack status.
+  Service:
+    Type: AWS::ECS::Service
+    Properties:
+      ServiceName: !Sub '${AWS::StackName}-app'
+      Cluster: !ImportValue 'sysdesign-prod-ClusterName'
+      TaskDefinition: !Ref AppTaskDefinition
+      CapacityProviderStrategy:
+        - CapacityProvider: !Ref CapacityProvider
+          Weight: 1
+      PlatformVersion: LATEST
+      DeploymentController:
+        Type: ECS
+      DeploymentConfiguration:
+        MinimumHealthyPercent: 0
+        MaximumPercent: 100
+        DeploymentCircuitBreaker:
+          Enable: true
+          Rollback: true
+      EnableExecuteCommand: true
+      PropagateTags: SERVICE
+      NetworkConfiguration:
+        AwsvpcConfiguration:
+          AssignPublicIp: ENABLED
+          SecurityGroups:
+            - !ImportValue 'sysdesign-prod-AppSecurityGroupId'
+          Subnets: !Split [',', !ImportValue 'sysdesign-prod-PublicSubnetIds']
+      ServiceRegistries:
+        - RegistryArn: !GetAtt CloudMapService.Arn
+
+  GatewayFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-gateway'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+      Policies:
+        - PolicyName: gateway
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: WakeService
+                Effect: Allow
+                Action:
+                  - ecs:DescribeServices
+                  - ecs:UpdateService
+                Resource: !Sub
+                  - 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:service/${ClusterName}/${AWS::StackName}-app'
+                  - ClusterName: !ImportValue 'sysdesign-prod-ClusterName'
+
+  # The idle function's last quiet observation, as an ISO timestamp, or
+  # `none`. The function rewrites it as it runs (`none` again when the
+  # observation is cleared) and never deletes it; CloudFormation never
+  # reconciles the value, so a stack update leaves whatever is there.
+  IdleStateParameter:
+    Type: AWS::SSM::Parameter
+    Properties:
+      Name: '/sysdesign/prod/idle-state'
+      Type: String
+      Tier: Standard
+      Description: 'When the idle function last saw the gateway quiet; owned by the function, not by the stack'
+      Value: 'none'
+      Tags:
+        project: sysdesign
+        env: prod
+
+  IdleFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-idle'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+      Policies:
+        - PolicyName: idle
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: StopService
+                Effect: Allow
+                Action:
+                  - ecs:DescribeServices
+                  - ecs:UpdateService
+                Resource: !Sub
+                  - 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:service/${ClusterName}/${AWS::StackName}-app'
+                  - ClusterName: !ImportValue 'sysdesign-prod-ClusterName'
+              - Sid: ReadInvocations
+                Effect: Allow
+                Action: cloudwatch:GetMetricData
+                Resource: '*'
+              - Sid: OwnIdleState
+                Effect: Allow
+                Action:
+                  - ssm:GetParameter
+                  - ssm:PutParameter
+                Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${IdleStateParameter}'
+              # ListTasks takes no resource ARN; the cluster condition scopes
+              # it. The function counts the running tasks that are not the
+              # service's own: a browser session in flight keeps the app awake.
+              - Sid: ListClusterTasks
+                Effect: Allow
+                Action: ecs:ListTasks
+                Resource: '*'
+                Condition:
+                  ArnEquals:
+                    ecs:cluster: !Sub
+                      - 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:cluster/${ClusterName}'
+                      - ClusterName: !ImportValue 'sysdesign-prod-ClusterName'
+              # ECS has no task deadline, so a session that hangs below the
+              # engine's rails would keep itself, and through the count above
+              # the app task, running for ever: the function reads each job
+              # task's start time and stops one older than IdleJobMaxMinutes.
+              # A task ARN carries the cluster's name; the condition pins the
+              # cluster as well.
+              - Sid: StopStaleJobs
+                Effect: Allow
+                Action:
+                  - ecs:DescribeTasks
+                  - ecs:StopTask
+                Resource: !Sub
+                  - 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:task/${ClusterName}/*'
+                  - ClusterName: !ImportValue 'sysdesign-prod-ClusterName'
+                Condition:
+                  ArnEquals:
+                    ecs:cluster: !Sub
+                      - 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:cluster/${ClusterName}'
+                      - ClusterName: !ImportValue 'sysdesign-prod-ClusterName'
+
+  # Code is a local path so `aws cloudformation package` uploads the bundle
+  # and rewrites this property to the artifacts bucket before the deploy.
+  # The timeout covers the upstream budget (connect + answer) with room for
+  # the sign-in and wake calls around it; CloudFront gives up at
+  # OriginReadTimeout anyway.
+  GatewayFunction:
+    Type: AWS::Lambda::Function
+    Metadata:
+      cfn-lint:
+        config:
+          # W3002: a local Code path is exactly what `aws cloudformation package`
+          # expects; the deploy script always packages this template first.
+          ignore_checks: [W3002]
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-gateway'
+      Description: 'Cognito sign-in, declared routes, wake-on-request proxy to the app task'
+      Runtime: nodejs24.x
+      Architectures:
+        - arm64
+      Handler: main.proxy
+      MemorySize: 512
+      Timeout: 150
+      Role: !GetAtt GatewayFunctionRole.Arn
+      Code: ./../../packages/app-gateway/dist
+      LoggingConfig:
+        LogGroup: !ImportValue 'sysdesign-prod-GatewayLogGroupName'
+      VpcConfig:
+        SubnetIds: !Split [',', !ImportValue 'sysdesign-prod-PublicSubnetIds']
+        SecurityGroupIds:
+          - !ImportValue 'sysdesign-prod-GatewaySecurityGroupId'
+        Ipv6AllowedForDualStack: true
+      Environment:
+        Variables:
+          AWS_USE_DUALSTACK_ENDPOINT: 'true'
+          GATEWAY_ROUTES: !Ref GatewayRoutes
+          GATEWAY_UPSTREAM_HOST: !Sub
+            - 'app.${Namespace}'
+            - Namespace: !ImportValue 'sysdesign-prod-NamespaceName'
+          GATEWAY_ORIGIN_SECRET: !Ref OriginSecret
+          GATEWAY_COGNITO_USER_POOL_ID: !ImportValue 'sysdesign-prod-UserPoolId'
+          GATEWAY_COGNITO_CLIENT_ID: !ImportValue 'sysdesign-prod-UserPoolClientId'
+          GATEWAY_ECS_CLUSTER: !ImportValue 'sysdesign-prod-ClusterName'
+          GATEWAY_ECS_SERVICE: !Sub '${AWS::StackName}-app'
+          GATEWAY_DB_HOST: !ImportValue 'sysdesign-prod-DbEndpoint'
+          GATEWAY_DB_PORT: !ImportValue 'sysdesign-prod-DbPort'
+          GATEWAY_UPSTREAM_TIMEOUT_MS: '110000'
+          GATEWAY_CONNECT_TIMEOUT_MS: '5000'
+  GatewayFunctionUrl:
+    Type: AWS::Lambda::Url
+    Properties:
+      TargetFunctionArn: !GetAtt GatewayFunction.Arn
+      AuthType: NONE
+      InvokeMode: BUFFERED
+  GatewayFunctionUrlPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref GatewayFunction
+      Action: lambda:InvokeFunctionUrl
+      Principal: '*'
+      FunctionUrlAuthType: NONE
+
+  # The same bundle as the gateway with the idle handler and only the idle
+  # settings: which service to stop, where the loop answers whether a run is
+  # in flight, where the last quiet observation is kept, and how long a
+  # session task may run before it is stopped.
+  IdleFunction:
+    Type: AWS::Lambda::Function
+    Metadata:
+      cfn-lint:
+        config:
+          ignore_checks: [W3002]
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-idle'
+      Description: 'Stops the app service after IdleMinutes without requests, seen twice, with no run or session in flight; stops a session task older than IdleJobMaxMinutes'
+      Runtime: nodejs24.x
+      Architectures:
+        - arm64
+      Handler: main.idle
+      MemorySize: 256
+      Timeout: 60
+      Role: !GetAtt IdleFunctionRole.Arn
+      Code: ./../../packages/app-gateway/dist
+      LoggingConfig:
+        LogGroup: !ImportValue 'sysdesign-prod-IdleLogGroupName'
+      VpcConfig:
+        SubnetIds: !Split [',', !ImportValue 'sysdesign-prod-PublicSubnetIds']
+        SecurityGroupIds:
+          - !ImportValue 'sysdesign-prod-GatewaySecurityGroupId'
+        Ipv6AllowedForDualStack: true
+      Environment:
+        Variables:
+          AWS_USE_DUALSTACK_ENDPOINT: 'true'
+          GATEWAY_ECS_CLUSTER: !ImportValue 'sysdesign-prod-ClusterName'
+          GATEWAY_ECS_SERVICE: !Sub '${AWS::StackName}-app'
+          GATEWAY_LOOP_URL: !Sub
+            - 'http://app.${Namespace}:3003'
+            - Namespace: !ImportValue 'sysdesign-prod-NamespaceName'
+          GATEWAY_IDLE_MINUTES: !Ref IdleMinutes
+          GATEWAY_IDLE_CONFIRM_MINUTES: !Ref IdleConfirmMinutes
+          GATEWAY_IDLE_JOB_MAX_MINUTES: !Ref IdleJobMaxMinutes
+          GATEWAY_PROXY_FUNCTION_NAME: !Ref GatewayFunction
+          GATEWAY_IDLE_STATE_PARAMETER: !Ref IdleStateParameter
+
+  SchedulerRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-scheduler'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: invoke-idle
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt IdleFunction.Arn
+  # The interval is IdleConfirmMinutes so the function's "one interval old"
+  # test and the schedule can never disagree.
+  IdleSchedule:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub '${AWS::StackName}-idle'
+      Description: 'Asks the idle function whether the service may stop'
+      ScheduleExpression: !Sub 'rate(${IdleConfirmMinutes} minutes)'
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      State: ENABLED
+      Target:
+        Arn: !GetAtt IdleFunction.Arn
+        RoleArn: !GetAtt SchedulerRole.Arn
+
+  JobFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-job'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+      Policies:
+        - PolicyName: job
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: WakeService
+                Effect: Allow
+                Action:
+                  - ecs:DescribeServices
+                  - ecs:UpdateService
+                Resource: !Sub
+                  - 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:service/${ClusterName}/${AWS::StackName}-app'
+                  - ClusterName: !ImportValue 'sysdesign-prod-ClusterName'
+              # Lambda retries a failed start on its own (JobFunctionRetries
+              # below), and an operator may run a launch while its schedule
+              # does: before RunTask the handler lists the family's RUNNING
+              # tasks tagged with the launch and refuses a second one, so two
+              # sessions never share a profile. ListTasks takes no resource
+              # ARN; the cluster condition scopes it.
+              - Sid: ListClusterTasks
+                Effect: Allow
+                Action: ecs:ListTasks
+                Resource: '*'
+                Condition:
+                  ArnEquals:
+                    ecs:cluster: !Sub
+                      - 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:cluster/${ClusterName}'
+                      - ClusterName: !ImportValue 'sysdesign-prod-ClusterName'
+              # The family is the platform stack's `${AWS::StackName}-session`,
+              # written out because a stack cannot read another's name; the
+              # stacks' names are fixed (lib.sh derives them from the slug).
+              - Sid: RunSession
+                Effect: Allow
+                Action: ecs:RunTask
+                Resource: !Sub 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:task-definition/sysdesign-prod-platform-session:*'
+                Condition:
+                  ArnEquals:
+                    ecs:cluster: !Sub
+                      - 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:cluster/${ClusterName}'
+                      - ClusterName: !ImportValue 'sysdesign-prod-ClusterName'
+              - Sid: PassSessionRoles
+                Effect: Allow
+                Action: iam:PassRole
+                Resource:
+                  - !ImportValue 'sysdesign-prod-TaskExecutionRoleArn'
+                  - !ImportValue 'sysdesign-prod-SessionTaskRoleArn'
+                Condition:
+                  StringEquals:
+                    iam:PassedToService: ecs-tasks.amazonaws.com
+
+  # The third handler of the gateway bundle, invoked by a schedule below or by
+  # `aws.sh session run <launch>`: it refuses a launch the declaration does not
+  # name and one whose task is still running, sets the app service's desired
+  # count to 1 when it is 0 (a session calls the loop, notifications and the
+  # lanes directly, so nothing else would wake them), and runs the session
+  # task definition — by its family, so its latest revision — with the
+  # launch's command: the template below with {launch} replaced, plus a manual
+  # run's extra arguments. The template and the launch list are
+  # infra/aws/apps.json's `jobs` entry, carried here so a schedule and a
+  # manual run share one derivation; tooling/aws-deploy-jobs.spec.ts holds the
+  # three to each other.
+  JobFunction:
+    Type: AWS::Lambda::Function
+    Metadata:
+      cfn-lint:
+        config:
+          ignore_checks: [W3002]
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-job'
+      Description: 'Runs a declared browser-session launch as a one-off task, waking the app service first'
+      Runtime: nodejs24.x
+      Architectures:
+        - arm64
+      Handler: main.job
+      MemorySize: 256
+      Timeout: 60
+      Role: !GetAtt JobFunctionRole.Arn
+      Code: ./../../packages/app-gateway/dist
+      LoggingConfig:
+        LogGroup: !ImportValue 'sysdesign-prod-JobLogGroupName'
+      VpcConfig:
+        SubnetIds: !Split [',', !ImportValue 'sysdesign-prod-PublicSubnetIds']
+        SecurityGroupIds:
+          - !ImportValue 'sysdesign-prod-GatewaySecurityGroupId'
+        Ipv6AllowedForDualStack: true
+      Environment:
+        Variables:
+          AWS_USE_DUALSTACK_ENDPOINT: 'true'
+          GATEWAY_ECS_CLUSTER: !ImportValue 'sysdesign-prod-ClusterName'
+          GATEWAY_ECS_SERVICE: !Sub '${AWS::StackName}-app'
+          # The family, not a revision ARN: an export another stack imports
+          # cannot change, and the revision changes with every ImageTag;
+          # tooling/aws-deploy-jobs.spec.ts refuses an import of one.
+          GATEWAY_JOB_TASK_DEFINITION: !ImportValue 'sysdesign-prod-SessionTaskFamily'
+          GATEWAY_JOB_CONTAINER: 'browser-session'
+          GATEWAY_JOB_COMMAND: '["run","--launch","{launch}","--headless","--wait-for-loop","8"]'
+          GATEWAY_JOB_LAUNCHES: 'linkedin,builtin'
+          GATEWAY_JOB_SUBNETS: !ImportValue 'sysdesign-prod-PublicSubnetIds'
+          GATEWAY_JOB_SECURITY_GROUP: !ImportValue 'sysdesign-prod-SessionSecurityGroupId'
+          GATEWAY_JOB_CAPACITY_PROVIDER: !Ref JobCapacityProvider
+  # A schedule invokes the function asynchronously, so what retries a start
+  # that failed inside it — a RunTask refused for capacity, a throw — is
+  # Lambda's own retry of the event, not the schedule's policy (which covers
+  # only the delivery to Lambda): two more attempts, about one and two
+  # minutes later, and none once the event is an hour old, so a night's
+  # session is never started the next afternoon. The handler's running-task
+  # check (ListClusterTasks on its role) is what keeps a retry of a start
+  # that did succeed from starting a second task.
+  JobFunctionRetries:
+    Type: AWS::Lambda::EventInvokeConfig
+    Properties:
+      FunctionName: !Ref JobFunction
+      Qualifier: '$LATEST'
+      MaximumRetryAttempts: 2
+      MaximumEventAgeInSeconds: 3600
+
+  JobScheduleRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-job-scheduler'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: scheduler.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: invoke-job
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !GetAtt JobFunction.Arn
+  # One schedule per launch in apps.json, every one in the state the
+  # JobSchedulesState parameter says (DISABLED by default: nothing runs
+  # unattended until the owner has run a launch by hand and flips it). The
+  # expressions are UTC on purpose: LinkedIn's daily Easy Apply allowance
+  # resets at 00:00Z, so the linkedin launch starts five minutes after it.
+  # The schedule's own retry policy covers only its delivery of the event to
+  # Lambda (a throttle, a permission); a start that failed inside the
+  # function is retried by Lambda's async policy, JobFunctionRetries above.
+  JobScheduleLinkedin:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub '${AWS::StackName}-job-linkedin'
+      Description: 'Runs the linkedin launch of browser-session'
+      ScheduleExpression: 'cron(5 0 * * ? *)'
+      ScheduleExpressionTimezone: UTC
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      State: !Ref JobSchedulesState
+      Target:
+        Arn: !GetAtt JobFunction.Arn
+        RoleArn: !GetAtt JobScheduleRole.Arn
+        Input: '{"launch":"linkedin"}'
+        RetryPolicy:
+          MaximumEventAgeInSeconds: 3600
+          MaximumRetryAttempts: 2
+  JobScheduleBuiltin:
+    Type: AWS::Scheduler::Schedule
+    Properties:
+      Name: !Sub '${AWS::StackName}-job-builtin'
+      Description: 'Runs the builtin launch of browser-session'
+      ScheduleExpression: 'cron(5 1 * * ? *)'
+      ScheduleExpressionTimezone: UTC
+      FlexibleTimeWindow:
+        Mode: 'OFF'
+      State: !Ref JobSchedulesState
+      Target:
+        Arn: !GetAtt JobFunction.Arn
+        RoleArn: !GetAtt JobScheduleRole.Arn
+        Input: '{"launch":"builtin"}'
+        RetryPolicy:
+          MaximumEventAgeInSeconds: 3600
+          MaximumRetryAttempts: 2
+
+  GatewayErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-gateway-errors'
+      AlarmDescription: 'The gateway function failed at least once in five minutes'
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref GatewayFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !ImportValue 'sysdesign-prod-AlertsTopicArn'
+  IdleErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-idle-errors'
+      AlarmDescription: 'The idle function failed at least once in five minutes; the service may never sleep'
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref IdleFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !ImportValue 'sysdesign-prod-AlertsTopicArn'
+  JobErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-job-errors'
+      AlarmDescription: 'The job function failed at least once in five minutes; a scheduled browser session did not start'
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref JobFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !ImportValue 'sysdesign-prod-AlertsTopicArn'
+  DatabaseAtMaxCapacityAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-database-at-max-capacity'
+      AlarmDescription: 'Aurora sat at its ACU ceiling for 30 minutes; a runaway query or a too-small MaxCapacity'
+      Namespace: AWS/RDS
+      MetricName: ServerlessDatabaseCapacity
+      Dimensions:
+        - Name: DBClusterIdentifier
+          Value: !ImportValue 'sysdesign-prod-DbClusterIdentifier'
+      Statistic: Average
+      Period: 300
+      EvaluationPeriods: 6
+      Threshold: !ImportValue 'sysdesign-prod-DbMaxCapacity'
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !ImportValue 'sysdesign-prod-AlertsTopicArn'
+
+Outputs:
+  ServiceName:
+    Value: !GetAtt Service.Name
+    Export:
+      Name: 'sysdesign-prod-ServiceName'
+  GatewayFunctionUrl:
+    Description: 'The function URL; the edge stack takes its host as the origin'
+    Value: !GetAtt GatewayFunctionUrl.FunctionUrl
+    Export:
+      Name: 'sysdesign-prod-GatewayFunctionUrl'

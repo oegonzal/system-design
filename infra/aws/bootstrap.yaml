@@ -1,0 +1,551 @@
+# Bootstrap stack (sysdesign-prod-bootstrap): deployed once, by hand, as an
+# account admin — never by CI, because it declares the trust CI deploys with.
+#
+# What it declares: the GitHub OIDC provider and the role the deploy workflow
+# assumes (trust pinned to one repository id and one environment, so a renamed
+# or forked repository cannot assume it), the execution role CloudFormation
+# uses for every other stack (service-scoped, with IAM and SSM narrowed to the
+# sysdesign-prod prefix), the artifacts bucket `aws cloudformation package`
+# uploads the gateway zip to (and `aws.sh db-import` a database dump, kept a
+# day), one ECR repository per image in apps.json, and a monthly cost budget
+# with email alerts.
+#
+# Absent on purpose: an OIDC thumbprint list (AWS trusts GitHub's root CA since
+# 2023 and ignores thumbprints for this provider); any secret value (the
+# SecureStrings under /sysdesign/prod are created by the owner); a NAT gateway
+# or any other billed network resource (none in this design).
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'System Design Studio: GitHub OIDC trust, CloudFormation execution role, artifacts, ECR, budget'
+
+Parameters:
+  GitHubOwner:
+    Type: String
+    Description: 'GitHub account that owns the repository (login, as in the repository URL)'
+  GitHubOwnerId:
+    Type: String
+    Description: 'Numeric id of that account; the immutable half of the OIDC subject'
+    AllowedPattern: '^[0-9]+$'
+  GitHubRepo:
+    Type: String
+    Description: 'Repository name without the owner'
+  GitHubRepoId:
+    Type: String
+    Description: 'Numeric id of the repository; the immutable half of the OIDC subject'
+    AllowedPattern: '^[0-9]+$'
+  ProductionEnvironmentName:
+    Type: String
+    Default: 'production'
+    Description: 'GitHub environment whose jobs may assume the deploy role'
+  BudgetEmail:
+    Type: String
+    Description: 'Address that receives the budget notifications'
+    AllowedPattern: '^[^@\s]+@[^@\s]+\.[^@\s]+$'
+  MonthlyBudgetUsd:
+    Type: Number
+    Default: 15
+    MinValue: 1
+    Description: 'Monthly spend, in USD, that the budget alerts against'
+
+# The ECR lifecycle policy, declared once; a mapping rather than a parameter
+# because it is not a knob anyone turns per deploy.
+Mappings:
+  Ecr:
+    Lifecycle:
+      Policy: '{"rules":[{"rulePriority":1,"description":"untagged layers live one day","selection":{"tagStatus":"untagged","countType":"sinceImagePushed","countUnit":"days","countNumber":1},"action":{"type":"expire"}},{"rulePriority":2,"description":"keep the last three tagged images","selection":{"tagStatus":"any","countType":"imageCountMoreThan","countNumber":3},"action":{"type":"expire"}}]}'
+
+Resources:
+  GitHubOidcProvider:
+    Type: AWS::IAM::OIDCProvider
+    Properties:
+      Url: 'https://token.actions.githubusercontent.com'
+      ClientIdList:
+        - 'sts.amazonaws.com'
+      Tags:
+        - Key: project
+          Value: sysdesign
+        - Key: env
+          Value: prod
+
+  # The deploy workflow's identity. Everything it may do is listed; the stack
+  # resources themselves are created through the execution role it passes.
+  GitHubDeployRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-github-deploy'
+      Description: 'Assumed by the deploy-aws workflow through GitHub OIDC'
+      MaxSessionDuration: 3600
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Federated: !Ref GitHubOidcProvider
+            Action: sts:AssumeRoleWithWebIdentity
+            # Both subject forms GitHub issues: the classic one by names and the
+            # immutable one with the owner and repository ids, so the trust
+            # holds whichever the repository's OIDC setting selects.
+            Condition:
+              StringEquals:
+                token.actions.githubusercontent.com:aud: 'sts.amazonaws.com'
+                token.actions.githubusercontent.com:sub:
+                  - !Sub 'repo:${GitHubOwner}/${GitHubRepo}:environment:${ProductionEnvironmentName}'
+                  - !Sub 'repo:${GitHubOwner}@${GitHubOwnerId}/${GitHubRepo}@${GitHubRepoId}:environment:${ProductionEnvironmentName}'
+      Policies:
+        - PolicyName: deploy
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: Stacks
+                Effect: Allow
+                Action:
+                  - cloudformation:CreateStack
+                  - cloudformation:UpdateStack
+                  - cloudformation:DeleteStack
+                  - cloudformation:DescribeStacks
+                  - cloudformation:DescribeStackEvents
+                  - cloudformation:DescribeStackResources
+                  - cloudformation:GetTemplate
+                  - cloudformation:GetTemplateSummary
+                  - cloudformation:CreateChangeSet
+                  - cloudformation:DescribeChangeSet
+                  - cloudformation:ExecuteChangeSet
+                  - cloudformation:DeleteChangeSet
+                  - cloudformation:UpdateTerminationProtection
+                Resource: !Sub 'arn:${AWS::Partition}:cloudformation:${AWS::Region}:${AWS::AccountId}:stack/sysdesign-prod-*/*'
+              - Sid: StacksReadOnly
+                Effect: Allow
+                Action:
+                  - cloudformation:ListStacks
+                  - cloudformation:ListExports
+                  - cloudformation:ValidateTemplate
+                Resource: '*'
+              - Sid: PassRolesToStacksAndTasks
+                Effect: Allow
+                Action: iam:PassRole
+                Resource:
+                  - !GetAtt CloudFormationExecutionRole.Arn
+                  - !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/sysdesign-prod-*'
+              - Sid: EcrLogin
+                Effect: Allow
+                Action: ecr:GetAuthorizationToken
+                Resource: '*'
+              - Sid: EcrPushPull
+                Effect: Allow
+                Action:
+                  - ecr:BatchCheckLayerAvailability
+                  - ecr:BatchGetImage
+                  - ecr:DescribeImages
+                  - ecr:GetDownloadUrlForLayer
+                  - ecr:InitiateLayerUpload
+                  - ecr:UploadLayerPart
+                  - ecr:CompleteLayerUpload
+                  - ecr:PutImage
+                Resource: !Sub 'arn:${AWS::Partition}:ecr:${AWS::Region}:${AWS::AccountId}:repository/sysdesign/*'
+              - Sid: Artifacts
+                Effect: Allow
+                Action:
+                  - s3:ListBucket
+                  - s3:GetObject
+                  - s3:PutObject
+                Resource:
+                  - !GetAtt ArtifactsBucket.Arn
+                  - !Sub '${ArtifactsBucket.Arn}/*'
+              - Sid: EcsOperate
+                Effect: Allow
+                Action:
+                  - ecs:DescribeServices
+                  - ecs:UpdateService
+                  - ecs:DescribeTasks
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:cluster/sysdesign-prod-*'
+                  - !Sub 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:service/sysdesign-prod-*/*'
+                  - !Sub 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:task/sysdesign-prod-*/*'
+              # Neither call takes a resource ARN: a task definition is read by
+              # family, and ListTasks is scoped by its cluster condition key.
+              - Sid: EcsReadTaskDefinitions
+                Effect: Allow
+                Action: ecs:DescribeTaskDefinition
+                Resource: '*'
+              - Sid: EcsListTasks
+                Effect: Allow
+                Action: ecs:ListTasks
+                Resource: '*'
+                Condition:
+                  ArnLike:
+                    ecs:cluster: !Sub 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:cluster/sysdesign-prod-*'
+              # `aws.sh exec`: ECS Exec into a task of the cluster, which runs
+              # through a Session Manager session on the ECS Exec document.
+              - Sid: EcsExec
+                Effect: Allow
+                Action: ecs:ExecuteCommand
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:cluster/sysdesign-prod-*'
+                  - !Sub 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:task/sysdesign-prod-*/*'
+              - Sid: EcsExecSession
+                Effect: Allow
+                Action: ssm:StartSession
+                Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}::document/AmazonECS-ExecuteCommand'
+              - Sid: EcsRunMigrate
+                Effect: Allow
+                Action: ecs:RunTask
+                Resource: !Sub 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:task-definition/sysdesign-prod-*:*'
+                Condition:
+                  ArnLike:
+                    ecs:cluster: !Sub 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:cluster/sysdesign-prod-*'
+              - Sid: ReadLogs
+                Effect: Allow
+                Action:
+                  - logs:GetLogEvents
+                  - logs:FilterLogEvents
+                  - logs:DescribeLogStreams
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/sysdesign/prod/*'
+                  - !Sub 'arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/sysdesign/prod/*:log-stream:*'
+              # `aws.sh status`: the cluster's state and its capacity metric.
+              - Sid: ReadDatabaseStatus
+                Effect: Allow
+                Action: rds:DescribeDBClusters
+                Resource: !Sub 'arn:${AWS::Partition}:rds:${AWS::Region}:${AWS::AccountId}:cluster:sysdesign-prod-*'
+              - Sid: ReadMetrics
+                Effect: Allow
+                Action: cloudwatch:GetMetricStatistics
+                Resource: '*'
+              - Sid: WhoAmI
+                Effect: Allow
+                Action: sts:GetCallerIdentity
+                Resource: '*'
+
+  # What CloudFormation itself may create for the other five stacks. The
+  # services are allowed whole (their resources all carry the stack's name);
+  # IAM and SSM, which outlive a stack's intent, are narrowed to the prefix.
+  CloudFormationExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-cfn-exec'
+      Description: 'Execution role for the sysdesign-prod network, data, platform, app and edge stacks'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: cloudformation.amazonaws.com
+            Action: sts:AssumeRole
+            Condition:
+              StringEquals:
+                aws:SourceAccount: !Ref AWS::AccountId
+      Policies:
+        - PolicyName: provision
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: Services
+                Effect: Allow
+                Action:
+                  - ec2:*
+                  - ecs:*
+                  - rds:*
+                  - elasticfilesystem:*
+                  - logs:*
+                  - cloudfront:*
+                  - lambda:*
+                  - scheduler:*
+                  - servicediscovery:*
+                  - route53:*
+                  - cognito-idp:*
+                  - sns:*
+                  - cloudwatch:*
+                Resource: '*'
+              - Sid: Parameters
+                Effect: Allow
+                Action:
+                  - ssm:PutParameter
+                  - ssm:DeleteParameter
+                  - ssm:GetParameter
+                  - ssm:GetParameters
+                  - ssm:GetParameterHistory
+                  - ssm:AddTagsToResource
+                  - ssm:RemoveTagsFromResource
+                  - ssm:ListTagsForResource
+                Resource: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter/sysdesign/prod/*'
+              - Sid: DecryptSecureStringsThroughSsm
+                Effect: Allow
+                Action: kms:Decrypt
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    kms:ViaService: !Sub 'ssm.${AWS::Region}.amazonaws.com'
+              - Sid: Roles
+                Effect: Allow
+                Action:
+                  - iam:CreateRole
+                  - iam:DeleteRole
+                  - iam:GetRole
+                  - iam:UpdateRole
+                  - iam:UpdateRoleDescription
+                  - iam:UpdateAssumeRolePolicy
+                  - iam:TagRole
+                  - iam:UntagRole
+                  - iam:PassRole
+                  - iam:PutRolePolicy
+                  - iam:DeleteRolePolicy
+                  - iam:GetRolePolicy
+                  - iam:ListRolePolicies
+                  - iam:AttachRolePolicy
+                  - iam:DetachRolePolicy
+                  - iam:ListAttachedRolePolicies
+                Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/sysdesign-prod-*'
+              - Sid: ServiceLinkedRoles
+                Effect: Allow
+                Action: iam:CreateServiceLinkedRole
+                Resource: !Sub 'arn:${AWS::Partition}:iam::${AWS::AccountId}:role/aws-service-role/*'
+              - Sid: PackagedCode
+                Effect: Allow
+                Action: s3:GetObject
+                Resource: !Sub '${ArtifactsBucket.Arn}/*'
+              # The data stack's files bucket and its key (phase 4): the one
+              # bucket a CI-deployed stack creates carries that stack's name,
+              # so the scope is the data stack's — `sysdesign-prod-*` would
+              # reach this stack's artifacts bucket too — and a KMS key has no
+              # name to scope by, so the key-management actions a stack needs
+              # are listed instead.
+              - Sid: StackBuckets
+                Effect: Allow
+                Action: 's3:*'
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:s3:::sysdesign-prod-data-*'
+                  - !Sub 'arn:${AWS::Partition}:s3:::sysdesign-prod-data-*/*'
+              - Sid: ManageKeys
+                Effect: Allow
+                Action:
+                  - kms:CreateKey
+                  - kms:DescribeKey
+                  - kms:CreateAlias
+                  - kms:DeleteAlias
+                  - kms:UpdateAlias
+                  - kms:ListAliases
+                  - kms:PutKeyPolicy
+                  - kms:GetKeyPolicy
+                  - kms:EnableKeyRotation
+                  - kms:GetKeyRotationStatus
+                  - kms:ScheduleKeyDeletion
+                  - kms:TagResource
+                  - kms:UntagResource
+                  - kms:ListResourceTags
+                  - kms:UpdateKeyDescription
+                Resource: '*'
+
+  ArtifactsBucket:
+    Type: AWS::S3::Bucket
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      BucketName: !Sub '${AWS::StackName}-artifacts-${AWS::AccountId}'
+      VersioningConfiguration:
+        Status: Enabled
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      LifecycleConfiguration:
+        Rules:
+          - Id: expire-packaged-templates
+            Status: Enabled
+            Prefix: 'cfn/'
+            ExpirationInDays: 30
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 30
+          # A database dump on its way to `aws.sh db-import` holds every
+          # application, memory and bus row of the laptop; nothing reads it
+          # after the restore, so it lives a day, and so does the version an
+          # `rm` would leave behind.
+          - Id: expire-imports
+            Status: Enabled
+            Prefix: 'imports/'
+            ExpirationInDays: 1
+            NoncurrentVersionExpiration:
+              NoncurrentDays: 1
+      Tags:
+        - Key: project
+          Value: sysdesign
+        - Key: env
+          Value: prod
+
+  # One repository per image in apps.json. Tags are git SHAs and immutable, so
+  # a rollback by tag always runs the bytes that were tested; the lifecycle
+  # keeps the last three deployable tags and drops untagged layers after a day.
+  StudioApiRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RepositoryName: 'sysdesign/studio-api'
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: !FindInMap [Ecr, Lifecycle, Policy]
+  QualityLoopRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RepositoryName: 'sysdesign/quality-loop'
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: !FindInMap [Ecr, Lifecycle, Policy]
+  GovconRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RepositoryName: 'sysdesign/govcon'
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: !FindInMap [Ecr, Lifecycle, Policy]
+  NotificationsRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RepositoryName: 'sysdesign/notifications'
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: !FindInMap [Ecr, Lifecycle, Policy]
+  JobApplicationRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RepositoryName: 'sysdesign/job-application'
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: !FindInMap [Ecr, Lifecycle, Policy]
+  AgenticSystemRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RepositoryName: 'sysdesign/agentic-system'
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: !FindInMap [Ecr, Lifecycle, Policy]
+  StudioUiRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RepositoryName: 'sysdesign/studio-ui'
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: !FindInMap [Ecr, Lifecycle, Policy]
+  QualityLoopUiRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RepositoryName: 'sysdesign/quality-loop-ui'
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: !FindInMap [Ecr, Lifecycle, Policy]
+  GovconUiRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RepositoryName: 'sysdesign/govcon-ui'
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: !FindInMap [Ecr, Lifecycle, Policy]
+  DbMigrateRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RepositoryName: 'sysdesign/db-migrate'
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: !FindInMap [Ecr, Lifecycle, Policy]
+  BrowserSessionRepository:
+    Type: AWS::ECR::Repository
+    DeletionPolicy: Retain
+    UpdateReplacePolicy: Retain
+    Properties:
+      RepositoryName: 'sysdesign/browser-session'
+      ImageTagMutability: IMMUTABLE
+      ImageScanningConfiguration:
+        ScanOnPush: true
+      LifecyclePolicy:
+        LifecyclePolicyText: !FindInMap [Ecr, Lifecycle, Policy]
+
+  MonthlyBudget:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: !Sub '${AWS::StackName}-monthly'
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: !Ref MonthlyBudgetUsd
+          Unit: USD
+      NotificationsWithSubscribers:
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 80
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetEmail
+        - Notification:
+            NotificationType: FORECASTED
+            ComparisonOperator: GREATER_THAN
+            Threshold: 100
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref BudgetEmail
+
+Outputs:
+  GitHubDeployRoleArn:
+    Description: 'Set as the AWS_DEPLOY_ROLE_ARN variable of the production environment'
+    Value: !GetAtt GitHubDeployRole.Arn
+    Export:
+      Name: 'sysdesign-prod-GitHubDeployRoleArn'
+  CloudFormationExecutionRoleArn:
+    Description: 'Passed as --role-arn to every other stack deploy'
+    Value: !GetAtt CloudFormationExecutionRole.Arn
+    Export:
+      Name: 'sysdesign-prod-CloudFormationExecutionRoleArn'
+  ArtifactsBucket:
+    Description: 'Bucket aws cloudformation package uploads the gateway code to'
+    Value: !Ref ArtifactsBucket
+    Export:
+      Name: 'sysdesign-prod-ArtifactsBucket'
+  EcrRegistry:
+    Description: 'Registry host the image tags are pushed to and pulled from'
+    Value: !Sub '${AWS::AccountId}.dkr.ecr.${AWS::Region}.amazonaws.com'
+    Export:
+      Name: 'sysdesign-prod-EcrRegistry'

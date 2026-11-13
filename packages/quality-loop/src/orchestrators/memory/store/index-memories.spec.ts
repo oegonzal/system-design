@@ -1,7 +1,7 @@
 import { DOCUMENT_MEMORY_KINDS, type QualityRunDto, type RunTrace } from '@sysdesign/contracts';
 import { describe, expect, it } from 'vitest';
 
-import { pointId } from '../../../modules/memory/qdrant/collection';
+import { pointId } from '../../../modules/memory/pgvector/collection';
 import { InMemoryMemoryStore, vectorOf } from '../../../modules/memory/testing';
 import { contentHash, type StoredChunk } from '../ports';
 import { MEMORY_HEADING } from '../../common';

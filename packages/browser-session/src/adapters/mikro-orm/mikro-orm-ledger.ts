@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { EntityManager } from '@mikro-orm/postgresql';
+import { EntityManager, UniqueConstraintViolationException } from '@mikro-orm/postgresql';
 import {
   INTERRUPTED,
   INTERRUPTED_STATUS,
@@ -22,6 +22,7 @@ import type {
   TaskClose,
 } from '../../core/ports';
 import { causeOf } from '../../core/ports';
+import { SessionRefused } from '../../core/unit-advice';
 
 /**
  * The records in Postgres. Every write runs on a fork of its own: the writes
@@ -30,6 +31,20 @@ import { causeOf } from '../../core/ports';
  * engine, so a write never has to answer with one.
  */
 const iso = (at: Date): string => at.toISOString();
+
+/**
+ * The partial unique index that admits one `running` row per profile
+ * (`Migration20261112100002_one_running_session_per_profile`): the lease the
+ * database holds where the engine's check cannot — a second session that
+ * passed the check in the minutes before its row is written is refused here.
+ */
+const RUNNING_PROFILE_INDEX = 'browser_session_running_profile';
+
+/** Whether a write failed on that index: Postgres' unique violation (23505), naming the index as its constraint. */
+const refusedByRunningProfile = (error: unknown): boolean =>
+  error instanceof UniqueConstraintViolationException &&
+  'constraint' in error &&
+  error.constraint === RUNNING_PROFILE_INDEX;
 const isoOrNull = (at: Date | null): string | null => (at === null ? null : iso(at));
 
 /**
@@ -121,7 +136,17 @@ export class MikroOrmLedger implements LedgerPort {
       startedAt: session.startedAt,
       heartbeatAt: session.startedAt,
     });
-    await em.flush();
+    try {
+      await em.flush();
+    } catch (error) {
+      // The row never landed: a refusal like the engine's own, so the command line exits 2 with nothing to clean up.
+      if (refusedByRunningProfile(error)) {
+        throw new SessionRefused(
+          `profile ${session.profile} is held by another session whose row was written first: one session per profile — wait for it to end, or stop it`,
+        );
+      }
+      throw error;
+    }
   }
 
   async recordCriteria(
@@ -227,6 +252,20 @@ export class MikroOrmLedger implements LedgerPort {
         error: close.error,
       },
     );
+  }
+
+  async liveSessionOn(
+    profile: string,
+    after: Date,
+  ): Promise<{ id: string; heartbeatAt: string } | null> {
+    const row = await this.em
+      .fork()
+      .findOne(
+        BrowserSession,
+        { profile, status: 'running', heartbeatAt: { $gt: after } },
+        { orderBy: { heartbeatAt: 'desc' } },
+      );
+    return row === null ? null : { id: row.id, heartbeatAt: iso(row.heartbeatAt) };
   }
 
   async listSessions(limit: number): Promise<BrowserSessionDto[]> {

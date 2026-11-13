@@ -88,7 +88,7 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-17',
     statement:
-      'Memory lives in a dedicated vector store started and stopped with the stack: chunks are upserted under deterministic ids per source run and ref so re-digesting replaces them, a collection is bound to one embedding model and dimension so a search never mixes models, the prompt embedding is cached by content hash and model in the run database, and store availability is verified at boot and reported as data.',
+      'The memory store lives in the stack’s database: the vector extension by migration, the collection’s table and its indexes at boot — once per process, two first calls at once sharing one ensure and a failed one forgotten; chunks are upserted under deterministic ids per source run and ref so re-digesting replaces them, one row per id with the last chunk winning when a replace names a ref twice, a collection is bound to one embedding model and dimension so a search never mixes models, every search is one statement in one transaction with the cosine as its score, the prompt embedding is cached by content hash and model in the same database, store availability is verified at boot and reported as data — a database without the extension or one that refuses as unreachable with the cause, no model as no-model — and a collection exported from the Qdrant that held it before the move is carried over once by the import-qdrant command, every point under the id it had with its payload as written, a point not at its id, not of this store’s payload or not of the store’s width refused by name.',
   },
   {
     id: 'QL-18',
@@ -113,7 +113,7 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-22',
     statement:
-      'Which model the loop calls is declared, not environmental: config/engine.json names a file under config/llm/ that carries the provider, the model, and for an OpenAI-shaped endpoint its base URL and which of OpenAI’s two APIs it is asked through — a name for the variable holding a key, never a key — and a checkout that chooses nothing runs on the Claude Code subscription. Whichever provider is chosen, serve and run prove at boot without a model call that it will answer and exit 1 saying how to fix it otherwise, announcing the model and the file that chose it; replay boots without one because it calls no model. The Claude Code provider accepts only the first-party subscription — a machine login or CLAUDE_CODE_OAUTH_TOKEN — and no API key or gateway token is ever passed to its process. Availability is read from the constructed client, never re-derived from the environment.',
+      'Which model the loop calls is declared, not environmental: config/engine.json names a file under config/llm/ that carries the provider, the model, and for an OpenAI-shaped endpoint its base URL and which of OpenAI’s two APIs it is asked through — a name for the variable holding a key, never a key — and a checkout that chooses nothing runs on the Claude Code subscription. Whichever provider is chosen, serve and run prove at boot without a model call that it will answer and exit 1 saying how to fix it otherwise, announcing the model and the file that chose it; replay and import-qdrant boot without one because neither calls a model. The Claude Code provider accepts only the first-party subscription — a machine login or CLAUDE_CODE_OAUTH_TOKEN — and no API key or gateway token is ever passed to its process. Availability is read from the constructed client, never re-derived from the environment.',
   },
   {
     id: 'QL-23',
@@ -278,7 +278,7 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-60',
     statement:
-      "A stored lesson carries the lineage of the iteration it cites — the run and iteration whose judges produced the evidence, which is the adopted run's when the source run's best is the copy it adopted; what the source run adopted; and the hash of the bare goal it was asked — written on every chunk beside the source the curator sees, indexed in the store by judged run, adopted run and goal on a collection built before as well as a new one, read back null from a point written before, and back-filled by a re-index.",
+      "A stored lesson carries the lineage of the iteration it cites — the run and iteration whose judges produced the evidence, which is the adopted run's when the source run's best is the copy it adopted; what the source run adopted; and the hash of the bare goal it was asked — written on every chunk beside the source the curator sees, carried nested beside the flat facets on the stored point and read off the hits after fusion rather than indexed, read back null from a point written before, and back-filled by a re-index.",
   },
   {
     id: 'QL-61',
@@ -318,7 +318,7 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-41',
     statement:
-      "A stored chunk carries the facets a search can narrow by and a curator can read — what it is about, how strongly it is grounded, and how many other runs confirmed it — every one optional so a point written before them still ranks; a probe states what it will consider as data rather than in the store's own filter language; each writer replaces only the chunk kinds it owns under a source run, so two writers under one run id cannot erase each other; and the payload indexes are ensured on every boot, so a facet added later reaches the collection that already holds the corpus.",
+      "A stored chunk carries the facets a search can narrow by and a curator can read — what it is about, how strongly it is grounded, and how many other runs confirmed it — every one optional so a point written before them still ranks; a probe states what it will consider as data rather than in the store's own filter language; each writer replaces only the chunk kinds it owns under a source run, so two writers under one run id cannot erase each other; and the table’s indexes — one per field a filter narrows by, every value bound through a placeholder — are ensured on every boot, so a field added later reaches the table that already holds the corpus.",
   },
   {
     id: 'QL-42',
@@ -358,7 +358,7 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
   {
     id: 'QL-71',
     statement:
-      'A memory recorded for one unit of work is read only for that unit: a unit is keyed by the identity its mission declares — whichever mission declares it — or by its own id where it declares none, so two units of one identity are one; the operator’s answers are taught in guidance documents each holding one unit’s answers, its head naming that unit in the index alone — no lens told of it, a document naming none rendering and hashing as before, and the digest’s report carrying it — and the reader stamps the key on every memory of a scope bound to a unit by one total table, withholding, named by the index, such a memory of a document that names no unit — the digest step counting each and giving it as its reason beside whatever else it stored, so the chunk never reads as one whose facts are all stored — while the orchestrator refuses before a row a document declaring every memory so bound that names none; the store indexes scope and key, and every search leaves out inside its filter every memory bound to a unit but those of the unit it names — all of them when it names none — so the slots they leave are refilled, no clause stated when no scope is bound, and the in-memory store answering every such search with the adapter’s whole hits on a real Qdrant; a form goal’s index names its unit, which the recall searches under, one engine-stated sentence of the scope legend — built from the table of bound scopes, and none when the goal names no unit or no scope is bound — saying every such item listed was recorded for a unit its mission identifies as the goal’s; and the form retrieval report takes the unit and lists each hit with its kind, scope and unit.',
+      'A memory recorded for one unit of work is read only for that unit: a unit is keyed by the identity its mission declares — whichever mission declares it — or by its own id where it declares none, so two units of one identity are one; the operator’s answers are taught in guidance documents each holding one unit’s answers, its head naming that unit in the index alone — no lens told of it, a document naming none rendering and hashing as before, and the digest’s report carrying it — and the reader stamps the key on every memory of a scope bound to a unit by one total table, withholding, named by the index, such a memory of a document that names no unit — the digest step counting each and giving it as its reason beside whatever else it stored, so the chunk never reads as one whose facts are all stored — while the orchestrator refuses before a row a document declaring every memory so bound that names none; the store indexes scope and key, and every search leaves out inside its filter every memory bound to a unit but those of the unit it names — all of them when it names none — so the slots they leave are refilled, no clause stated when no scope is bound, and the in-memory store answering every such search with the adapter’s whole hits on a real pgvector table; a form goal’s index names its unit, which the recall searches under, one engine-stated sentence of the scope legend — built from the table of bound scopes, and none when the goal names no unit or no scope is bound — saying every such item listed was recorded for a unit its mission identifies as the goal’s; and the form retrieval report takes the unit and lists each hit with its kind, scope and unit.',
   },
   {
     id: 'QL-72',
@@ -429,5 +429,10 @@ export const QUALITY_LOOP_CRITERIA: readonly Criterion[] = [
     id: 'QL-85',
     statement:
       'A policy may cap the remediations a revise or retry is briefed with (`briefing.remediationsPerRound`): every validator note is handed, then the worst of the rest up to the cap in the controller’s order, the prompt names how many of how many when any were kept back, and the decision, the record and every reader keep the whole list; absent, every selected remediation is handed.',
+  },
+  {
+    id: 'QL-86',
+    statement:
+      'The import-qdrant command is for a store the loop has not written to since the move: a table that already holds chunks is refused, naming how many, unless `--force` is given; a dry run checks every point and writes nothing — not even the table, one not there yet read as holding nothing rather than made; and a flag the command does not know, or a `--from` that is not a URL, answers the usage line and exit 2 before anything boots.',
   },
 ];

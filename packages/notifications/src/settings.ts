@@ -14,9 +14,14 @@ import { interactionSettingsSchema, type InteractionSettings } from './interacti
  * each kind's files sit side by side under `config/<kind>/`, complete and
  * readable on their own. Each layer declares the schema of its own kind; this
  * reads them, refuses a kind left unchosen by naming where the choices were
- * looked for, and checks what one kind promises another.
+ * looked for, and checks what one kind promises another. A caller may choose
+ * a kind's file itself — the environment names the channels a deployment
+ * runs — and its choice wins over the engine file's for that kind.
  */
 type SettingsKind = 'bus' | 'interactions' | 'channels';
+
+/** A file name per kind the caller chooses itself; a kind left out is the engine file's to choose. */
+export type SettingsChoices = Partial<Record<SettingsKind, string>>;
 
 export interface NotificationsSettings {
   bus: BusSettings;
@@ -27,9 +32,13 @@ export interface NotificationsSettings {
   sources: Readonly<Record<SettingsKind, string>>;
 }
 
-export function readSettings(root: string, read?: ReadFile): NotificationsSettings {
+export function readSettings(
+  root: string,
+  read?: ReadFile,
+  choices: SettingsChoices = {},
+): NotificationsSettings {
   const chosen = <T>(kind: SettingsKind, schema: z.ZodType<T>): { config: T; source: string } => {
-    const found = readChosen(kind, schema, root, read);
+    const found = readChosen(kind, schema, root, read, choices[kind]);
     if (found === null) {
       throw new NotificationsConfigError(
         `${resolve(root, CONFIG_DIR, ENGINE_FILE)} chooses no ${kind}: name a file under ${resolve(root, CONFIG_DIR, kind)}`,

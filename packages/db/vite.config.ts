@@ -2,9 +2,12 @@
 import { defineConfig } from 'vitest/config';
 import { nxViteTsPaths } from '@nx/vite/plugins/nx-tsconfig-paths.plugin';
 
+import { testDatabaseEnv } from '../../vite.nest';
+
 /**
  * The package's own specs: the guard that keeps every suite off real data.
- * None of them opens a connection — the guard must refuse before one exists.
+ * The executor's spec opens one, on the test database the environment names,
+ * after the guard; the rest open none — the guard must refuse before one exists.
  */
 export default defineConfig({
   root: __dirname,
@@ -14,6 +17,7 @@ export default defineConfig({
     watch: false,
     globals: true,
     environment: 'node',
+    env: testDatabaseEnv(),
     include: ['src/**/*.{test,spec}.ts'],
     reporters: ['default'],
   },

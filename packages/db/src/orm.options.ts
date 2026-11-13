@@ -101,4 +101,11 @@ export const ormOptions = {
   ],
   metadataProvider: ReflectMetadataProvider,
   namingStrategy: UnderscoreNamingStrategy,
+  /**
+   * The memory stores make their `vec_<collection>` tables at boot, outside
+   * the entity model (MikroORM has no vector type); without this the schema
+   * diff behind `migration:check` and `migration:create` would propose
+   * dropping every one of them.
+   */
+  schemaGenerator: { skipTables: [/^vec_/] },
 };

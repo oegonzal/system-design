@@ -223,9 +223,13 @@ export function recordStoreContract(
         id(1),
       ]);
       await store.close(id(1), { ...superseded(at(5)), status: 'invalidated', reason: 'gone' });
-      expect((await store.unprojectionDue('c1', 10)).map((row) => row.id)).toEqual([id(1)]);
+      // Closed and still marked, whatever collection the mark names: the sweep
+      // reads the mark to tell a point to remove from a mark to forget. An
+      // active record's mark is never due, nor is a closed record without one.
+      await store.markProjected([id(2)], 'c0');
+      expect((await store.unprojectionDue(10)).map((row) => row.id)).toEqual([id(1)]);
       await store.markProjected([id(1)], null);
-      expect(await store.unprojectionDue('c1', 10)).toEqual([]);
+      expect(await store.unprojectionDue(10)).toEqual([]);
     });
   });
 }

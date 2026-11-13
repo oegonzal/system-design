@@ -1,0 +1,8 @@
+{
+  "goal": "packages/browser-session/goals/linkedin-easy-apply.md",
+  "profile": "linkedin",
+  "url": "https://www.linkedin.com/jobs/search-results/?keywords=easy%20apply%20software%20engineer%20remote&f_AL=true&f_TPR=r86400",
+  "targetDone": 6,
+  "maxTasks": 9,
+  "maxMinutes": 120
+}

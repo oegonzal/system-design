@@ -70,6 +70,10 @@ playwright-report/
 /Resume_a2.pdf
 /*.pdf
 
+# A whole-database dump on its way to the cloud (docs/aws/deployment.md, the
+# cutover): every application, memory and bus row — never committed.
+*.dump
+
 # TypeScript incremental build state
 *.tsbuildinfo
 

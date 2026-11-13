@@ -60,17 +60,17 @@ refuses to start without a model login before Nest loads.
 
 ## `src/` at a glance
 
-| Folder           | What it is                                                                      |
-| ---------------- | ------------------------------------------------------------------------------- |
-| `core/`          | The engine. Pure: no Nest, no clock, no filesystem, no env vars, no randomness. |
-| `pipelines/`     | The fourteen pipelines, one folder each, plus the registry.                     |
-| `orchestrators/` | Compositions that run several pipelines in order, declared as data.             |
-| `modules/`       | The NestJS layer: HTTP routes, Postgres, Qdrant, the model client.              |
-| `cli/`           | The two command-line entry points, `run` and `replay`.                          |
-| `dump/`          | The layout of a run's dump folder, built purely in memory.                      |
-| `types/`         | One ambient declaration so a persona can be imported as `*.md?raw`.             |
-| `boot.ts`        | `commandOf` picks the mode; `preflight` refuses to start without a model login. |
-| `main.ts`        | Dispatches to the CLI or boots the HTTP app on `QUALITY_LOOP_PORT` (3003).      |
+| Folder           | What it is                                                                                 |
+| ---------------- | ------------------------------------------------------------------------------------------ |
+| `core/`          | The engine. Pure: no Nest, no clock, no filesystem, no env vars, no randomness.            |
+| `pipelines/`     | The fourteen pipelines, one folder each, plus the registry.                                |
+| `orchestrators/` | Compositions that run several pipelines in order, declared as data.                        |
+| `modules/`       | The NestJS layer: HTTP routes, Postgres (the runs and the memory table), the model client. |
+| `cli/`           | The three command-line entry points, `run`, `replay` and `import-qdrant`.                  |
+| `dump/`          | The layout of a run's dump folder, built purely in memory.                                 |
+| `types/`         | One ambient declaration so a persona can be imported as `*.md?raw`.                        |
+| `boot.ts`        | `commandOf` picks the mode; `preflight` refuses to start without a model login.            |
+| `main.ts`        | Dispatches to the CLI or boots the HTTP app on `QUALITY_LOOP_PORT` (3003).                 |
 
 ## `core/` — the engine
 
@@ -381,16 +381,17 @@ so a reader can tell a live run from a killed one still saying `running` before 
 Owns the memory tier's adapters. Tokens: `EMBEDDING_CLIENT`, `EMBEDDING_CACHE`, `MEMORY_STORE`,
 `QUERY_PROBES`, `MEMORY_SUPPORT`, `MEMORY_PORTS`, `KNOWLEDGE_PORTS`.
 
-| File                                       | What it does                                                       |
-| ------------------------------------------ | ------------------------------------------------------------------ |
-| `qdrant/qdrant-memory-store.ts`            | The vector store adapter.                                          |
-| `qdrant/collection.ts`                     | Collection naming by model, width and index generation; payloads.  |
-| `persistence/mikro-orm-embedding-cache.ts` | Caches embeddings by model and content hash.                       |
-| `persistence/mikro-orm-memory-support.ts`  | Which run confirmed or contradicted which stored item.             |
-| `query-probes/llm-query-probes.ts`         | Turns a goal into retrieval probes with one structured model call. |
-| `reports/effectiveness.ts`                 | Did a recalled lesson's run see its defects resolve.               |
-| `reports/gaps.ts`                          | What no recall could serve, by brief.                              |
-| `memory.service.ts`                        | Re-index, retraction by run or by point, and the four reports.     |
+| File                                       | What it does                                                                          |
+| ------------------------------------------ | ------------------------------------------------------------------------------------- |
+| `pgvector/pgvector-memory-store.ts`        | The vector store adapter, over pgvector in the run database.                          |
+| `pgvector/collection.ts`                   | Collection naming by model, width and index generation; the table's schema; payloads. |
+| `pgvector/filter.ts`                       | A probe's declared filter compiled to one SQL clause.                                 |
+| `persistence/mikro-orm-embedding-cache.ts` | Caches embeddings by model and content hash.                                          |
+| `persistence/mikro-orm-memory-support.ts`  | Which run confirmed or contradicted which stored item.                                |
+| `query-probes/llm-query-probes.ts`         | Turns a goal into retrieval probes with one structured model call.                    |
+| `reports/effectiveness.ts`                 | Did a recalled lesson's run see its defects resolve.                                  |
+| `reports/gaps.ts`                          | What no recall could serve, by brief.                                                 |
+| `memory.service.ts`                        | Re-index, retraction by run or by point, and the four reports.                        |
 
 `KNOWLEDGE_PORTS` is the same embeddings and store object the memory ports hold, plus the support
 store: one adapter set, two port shapes, because `support` belongs to one orchestrator and widening
@@ -512,6 +513,12 @@ subcommand for them.
 prints a JSON summary and exits by the decision. `cli/replay.ts` re-decides every recorded iteration
 of a pipeline's runs under every controller in the registry, under the pipeline's current policy, and
 calls no model — it is how two strategies get compared on recorded evidence instead of by feel.
+`cli/import-qdrant.ts` carries the memory collection over from the Qdrant that held it before the
+pgvector move (2026-11-12): one scroll over `fetch`, every point upserted under its own id, the
+refusals named, nothing written under `--dry-run` — not even the table — and a table that already
+holds chunks refused unless `--force` is given, since the import is for a store the loop has not
+written to since the move; it boots the database alone, calls no model, and answers a flag it does
+not know with the usage line and exit 2.
 `cli/args.ts` is the shared flag parser.
 
 `dump/build-run-dump.ts` and `dump/render-run-markdown.ts` build the dump folder in memory; neither

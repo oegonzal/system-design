@@ -22,7 +22,8 @@ describe('the dependency matrix', () => {
 
   it.each([
     ['criteria', ['contracts']],
-    ['db', ['contracts']],
+    ['pgvector-kit', ['contracts']],
+    ['db', ['contracts', 'pgvector-kit']],
     ['config-kit', []],
     ['llm', ['contracts', 'config-kit']],
     ['run-dump', []],
@@ -35,7 +36,7 @@ describe('the dependency matrix', () => {
     ['govcon-ui', ['contracts', 'design-system', 'web-kit', 'web-testing']],
     ['loop-client', ['contracts']],
     ['notifications-client', ['contracts']],
-    ['agentic-memory', ['contracts', 'db', 'qdrant-kit']],
+    ['agentic-memory', ['contracts', 'db', 'pgvector-kit']],
     ['agentic-memory-client', ['contracts', 'agentic-memory']],
     [
       'agentic-system',
@@ -48,12 +49,11 @@ describe('the dependency matrix', () => {
         'notifications-client',
         'agentic-memory',
         'llm',
-        'qdrant-kit',
       ],
     ],
     ['studio-testing', ['contracts', 'loop-client']],
     ['studio-api', ['contracts', 'db', 'nest-kit', 'loop-client', 'studio-testing']],
-    ['quality-loop', ['contracts', 'db', 'llm', 'run-dump', 'nest-kit', 'qdrant-kit']],
+    ['quality-loop', ['contracts', 'db', 'llm', 'run-dump', 'nest-kit', 'pgvector-kit']],
     [
       'govcon',
       ['contracts', 'db', 'nest-kit', 'notifications-client', 'loop-client', 'studio-testing'],
@@ -75,6 +75,7 @@ describe('the dependency matrix', () => {
     ['memory-ingest', ['contracts', 'loop-client', 'agentic-memory-client', 'studio-testing']],
     ['notifications', ['contracts', 'db', 'nest-kit', 'config-kit']],
     ['website', []],
+    ['app-gateway', []],
   ] as const)('%s may depend only on %j', (pkg, allowed) => {
     expect(ALLOWED[pkg]).toEqual(allowed);
   });

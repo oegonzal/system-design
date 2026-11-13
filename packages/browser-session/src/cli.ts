@@ -1,6 +1,7 @@
 /**
- * `main.js run --goal <md> --profile <name> [--headed|--headless] [--max-tasks n] [--max-minutes n] [--max-failures n] [--max-stalled-steps n]`
+ * `main.js run [--launch <name>] --goal <md> --profile <name> [--headed|--headless] [--max-tasks n] [--max-minutes n] [--max-failures n] [--max-stalled-steps n] [--wait-for-loop <minutes>]`
  * `main.js login --profile <name> --url <url>`
+ * `main.js export-state --profile <name> --out <file> [--url <site>]`
  * `main.js sessions [--limit n] [--json]`
  * `main.js show <id> [--json]`
  * `main.js replay-events <id>`
@@ -29,6 +30,7 @@ import {
   DEFAULT_LIST_LIMIT,
   flagKey,
   headedOf,
+  minutesOf,
   PACKAGE_ROOT,
   parseArgsOptions,
   positiveInteger,
@@ -42,6 +44,14 @@ import {
 } from './config';
 import type { SuppliedDocument } from './core/ports';
 import { SessionRefused } from './core/unit-advice';
+import {
+  documentsWithLaunch,
+  exportOrigins,
+  railsWithLaunch,
+  readLaunch,
+  readLaunches,
+  type Launch,
+} from './launch';
 import { AppModule } from './modules/app/app.module';
 import { DEFAULT_REPLAYS_DIR } from './modules/session/replay-fields';
 import { SessionService } from './modules/session/session.service';
@@ -57,11 +67,18 @@ import { readSessionSettings, type SessionDefaults } from './settings';
 const flag = (key: SessionFlag): string => SESSION_FLAGS[key].name;
 
 export const USAGE = `usage: browser-session <command> [options]
-  run       ${flag('goal')} <md> ${flag('profile')} <name> [${flag('url')} <url>] [${flag('headed')}|${flag('headless')}] [${flag('targetDone')} n] [${flag('maxTasks')} n] [${flag('maxMinutes')} n] [${flag('maxFailures')} n] [${flag('maxStalledSteps')} n] [${flag('subject')} <name>] [${flag('document')} <name>=<path> …]
+  run       [${flag('launch')} <name>] ${flag('goal')} <md> ${flag('profile')} <name> [${flag('url')} <url>] [${flag('headed')}|${flag('headless')}] [${flag('targetDone')} n] [${flag('maxTasks')} n] [${flag('maxMinutes')} n] [${flag('maxFailures')} n] [${flag('maxStalledSteps')} n] [${flag('subject')} <name>] [${flag('document')} <name>=<path> …] [${flag('waitForLoop')} <minutes>]
             every decision is a quality-loop run; the operator is asked at the terminal when a field needs a person;
-            each ${flag('document')} supplies the file for a document the mission declares under Documents, by name
+            each ${flag('document')} supplies the file for a document the mission declares under Documents, by name;
+            ${flag('launch')} reads launches/<name>.json — goal, profile, url, documents by file name under the documents dir,
+            target, task and minute limits — a flag given beside it winning, ${flag('goal')} and ${flag('profile')} then optional;
+            ${flag('waitForLoop')} asks the loop's health every 5 s for up to that many minutes before binding, refusing one that stays silent
   login     ${flag('profile')} <name> ${flag('url')} <url>
             opens the profile headed; sign in, press Enter; the profile keeps the cookies
+  export-state ${flag('profile')} <name> ${flag('out')} <file> [${flag('url')} <site>]
+            writes the profile's sign-in — cookies, local storage, IndexedDB — as JSON readable by you alone, for
+            \`pnpm aws:files push <file> state/<name>.json\`; the local storage of each launch's site that names the profile travels,
+            and of the site ${flag('url')} names; refused while a session holds the profile; delete the file once pushed
   sessions  [${flag('limit')} n] [${flag('json')}]
   show      <id> [${flag('json')}]
   replay-events <id>
@@ -94,12 +111,16 @@ const RUN_FLAGS: readonly SessionFlag[] = [
   'maxStalledSteps',
   'subject',
   'document',
+  'launch',
+  'waitForLoop',
 ];
 
 /** The commands, as data: the flags each reads, what each takes as a positional, and whether it reads or writes the session's tables. */
 export const COMMANDS = {
   run: { flags: RUN_FLAGS, positionals: 0, ledger: true },
   login: { flags: ['profile', 'url'], positionals: 0, ledger: false },
+  // The lease a running session holds on a profile is a ledger fact, so an export reads the ledger.
+  'export-state': { flags: ['profile', 'out', 'url'], positionals: 0, ledger: true },
   sessions: { flags: ['limit', 'json'], positionals: 0, ledger: true },
   show: { flags: ['json'], positionals: 1, ledger: true },
   'replay-events': { flags: [], positionals: 1, ledger: true },
@@ -132,8 +153,17 @@ export type Options =
       startUrl: string | undefined;
       /** The files for the documents the mission declares, by name, as given. */
       documents: SuppliedDocument[];
+      /** How long to wait for the loop before binding; 0 binds at once. */
+      waitForLoopMinutes: number;
     }
   | { command: 'login'; profile: string; url: string }
+  | {
+      command: 'export-state';
+      profile: string;
+      out: string;
+      /** The sites whose local storage and IndexedDB travel with the cookies: each launch's that names the profile, and --url's. */
+      origins: string[];
+    }
   | { command: 'sessions'; limit: number; json: boolean; staleAfterMs: number }
   | { command: 'show'; id: string; json: boolean; staleAfterMs: number }
   | { command: 'replay-events'; id: string }
@@ -167,8 +197,14 @@ export interface Io {
 /** The slice of the service the CLI drives — the fake in the spec implements exactly this. */
 export type CliService = Pick<
   SessionService,
-  'run' | 'login' | 'list' | 'show' | 'replayEvents' | 'teachAgain' | 'replayFields'
+  'run' | 'login' | 'exportState' | 'list' | 'show' | 'replayEvents' | 'teachAgain' | 'replayFields'
 >;
+
+/** The launch files, read and resolved — `readLaunch` and `readLaunches` as the CLI binds them; a spec's table. */
+export interface LaunchSource {
+  named(name: string): Launch;
+  all(): Launch[];
+}
 
 const isCommand = (value: string | undefined): value is Command =>
   value !== undefined && Object.hasOwn(COMMANDS, value);
@@ -180,8 +216,12 @@ const required = (value: string | undefined, key: SessionFlag): string => {
   return value;
 };
 
-/** argv → options over the settings' defaults, or an Error whose message is the usage problem. */
-export function parseOptions(argv: readonly string[], defaults: SessionDefaults): Options | Error {
+/** argv → options over the settings' defaults — and over the launch file, when one is named — or an Error whose message is the usage problem. */
+export function parseOptions(
+  argv: readonly string[],
+  defaults: SessionDefaults,
+  launches: LaunchSource,
+): Options | Error {
   const [command, ...rest] = argv;
   if (!isCommand(command)) return new Error(USAGE);
   try {
@@ -209,11 +249,14 @@ export function parseOptions(argv: readonly string[], defaults: SessionDefaults)
       return Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
     };
     switch (command) {
-      case 'run':
+      case 'run': {
+        // The launch file stands where no flag does; a flag given wins over its field.
+        const launchName = text('launch');
+        const launch = launchName === undefined ? null : launches.named(launchName);
         return {
           command,
-          goalPath: required(text('goal'), 'goal'),
-          profile: required(text('profile'), 'profile'),
+          goalPath: required(text('goal') ?? launch?.goal, 'goal'),
+          profile: required(text('profile') ?? launch?.profile, 'profile'),
           headed: headedOf({ headed: on('headed'), headless: on('headless') }, defaults.headed),
           rails: railsOf(
             {
@@ -223,18 +266,29 @@ export function parseOptions(argv: readonly string[], defaults: SessionDefaults)
               maxFailures: text('maxFailures'),
               maxStalledSteps: text('maxStalledSteps'),
             },
-            defaults.rails,
+            railsWithLaunch(launch, defaults.rails),
           ),
           subject: text('subject'),
-          startUrl: text('url'),
-          documents: list('document').map(suppliedDocumentOf),
+          startUrl: text('url') ?? launch?.url,
+          documents: documentsWithLaunch(list('document').map(suppliedDocumentOf), launch),
+          waitForLoopMinutes: minutesOf(text('waitForLoop'), 'waitForLoop'),
         };
+      }
       case 'login':
         return {
           command,
           profile: required(text('profile'), 'profile'),
           url: required(text('url'), 'url'),
         };
+      case 'export-state': {
+        const profile = required(text('profile'), 'profile');
+        return {
+          command,
+          profile,
+          out: required(text('out'), 'out'),
+          origins: exportOrigins(profile, launches.all(), text('url')),
+        };
+      }
       case 'sessions':
         return {
           command,
@@ -290,6 +344,21 @@ export async function execute(options: Options, service: CliService, io: Io): Pr
         await service.login(options.profile, options.url);
         io.out(`profile ${options.profile} closed; its cookies persist`);
         return 0;
+      case 'export-state': {
+        const { cookies, origins } = await service.exportState(
+          options.profile,
+          options.out,
+          options.origins,
+        );
+        const sites =
+          options.origins.length === 0
+            ? `no launch names the profile and no ${flag('url')} was given, so the cookies alone travel`
+            : `${origins} of the ${options.origins.length} site(s) visited held local storage`;
+        io.out(
+          `profile ${options.profile}: ${cookies} cookie(s) written to ${options.out} — ${sites}; the file is readable by you alone and is the sign-in: push it with\n  pnpm aws:files push ${options.out} state/${options.profile}.json\nthen delete it`,
+        );
+        return 0;
+      }
       case 'sessions': {
         const sessions = await service.list(options.limit);
         io.out(
@@ -353,7 +422,10 @@ export async function cli(argv: readonly string[]): Promise<number> {
     console.error(errorMessage(error));
     return 2;
   }
-  const options = parseOptions(argv, config.settings.session);
+  const options = parseOptions(argv, config.settings.session, {
+    named: (name) => readLaunch(PACKAGE_ROOT, name, config.docsDir),
+    all: () => readLaunches(PACKAGE_ROOT, config.docsDir),
+  });
   if (options instanceof Error) {
     console.error(options.message);
     return 2;

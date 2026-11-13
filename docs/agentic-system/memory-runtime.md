@@ -9,9 +9,10 @@ The design tool ([memory-design-capability.md](memory-design-capability.md))
 produces a **strategy**: registers, the typed interfaces over them, and the
 workflows that move memory through them. This runtime is what executes one. It
 follows `docs/memory/memory-designing.md`'s recommended starting design —
-PostgreSQL as the source of truth, a derived and rebuildable Qdrant projection,
-and a dedicated Memory Service with a provider-independent typed API — and keeps
-facts, events, state and procedures apart, as that document insists.
+PostgreSQL as the source of truth, a derived and rebuildable vector projection
+(since 12 Nov 2026 a pgvector table in that same database; Qdrant before), and a
+dedicated Memory Service with a provider-independent typed API — and keeps facts,
+events, state and procedures apart, as that document insists.
 
 It is a separate bounded context from the quality loop's own grading memory: it
 neither reads nor widens it.
@@ -206,11 +207,14 @@ a tenant-wide fact reaches every user in the tenant, a user's fact that user alo
 and a sibling sees nothing. A consolidation reads **within** a scope — everything
 at or below it.
 
-In Postgres this is `partition = $p and scope <@ $request`. In Qdrant it is the
-partition, then for every _other_ policy key either "unset on the point or equal
-to the request's" or, when the request does not name the key, "unset" — a loop
+In the record store this is `partition = $p and scope <@ $request`. In the
+pgvector index it is the partition, then for every _other_ policy key either
+"unset on the point or equal to the request's" (`(scope->>$k) is null or
+scope->>$k = $v`) or, when the request does not name the key, "unset" — a loop
 over the policy's keys, never the request's, which would let a user's memory leak
-tenant-wide.
+tenant-wide. The key names are bound as values, never spelled into the SQL, and
+the in-memory index of the specs states the same rule in code; the live spec
+holds the two to the same answers.
 
 The standard policy (`config/memory/standard.json`) declares four keys — `tenant`,
 `project`, `user` and `unit` — the fourth binding a memory to the one unit of work it
@@ -223,12 +227,23 @@ A space keeps the policy snapshot it was compiled with and reports its keys as
 A periodic job across every space:
 
 - **expires** short-term records past their time to live (`valid_to` = the expiry);
-- **removes** the points of records that closed;
+- **removes** the points of records that closed — and forgets the mark of a closed record whose
+  collection is no longer current (every record closed before the move to `v2` is marked `v1`),
+  asking nothing of the index, since that collection's table holds no point to remove;
 - **projects** every current record whose point is not in the current collection.
 
-The collection name binds the embedding model and its width, so changing either
-starts an empty collection that the sweep backfills from Postgres. Until it
-finishes, recall by meaning has a gap; exact and temporal recall do not.
+The collection name binds the index generation, the embedding model and its
+width, so changing any of them starts an empty collection that the sweep
+backfills from Postgres. Until it finishes, recall by meaning has a gap; exact
+and temporal recall do not. A collection is one table of the app's own
+database (`vec_agentic_memory__v2__<model>__<width>`, made with its indexes on
+first use), and `memory_record.projected_into` still names the collection, not
+the table. The move from Qdrant on 12 Nov 2026 bumped the generation to `v2`
+for exactly this reason: the old points never crossed over, so every current
+record still marked as projected into the `v1` collection is due again, and the
+first sweep rebuilds the index — one embedding call per page of 100 records,
+about 13 for the 1,250 records the laptop held projected when they were counted
+on 11 Nov 2026 — while a closed record still marked `v1` has its mark forgotten.
 
 ## 9. HTTP — `packages/agentic-system`, `/spaces`
 
@@ -359,7 +374,11 @@ What the caller owns:
 - Engine: `packages/agentic-memory/src/` — `space/` (policy, scope, compile),
   `kinds/`, `write/` (and the write brief, `brief.ts`), `recall/`, `lifecycle/`
   (consolidate, sweep), `service/`
-- Adapters: `src/adapters/mikro-orm/` (Postgres), `src/adapters/qdrant/`
+- Adapters: `src/adapters/mikro-orm/` (the record and space stores),
+  `src/adapters/pgvector/` (the vector index: the table and filter in
+  `collection.ts`, the statements in `pgvector-vector-index.ts`, over the
+  `SqlExecutor` of `@sysdesign/pgvector-kit` that `@sysdesign/db` implements
+  on the ORM's entity manager)
 - Fakes holding the same contract: `src/testing/` (and `record-store-contract.ts`
   and `space-store-contract.ts`, each run against both stores)
 - Wire shapes and the record vocabulary: `packages/contracts/src/lib/agentic-system/memory.ts`

@@ -1,0 +1,121 @@
+# cfn-guard rules every template under infra/aws must pass (run by
+# `aws.sh lint` and CI). Each rule names one invariant of the design, so a
+# template edit that weakens it fails before it reaches an account. A rule
+# is conditional on its resource type existing, so a template without, say,
+# a database passes the database rules vacuously.
+
+let rds_clusters = Resources.*[ Type == 'AWS::RDS::DBCluster' ]
+let rds_instances = Resources.*[ Type == 'AWS::RDS::DBInstance' ]
+let log_groups = Resources.*[ Type == 'AWS::Logs::LogGroup' ]
+let ecr_repositories = Resources.*[ Type == 'AWS::ECR::Repository' ]
+let buckets = Resources.*[ Type == 'AWS::S3::Bucket' ]
+let security_groups = Resources.*[ Type == 'AWS::EC2::SecurityGroup' ]
+let ingress_rules = Resources.*[ Type == 'AWS::EC2::SecurityGroupIngress' ]
+let task_definitions = Resources.*[ Type == 'AWS::ECS::TaskDefinition' ]
+let functions = Resources.*[ Type == 'AWS::Lambda::Function' ]
+let distributions = Resources.*[ Type == 'AWS::CloudFront::Distribution' ]
+let kms_keys = Resources.*[ Type == 'AWS::KMS::Key' ]
+
+# The database is encrypted at rest, never publicly addressable, and cannot
+# be deleted by a stack operation.
+rule rds_cluster_hardened when %rds_clusters !empty {
+  %rds_clusters.Properties.StorageEncrypted == true
+  %rds_clusters.Properties.DeletionProtection == true
+}
+rule rds_instance_private when %rds_instances !empty {
+  %rds_instances.Properties.PubliclyAccessible == false
+}
+
+# Every log group expires, so logs never become the largest line of the bill.
+rule log_groups_expire when %log_groups !empty {
+  %log_groups.Properties.RetentionInDays exists
+}
+
+# A tag always names the same bytes: a rollback by tag is a rollback.
+rule ecr_tags_immutable when %ecr_repositories !empty {
+  %ecr_repositories.Properties.ImageTagMutability == 'IMMUTABLE'
+}
+
+# No bucket here is ever public, and every bucket says what it encrypts with
+# (S3 encrypts regardless; the declaration is what names the key).
+rule buckets_block_public_access when %buckets !empty {
+  %buckets.Properties.PublicAccessBlockConfiguration {
+    BlockPublicAcls == true
+    BlockPublicPolicy == true
+    IgnorePublicAcls == true
+    RestrictPublicBuckets == true
+  }
+}
+rule buckets_declare_encryption when %buckets !empty {
+  %buckets.Properties.BucketEncryption exists
+}
+
+# A customer-managed key rotates yearly; every version stays readable, so the
+# files bucket's objects never need re-encrypting.
+rule kms_keys_rotate when %kms_keys !empty {
+  %kms_keys.Properties.EnableKeyRotation == true
+}
+
+# Nothing in the VPC accepts the open internet; the only public entry is the
+# CloudFront → function URL path, which carries no security group. A group
+# with no ingress block at all (the gateway's) has nothing to check.
+rule security_groups_no_open_ingress when %security_groups !empty {
+  %security_groups.Properties {
+    when SecurityGroupIngress exists {
+      SecurityGroupIngress[*] {
+        when CidrIp exists { CidrIp != '0.0.0.0/0' }
+        when CidrIpv6 exists { CidrIpv6 != '::/0' }
+      }
+    }
+  }
+}
+rule ingress_rules_no_open_ingress when %ingress_rules !empty {
+  %ingress_rules.Properties {
+    when CidrIp exists { CidrIp != '0.0.0.0/0' }
+    when CidrIpv6 exists { CidrIpv6 != '::/0' }
+  }
+}
+
+# A credential reaches a container only as a Secret (read from SSM by ARN at
+# start), never as a plain Environment value baked into the task definition.
+rule task_environment_holds_no_credentials when %task_definitions !empty {
+  %task_definitions.Properties.ContainerDefinitions[*] {
+    when Environment exists {
+      Environment[*] {
+        when Name exists { Name != /(TOKEN|KEY|PASSWORD|SECRET)/ }
+      }
+    }
+  }
+}
+
+# Model access is the Claude Code subscription token and nothing else; an
+# API key appears in no task definition and no function.
+rule no_anthropic_api_key_in_tasks when %task_definitions !empty {
+  %task_definitions.Properties.ContainerDefinitions[*] {
+    when Environment exists {
+      Environment[*] {
+        when Name exists { Name != 'ANTHROPIC_API_KEY' }
+      }
+    }
+    when Secrets exists {
+      Secrets[*] {
+        when Name exists { Name != 'ANTHROPIC_API_KEY' }
+      }
+    }
+  }
+}
+rule no_anthropic_api_key_in_functions when %functions !empty {
+  %functions.Properties {
+    when Environment.Variables exists { Environment.Variables.ANTHROPIC_API_KEY !exists }
+  }
+}
+
+# Every behaviour upgrades plain HTTP; the session cookies are Secure.
+rule cloudfront_behaviours_redirect_to_https when %distributions !empty {
+  %distributions.Properties.DistributionConfig {
+    DefaultCacheBehavior.ViewerProtocolPolicy == 'redirect-to-https'
+    when CacheBehaviors exists {
+      CacheBehaviors[*].ViewerProtocolPolicy == 'redirect-to-https'
+    }
+  }
+}

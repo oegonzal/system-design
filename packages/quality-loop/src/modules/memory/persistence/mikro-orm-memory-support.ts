@@ -16,7 +16,7 @@ import { Injectable } from '@nestjs/common';
 import { EntityManager } from '@mikro-orm/postgresql';
 import { MemorySupport } from '@sysdesign/db';
 
-import { pointId } from '../qdrant/collection';
+import { pointId } from '../pgvector/collection';
 import type {
   SupportCount,
   SupportKind,
