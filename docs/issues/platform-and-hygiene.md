@@ -529,3 +529,11 @@ the round only changed how the channels file is chosen (`NOTIFICATIONS_CHANNELS`
 write), then pin it with a case that answers the instant the delivery is
 seen. Until then, read a lone failure of this case as the race, not as a
 regression.
+
+**Resolution (2026-11-13).** The spec now waits for the service's own fact — the
+`interaction_delivery` row the dispatcher records after the channel sends — before
+answering, so it no longer races the dispatcher's write; `until` in
+`interactions/testing.ts` awaits its predicate. The production window stays as
+it was (an answer typed between a channel's send and the record is told nothing
+is waiting), which no person on Telegram can reach; closing it in the dispatcher
+is still open.
