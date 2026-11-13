@@ -71,6 +71,13 @@ describe('the notifications HTTP surface', () => {
     });
     expect(put.status).toBe(201);
     await until(() => phone.delivered.some((delivered) => delivered.id === prompt.id));
+    // The channel's record comes before the service's: a typed answer finds its prompt through the
+    // delivery the service recorded, so the answer waits for that row (a loaded runner reached
+    // the gap, 2026-11-13).
+    const em = app.get(EntityManager);
+    await until(
+      async () => (await em.fork().count(InteractionDelivery, { interaction: prompt.id })) > 0,
+    );
 
     expect(await phone.send('b', 'reply-1')).toEqual({
       kind: 'accepted',

@@ -4,9 +4,9 @@ import type { ChannelDelivery } from '../channels/port';
 import type { DeliveryRecord, InteractionRecord, InteractionStore } from './ports';
 
 /** Polls until `holds` is true, for what a background consumer does; fails after `ms`. */
-export async function until(holds: () => boolean, ms = 3_000): Promise<void> {
+export async function until(holds: () => boolean | Promise<boolean>, ms = 3_000): Promise<void> {
   const deadline = Date.now() + ms;
-  while (!holds()) {
+  while (!(await holds())) {
     if (Date.now() > deadline) throw new Error('the condition never held');
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
