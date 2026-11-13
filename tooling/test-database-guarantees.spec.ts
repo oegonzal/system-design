@@ -285,13 +285,16 @@ const bootsUnguarded = (source: string, path?: string): boolean | null => {
 
 describe('test database guarantees', () => {
   const files = sourceFiles(join(REPO, 'packages'));
+  // Both scans read every source file under packages/ (hundreds of files); a GitHub runner took
+  // 6 s where this machine takes 2 s (2026-11-13), past vitest's 5 s default.
+  const SCAN_TIMEOUT = { timeout: 30_000 };
   const read = (path: string): string => readFileSync(path, 'utf8');
 
   it('finds the workspace it is meant to guard', () => {
     expect(files.length).toBeGreaterThan(200);
   });
 
-  it('only the guarded doors empty a table', () => {
+  it('only the guarded doors empty a table', SCAN_TIMEOUT, () => {
     const offenders = files
       .filter((path) => !GUARDED.includes(relative(path)))
       .map((path) => [relative(path), emptyingForms(read(path), path)] as const)
@@ -303,23 +306,27 @@ describe('test database guarantees', () => {
     expect(idle).toEqual([]);
   });
 
-  it('test code that boots an application or an ORM guards the database first, in the same file', () => {
-    const booting = files.filter(
-      (path) => TEST_CODE.test(relative(path)) && bootsUnguarded(read(path), path) !== null,
-    );
-    // The harnesses and the specs that boot by hand are all found…
-    expect(booting.map(relative)).toEqual(
-      expect.arrayContaining([
-        'packages/quality-loop/src/modules/http/testing.ts',
-        'packages/studio-api/src/test/harness.ts',
-        'packages/db/src/testing/ensure-database.ts',
-        'packages/govcon/src/modules/app/testing.ts',
-      ]),
-    );
-    // …and none of them boots before it guards.
-    const unguarded = booting.filter((path) => bootsUnguarded(read(path), path));
-    expect(unguarded.map(relative)).toEqual([]);
-  });
+  it(
+    'test code that boots an application or an ORM guards the database first, in the same file',
+    SCAN_TIMEOUT,
+    () => {
+      const booting = files.filter(
+        (path) => TEST_CODE.test(relative(path)) && bootsUnguarded(read(path), path) !== null,
+      );
+      // The harnesses and the specs that boot by hand are all found…
+      expect(booting.map(relative)).toEqual(
+        expect.arrayContaining([
+          'packages/quality-loop/src/modules/http/testing.ts',
+          'packages/studio-api/src/test/harness.ts',
+          'packages/db/src/testing/ensure-database.ts',
+          'packages/govcon/src/modules/app/testing.ts',
+        ]),
+      );
+      // …and none of them boots before it guards.
+      const unguarded = booting.filter((path) => bootsUnguarded(read(path), path));
+      expect(unguarded.map(relative)).toEqual([]);
+    },
+  );
 });
 
 describe('the gate catches what it claims to', () => {
