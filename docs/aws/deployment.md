@@ -1072,6 +1072,22 @@ sessions add two wakes a day.
 
 ## Troubleshooting
 
+**The platform stack's first create failed on the cluster with "unable to assume the service linked
+role".** A fresh account has no `AWSServiceRoleForECS`; ECS creates it during that very
+`CreateCluster` and the call fails once while the role propagates (seen 2026-11-15). It cannot be
+declared in a template afterwards (the name is taken), so: delete the rolled-back platform stack
+(`aws cloudformation delete-stack --stack-name sysdesign-prod-platform`, then
+`wait stack-delete-complete`) and run the deploy again.
+
+**The data stack's first create failed on the EFS file system with "the specified KMS key could
+not be found".** The file system is encrypted with the AWS-managed EFS key, and a new account has
+no such key until EFS first uses one; the first attempt creates the key and fails. Delete the
+rolled-back stack (`aws cloudformation delete-stack --stack-name sysdesign-prod-data`, then
+`wait stack-delete-complete`), schedule the deletion of the customer key the attempt left behind
+(`aws kms list-keys`, the one described as the files bucket's; `schedule-key-deletion
+--pending-window-in-days 7`), and run the deploy again (`pnpm aws:deploy`): the managed key now
+exists and the create goes through (seen 2026-11-14 on the account's first deploy).
+
 **`verify` fails with "GET /api/health answered 401".** `/api/health` is declared `public` in
 `infra/aws/apps.json`, so the gate never asks it for a session; a `401` there means the routes the
 gateway runs are not the ones `apps.json` declares — the `GatewayRoutes` default in `app.yaml` (or
