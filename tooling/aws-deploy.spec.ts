@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -83,6 +83,26 @@ describe('the AWS deployment is made from infra/aws/apps.json', () => {
   const served = images.filter(
     (entry): entry is [string, ImageDeclaration & { port: number }] => entry[1].port !== undefined,
   );
+
+  it("[CLOUD-1] every image is built from the stage its task runs: the target names a stage of its Dockerfile, and a served image's stage is the last one, so a build that names no target gets it too", () => {
+    const stagesOf = (file: string): string[] =>
+      readFileSync(join(INFRA, '..', '..', file), 'utf8')
+        .split('\n')
+        .map((line) => /^FROM\s+\S+\s+AS\s+(\S+)/i.exec(line)?.[1])
+        .filter((stage): stage is string => stage !== undefined);
+    for (const entry of imageMatrix(apps, { withLocalOnly: true }).include) {
+      const stages = stagesOf(entry.file);
+      expect(entry.target, `${entry.image} names its stage`).not.toBe('');
+      expect(stages, `${entry.image}: ${entry.file} has the stage ${entry.target}`).toContain(
+        entry.target,
+      );
+      if (entry.target !== 'migrate') {
+        expect(stages.at(-1), `${entry.image}: the served stage is the last of ${entry.file}`).toBe(
+          entry.target,
+        );
+      }
+    }
+  });
 
   it('[CLOUD-1] every image names a package of its declared kind, with what its Dockerfile takes', () => {
     const misnamed = images.filter(([name, { kind }]) => {

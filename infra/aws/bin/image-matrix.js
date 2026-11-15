@@ -31,8 +31,10 @@ const PLAYWRIGHT_DOCKERFILE = 'docker/playwright-app.Dockerfile';
 
 const entryFor = ([image, spec]) => {
   switch (spec.kind) {
+    // Every served image names its stage: a build without a target takes the Dockerfile's last
+    // stage, and the first deploy shipped the migrate stage as every Nest image that way (2026-11-15).
     case 'nest':
-      return { image, file: NEST_DOCKERFILE, target: '', build_args: `APP=${image}` };
+      return { image, file: NEST_DOCKERFILE, target: 'runner', build_args: `APP=${image}` };
     case 'next': {
       const [name, url] = Object.entries(spec.public)[0];
       const args = [
@@ -41,10 +43,10 @@ const entryFor = ([image, spec]) => {
         `PUBLIC_VAR=${name}`,
         `PUBLIC_URL=${url}`,
       ];
-      return { image, file: NEXT_DOCKERFILE, target: '', build_args: args.join('\n') };
+      return { image, file: NEXT_DOCKERFILE, target: 'runner', build_args: args.join('\n') };
     }
     case 'playwright':
-      return { image, file: PLAYWRIGHT_DOCKERFILE, target: '', build_args: `APP=${image}` };
+      return { image, file: PLAYWRIGHT_DOCKERFILE, target: 'runner', build_args: `APP=${image}` };
     case 'migrate':
       return { image, file: NEST_DOCKERFILE, target: 'migrate', build_args: '' };
     default:

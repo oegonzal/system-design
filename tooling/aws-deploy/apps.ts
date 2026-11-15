@@ -120,12 +120,12 @@ export function imageMatrix(
         `PUBLIC_VAR=${name}`,
         `PUBLIC_URL=${url}`,
       ];
-      return { image, file: NEXT_DOCKERFILE, target: '', build_args: args.join('\n') };
+      return { image, file: NEXT_DOCKERFILE, target: 'runner', build_args: args.join('\n') };
     }
     if (spec.kind === 'playwright') {
-      return { image, file: PLAYWRIGHT_DOCKERFILE, target: '', build_args: `APP=${image}` };
+      return { image, file: PLAYWRIGHT_DOCKERFILE, target: 'runner', build_args: `APP=${image}` };
     }
-    return { image, file: NEST_DOCKERFILE, target: '', build_args: `APP=${image}` };
+    return { image, file: NEST_DOCKERFILE, target: 'runner', build_args: `APP=${image}` };
   });
   return { include };
 }
