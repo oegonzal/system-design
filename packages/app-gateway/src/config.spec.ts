@@ -7,6 +7,7 @@ import {
   GatewayConfigError,
   idleConfigFromEnv,
   jobConfigFromEnv,
+  quietConfigFromEnv,
 } from './config';
 
 const sources = (dir: string): string[] =>
@@ -91,7 +92,12 @@ describe('the gateway configuration', () => {
       { name: 'GATEWAY_JOB_SECURITY_GROUP', fallback: undefined },
       { name: 'GATEWAY_JOB_CAPACITY_PROVIDER', fallback: 'FARGATE' },
     ]);
-    expect(Object.keys(APP_GATEWAY_ENV)).toEqual(['gateway', 'idle', 'job']);
+    expect(Object.values(APP_GATEWAY_ENV.quiet)).toEqual([
+      { name: 'GATEWAY_ECS_CLUSTER', fallback: undefined },
+      { name: 'GATEWAY_ECS_SERVICE', fallback: undefined },
+      { name: 'GATEWAY_LOOP_URL', fallback: undefined },
+    ]);
+    expect(Object.keys(APP_GATEWAY_ENV)).toEqual(['gateway', 'idle', 'job', 'quiet']);
 
     const readers = sources(__dirname)
       .filter((path) => readFileSync(path, 'utf8').includes('process.env'))
@@ -306,6 +312,28 @@ describe('the gateway configuration', () => {
     ],
   ])('refuses the job handler %s by name', (_case, env, message) => {
     expect(() => jobConfigFromEnv({ ...JOB, ...env })).toThrow(new GatewayConfigError(message));
+  });
+
+  it('[OPS-7] reads the quiet handler its own three variables, and refuses a missing or non-http loop address by name', () => {
+    const QUIET = {
+      GATEWAY_ECS_CLUSTER: 'cluster',
+      GATEWAY_ECS_SERVICE: 'service',
+      GATEWAY_LOOP_URL: 'http://app.sysdesign.internal:3003',
+    };
+    expect(quietConfigFromEnv(QUIET)).toEqual({
+      ecsCluster: 'cluster',
+      ecsService: 'service',
+      loopUrl: 'http://app.sysdesign.internal:3003',
+    });
+    expect(() => quietConfigFromEnv({ ...QUIET, GATEWAY_LOOP_URL: '' })).toThrow(
+      new GatewayConfigError('GATEWAY_LOOP_URL must be set'),
+    );
+    expect(() => quietConfigFromEnv({ ...QUIET, GATEWAY_LOOP_URL: 'app:3003' })).toThrow(
+      GatewayConfigError,
+    );
+    expect(() =>
+      quietConfigFromEnv({ ...QUIET, GATEWAY_ROUTES: '', GATEWAY_IDLE_STATE_PARAMETER: '' }),
+    ).not.toThrow();
   });
 
   it('holds each handler to its own variables: none reads another’s', () => {

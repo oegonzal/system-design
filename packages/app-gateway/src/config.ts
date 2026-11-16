@@ -6,14 +6,14 @@ import { AUTH_PREFIX, prefixCovers, ROUTES_SCHEMA, type Route } from './routes';
 /**
  * The gateway's configuration, declared once. Every variable any handler
  * reads is named here as data with the value it takes when unset, and read by
- * one of the three functions below, which refuse by name anything they cannot
+ * one of the four functions below, which refuse by name anything they cannot
  * use — before a request is answered, never while one is. Nothing else in the
  * package reads the environment: `config.spec.ts` holds it to that.
  *
- * `proxy`, `idle` and `job` are three functions with three environments, so
- * the rows are declared per handler; the two every handler shares — the
- * service one wakes, another stops and the third wakes for a launch — are
- * declared once and named by all.
+ * `proxy`, `idle`, `job` and `quiet` are four functions with four
+ * environments, so the rows are declared per handler; the two every handler
+ * shares — the service one wakes, another stops, the third wakes for a
+ * launch and the fourth reads — are declared once and named by all.
  */
 type EnvRow = { readonly name: string; readonly fallback: string | undefined };
 
@@ -54,6 +54,10 @@ export const APP_GATEWAY_ENV = {
     subnets: { name: 'GATEWAY_JOB_SUBNETS', fallback: undefined },
     securityGroup: { name: 'GATEWAY_JOB_SECURITY_GROUP', fallback: undefined },
     capacityProvider: { name: 'GATEWAY_JOB_CAPACITY_PROVIDER', fallback: 'FARGATE' },
+  },
+  quiet: {
+    ...ECS_ROWS,
+    loopUrl: { name: 'GATEWAY_LOOP_URL', fallback: undefined },
   },
 } as const;
 
@@ -115,6 +119,13 @@ export interface JobConfig {
   subnets: readonly string[];
   securityGroups: readonly string[];
   capacityProvider: CapacityProvider;
+}
+
+/** What the quiet check reads: the service whose tasks are counted, and the loop asked for runs in progress. */
+export interface QuietConfig {
+  ecsCluster: string;
+  ecsService: string;
+  loopUrl: string;
 }
 
 const refuse = (message: string): never => {
@@ -292,5 +303,15 @@ export function jobConfigFromEnv(env: NodeJS.ProcessEnv = process.env): JobConfi
     subnets: nameList(rows.subnets, required(env, rows.subnets)),
     securityGroups: nameList(rows.securityGroup, required(env, rows.securityGroup)),
     capacityProvider: capacityProvider(rows.capacityProvider, required(env, rows.capacityProvider)),
+  };
+}
+
+/** The quiet handler's read of its own environment, refused the same way. */
+export function quietConfigFromEnv(env: NodeJS.ProcessEnv = process.env): QuietConfig {
+  const rows = APP_GATEWAY_ENV.quiet;
+  return {
+    ecsCluster: required(env, rows.ecsCluster),
+    ecsService: required(env, rows.ecsService),
+    loopUrl: httpUrl(rows.loopUrl, required(env, rows.loopUrl)),
   };
 }

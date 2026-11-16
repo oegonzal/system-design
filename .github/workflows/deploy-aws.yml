@@ -248,7 +248,9 @@ jobs:
       needs.resolve.result == 'success' && needs.gateway.result == 'success' &&
       (needs.images.result == 'success' || needs.images.result == 'skipped')
     runs-on: ubuntu-24.04
-    timeout-minutes: 45
+    # wait-quiet may hold the run up to 130 minutes (a session's limit) before
+    # the migration; the deploy itself takes about fifteen.
+    timeout-minutes: 180
     permissions:
       contents: read
       id-token: write
@@ -356,6 +358,14 @@ jobs:
           bash infra/aws/bin/aws.sh deploy-stack network
           bash infra/aws/bin/aws.sh deploy-stack data
           bash infra/aws/bin/aws.sh deploy-stack platform "ImageTag=$IMAGE_TAG"
+
+      # A grade or a session in flight dies with the task the app deploy
+      # rolls, and the migration may change what they read: aws.sh asks the
+      # quiet function and waits while it answers busy, up to
+      # AWS_DEPLOY_WAIT_MINUTES (130 by default), then goes on. migrate and
+      # deploy-stack app ask again themselves; quiet, that costs seconds.
+      - name: Wait for in-flight work
+        run: bash infra/aws/bin/aws.sh wait-quiet
 
       - name: Migrate the database
         run: bash infra/aws/bin/aws.sh migrate

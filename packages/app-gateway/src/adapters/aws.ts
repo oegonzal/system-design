@@ -21,6 +21,7 @@ import type { CapacityProvider } from '../config';
 import { NO_OBSERVATION, type IdleState, type InvocationMetrics, type JobActivity } from '../idle';
 import type { TaskRunner } from '../job';
 import type { Log } from '../log';
+import type { JobCounter } from '../quiet';
 import type { ServiceControl } from '../wake';
 
 /**
@@ -202,6 +203,32 @@ export function ecsJobActivity(
         for (const task of stale) await stop(task);
         // A task listed but not described still counts as running: a wrong keep costs one interval.
         return { running: jobs.length - stale.length, stopped: stale.length };
+      } catch (error) {
+        log('tasks could not be counted', { error: String(error) });
+        return undefined;
+      }
+    },
+  };
+}
+
+/**
+ * The cluster's running tasks that are not the service's own, counted and
+ * nothing more — the quiet check's question, with none of the idle check's
+ * stopping. ECS not answering is none, logged.
+ */
+export function ecsRunningJobs(
+  client: ECSClient,
+  { cluster, service }: Pick<JobWatch, 'cluster' | 'service'>,
+  log: Log,
+): JobCounter {
+  return {
+    async runningJobs() {
+      try {
+        const own = new Set(
+          await listTasks(client, { cluster, serviceName: service, desiredStatus: 'RUNNING' }),
+        );
+        const all = await listTasks(client, { cluster, desiredStatus: 'RUNNING' });
+        return all.filter((arn) => !own.has(arn)).length;
       } catch (error) {
         log('tasks could not be counted', { error: String(error) });
         return undefined;

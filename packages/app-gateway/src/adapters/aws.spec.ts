@@ -16,7 +16,13 @@ import {
 
 import { NO_OBSERVATION } from '../idle';
 import { recordedLog } from '../testing';
-import { ecsJobActivity, ecsTaskRunner, ssmIdleState, type TaskPlacement } from './aws';
+import {
+  ecsJobActivity,
+  ecsRunningJobs,
+  ecsTaskRunner,
+  ssmIdleState,
+  type TaskPlacement,
+} from './aws';
 
 /**
  * The idle state over a parameter store in memory: the SDK's commands are
@@ -248,6 +254,36 @@ describe('the ECS task lookup', () => {
 const NOW = Date.parse('2026-11-11T12:00:00.000Z');
 const WATCH = { cluster: 'cluster', service: 'service', maxJobMinutes: 240 };
 const minutesAgo = (minutes: number): Date => new Date(NOW - minutes * 60_000);
+
+describe('the ECS running jobs', () => {
+  it('[OPS-7] counts the cluster’s running tasks that are not the service’s own, every page, describing and stopping nothing', async () => {
+    const { client, inputs, described, stopped, log } = taskLister({
+      all: [[arn('app'), arn('session')], [arn('migrate')]],
+      service: [[arn('app')]],
+    });
+    await expect(ecsRunningJobs(client, WATCH, log).runningJobs()).resolves.toBe(2);
+    expect(inputs.map((input) => [input.serviceName, input.nextToken])).toEqual([
+      ['service', undefined],
+      [undefined, undefined],
+      [undefined, '1'],
+    ]);
+    expect(described).toEqual([]);
+    expect(stopped).toEqual([]);
+  });
+
+  it('[OPS-7] answers none, logged, when ECS could not be asked', async () => {
+    const client = {
+      send: async () => {
+        throw new Error('ecs down');
+      },
+    } as unknown as ECSClient;
+    const { log, lines } = recordedLog();
+    await expect(ecsRunningJobs(client, WATCH, log).runningJobs()).resolves.toBeUndefined();
+    expect(lines).toEqual([
+      { message: 'tasks could not be counted', detail: { error: 'Error: ecs down' } },
+    ]);
+  });
+});
 
 describe('the ECS job activity', () => {
   it('[OPS-3] counts the cluster’s running tasks that are not the service’s own, reading every page of both lists, and describes them', async () => {

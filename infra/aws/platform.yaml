@@ -89,6 +89,11 @@ Resources:
     Properties:
       LogGroupName: '/sysdesign/prod/job'
       RetentionInDays: !Ref LogRetentionDays
+  QuietLogGroup:
+    Type: AWS::Logs::LogGroup
+    Properties:
+      LogGroupName: '/sysdesign/prod/quiet'
+      RetentionInDays: !Ref LogRetentionDays
 
   # What the ECS agent needs to start a task: pull the images, write the logs,
   # read the SecureStrings. Nothing the containers themselves can use.
@@ -513,6 +518,10 @@ Outputs:
     Value: !Ref IdleLogGroup
     Export:
       Name: 'sysdesign-prod-IdleLogGroupName'
+  QuietLogGroupName:
+    Value: !Ref QuietLogGroup
+    Export:
+      Name: 'sysdesign-prod-QuietLogGroupName'
   SessionLogGroupName:
     Description: 'Where a browser-session task writes, stream browser-session/browser-session/<task id>'
     Value: !Ref SessionLogGroup

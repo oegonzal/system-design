@@ -24,6 +24,7 @@ MIGRATE_CONTAINER='db-migrate'
 SESSION_CONTAINER='browser-session'
 SESSION_FAMILY="${PREFIX}-platform-session"
 JOB_FUNCTION="${PREFIX}-app-job"
+QUIET_FUNCTION="${PREFIX}-app-quiet"
 GATEWAY_FUNCTION="${PREFIX}-app-gateway"
 # Where the artifacts bucket keeps a database dump on its way to the import.
 IMPORTS_PREFIX='imports'
@@ -33,6 +34,11 @@ VERIFY_POLL_SECONDS=10
 VERIFY_POLLS=36
 DRAIN_POLL_SECONDS=10
 DRAIN_POLLS=30
+QUIET_POLL_SECONDS=30
+# Longer than a session's own limit (120 minutes) and its stop grace.
+DEPLOY_WAIT_MINUTES=130
+# Polls of an answer that could not be taken before a deploy goes on without it.
+QUIET_UNKNOWN_POLLS=10
 CURL_MAX_SECONDS=15
 # The most task ARNs one `describe-tasks` takes.
 DESCRIBE_BATCH=100
@@ -173,6 +179,85 @@ wait_for_rollout() {
     sleep "${ROLLOUT_POLL_SECONDS}"
   done
   die 'the rollout did not complete in time'
+}
+
+# One invocation of the quiet function, as a word and the answer: `quiet`,
+# `busy` or `unknown` with the summary JSON; `absent` when the function is
+# not deployed (the first deploy of the app stack that declares it);
+# `invoke-failed` with the error otherwise — a failed invocation, whose
+# payload is the runtime's error, reads as invoke-failed too.
+quiet_probe() {
+  local out err
+  out="$(temp_file quiet)"
+  err="$(temp_file quiet-err)"
+  if ! aws lambda invoke --function-name "${QUIET_FUNCTION}" \
+    --cli-binary-format raw-in-base64-out --payload '{}' "${out}" > /dev/null 2> "${err}"; then
+    if grep -q ResourceNotFoundException "${err}"; then
+      echo absent
+    else
+      echo "invoke-failed $(tr '\n' ' ' < "${err}" | cut -c1-200)"
+    fi
+    return 0
+  fi
+  node -e '
+    const fs = require("fs");
+    let answer;
+    try { answer = JSON.parse(fs.readFileSync(process.argv[1], "utf8")); } catch { answer = undefined; }
+    if (typeof answer !== "object" || answer === null || typeof answer.quiet !== "boolean") {
+      console.log(`invoke-failed ${JSON.stringify(answer ?? null).slice(0, 200)}`);
+    } else {
+      console.log(`${answer.quiet ? "quiet" : answer.unknown ? "unknown" : "busy"} ${JSON.stringify(answer)}`);
+    }
+  ' "${out}"
+}
+
+# The deploy's courtesy to in-flight work: a grade or a session dies with
+# the task an app deploy rolls, and a migration may change what they read,
+# so both wait here first. Busy is waited on up to DEPLOY_WAIT_MINUTES
+# (AWS_DEPLOY_WAIT_MINUTES overrides it; 0 skips the wait), then the deploy
+# goes on and says so. An answer that could not be taken — the function
+# absent, unreachable, or itself unable to count — is waited on for
+# QUIET_UNKNOWN_POLLS polls only: a task that is starting answers soon, and
+# one that is broken may be what the deploy is there to fix.
+wait_for_quiet() {
+  local minutes="${AWS_DEPLOY_WAIT_MINUTES:-${DEPLOY_WAIT_MINUTES}}" polls poll state detail
+  local unknown=0
+  case "${minutes}" in
+    '' | *[!0-9]*) die "AWS_DEPLOY_WAIT_MINUTES must be a whole number of minutes, got '${minutes}'" ;;
+  esac
+  if [ "${minutes}" -eq 0 ]; then
+    note 'AWS_DEPLOY_WAIT_MINUTES is 0: not waiting for in-flight work'
+    return 0
+  fi
+  polls=$((minutes * 60 / QUIET_POLL_SECONDS))
+  [ "${polls}" -ge 1 ] || polls=1
+  for poll in $(seq 1 "${polls}"); do
+    read -r state detail <<< "$(quiet_probe)"
+    case "${state}" in
+      quiet)
+        note "nothing in flight: ${detail:-}"
+        return 0
+        ;;
+      absent)
+        note 'the quiet function is not deployed yet; going on'
+        return 0
+        ;;
+      busy)
+        unknown=0
+        note "in flight, waiting (${poll}/${polls}): ${detail:-}"
+        ;;
+      *)
+        unknown=$((unknown + 1))
+        if [ "${unknown}" -ge "${QUIET_UNKNOWN_POLLS}" ]; then
+          note "could not tell ${QUIET_UNKNOWN_POLLS} times; going on: ${state} ${detail:-}"
+          return 0
+        fi
+        note "could not tell (${unknown}/${QUIET_UNKNOWN_POLLS}): ${state} ${detail:-}"
+        ;;
+    esac
+    sleep "${QUIET_POLL_SECONDS}"
+  done
+  note "still in flight after ${minutes} minutes; going on"
 }
 
 # `wait tasks-stopped` gives up with 255 after its own limit (about ten

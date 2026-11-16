@@ -19,9 +19,13 @@ usage: infra/aws/bin/aws.sh <command> [args]
   lint                               cfn-lint every template, then cfn-guard when installed
   bootstrap [Key=Value ...]          deploy the bootstrap stack by hand (needs BudgetEmail=...)
   deploy-stack <name> [Key=Value ..] deploy network | data | platform | app | edge from its params file
-                                     (app: packages the gateway code, then waits for the rollout)
-  migrate                            run the platform stack's db-migrate task, wait, print its log,
-                                     fail on a non-zero exit
+                                     (app: waits for in-flight work, packages the gateway code, then
+                                     waits for the rollout)
+  migrate                            wait for in-flight work, then run the platform stack's db-migrate
+                                     task, wait, print its log, fail on a non-zero exit
+  wait-quiet                         wait while a grade or a session is in flight (what migrate and
+                                     deploy-stack app do first); AWS_DEPLOY_WAIT_MINUTES bounds it,
+                                     0 skips it
   wake | sleep                       set the app service's desired count to 1 | 0
   status                             service, task and Aurora capacity at a glance
   exec [container]                   ECS Exec shell into one container of the running task
@@ -103,6 +107,7 @@ cmd_deploy_stack() {
   esac
   stack="$(stack_name "${short}")"
   if [ "${short}" = app ]; then
+    wait_for_quiet
     template="$(package_app_template "$@")"
   else
     template="$(template_file "${short}")"
@@ -161,6 +166,7 @@ run_migrate_task() {
 }
 
 cmd_migrate() {
+  wait_for_quiet
   run_migrate_task migrate || die 'the migration failed'
   note 'migrations applied'
 }
@@ -172,6 +178,7 @@ set_desired_count() {
   aws ecs update-service --cluster "${cluster}" --service "${service}" --desired-count "$1" \
     --query 'service.{desired:desiredCount,running:runningCount}' --output text
 }
+cmd_wait_quiet() { wait_for_quiet; }
 cmd_wake() { set_desired_count 1; }
 cmd_sleep() { set_desired_count 0; }
 
@@ -452,6 +459,7 @@ main() {
         bootstrap) cmd_bootstrap "$@" ;;
         deploy-stack) cmd_deploy_stack "$@" ;;
         migrate) cmd_migrate ;;
+        wait-quiet) cmd_wait_quiet ;;
         wake) cmd_wake ;;
         sleep) cmd_sleep ;;
         status) cmd_status ;;

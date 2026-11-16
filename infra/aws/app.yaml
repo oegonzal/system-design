@@ -807,6 +807,80 @@ Resources:
         Arn: !GetAtt IdleFunction.Arn
         RoleArn: !GetAtt SchedulerRole.Arn
 
+  # The quiet function's role: count the cluster's tasks and read the
+  # service, nothing more — a probe that could stop or start would not be one.
+  QuietFunctionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: !Sub '${AWS::StackName}-quiet'
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - !Sub 'arn:${AWS::Partition}:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole'
+      Policies:
+        - PolicyName: quiet
+          PolicyDocument:
+            Version: '2012-10-17'
+            Statement:
+              - Sid: ReadService
+                Effect: Allow
+                Action: ecs:DescribeServices
+                Resource: !Sub
+                  - 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:service/${ClusterName}/${AWS::StackName}-app'
+                  - ClusterName: !ImportValue 'sysdesign-prod-ClusterName'
+              - Sid: ListClusterTasks
+                Effect: Allow
+                Action: ecs:ListTasks
+                Resource: '*'
+                Condition:
+                  ArnEquals:
+                    ecs:cluster: !Sub
+                      - 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:cluster/${ClusterName}'
+                      - ClusterName: !ImportValue 'sysdesign-prod-ClusterName'
+
+  # What a migration and an app deploy ask before they go on: whether a
+  # grade or a session is in flight (packages/app-gateway/src/quiet.ts). The
+  # roll of the app task ends whatever it was doing — on 2026-11-16 a grade
+  # died under the pipeline — so `aws.sh wait-quiet` invokes this and waits
+  # while the answer is busy.
+  QuietFunction:
+    Type: AWS::Lambda::Function
+    Metadata:
+      cfn-lint:
+        config:
+          ignore_checks: [W3002]
+    Properties:
+      FunctionName: !Sub '${AWS::StackName}-quiet'
+      Description: 'Answers whether a grade or a browser session is in flight, for a deploy to wait on'
+      Runtime: nodejs24.x
+      Architectures:
+        - arm64
+      Handler: main.quiet
+      MemorySize: 256
+      Timeout: 30
+      Role: !GetAtt QuietFunctionRole.Arn
+      Code: ./../../packages/app-gateway/dist
+      LoggingConfig:
+        LogGroup: !ImportValue 'sysdesign-prod-QuietLogGroupName'
+      VpcConfig:
+        SubnetIds: !Split [',', !ImportValue 'sysdesign-prod-PublicSubnetIds']
+        SecurityGroupIds:
+          - !ImportValue 'sysdesign-prod-GatewaySecurityGroupId'
+        Ipv6AllowedForDualStack: true
+      Environment:
+        Variables:
+          AWS_USE_DUALSTACK_ENDPOINT: 'true'
+          GATEWAY_ECS_CLUSTER: !ImportValue 'sysdesign-prod-ClusterName'
+          GATEWAY_ECS_SERVICE: !Sub '${AWS::StackName}-app'
+          GATEWAY_LOOP_URL: !Sub
+            - 'http://app.${Namespace}:3003'
+            - Namespace: !ImportValue 'sysdesign-prod-NamespaceName'
+
   JobFunctionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -1029,6 +1103,24 @@ Resources:
       Dimensions:
         - Name: FunctionName
           Value: !Ref IdleFunction
+      Statistic: Sum
+      Period: 300
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+      AlarmActions:
+        - !ImportValue 'sysdesign-prod-AlertsTopicArn'
+  QuietErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: !Sub '${AWS::StackName}-quiet-errors'
+      AlarmDescription: 'The quiet function failed at least once in five minutes; a deploy waits minutes on it, then goes on without knowing'
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref QuietFunction
       Statistic: Sum
       Period: 300
       EvaluationPeriods: 1

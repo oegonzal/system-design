@@ -160,6 +160,12 @@ Resources:
                   - !Sub 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:cluster/sysdesign-prod-*'
                   - !Sub 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:service/sysdesign-prod-*/*'
                   - !Sub 'arn:${AWS::Partition}:ecs:${AWS::Region}:${AWS::AccountId}:task/sysdesign-prod-*/*'
+              # `aws.sh wait-quiet`, which migrate and deploy-stack app run
+              # first: one invocation of the app stack's quiet function.
+              - Sid: AskQuiet
+                Effect: Allow
+                Action: lambda:InvokeFunction
+                Resource: !Sub 'arn:${AWS::Partition}:lambda:${AWS::Region}:${AWS::AccountId}:function:sysdesign-prod-app-quiet'
               # Neither call takes a resource ARN: a task definition is read by
               # family, and ListTasks is scoped by its cluster condition key.
               - Sid: EcsReadTaskDefinitions

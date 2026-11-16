@@ -1,6 +1,6 @@
 # app-gateway
 
-The edge of the studio on AWS: three Lambda handlers in one bundle. `proxy` sits behind a function URL that CloudFront fronts, and is the only way into the Fargate task — it signs the viewer in, picks the upstream port from the declared routes, forwards the request, and wakes the stack when nobody is listening. `idle` runs on a schedule and puts the stack to sleep when nothing has used it, twice over, and stops a job that has run past its ceiling. `job` starts one launch of the browser session as a task of its own — one at a time per launch — for the launch schedules and for `aws.sh session run` alike, waking the stack first. Nothing here is a Nest service; nothing here listens on a port.
+The edge of the studio on AWS: four Lambda handlers in one bundle. `proxy` sits behind a function URL that CloudFront fronts, and is the only way into the Fargate task — it signs the viewer in, picks the upstream port from the declared routes, forwards the request, and wakes the stack when nobody is listening. `idle` runs on a schedule and puts the stack to sleep when nothing has used it, twice over, and stops a job that has run past its ceiling. `job` starts one launch of the browser session as a task of its own — one at a time per launch — for the launch schedules and for `aws.sh session run` alike, waking the stack first. `quiet` answers whether a grade or a session is in flight, for `aws.sh wait-quiet` — what a migration and an app deploy run first, since the roll ends whatever the task was doing. Nothing here is a Nest service; nothing here listens on a port.
 
 ```bash
 pnpm exec nx test app-gateway        # every seam faked; the network adapters against servers of the test process
@@ -38,6 +38,10 @@ Every run reads the proxy function's `Invocations` (CloudWatch, Sum) over the la
 - none → `GET <GATEWAY_LOOP_URL>/runs?status=running&limit=1` with a 5 s timeout: a 200 whose `meta.total` is 0 sets the service to zero tasks and clears the observation (`stopped`); a run in progress keeps both (`busy`); a loop that cannot be asked keeps both (`loop-unreachable`) — a wrong stop loses a run or a session, a wrong keep costs one interval.
 
 A service already at zero clears a stale observation (`asleep`); one not found is left alone (`service-unknown`). It returns `{outcome, idleMinutes, invocations, desiredCount?, quietSince?, runningJobs?, stoppedJobs?, runningRuns?}`; a check that throws is logged as `idle check failed` and left failed, so the schedule's own error count is what an alarm reads. The state parameter is the idle handler's: the stack creates it with `none`, the handler writes it (and writes `none` back when the observation is cleared, never deleting what the stack declares), and CloudFormation never reconciles its value.
+
+## `quiet`
+
+One invocation, one answer: `{quiet, desiredCount?, runningJobs?, runningRuns?, unknown?}`. The cluster's running tasks that are not the service's own are counted (never stopped — that is `idle`'s ceiling, not this); any means busy. None, and a service that wants no task, is quiet: nothing runs on a task that is not there. Otherwise the loop is asked `GET /runs?status=running&limit=1`; a run in progress is busy. A count that could not be taken — ECS or the loop not answering — is `quiet: false` with `unknown` naming which, so the caller can wait a little and go on rather than roll over work it cannot see. Seen 2026-11-16: a grade submitted at 03:00Z died when the pipeline rolled the task at 03:13Z; a nightly session would die the same way.
 
 ## `job`
 
@@ -98,6 +102,14 @@ Every failure is thrown — a refused event, a launch already running, ECS not a
 | `GATEWAY_JOB_SECURITY_GROUP`    | required  | the security group it joins                                                                                                                                                      |
 | `GATEWAY_JOB_CAPACITY_PROVIDER` | `FARGATE` | `FARGATE` or `FARGATE_SPOT`                                                                                                                                                      |
 
+`quiet`:
+
+| Variable              | Fallback | Meaning                                                      |
+| --------------------- | -------- | ------------------------------------------------------------ |
+| `GATEWAY_ECS_CLUSTER` | required | the cluster whose tasks are counted, the service's own apart |
+| `GATEWAY_ECS_SERVICE` | required | that service                                                 |
+| `GATEWAY_LOOP_URL`    | required | where `quiet` asks for runs in progress                      |
+
 ## Layout
 
-`routes.ts` (the declared routes and the reserved `/auth`) · `http.ts` (the function URL shapes, the shared answers and the page frame) · `auth/` (the session layer: `session.ts` over the seams in `port.ts`; `cookies.ts`, `login-page.ts`; `adapters.ts` the real verifier, the Cognito client and the authenticator over its `send`) · `upstream.ts` (the forwarding port and the event ↔ request translations) · `proxy.ts`, `wake.ts`, `idle.ts`, `job.ts` (the handlers over their seams; `wake.ts` holds `ensureDesired`, the one reading of "asleep") · `adapters/aws.ts`, `adapters/network.ts` (ECS — the service, the task runner with its lookup, the job count with its ceiling —, CloudWatch, the SSM idle state; `node:http`, the loop, the database touch) · `main.ts` (the wiring). Every seam is a port with a fake in its spec; no spec reaches the network.
+`routes.ts` (the declared routes and the reserved `/auth`) · `http.ts` (the function URL shapes, the shared answers and the page frame) · `auth/` (the session layer: `session.ts` over the seams in `port.ts`; `cookies.ts`, `login-page.ts`; `adapters.ts` the real verifier, the Cognito client and the authenticator over its `send`) · `upstream.ts` (the forwarding port and the event ↔ request translations) · `proxy.ts`, `wake.ts`, `idle.ts`, `job.ts`, `quiet.ts` (the handlers over their seams; `wake.ts` holds `ensureDesired`, the one reading of "asleep") · `adapters/aws.ts`, `adapters/network.ts` (ECS — the service, the task runner with its lookup, the job count with its ceiling —, CloudWatch, the SSM idle state; `node:http`, the loop, the database touch) · `main.ts` (the wiring). Every seam is a port with a fake in its spec; no spec reaches the network.

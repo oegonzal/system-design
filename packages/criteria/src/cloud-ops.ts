@@ -38,4 +38,9 @@ export const CLOUD_OPS_CRITERIA: readonly Criterion[] = [
     statement:
       'A job over the ceiling is stopped, not kept: the idle check describes the cluster’s running tasks that are not the service’s own, a hundred per call, stops every one created more than GATEWAY_IDLE_JOB_MAX_MINUTES (a whole number of minutes, 240 unless set) ago with the reason "idle: over the ceiling of N minutes", logged, and counts the rest as running, carrying both counts in its summary (runningJobs, stoppedJobs) — so a session that hangs past the engine’s rails cannot keep the stack awake for good; a stop that fails keeps the service, logged.',
   },
+  {
+    id: 'OPS-7',
+    statement:
+      'A deploy waits for in-flight work: the quiet check counts the cluster’s tasks that are not the service’s own without stopping any, asks the loop for runs in progress only while the service wants a task, is quiet when both are zero or the service is asleep, busy when either runs, and never reads a count it could not take as quiet; a migration and an app deploy wait while it is busy and go on after a bound, and a probe that cannot be reached delays them minutes, not hours.',
+  },
 ];

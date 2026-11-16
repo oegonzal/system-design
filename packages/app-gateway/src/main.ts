@@ -4,6 +4,7 @@ import { SSMClient } from '@aws-sdk/client-ssm';
 
 import {
   ecsJobActivity,
+  ecsRunningJobs,
   ecsServiceControl,
   ecsTaskRunner,
   lambdaInvocationMetrics,
@@ -11,18 +12,25 @@ import {
 } from './adapters/aws';
 import { databaseTouch, httpUpstream, loopActivity } from './adapters/network';
 import { cognitoAuthenticator, cognitoClient, cognitoTokenVerifier, createSession } from './auth';
-import { gatewayConfigFromEnv, idleConfigFromEnv, jobConfigFromEnv } from './config';
+import {
+  gatewayConfigFromEnv,
+  idleConfigFromEnv,
+  jobConfigFromEnv,
+  quietConfigFromEnv,
+} from './config';
 import type { GatewayEvent, GatewayResult } from './http';
 import { createIdleHandler, type IdleHandler, type IdleSummary } from './idle';
 import { createJobHandler, type JobHandler, type JobStarted } from './job';
 import { consoleLog } from './log';
 import { createProxyHandler, type ProxyHandler } from './proxy';
+import { createQuietHandler, type QuietHandler, type QuietSummary } from './quiet';
 import { createWake } from './wake';
 
 /**
- * The gateway's three Lambda handlers, wired from the modules with the real
+ * The gateway's four Lambda handlers, wired from the modules with the real
  * adapters: `proxy` behind the function URL, `idle` on the schedule, `job`
- * behind the launch schedules and `aws.sh session run`. Each is wired on its
+ * behind the launch schedules and `aws.sh session run`, `quiet` behind
+ * `aws.sh wait-quiet` (what a migration and an app deploy run first). Each is wired on its
  * first invocation and kept for the container's life, so a configuration
  * the environment refuses fails that invocation by name and the module
  * itself always loads.
@@ -94,9 +102,22 @@ function wireJob(): JobHandler {
   });
 }
 
+function wireQuiet(): QuietHandler {
+  const config = quietConfigFromEnv();
+  const log = consoleLog;
+  const ecs = new ECSClient({});
+  return createQuietHandler({
+    service: ecsServiceControl(ecs, config.ecsCluster, config.ecsService),
+    jobs: ecsRunningJobs(ecs, { cluster: config.ecsCluster, service: config.ecsService }, log),
+    loop: loopActivity(config.loopUrl, log),
+    log,
+  });
+}
+
 let proxying: ProxyHandler | undefined;
 let idling: IdleHandler | undefined;
 let launching: JobHandler | undefined;
+let probing: QuietHandler | undefined;
 
 export const proxy = async (event: GatewayEvent): Promise<GatewayResult> =>
   (proxying ??= wireProxy())(event);
@@ -104,3 +125,5 @@ export const proxy = async (event: GatewayEvent): Promise<GatewayResult> =>
 export const idle = async (): Promise<IdleSummary> => (idling ??= wireIdle())();
 
 export const job = async (event: unknown): Promise<JobStarted> => (launching ??= wireJob())(event);
+
+export const quiet = async (): Promise<QuietSummary> => (probing ??= wireQuiet())();
