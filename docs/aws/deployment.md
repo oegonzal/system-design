@@ -280,7 +280,10 @@ with `Cache-Control: no-store`.
 CloudFront-backed and is not reliably reachable over IPv6, which is all a Lambda in this VPC has
 to the outside; the `cognito-idp` API endpoint is). `GET /auth/login` renders an inline-styled
 form — email, password, a hidden `returnTo` and a hidden `csrf` — and sets `sd_csrf` (random,
-10 minutes). `POST /auth/login` requires the form's `csrf` to equal the cookie, calls `InitiateAuth`
+10 minutes; a request that already carries a well-formed one keeps it, so a parallel load of the
+page — the browser's favicon request, redirected here while signed out; a second tab — leaves an
+open form valid, and every gateway page declares an empty icon so no favicon request is made).
+`POST /auth/login` requires the form's `csrf` to equal the cookie, calls `InitiateAuth`
 with `USER_PASSWORD_AUTH` against the user pool (`GATEWAY_COGNITO_USER_POOL_ID`,
 `GATEWAY_COGNITO_CLIENT_ID`; the region is the pool id's prefix, and the client pins
 `https://cognito-idp.<region>.amazonaws.com` with dual-stack off, so the global
@@ -1127,6 +1130,12 @@ runs the previous revision and the stack is in a `ROLLBACK` state.
 stopped task is known to produce; the request was still answered the starting page and the wake
 still happened (before 2026-11-15 such a code was a `502`, and the first wake produced one, an
 `EBUSY`). A code that keeps appearing while the task runs is a new cause worth reading.
+
+**The sign-in page answers "The form had expired" at once.** The `sd_csrf` cookie the browser sent
+is not the form's token. Before 2026-11-16 the browser's own `/favicon.ico` request, redirected to
+the sign-in page, re-issued the cookie behind every open form; since then a request keeps the token
+it carries and the pages declare an empty icon. What remains: a form left open past its ten
+minutes, or a browser that blocks the site's cookies.
 
 **The sign-in page answers "set the password permanent" (`NEW_PASSWORD_REQUIRED`).** The user was
 created with a temporary password, which the gateway's page cannot change. Run the

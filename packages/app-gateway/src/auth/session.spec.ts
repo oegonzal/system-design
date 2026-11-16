@@ -84,6 +84,23 @@ describe('the session layer', () => {
     expect(hiddenField(result.body ?? '', 'returnTo')).toBe('/prompts/1');
     expect(result.body).toContain('<form method="post" action="/auth/login">');
     expect(result.body).toContain('type="password" name="password"');
+    expect(result.body).toContain('<link rel="icon" href="data:,">');
+  });
+
+  it('keeps the token a request already carries, so a parallel load leaves an open form valid', async () => {
+    const { layer } = session({});
+    const token = 'token-the-browser-holds-01';
+    const kept = await layer.route(
+      functionUrlEvent({ path: '/auth/login', cookies: [`sd_csrf=${token}`] }),
+    );
+    expect(cookieValue(kept.cookies, 'sd_csrf')).toBe(token);
+    expect(hiddenField(kept.body ?? '', 'csrf')).toBe(token);
+    const malformed = await layer.route(
+      functionUrlEvent({ path: '/auth/login', cookies: ['sd_csrf=short'] }),
+    );
+    const minted = cookieValue(malformed.cookies, 'sd_csrf');
+    expect(minted).toMatch(/^[\w-]{20,}$/);
+    expect(hiddenField(malformed.body ?? '', 'csrf')).toBe(minted);
   });
 
   it('signs in a form whose token matches: asks the pool, sets the session, clears the token, returns', async () => {
@@ -156,18 +173,21 @@ describe('the session layer', () => {
     }
   });
 
-  it('renders the form again with a message and 401 when the pool refuses the password', async () => {
+  it('renders the form again with a message and 401 when the pool refuses the password, keeping the token', async () => {
     const { layer } = session({ signIn: { kind: 'refused' } });
+    const token = 'token-that-matched-000001';
     const result = await layer.route(
       posted(
-        { csrf: 't', email: 'a@b.c', password: 'wrong', returnTo: '/prompts/1' },
-        { cookies: ['sd_csrf=t'] },
+        { csrf: token, email: 'a@b.c', password: 'wrong', returnTo: '/prompts/1' },
+        { cookies: [`sd_csrf=${token}`] },
       ),
     );
     expect(result.statusCode).toBe(401);
     expect(result.body).toContain('were not accepted');
     expect(hiddenField(result.body ?? '', 'returnTo')).toBe('/prompts/1');
     expect(result.cookies?.map((cookie) => cookie.split('=')[0])).toEqual(['sd_csrf']);
+    expect(cookieValue(result.cookies, 'sd_csrf')).toBe(token);
+    expect(hiddenField(result.body ?? '', 'csrf')).toBe(token);
   });
 
   it('asks for both fields before asking the pool', async () => {

@@ -84,9 +84,24 @@ const clearedSession = (): string[] => [
   clearCookie(SESSION_COOKIES.refresh),
 ];
 
-/** The form, with a fresh token in the cookie and the field: every render starts a new attempt. */
-function loginForm(returnTo: string, status: number, message?: string): GatewayResult {
-  const csrf = csrfToken();
+/** What `csrfToken` mints: 16 random bytes as base64url. */
+const CSRF_SHAPE = /^[\w-]{20,}$/;
+
+/**
+ * The form, with the same token in the cookie and the hidden field. A request
+ * that already carries a well-formed token keeps it, so a parallel load of
+ * this page — the browser's favicon request lands here through the sign-in
+ * redirect, and so does a second tab — leaves a form that is still open valid
+ * (seen 2026-11-16: every browser sign-in was "expired"); a request without
+ * one, or whose token failed the check, starts a new attempt.
+ */
+function loginForm(
+  returnTo: string,
+  status: number,
+  message?: string,
+  keep?: string,
+): GatewayResult {
+  const csrf = keep !== undefined && CSRF_SHAPE.test(keep) ? keep : csrfToken();
   return {
     ...htmlResult(status, loginPage({ returnTo, csrf, message }), NO_STORE),
     cookies: [setCookie(SESSION_COOKIES.csrf, csrf, COOKIE_MAX_AGE.csrf)],
@@ -119,7 +134,7 @@ async function submitLogin(
   const email = form.get('email')?.trim() ?? '';
   const password = form.get('password') ?? '';
   if (email === '' || password === '') {
-    return loginForm(returnTo, 400, 'Both the email and the password are needed.');
+    return loginForm(returnTo, 400, 'Both the email and the password are needed.', csrf);
   }
   const signIn = await authenticator.signIn(email, password);
   switch (signIn.kind) {
@@ -129,7 +144,7 @@ async function submitLogin(
         clearCookie(SESSION_COOKIES.csrf),
       ]);
     case 'refused':
-      return loginForm(returnTo, 401, 'That email and password were not accepted.');
+      return loginForm(returnTo, 401, 'That email and password were not accepted.', csrf);
     case 'challenge':
       return challengePage(signIn.name);
   }
@@ -163,6 +178,8 @@ export function createSession({ verifier, authenticator }: SessionDeps): Session
           return loginForm(
             sameOriginPath(new URLSearchParams(event.rawQueryString).get('returnTo')),
             200,
+            undefined,
+            readCookies(event)[SESSION_COOKIES.csrf],
           );
         case `POST ${LOGIN_PATH}`:
           return submitLogin(event, authenticator);

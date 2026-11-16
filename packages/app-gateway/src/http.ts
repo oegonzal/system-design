@@ -94,13 +94,16 @@ export const escapeHtml = (text: string): string =>
 /**
  * The one page frame, styled inline: the gateway serves it with no assets of
  * its own. `main` and `head` are trusted markup the caller built — a form, a
- * `<meta>` — with every value of the viewer's already escaped.
+ * `<meta>` — with every value of the viewer's already escaped. The empty icon
+ * link keeps the browser from asking for `/favicon.ico` behind the page: signed
+ * out, that request is redirected to the sign-in page too.
  */
 export function page(title: string, main: string, head = ''): string {
   return [
     '<!doctype html>',
     '<html lang="en"><head><meta charset="utf-8">',
     '<meta name="viewport" content="width=device-width, initial-scale=1">',
+    '<link rel="icon" href="data:,">',
     head,
     `<title>${escapeHtml(title)}</title></head>`,
     '<body style="margin:0;min-height:100vh;display:grid;place-items:center;',
