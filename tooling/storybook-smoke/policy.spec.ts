@@ -159,6 +159,20 @@ describe('classify', () => {
     expect(classify(chatty)).toBe('ok');
   });
 
+  it('ignores React Flow’s attribution notice, which the SdNode story harness provokes on purpose', () => {
+    expect(
+      isIgnorableNoise({
+        kind: 'warning',
+        text:
+          'React Flow: It seems like you are hiding the attribution. Please only do this when you are ' +
+          'subscribed to React Flow Pro: https://reactflow.dev/remove-attribution',
+      }),
+    ).toBe(true);
+    expect(isIgnorableNoise({ kind: 'warning', text: 'React Flow: attribution missing' })).toBe(
+      false,
+    );
+  });
+
   it('does not excuse a message that merely contains familiar words', () => {
     expect(
       isIgnorableNoise({ kind: 'warning', text: 'failed to load React DevTools panel data' }),

@@ -84,14 +84,20 @@ export const RENDER_MODES: readonly ColorMode[] = (
  * Console output the gate tolerates.
  *
  * Deny by default: the list names dev-server chatter that says nothing about
- * the component under test, and nothing else. Every entry is a pattern rather
- * than a flag so the allowance is as narrow as the message it excuses —
- * a warning that merely *contains* familiar words still fails.
+ * the component under test, plus one vendor notice a story provokes on
+ * purpose, and nothing else. Every entry is a pattern rather than a flag so
+ * the allowance is as narrow as the message it excuses — a warning that
+ * merely *contains* familiar words still fails.
  */
 const IGNORED_NOISE: readonly RegExp[] = [
   /Download the React DevTools/,
   /\[vite\] (?:connecting|connected)/,
   /websocket connection.*(?:closed|lost)/i,
+  // React Flow's Pro notice when a canvas hides its attribution, which the
+  // SdNode story harness does (`proOptions.hideAttribution`): about the
+  // vendor's terms, not the component, and caught by the capture only now
+  // and then (1 render of 1,049 on 2026-11-16), which failed CI at random.
+  /React Flow: It seems like you are hiding the attribution/,
 ];
 
 export const isIgnorableNoise = (message: ConsoleMessage): boolean =>
