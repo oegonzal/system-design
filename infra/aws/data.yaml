@@ -317,8 +317,13 @@ Resources:
             Principal: '*'
             Action: s3:PutObject
             Resource: !Sub '${FilesBucket.Arn}/*'
+            # IfExists alone would also match an upload that names no key and takes the
+            # bucket's default (the condition is true when the key is absent): deny only a
+            # header that is present and names another key.
             Condition:
-              StringNotEqualsIfExists:
+              'Null':
+                s3:x-amz-server-side-encryption-aws-kms-key-id: 'false'
+              StringNotEquals:
                 s3:x-amz-server-side-encryption-aws-kms-key-id: !GetAtt FilesKey.Arn
           - Sid: DenyAnotherEncryption
             Effect: Deny
@@ -326,7 +331,9 @@ Resources:
             Action: s3:PutObject
             Resource: !Sub '${FilesBucket.Arn}/*'
             Condition:
-              StringNotEqualsIfExists:
+              'Null':
+                s3:x-amz-server-side-encryption: 'false'
+              StringNotEquals:
                 s3:x-amz-server-side-encryption: 'aws:kms'
 
 Outputs:
