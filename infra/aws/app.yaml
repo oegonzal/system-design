@@ -717,15 +717,16 @@ Resources:
       FunctionUrlAuthType: NONE
   # Lambda refuses a public URL whose policy grants InvokeFunctionUrl alone: "Invoking
   # a Function URL requires both the lambda:InvokeFunctionUrl and lambda:InvokeFunction
-  # permissions" (the first deploy, 2026-11-15). The condition keeps this to URL
-  # invocations: a direct Invoke call carries no FunctionUrlAuthType and is denied.
+  # permissions" (the first deploy, 2026-11-15) — the rule for URLs made since October
+  # 2025. The InvokedViaFunctionUrl condition keeps this to URL invocations: a direct
+  # Invoke call is denied.
   GatewayFunctionInvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
       FunctionName: !Ref GatewayFunction
       Action: lambda:InvokeFunction
       Principal: '*'
-      FunctionUrlAuthType: NONE
+      InvokedViaFunctionUrl: true
 
   # The same bundle as the gateway with the idle handler and only the idle
   # settings: which service to stop, where the loop answers whether a run is

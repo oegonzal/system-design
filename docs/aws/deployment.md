@@ -33,7 +33,7 @@ browser ──HTTPS──▶ CloudFront (one distribution, <id>.cloudfront.net)
                    │  everything else → CachingDisabled, AllViewerExceptHostHeader, all methods, 503 never cached
                    │  origin custom header x-origin-verify: <secret>
                    ▼
-            Lambda function URL (AuthType NONE, whose resource policy grants both `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction` to anyone — Lambda refuses a public URL with the first alone (2026-11-15); the gateway refuses any request without the header)
+            Lambda function URL (AuthType NONE, whose resource policy grants both `lambda:InvokeFunctionUrl` and `lambda:InvokeFunction` to anyone, the second only when invoked through the URL (`lambda:InvokedViaFunctionUrl`) — Lambda refuses a public URL with the first alone since October 2025 (seen 2026-11-15); the gateway refuses any request without the header)
                    ▼
             app-gateway Lambda (in the VPC, IPv6 to the AWS APIs)
                    │  1. session: cookie sd_id verified; expired → refreshed from sd_refresh (cognito-idp);
