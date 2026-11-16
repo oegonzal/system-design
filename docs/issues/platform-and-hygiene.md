@@ -537,3 +537,68 @@ answering, so it no longer races the dispatcher's write; `until` in
 it was (an answer typed between a channel's send and the record is told nothing
 is waiting), which no person on Telegram can reach; closing it in the dispatcher
 is still open.
+
+### PLAT-19 · The loop keeps calling the model after SIGTERM
+
+**Status** open · **Severity** medium · **Where** `packages/quality-loop` (the run engine, the Nest shutdown hooks)
+
+**What.** When ECS stops the app task (a deploy's roll before 2026-11-16, the
+idle stop, a manual `aws.sh sleep`) the loop container receives SIGTERM and
+has `StopTimeout` 120 s. A run in flight keeps dispatching model calls through
+the whole grace and is SIGKILLed with the run still marked `running`; the next
+task's janitor fails it three minutes later as "the run's heartbeat went
+stale". The calls made during the grace are spent for nothing.
+
+**Evidence.** 2026-11-16: run `2026-11-16T03-00-53-680-dcbe25-quality`
+(system-design-canvas 2.4.0), SIGTERM at 03:13:33Z, an exchange started at
+03:13:52Z, the last heartbeat 03:15:27Z, SIGKILL about 03:15:34Z, failed by
+the janitor at 03:21:21Z (the verification workflow's studio checker and its
+refuter, journal `wf_8b093a2a-c32`).
+
+**Recommendation.** On SIGTERM stop admitting runs, mark the in-flight runs
+`interrupted` at once (their callers can regrade), and exit — the 120 s grace
+is far shorter than a grade. Since 2026-11-16 a deploy no longer rolls the
+task while a run or a session is in flight (`aws.sh wait-quiet`, OPS-7), so
+only the idle stop (which already waits for no run) and a manual sleep reach
+this path.
+
+### PLAT-20 · Token usage is not accounted per run
+
+**Status** open · **Severity** medium · **Where** `packages/llm/src/claude-turn.ts` (the usage read), `packages/contracts` (`LlmExchangeSummaryDto`), the run dumps' `meta.json`
+
+**What.** The seam records only the SDK's `input_tokens` and `output_tokens`;
+`cache_creation_input_tokens`, `cache_read_input_tokens` and the model id the
+SDK reports are dropped, so every recorded exchange shows two input tokens and
+no run says which model answered. The run API exposes no usage at all. With
+the cloud billed per token (Bedrock, the owner's decision of 2026-11-16) a
+bill cannot be reconciled against runs.
+
+**Evidence.** 2026-11-16 audit (journal `wf_8b093a2a-c32`): 76 laptop dump
+`meta.json` files all carry `usage.inputTokens 2` while their `system.txt` +
+`user.txt` average about 63 KB; `GET /loop/runs/<id>` carries `llm.model` as
+the provider label only.
+
+**Recommendation.** Record the four usage counters and the model id per call,
+sum them on the run summary, and show them in the inspector; then re-measure
+the per-pipeline cost the audit estimated from bytes/4.
+
+### PLAT-21 · A deploy rolled the app task under a running grade
+
+**Status** closed (2026-11-16) · **Severity** high · **Where** the deploy workflow, `infra/aws/bin/aws.sh`, `packages/app-gateway`
+
+**What.** The service runs one task with minimum healthy 0, so every pipeline
+deploy (every push to `main` re-tags the images) stopped the running task
+before the new one was up: a grade in flight died, the site answered 503 for
+about four minutes, and a nightly job-application session would have died the
+same way.
+
+**How it closed.** Commit c3ce5164: a fourth gateway handler, `quiet`, counts
+the cluster's tasks that are not the service's own and asks the loop for runs
+in progress; `aws.sh wait-quiet` — run by the pipeline before the migration,
+and by `migrate` and `deploy-stack app` themselves — waits while it answers
+busy, up to `AWS_DEPLOY_WAIT_MINUTES` (130, longer than a session's limit),
+then goes on. Verified live the same night: busy with a grade running, quiet
+after, the one-minute bound and the off switch.
+
+**Verify.** `AWS_DEPLOY_WAIT_MINUTES=1 bash infra/aws/bin/aws.sh wait-quiet`
+while a grade runs prints `in flight, waiting` then `going on`.

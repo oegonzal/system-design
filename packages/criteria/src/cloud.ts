@@ -20,7 +20,7 @@ export const CLOUD_CRITERIA: readonly Criterion[] = [
   {
     id: 'CLOUD-3',
     statement:
-      'The model is reached on the subscription alone and secrets never ride as plain environment: no template, parameter file, script or workflow names ANTHROPIC_API_KEY, and every token-, key-, password- or secret-named variable of a task definition is a secret, never an environment value.',
+      'The model is reached without an API key and secrets never ride as plain environment: no template, parameter file, script or workflow names ANTHROPIC_API_KEY, and every token-, key-, password- or secret-named variable of a task definition is a secret, never an environment value.',
   },
   {
     id: 'CLOUD-4',
@@ -36,5 +36,10 @@ export const CLOUD_CRITERIA: readonly Criterion[] = [
     id: 'CLOUD-6',
     statement:
       'The stacks stay updatable: no stack imports a task-definition revision — no !ImportValue names an export whose value is a !Ref of an AWS::ECS::TaskDefinition, whose ARN changes with every tag — and the job function runs the session task by the family the platform stack exports, which is the session task definition’s own.',
+  },
+  {
+    id: 'CLOUD-7',
+    statement:
+      'The cloud loop’s model is the committed Bedrock choice: the quality-loop container’s LLM_CHOICE names a config/llm/<name>.json whose provider is claude-bedrock; the platform stack’s BedrockModelId and BedrockSmallModelId — their template defaults and their params/prod/platform.json values — equal that file’s model and smallModel, and the task role is granted bedrock:InvokeModel and bedrock:InvokeModelWithResponseStream on them; no task definition in any template carries CLAUDE_CODE_OAUTH_TOKEN, the subscription’s token, which stays on the laptop; and docker/nest-app.Dockerfile copies config/ into the runner stage, so the image carries the file it is told to read.',
   },
 ];

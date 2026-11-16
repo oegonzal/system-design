@@ -9,7 +9,11 @@ import { query as sdkQuery, type SDKUserMessage } from '@anthropic-ai/claude-age
  * `CLAUDE_CODE_OAUTH_TOKEN` (from `claude setup-token`) answers with that
  * token as its source. Anything else — no credential, an API key, a
  * gateway token, a key helper, a third-party provider — is not the
- * subscription, and the loop refuses to run on it.
+ * subscription, and the subscription provider refuses to run on it. The one
+ * other account the repository accepts is Amazon Bedrock, where the CLI is
+ * told so (`CLAUDE_CODE_USE_BEDROCK`) and reports `bedrock` as its provider,
+ * billing the AWS account whose credentials the SDK chain finds; only the
+ * `claude-bedrock` provider asks for it, and it is still no API key.
  */
 export interface ClaudeAccount {
   apiProvider: string | null;
@@ -69,6 +73,21 @@ export const signedIn = (account: ClaudeAccount): boolean =>
   (account.tokenSource === null
     ? account.subscriptionType !== null
     : SUBSCRIPTION_TOKEN_SOURCES.includes(account.tokenSource));
+
+/** The provider the CLI reports when it calls Amazon Bedrock. */
+const BEDROCK_PROVIDER = 'bedrock';
+
+/**
+ * Amazon Bedrock and no Anthropic key: what the `claude-bedrock` provider
+ * requires of the CLI it spawns. The subscription fields say nothing here —
+ * a token source would be the subscription's, and Bedrock has none. The
+ * check proves the CLI is on Bedrock, not that the AWS credentials behind it
+ * exist or may invoke the model (measured 2026-11-16: the CLI reports
+ * `bedrock` with no credentials reachable); that takes a call, and a refused
+ * one fails the first.
+ */
+export const onBedrock = (account: ClaudeAccount): boolean =>
+  account.apiProvider === BEDROCK_PROVIDER && account.apiKeySource === null;
 
 /** What the account check found, in words that name no credential. */
 export const describeAccount = (account: ClaudeAccount): string =>

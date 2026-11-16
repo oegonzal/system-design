@@ -42,6 +42,68 @@ describe('the subscription client at its call site', () => {
     }
   });
 
+  it('[QL-22] strips a withheld credential from the provider overlay too, keeping the rest of it', async () => {
+    const { run, seen } = scripted([
+      { type: 'result', subtype: 'success', is_error: false, result: '{"answer":"ok"}' },
+    ]);
+    const client = new ClaudeAgentLlmClient({
+      query: run,
+      env: { ANTHROPIC_API_KEY: 'sk-overlay', AWS_REGION: 'eu-west-1' },
+    });
+    await expect(
+      client.completeStructured({ system: 's', user: 'u', schema: answer }),
+    ).resolves.toEqual({ answer: 'ok' });
+    expect(seen.env).not.toHaveProperty('ANTHROPIC_API_KEY');
+    expect(seen.env?.['AWS_REGION']).toBe('eu-west-1');
+  });
+
+  it("[QL-22] lays the provider's variables over the process's, the withheld credentials still withheld and the ceiling still the seam's", async () => {
+    const saved = { region: process.env['AWS_REGION'], key: process.env['ANTHROPIC_API_KEY'] };
+    process.env['AWS_REGION'] = 'eu-west-1';
+    process.env['ANTHROPIC_API_KEY'] = 'sk-test';
+    try {
+      const env = {
+        CLAUDE_CODE_USE_BEDROCK: '1',
+        AWS_REGION: 'us-east-1',
+        ANTHROPIC_MODEL: 'us.anthropic.claude-sonnet-4-6',
+        CLAUDE_CODE_MAX_OUTPUT_TOKENS: '1',
+      };
+      const { run, seen } = scripted([succeeded('{"answer":"ok"}')]);
+      await new ClaudeAgentLlmClient({ query: run, env, model: 'us.anthropic.claude-sonnet-4-6' })
+        .withRecorder(() => undefined)
+        .completeStructured({ system: 's', user: 'u', schema: answer });
+      // The provider's region wins over the shell's; the key is still gone; the
+      // cap is the seam's whatever the provider says — and a recording twin
+      // carries all of it, since it is the twin that every run calls through.
+      expect(seen.env).toMatchObject({
+        CLAUDE_CODE_USE_BEDROCK: '1',
+        AWS_REGION: 'us-east-1',
+        ANTHROPIC_MODEL: 'us.anthropic.claude-sonnet-4-6',
+        CLAUDE_CODE_MAX_OUTPUT_TOKENS: String(OUTPUT_TOKEN_CEILING),
+      });
+      expect(seen.env).not.toHaveProperty('ANTHROPIC_API_KEY');
+      expect(seen.options?.['model']).toBe('us.anthropic.claude-sonnet-4-6');
+
+      // With no provider variables, the process's own stand.
+      const bare = scripted([succeeded('{"answer":"ok"}')]);
+      await new ClaudeAgentLlmClient({ query: bare.run }).completeStructured({
+        system: 's',
+        user: 'u',
+        schema: answer,
+      });
+      expect(bare.seen.env?.['AWS_REGION']).toBe('eu-west-1');
+      expect(bare.seen.env).not.toHaveProperty('CLAUDE_CODE_USE_BEDROCK');
+    } finally {
+      for (const [name, value] of [
+        ['AWS_REGION', saved.region],
+        ['ANTHROPIC_API_KEY', saved.key],
+      ] as const) {
+        if (value === undefined) delete process.env[name];
+        else process.env[name] = value;
+      }
+    }
+  });
+
   it("[QL-22] spawns a declared effort as the CLI's own effort level, and leaves it to the CLI when none is declared", async () => {
     const ok = () => [
       { type: 'result', subtype: 'success', is_error: false, result: '{"answer":"ok"}' },

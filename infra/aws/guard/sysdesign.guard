@@ -88,8 +88,10 @@ rule task_environment_holds_no_credentials when %task_definitions !empty {
   }
 }
 
-# Model access is the Claude Code subscription token and nothing else; an
-# API key appears in no task definition and no function.
+# Model access is never an API key: the laptop's loop runs on the Claude Code
+# subscription login and the cloud's on Amazon Bedrock through the task role
+# (platform.yaml, InvokeClaudeOnBedrock); an API key appears in no task
+# definition and no function.
 rule no_anthropic_api_key_in_tasks when %task_definitions !empty {
   %task_definitions.Properties.ContainerDefinitions[*] {
     when Environment exists {

@@ -3,12 +3,15 @@ import { describe, expect, it } from 'vitest';
 import type { ClaudeAccount } from './claude-account';
 import { ClaudeAgentLlmClient } from './claude-agent-client';
 import {
+  assertBedrockLogin,
   assertModelProvider,
   assertSubscriptionLogin,
+  BEDROCK_PROVIDER_HELP,
   createEmbeddingClientFromEnv,
   createQualityLoopLlm,
   describeModelProvider,
   PROVIDERS,
+  providerEnv,
 } from './create-client';
 import { llmConfigSchema, LLM_PROVIDERS, type LlmConfig } from './llm-config';
 import { OpenAiCompatibleLlmClient } from './openai-compatible-client';
@@ -85,6 +88,61 @@ describe('the configured provider is the one that is built, and the one that is 
     await expect(
       assertSubscriptionLogin(() => Promise.reject(new Error('CLI exited'))),
     ).rejects.toThrow(/could not check the model provider \(CLI exited\)/);
+  });
+
+  it('[QL-22] the Bedrock row turns the file into the CLI’s environment, pins its model, and accepts only a CLI on Bedrock without an API key', async () => {
+    const bedrock = config({
+      provider: 'claude-bedrock',
+      model: 'us.anthropic.claude-sonnet-4-6',
+      smallModel: 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
+      region: 'us-east-1',
+    });
+    // The names are the vendor's, the values the file's: the task environment
+    // carries no model choice.
+    expect(providerEnv(bedrock)).toEqual({
+      CLAUDE_CODE_USE_BEDROCK: '1',
+      AWS_REGION: 'us-east-1',
+      ANTHROPIC_MODEL: 'us.anthropic.claude-sonnet-4-6',
+      ANTHROPIC_DEFAULT_HAIKU_MODEL: 'us.anthropic.claude-haiku-4-5-20251001-v1:0',
+    });
+    const noSmall = config({
+      provider: 'claude-bedrock',
+      model: 'us.anthropic.claude-sonnet-4-6',
+      region: 'us-east-1',
+    });
+    expect(providerEnv(noSmall)).not.toHaveProperty('ANTHROPIC_DEFAULT_HAIKU_MODEL');
+    expect(providerEnv(config())).toEqual({});
+    expect(providerEnv(config({ provider: 'openai-compatible' }))).toEqual({});
+
+    const client = createQualityLoopLlm(bedrock, {});
+    expect(client).toBeInstanceOf(ClaudeAgentLlmClient);
+    expect(client.model).toBe('us.anthropic.claude-sonnet-4-6');
+    expect(describeModelProvider(bedrock)).toEqual({ model: 'us.anthropic.claude-sonnet-4-6' });
+
+    await expect(
+      assertBedrockLogin(() => Promise.resolve(account({ apiProvider: 'bedrock' }))),
+    ).resolves.toBeUndefined();
+    // The subscription is not Bedrock, and the way out is Bedrock's own, not `claude login`.
+    const onSubscription = () => Promise.resolve(account({ subscriptionType: 'Claude Max' }));
+    await expect(assertBedrockLogin(onSubscription)).rejects.toThrow(
+      /no model provider \(provider firstParty, token source none\).*bedrock:InvokeModel/,
+    );
+    await expect(assertBedrockLogin(onSubscription)).rejects.not.toThrow(/claude login/);
+    await expect(assertBedrockLogin(onSubscription)).rejects.toThrow(BEDROCK_PROVIDER_HELP);
+    await expect(
+      assertBedrockLogin(() =>
+        Promise.resolve(account({ apiProvider: 'bedrock', apiKeySource: 'ANTHROPIC_API_KEY' })),
+      ),
+    ).rejects.toThrow(/API key source ANTHROPIC_API_KEY/);
+    await expect(
+      assertBedrockLogin(() => Promise.reject(new Error('no AWS credentials'))),
+    ).rejects.toThrow(
+      /could not check the model provider \(no AWS credentials\).*AWS credentials the default SDK chain/,
+    );
+    // And the subscription row still refuses a CLI on Bedrock: this machine stays where it is.
+    await expect(
+      assertSubscriptionLogin(() => Promise.resolve(account({ apiProvider: 'bedrock' }))),
+    ).rejects.toThrow(/provider bedrock.*claude login/);
   });
 });
 

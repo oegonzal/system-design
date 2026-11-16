@@ -27,8 +27,10 @@
 # function (sleep), so a deploy while asleep registers the new revision
 # without starting a task; a load balancer (the function URL has no 30 s cap
 # and costs nothing idle); any secret value (the containers read them from
-# SSM by ARN at start); the Claude API key (the loop runs on the subscription
-# token, nothing else is accepted); a NAT gateway.
+# SSM by ARN at start); an Anthropic API key or a Claude subscription token
+# (the loop calls Claude through Amazon Bedrock with the task role's
+# credentials, on the committed config/llm file LLM_CHOICE names below; the
+# subscription is this laptop's); a NAT gateway.
 AWSTemplateFormatVersion: '2010-09-09'
 Description: 'System Design Studio: ECS service, gateway, idle and job Lambdas, idle state, session schedules, alarms'
 
@@ -214,11 +216,17 @@ Resources:
               Value: '1'
             - Name: USE_BUILTIN_RIPGREP
               Value: '0'
+            # Which committed config/llm file the loop runs on: the Bedrock one
+            # (Sonnet 4.6 and Haiku 4.5 through this region's inference profiles,
+            # with the task role's credentials), read from the image's config/,
+            # while the checked-in config/engine.json keeps the laptop on the
+            # subscription. The file carries the choice; this carries its name
+            # (CLOUD-7 holds the two, and the platform stack's grant, together).
+            - Name: LLM_CHOICE
+              Value: 'claude-bedrock'
           Secrets:
             - Name: DB_PASSWORD
               ValueFrom: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPrefix}/DB_PASSWORD'
-            - Name: CLAUDE_CODE_OAUTH_TOKEN
-              ValueFrom: !Sub 'arn:${AWS::Partition}:ssm:${AWS::Region}:${AWS::AccountId}:parameter${SecretsPrefix}/CLAUDE_CODE_OAUTH_TOKEN'
             - !If
               - HasOpenAiKey
               - Name: OPENAI_API_KEY

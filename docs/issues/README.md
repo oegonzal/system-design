@@ -32,61 +32,65 @@ of re-deriving the problem.
 
 ## Index
 
-| Id       | Title                                                                    | Status   | Severity |
-| -------- | ------------------------------------------------------------------------ | -------- | -------- |
-| ENG-1    | Penalty-only dimensions carry weight without information                 | open     | high     |
-| ENG-2    | One lost sample voids a whole lens                                       | closed   | —        |
-| ENG-3    | Defect grouping chains through shared refs                               | open     | medium   |
-| ENG-4    | No `evidenceRefs` distinct from `locationRefs`                           | accepted | —        |
-| ENG-5    | Memory reaches the producer only through the goal                        | accepted | —        |
-| ENG-6    | The trace lands only when the loop ends                                  | accepted | —        |
-| ENG-7    | No response memoisation; a re-grade re-bills                             | open     | medium   |
-| ENG-8    | `agentic-design` accepts 6 of 40 iterations                              | watch    | —        |
-| ENG-9    | `replay` reads one page and does not say so                              | open     | low      |
-| ENG-10   | A boot sweep fails another process's live run; its close cannot undo it  | closed   | —        |
-| MEM-1    | Persona compliance still costs admission                                 | open     | medium   |
-| MEM-2    | Memory transfers, but improving answers is unproven                      | open     | high     |
-| MEM-3    | No retrieval score floor; RRF trades sharpness for breadth               | open     | medium   |
-| MEM-4    | A one-domain store injects little across domains                         | watch    | —        |
-| MEM-5    | Write-time deduplication, measured and not built                         | accepted | —        |
-| MEM-6    | Nothing prunes either store; the embedding cache never expires           | open     | low      |
-| MEM-7    | Prepared but unused: keyword indexes, payload fields, an untyped `using` | closed   | —        |
-| MEM-8    | `reindex` and `retrieval-report` have no specs                           | open     | medium   |
-| MEM-9    | Not built by choice, listed so nobody rediscovers them                   | accepted | —        |
-| MEM-10   | The digest routinely ends `revise` at its iteration cap                  | watch    | —        |
-| MEM-11   | `MemoryStepDto.counts` keys are a convention, not a vocabulary           | open     | low      |
-| SEAM-1   | The no-op client is still wired in                                       | closed   | —        |
-| SEAM-2   | No retry on a schema miss                                                | closed   | —        |
-| SEAM-3   | No temperature, seed or memoisation at the seam                          | open     | medium   |
-| SEAM-4   | The boot sweep interrupts in-flight runs from any process                | closed   | —        |
-| SEAM-5   | The pre-commit review runs no critics on the subscription route          | closed   | —        |
-| SEAM-6   | CI never calls a model; no judge-regression harness                      | open     | medium   |
-| STUDIO-1 | Archetypes still drive prompt generation and coverage                    | closed   | —        |
-| STUDIO-2 | Two grading engines coexist                                              | closed   | —        |
-| STUDIO-3 | Critic and evaluator collapse into one weakness ordinal; no controller   | closed   | —        |
-| STUDIO-4 | Judge robustness is containment, not measurement                         | closed   | —        |
-| STUDIO-5 | A thin finding contract and two display leaks                            | closed   | —        |
-| STUDIO-6 | Lenses are code, not records, and run serially                           | closed   | —        |
-| STUDIO-7 | Dumps are read by nothing; no incident loop                              | open     | medium   |
-| STUDIO-8 | `EVAL_DETERMINISTIC` grades with rules alone                             | closed   | —        |
-| PLAT-1   | No observability integration                                             | open     | high     |
-| PLAT-2   | Nothing declared or deployed on AWS                                      | closed   | —        |
-| PLAT-3   | Tilt covers the studio but not the vector store or the quality loop      | closed   | —        |
-| PLAT-4   | The quality-loop client has no browser journey                           | open     | low      |
-| PLAT-5   | Stale counts in four places                                              | closed   | —        |
-| PLAT-6   | A root-level file outside every gate                                     | open     | low      |
-| PLAT-7   | A tracked note that trips the branding tripwire, already in history      | accepted | —        |
-| PLAT-8   | Not built at single-user scale: review queue, monitors, canary           | accepted | —        |
-| PLAT-9   | No docs index                                                            | open     | low      |
-| PLAT-10  | The synchronous rubric derivation can outlast the edge                   | open     | medium   |
-| PLAT-11  | The memory tier is not deployed                                          | closed   | —        |
-| PLAT-12  | Telegram's one poller per token now spans two machines                   | closed   | —        |
-| PLAT-13  | Govcon's pull and warm run on every wake                                 | open     | low      |
-| PLAT-14  | A sign-in challenge on the cloud's device needs a person                 | open     | medium   |
-| PLAT-15  | Session dumps in the cloud have no reader                                | open     | low      |
-| PLAT-16  | A session task has no hard stop                                          | closed   | —        |
-| PLAT-17  | Each nightly session arrives from a new datacenter address               | watch    | —        |
-| PLAT-18  | A notifications spec races under load                                    | open     | low      |
+| Id       | Title                                                                                 | Status   | Severity |
+| -------- | ------------------------------------------------------------------------------------- | -------- | -------- |
+| ENG-1    | Penalty-only dimensions carry weight without information                              | open     | high     |
+| ENG-2    | One lost sample voids a whole lens                                                    | closed   | —        |
+| ENG-3    | Defect grouping chains through shared refs                                            | open     | medium   |
+| ENG-4    | No `evidenceRefs` distinct from `locationRefs`                                        | accepted | —        |
+| ENG-5    | Memory reaches the producer only through the goal                                     | accepted | —        |
+| ENG-6    | The trace lands only when the loop ends                                               | accepted | —        |
+| ENG-7    | No response memoisation; a re-grade re-bills                                          | open     | medium   |
+| ENG-8    | `agentic-design` accepts 6 of 40 iterations                                           | watch    | —        |
+| ENG-9    | `replay` reads one page and does not say so                                           | open     | low      |
+| ENG-10   | A boot sweep fails another process's live run; its close cannot undo it               | closed   | —        |
+| MEM-1    | Persona compliance still costs admission                                              | open     | medium   |
+| MEM-2    | Memory transfers, but improving answers is unproven                                   | open     | high     |
+| MEM-3    | No retrieval score floor; RRF trades sharpness for breadth                            | open     | medium   |
+| MEM-4    | A one-domain store injects little across domains                                      | watch    | —        |
+| MEM-5    | Write-time deduplication, measured and not built                                      | accepted | —        |
+| MEM-6    | Nothing prunes either store; the embedding cache never expires                        | open     | low      |
+| MEM-7    | Prepared but unused: keyword indexes, payload fields, an untyped `using`              | closed   | —        |
+| MEM-8    | `reindex` and `retrieval-report` have no specs                                        | open     | medium   |
+| MEM-9    | Not built by choice, listed so nobody rediscovers them                                | accepted | —        |
+| MEM-10   | The digest routinely ends `revise` at its iteration cap                               | watch    | —        |
+| MEM-11   | `MemoryStepDto.counts` keys are a convention, not a vocabulary                        | open     | low      |
+| SEAM-1   | The no-op client is still wired in                                                    | closed   | —        |
+| SEAM-2   | No retry on a schema miss                                                             | closed   | —        |
+| SEAM-3   | No temperature, seed or memoisation at the seam                                       | open     | medium   |
+| SEAM-4   | The boot sweep interrupts in-flight runs from any process                             | closed   | —        |
+| SEAM-5   | The pre-commit review runs no critics on the subscription route                       | closed   | —        |
+| SEAM-6   | CI never calls a model; no judge-regression harness                                   | open     | medium   |
+| SEAM-7   | The cloud loop calls Claude through Amazon Bedrock; the laptop keeps the subscription | watch    | —        |
+| STUDIO-1 | Archetypes still drive prompt generation and coverage                                 | closed   | —        |
+| STUDIO-2 | Two grading engines coexist                                                           | closed   | —        |
+| STUDIO-3 | Critic and evaluator collapse into one weakness ordinal; no controller                | closed   | —        |
+| STUDIO-4 | Judge robustness is containment, not measurement                                      | closed   | —        |
+| STUDIO-5 | A thin finding contract and two display leaks                                         | closed   | —        |
+| STUDIO-6 | Lenses are code, not records, and run serially                                        | closed   | —        |
+| STUDIO-7 | Dumps are read by nothing; no incident loop                                           | open     | medium   |
+| STUDIO-8 | `EVAL_DETERMINISTIC` grades with rules alone                                          | closed   | —        |
+| PLAT-1   | No observability integration                                                          | open     | high     |
+| PLAT-2   | Nothing declared or deployed on AWS                                                   | closed   | —        |
+| PLAT-3   | Tilt covers the studio but not the vector store or the quality loop                   | closed   | —        |
+| PLAT-4   | The quality-loop client has no browser journey                                        | open     | low      |
+| PLAT-5   | Stale counts in four places                                                           | closed   | —        |
+| PLAT-6   | A root-level file outside every gate                                                  | open     | low      |
+| PLAT-7   | A tracked note that trips the branding tripwire, already in history                   | accepted | —        |
+| PLAT-8   | Not built at single-user scale: review queue, monitors, canary                        | accepted | —        |
+| PLAT-9   | No docs index                                                                         | open     | low      |
+| PLAT-10  | The synchronous rubric derivation can outlast the edge                                | open     | medium   |
+| PLAT-11  | The memory tier is not deployed                                                       | closed   | —        |
+| PLAT-12  | Telegram's one poller per token now spans two machines                                | closed   | —        |
+| PLAT-13  | Govcon's pull and warm run on every wake                                              | open     | low      |
+| PLAT-14  | A sign-in challenge on the cloud's device needs a person                              | open     | medium   |
+| PLAT-15  | Session dumps in the cloud have no reader                                             | open     | low      |
+| PLAT-16  | A session task has no hard stop                                                       | closed   | —        |
+| PLAT-17  | Each nightly session arrives from a new datacenter address                            | watch    | —        |
+| PLAT-18  | A notifications spec races under load                                                 | open     | low      |
+| PLAT-19  | The loop keeps calling the model after SIGTERM                                        | open     | medium   |
+| PLAT-20  | Token usage is not accounted per run                                                  | open     | medium   |
+| PLAT-21  | A deploy rolled the app task under a running grade                                    | closed   | high     |
 
 ## Recommended improvements, by leverage
 

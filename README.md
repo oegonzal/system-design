@@ -59,14 +59,17 @@ tilt up                 # stores → migrations → seed → api, quality loop, 
 | Postgres        | localhost:5433 · `admin`/`admin` · db `sysdesign`    |
 | Storybook       | `nx run storybook:storybook` → http://localhost:6006 |
 
-Grading needs a model, and the quality loop runs only on a Claude Code
-subscription login: this machine's `claude login`, or, where there is no login
-(a Tilt/Kubernetes pod), the `CLAUDE_CODE_OAUTH_TOKEN` that `claude setup-token`
-prints, kept in the repo's gitignored `.env` or exported in the shell. `serve`
-and `run` ask Claude Code whether it is signed in before anything boots (no
-model call) and exit 1 saying how to get a login when it is not; there is no
-switch that runs the loop without a model, so a run never looks graded when
-none ran. An API key in the environment is never used. No test calls a model:
+Grading needs a model. On this machine the quality loop runs on a Claude Code
+subscription login — `claude login`, or, where there is no login (a
+Tilt/Kubernetes pod), the `CLAUDE_CODE_OAUTH_TOKEN` that `claude setup-token`
+prints, kept in the repo's gitignored `.env` or exported in the shell; in the
+cloud it runs on Amazon Bedrock, Sonnet 4.6, billed to the AWS account
+(`LLM_CHOICE=claude-bedrock` names the committed `config/llm/claude-bedrock.json`,
+while `config/engine.json` keeps the laptop on the subscription). `serve` and
+`run` ask Claude Code which account it is on before anything boots (no model
+call) and exit 1 saying how to fix it when it is not the configured provider's;
+there is no switch that runs the loop without a model, so a run never looks
+graded when none ran. An API key in the environment is never used. No test calls a model:
 the loop's specs script a fake client, and the studio's specs and the e2e stub
 share one fake loop (`packages/studio-testing`).
 
@@ -115,7 +118,7 @@ dependency is hoisted to the root and Nx is the single entry point.
 | `packages/contracts`            | Wire types, `as const` vocabularies and the zod schemas every layer derives from                                                                                                                                                                                                                                                                             |
 | `packages/db`                   | MikroORM entities, migrations, seed — shared by the API and the quality loop                                                                                                                                                                                                                                                                                 |
 | `packages/config-kit`           | A program's configuration chosen by name: `config/engine.json` names one file per kind under `config/<kind>/`, read against its owner's schema                                                                                                                                                                                                               |
-| `packages/llm`                  | The one LLM seam: Claude Code on the subscription login (none, no boot), plus the embeddings port                                                                                                                                                                                                                                                            |
+| `packages/llm`                  | The one LLM seam: Claude Code on the subscription login (laptop) or on Amazon Bedrock (cloud, `LLM_CHOICE=claude-bedrock`) — neither, no boot — plus the embeddings port                                                                                                                                                                                     |
 | `packages/nest-kit`             | Shared Nest plumbing: zod pipe, MikroORM root module, health, CORS, list paging, LIKE escaping                                                                                                                                                                                                                                                               |
 | `packages/design-system`        | Emotion tokens → semantic roles → primitives, contrast-asserted                                                                                                                                                                                                                                                                                              |
 | `packages/studio-api`           | NestJS REST API: prompts, sessions, revisions, stories; grading and coaching through the loop                                                                                                                                                                                                                                                                |

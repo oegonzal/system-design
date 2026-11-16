@@ -2,9 +2,10 @@
 # what outlives any one revision of it. Deployed after data, before app.
 #
 # What it declares: the ECS cluster, the three IAM roles the tasks run with
-# (execution: pull, log, read secrets; task: ECS Exec and the dump volume,
-# plus the migrate task's read of a database import; session task: ECS Exec,
-# the session dumps and the files bucket), the six log groups the app task,
+# (execution: pull, log, read secrets; task: ECS Exec, the dump volume and
+# the loop's Claude calls on Amazon Bedrock, plus the migrate task's read of a
+# database import; session task: ECS Exec, the session dumps and the files
+# bucket), the six log groups the app task,
 # the migrate task, the gateway, the idle function, the browser-session task
 # and the job function write to, the one-off db-migrate task definition the
 # deploy runs before the app service rolls (so a schema is never older than
@@ -43,6 +44,22 @@ Parameters:
     Type: String
     Default: ''
     Description: 'Address the alerts topic emails; empty leaves the topic without a subscription'
+  # The two models the loop calls on Amazon Bedrock, as cross-region inference
+  # profile ids — the values of config/llm/claude-bedrock.json, which the
+  # quality-loop container runs by LLM_CHOICE; tooling/aws-deploy.spec.ts
+  # (CLOUD-7) holds these defaults and params/prod/platform.json to that file.
+  # The pattern pins the shape the task role's grant derives the foundation
+  # model from: `<geography>.anthropic.<model>`, exactly two dots.
+  BedrockModelId:
+    Type: String
+    Default: 'us.anthropic.claude-sonnet-4-6'
+    Description: 'Inference profile the loop calls Claude through; equals model in config/llm/claude-bedrock.json'
+    AllowedPattern: '^[a-z-]+\.anthropic\.[a-z0-9:-]+$'
+  BedrockSmallModelId:
+    Type: String
+    Default: 'us.anthropic.claude-haiku-4-5-20251001-v1:0'
+    Description: 'Inference profile the CLI runs its small asks on; equals smallModel in config/llm/claude-bedrock.json'
+    AllowedPattern: '^[a-z-]+\.anthropic\.[a-z0-9:-]+$'
 
 Conditions:
   HasAlertEmail: !Not [!Equals [!Ref AlertEmail, '']]
@@ -146,8 +163,9 @@ Resources:
                     kms:ViaService: !Sub 'ssm.${AWS::Region}.amazonaws.com'
 
   # What the running containers may do: accept an ECS Exec session, mount the
-  # dump volume through its access point, and (the migrate task runs with this
-  # role too) read a database dump `aws.sh db-import` uploaded.
+  # dump volume through its access point, call Claude on Amazon Bedrock (the
+  # loop's model), and (the migrate task runs with this role too) read a
+  # database dump `aws.sh db-import` uploaded.
   TaskRole:
     Type: AWS::IAM::Role
     Properties:
@@ -192,6 +210,63 @@ Resources:
                 Resource: !Sub
                   - 'arn:${AWS::Partition}:s3:::${ArtifactsBucket}/imports/*'
                   - ArtifactsBucket: !ImportValue 'sysdesign-prod-ArtifactsBucket'
+              # The loop's model calls: the quality-loop container runs the
+              # bundled Claude CLI on Bedrock (app.yaml's LLM_CHOICE). A
+              # cross-region inference profile is invoked by its own ARN and
+              # routes to the foundation model in each region of its
+              # geography, and Bedrock checks the caller against both — so each
+              # model is granted twice: the profile in this account, in any region
+              # (the file's `region` names which, and the stack's may differ),
+              # and the foundation model it fronts in any region (a
+              # foundation-model ARN carries no account). The foundation model
+              # id is the profile id without its geography prefix
+              # (`us.anthropic.claude-sonnet-4-6` → `anthropic.claude-sonnet-4-6`),
+              # which the parameters' pattern holds to exactly that shape, so the
+              # split below is sound. GetInferenceProfile lets the CLI resolve a
+              # profile to its model (the vendor's own policy names it).
+              - Sid: InvokeClaudeOnBedrock
+                Effect: Allow
+                Action:
+                  - bedrock:InvokeModel
+                  - bedrock:InvokeModelWithResponseStream
+                  - bedrock:GetInferenceProfile
+                Resource:
+                  - !Sub 'arn:${AWS::Partition}:bedrock:*:${AWS::AccountId}:inference-profile/${BedrockModelId}'
+                  - !Sub 'arn:${AWS::Partition}:bedrock:*:${AWS::AccountId}:inference-profile/${BedrockSmallModelId}'
+                  - !Sub
+                    - 'arn:${AWS::Partition}:bedrock:*::foundation-model/${FoundationModel}'
+                    - FoundationModel: !Join
+                        - '.'
+                        - - !Select [1, !Split ['.', !Ref BedrockModelId]]
+                          - !Select [2, !Split ['.', !Ref BedrockModelId]]
+                  - !Sub
+                    - 'arn:${AWS::Partition}:bedrock:*::foundation-model/${FoundationModel}'
+                    - FoundationModel: !Join
+                        - '.'
+                        - - !Select [1, !Split ['.', !Ref BedrockSmallModelId]]
+                          - !Select [2, !Split ['.', !Ref BedrockSmallModelId]]
+              # Bedrock creates the account's Marketplace agreement for a
+              # third-party model on the first invocation, and only when the
+              # invoking role may subscribe (2026-11-16: `agreementAvailability`
+              # NOT_AVAILABLE for both models); the condition keeps the grant
+              # to calls Bedrock itself makes — the vendor's own policy shape.
+              - Sid: SubscribeOnFirstCall
+                Effect: Allow
+                Action:
+                  - aws-marketplace:ViewSubscriptions
+                  - aws-marketplace:Subscribe
+                Resource: '*'
+                Condition:
+                  StringEquals:
+                    aws:CalledViaLast: bedrock.amazonaws.com
+              # The CLI lists the account's inference profiles at start to
+              # resolve its models ("When Claude Code can list the inference
+              # profiles in your account", the vendor page); the action takes
+              # no resource.
+              - Sid: DiscoverInferenceProfiles
+                Effect: Allow
+                Action: bedrock:ListInferenceProfiles
+                Resource: '*'
 
   # What a browser-session task may do: accept an ECS Exec session, mount its
   # dumps directory through the sessions access point, and read and write the

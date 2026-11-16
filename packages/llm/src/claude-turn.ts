@@ -47,14 +47,21 @@ export interface TurnAsk {
   model: string | undefined;
   /** Only when the ask declared one; otherwise the CLI's own default effort. */
   effort: ReasoningEffort | undefined;
+  /**
+   * The provider's own variables, laid over the process's: how a committed
+   * file's choice (Bedrock on, its region, its models) reaches the CLI with
+   * the task environment carrying none of it. Empty on the subscription.
+   */
+  env: Readonly<Record<string, string>>;
   abort: AbortController;
 }
 
-/** The options of one structured call's turn: tool-less, settings-less, single-turn, billed to the subscription alone. */
+/** The options of one structured call's turn: tool-less, settings-less, single-turn, billed only where the provider says. */
 export const turnOptions = ({
   system,
   model,
   effort,
+  env,
   abort,
 }: TurnAsk): NonNullable<Parameters<ClaudeQuery>[0]['options']> => ({
   systemPrompt: system,
@@ -70,11 +77,14 @@ export const turnOptions = ({
   settingSources: [],
   persistSession: false,
   abortController: abort,
-  // `env` REPLACES the subprocess environment, so spread the current
-  // one and only raise the output cap — the login credentials the SDK
-  // reads live in process.env / the config dir and must be preserved.
+  // `env` REPLACES the subprocess environment, so spread the current one —
+  // the login credentials the SDK reads live in process.env / the config dir
+  // and must be preserved, an ECS task's AWS credentials among them — lay the
+  // provider's variables over it (the strip runs on the merged whole, so an
+  // overlay can no more carry an API key than the process can), and raise the
+  // output cap last: the ceiling is the seam's own, whatever the provider.
   env: {
-    ...subscriptionEnv(process.env),
+    ...subscriptionEnv({ ...process.env, ...env }),
     CLAUDE_CODE_MAX_OUTPUT_TOKENS: String(OUTPUT_TOKEN_CEILING),
   },
 });

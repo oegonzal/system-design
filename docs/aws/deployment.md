@@ -19,11 +19,13 @@ costs. The folder map is [`infra/aws/README.md`](../../infra/aws/README.md); the
 section is in [`docs/pipelines/browser-session.md`](../pipelines/browser-session.md).
 
 Written 2026-11-11 from the files in the repository; the browser session, the two lanes and the
-memory tier were added on 2026-11-12, the same way. Nothing has been deployed to an AWS account yet,
-so every statement about live behaviour — wake times, Aurora's resume, the shape of the OIDC claim,
-what an expired token does, what LinkedIn makes of a datacenter address — is read from the vendor's
-documentation or from the plan this was built to, and is marked as such. The first deploy is what
-verifies them; update this page with what it measures.
+memory tier were added on 2026-11-12, the same way. The stacks have been live
+in the owner's account since 2026-11-15, and what the first days measured — the wake time, the two
+first-account failures, the gateway's codes, the sign-in page's cookie — is recorded where it
+belongs below. What is still read from the vendor's pages rather than measured is marked as such:
+what Bedrock answers before the use-case form is in, what LinkedIn makes of a datacenter address. On 2026-11-16 the
+cloud loop's model calls moved from the subscription token to Amazon Bedrock (Sonnet 4.6), written
+up the same way: from the files and the vendor's pages, unverified live until the next deploy.
 
 ## What it is and how it fits
 
@@ -51,7 +53,7 @@ browser ──HTTPS──▶ CloudFront (one distribution, <id>.cloudfront.net)
               ├─ quality-loop-ui :4201  Next standalone, basePath /inspector, NEXT_PUBLIC_QUALITY_LOOP_URL=/loop
               ├─ govcon-ui       :4202  Next standalone, basePath /govcon, NEXT_PUBLIC_GOVCON_URL=/govcon-api
               ├─ studio-api      :3000  → localhost:3003
-              ├─ quality-loop    :3003  spawns the bundled Claude CLI on the subscription token; dumps on EFS;
+              ├─ quality-loop    :3003  spawns the bundled Claude CLI on Amazon Bedrock (Sonnet 4.6, LLM_CHOICE); dumps on EFS;
               │                         memories as pgvector tables in Aurora (OPENAI_API_KEY embeds them)
               ├─ govcon          :3004  (command: serve) → localhost:3003, localhost:3005
               ├─ notifications   :3005  channels file telegram-cloud (the govcon bot and the job-application bot)
@@ -156,22 +158,24 @@ deploy.
 Deployed after `data` and before the migration, so the migrate and session task definitions carry
 the new tag before the service does.
 
-| Resource                                                                | What it declares, and why                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `Cluster` (`sysdesign-prod-platform`)                                   | Capacity providers `FARGATE` and `FARGATE_SPOT`; Container Insights off (it is a billed metric stream).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
-| Seven `AWS::Logs::LogGroup`                                             | `/sysdesign/prod/app` (one stream prefix per container), `/sysdesign/prod/migrate` (the stream `aws.sh migrate` tails), `/sysdesign/prod/gateway`, `/sysdesign/prod/idle`, `/sysdesign/prod/session` (a browser-session task, stream `browser-session/browser-session/<task id>`, the one `aws.sh session logs` tails) and `/sysdesign/prod/job` (the job function), each with `LogRetentionDays` (14), so logs never become the largest line of the bill., `/sysdesign/prod/quiet` (the quiet function's)                                                                                                                                                                                    |
-| `TaskExecutionRole` (`sysdesign-prod-platform-task-execution`)          | What the ECS agent needs to start a task: pull from `repository/sysdesign/*`, write the app, migrate and session log groups, `ssm:GetParameters` under `/sysdesign/prod/*` and `kms:Decrypt` through SSM. Nothing the containers can use.                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| `TaskRole` (`sysdesign-prod-platform-task`)                             | What the app and migrate containers may do: accept an ECS Exec session (`ssmmessages:*`), mount the dump volume through its access point (`ClientMount`/`ClientWrite`), and read `imports/*` of the artifacts bucket (`s3:GetObject`), which is how the restore command `aws.sh db-import` gives the migrate task reaches the dump.                                                                                                                                                                                                                                                                                                                                                           |
-| `SessionTaskRole` (`sysdesign-prod-platform-session-task`)              | What a browser-session task may do: ECS Exec; mount the sessions access point and nothing else of the file system; `s3:GetObject`/`PutObject`/`DeleteObject` on `profiles/*`, `state/*` and `docs/*` of the files bucket and `s3:ListBucket` on the whole bucket — unconditioned, because S3 answers 404 for a missing object only to a caller allowed to list the bucket and 403 otherwise, and a `HeadObject` carries no `s3:prefix` for a prefix condition to match, so a conditioned grant would turn "no archive yet" into `Forbidden`, which the session's S3 adapter reads as a failure rather than as the first run; `kms:GenerateDataKey`, `Decrypt` and `Encrypt` on the files key. |
-| `MigrateTaskDefinition` (family `sysdesign-prod-platform-migrate`)      | ARM64, 0.5 vCPU / 1 GB, the `db-migrate` image at `ImageTag` with the same `DB_*` environment and the `DB_PASSWORD` secret as the services, plus `AWS_REGION` (the restore command's S3 client reads it; Fargate usually sets it, the template states it) and `ARTIFACTS_BUCKET` (read only by the restore command), logging to `/sysdesign/prod/migrate` under the stream prefix `db-migrate` (its container name, the one `lib.sh` reads back); `aws.sh migrate` runs it once per deploy, before the app stack, and `aws.sh db-import` runs it with a command override.                                                                                                                     |
-| `SessionTaskDefinition` (family `sysdesign-prod-platform-session`)      | ARM64, 2 vCPU / 4 GB (a starting size for one headless Chromium, to be measured), the `browser-session` image at `ImageTag`, no `Command` (the job function supplies it), the session task role, `InitProcessEnabled` (an init reaps Chromium's children), `StopTimeout` 120 (the engine archives the profile when stopped), the EFS volume `sessions` mounted at `/app/static/browser-session`, the environment and secrets of the next table, logging to `/sysdesign/prod/session` under the prefix `browser-session`. Fargate's default 20 GiB ephemeral disk holds the image, the restored profile and the documents.                                                                     |
-| `UserPool` (`sysdesign-prod-platform-users`)                            | Email as the username, admin-created users only (no self sign-up), a 12-character password with upper, lower, digit and symbol, MFA off, recovery by verified email. Retained on stack deletion, so the one user survives a stack replacement.                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| `UserPoolClient` (`sysdesign-prod-platform-gateway`)                    | A public client (no secret; the gateway would have to hold one) with exactly the two flows the gateway's own sign-in page uses: `ALLOW_USER_PASSWORD_AUTH` for the form and `ALLOW_REFRESH_TOKEN_AUTH` for the session cookie; no OAuth flows, no callback URL, no hosted-UI domain, user-existence errors hidden. ID and access tokens valid 1 hour, refresh tokens 30 days. The pool and client ids reach the gateway as two environment variables.                                                                                                                                                                                                                                         |
-| `AlertsTopic` (`sysdesign-prod-platform-alerts`) + `AlertsSubscription` | What the app stack's alarms publish to; the email subscription exists only when `AlertEmail` is given.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Resource                                                                | What it declares, and why                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Cluster` (`sysdesign-prod-platform`)                                   | Capacity providers `FARGATE` and `FARGATE_SPOT`; Container Insights off (it is a billed metric stream).                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| Seven `AWS::Logs::LogGroup`                                             | `/sysdesign/prod/app` (one stream prefix per container), `/sysdesign/prod/migrate` (the stream `aws.sh migrate` tails), `/sysdesign/prod/gateway`, `/sysdesign/prod/idle`, `/sysdesign/prod/session` (a browser-session task, stream `browser-session/browser-session/<task id>`, the one `aws.sh session logs` tails) and `/sysdesign/prod/job` (the job function), each with `LogRetentionDays` (14), so logs never become the largest line of the bill., `/sysdesign/prod/quiet` (the quiet function's)                                                                                                                                                                                                |
+| `TaskExecutionRole` (`sysdesign-prod-platform-task-execution`)          | What the ECS agent needs to start a task: pull from `repository/sysdesign/*`, write the app, migrate and session log groups, `ssm:GetParameters` under `/sysdesign/prod/*` and `kms:Decrypt` through SSM. Nothing the containers can use.                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| `TaskRole` (`sysdesign-prod-platform-task`)                             | What the app and migrate containers may do: accept an ECS Exec session (`ssmmessages:*`), mount the dump volume through its access point (`ClientMount`/`ClientWrite`), read `imports/*` of the artifacts bucket (`s3:GetObject`), which is how the restore command `aws.sh db-import` gives the migrate task reaches the dump, and call Claude on Amazon Bedrock for the loop: `bedrock:InvokeModel`, `InvokeModelWithResponseStream` and `GetInferenceProfile` on the two inference profiles `BedrockModelId` and `BedrockSmallModelId` name and on the foundation models they route to in any region, plus `bedrock:ListInferenceProfiles` on `*`, which the CLI calls at start to resolve its models. |
+| `SessionTaskRole` (`sysdesign-prod-platform-session-task`)              | What a browser-session task may do: ECS Exec; mount the sessions access point and nothing else of the file system; `s3:GetObject`/`PutObject`/`DeleteObject` on `profiles/*`, `state/*` and `docs/*` of the files bucket and `s3:ListBucket` on the whole bucket — unconditioned, because S3 answers 404 for a missing object only to a caller allowed to list the bucket and 403 otherwise, and a `HeadObject` carries no `s3:prefix` for a prefix condition to match, so a conditioned grant would turn "no archive yet" into `Forbidden`, which the session's S3 adapter reads as a failure rather than as the first run; `kms:GenerateDataKey`, `Decrypt` and `Encrypt` on the files key.             |
+| `MigrateTaskDefinition` (family `sysdesign-prod-platform-migrate`)      | ARM64, 0.5 vCPU / 1 GB, the `db-migrate` image at `ImageTag` with the same `DB_*` environment and the `DB_PASSWORD` secret as the services, plus `AWS_REGION` (the restore command's S3 client reads it; Fargate usually sets it, the template states it) and `ARTIFACTS_BUCKET` (read only by the restore command), logging to `/sysdesign/prod/migrate` under the stream prefix `db-migrate` (its container name, the one `lib.sh` reads back); `aws.sh migrate` runs it once per deploy, before the app stack, and `aws.sh db-import` runs it with a command override.                                                                                                                                 |
+| `SessionTaskDefinition` (family `sysdesign-prod-platform-session`)      | ARM64, 2 vCPU / 4 GB (a starting size for one headless Chromium, to be measured), the `browser-session` image at `ImageTag`, no `Command` (the job function supplies it), the session task role, `InitProcessEnabled` (an init reaps Chromium's children), `StopTimeout` 120 (the engine archives the profile when stopped), the EFS volume `sessions` mounted at `/app/static/browser-session`, the environment and secrets of the next table, logging to `/sysdesign/prod/session` under the prefix `browser-session`. Fargate's default 20 GiB ephemeral disk holds the image, the restored profile and the documents.                                                                                 |
+| `UserPool` (`sysdesign-prod-platform-users`)                            | Email as the username, admin-created users only (no self sign-up), a 12-character password with upper, lower, digit and symbol, MFA off, recovery by verified email. Retained on stack deletion, so the one user survives a stack replacement.                                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| `UserPoolClient` (`sysdesign-prod-platform-gateway`)                    | A public client (no secret; the gateway would have to hold one) with exactly the two flows the gateway's own sign-in page uses: `ALLOW_USER_PASSWORD_AUTH` for the form and `ALLOW_REFRESH_TOKEN_AUTH` for the session cookie; no OAuth flows, no callback URL, no hosted-UI domain, user-existence errors hidden. ID and access tokens valid 1 hour, refresh tokens 30 days. The pool and client ids reach the gateway as two environment variables.                                                                                                                                                                                                                                                     |
+| `AlertsTopic` (`sysdesign-prod-platform-alerts`) + `AlertsSubscription` | What the app stack's alarms publish to; the email subscription exists only when `AlertEmail` is given.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 Parameters: `ImageTag` (a workflow override, like the app stack's), `LogRetentionDays` (14),
 `SecretsPrefix` (`/sysdesign/prod`), `AlertEmail` (empty; an `aws.sh deploy-stack platform
-AlertEmail=…` override). Exports: `ClusterName`, `TaskExecutionRoleArn`, `TaskRoleArn`,
+AlertEmail=…` override), `BedrockModelId` (`us.anthropic.claude-sonnet-4-6`) and
+`BedrockSmallModelId` (`us.anthropic.claude-haiku-4-5-20251001-v1:0`) — the loop's two models,
+equal to `config/llm/claude-bedrock.json`, which `CLOUD-7` holds them to. Exports: `ClusterName`, `TaskExecutionRoleArn`, `TaskRoleArn`,
 `AppLogGroupName`, `GatewayLogGroupName`, `IdleLogGroupName`, `SessionLogGroupName`,
 `JobLogGroupName`, `MigrateTaskDefinitionArn` (read by `aws.sh`, imported by no stack),
 `SessionTaskFamily` (the family, never the revision ARN: an export another stack imports cannot
@@ -214,7 +218,7 @@ gained in phase 4 are the session's `BROWSER_CHANNEL`, `BROWSER_PROFILE_BUCKET` 
 | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | all six Nest containers, `db-migrate`, `browser-session` | `DB_HOST` (the cluster endpoint), `DB_PORT` (5432), `DB_USERNAME`, `DB_NAME`, `PGSSLMODE=verify-full`, `NODE_EXTRA_CA_CERTS=/etc/ssl/certs/rds-global-bundle.pem` (the RDS CA bundle vendored in `docker/rds-global-bundle.pem`)                                                                                                                                                                                                                                                                                                                                                                                                                       | `DB_PASSWORD` ← `/sysdesign/prod/DB_PASSWORD`                                                                                                                                                                                                                                                                                     |
 | `studio-api`                                             | `PORT=3000`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            |                                                                                                                                                                                                                                                                                                                                   |
-| `quality-loop`                                           | `QUALITY_LOOP_PORT=3003`, `QUALITY_LOOP_DUMP_DIR=/app/static/runs` (the EFS mount), and for the spawned CLI `DISABLE_AUTOUPDATER=1`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`, `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`, `USE_BUILTIN_RIPGREP=0` (Alpine needs the system ripgrep)                                                                                                                                                                                                                                                                                                                                                                      | `CLAUDE_CODE_OAUTH_TOKEN` ← `/sysdesign/prod/CLAUDE_CODE_OAUTH_TOKEN`; `OPENAI_API_KEY` ← `/sysdesign/prod/OPENAI_API_KEY` when `DeployOpenAiKey=true`                                                                                                                                                                            |
+| `quality-loop`                                           | `QUALITY_LOOP_PORT=3003`, `QUALITY_LOOP_DUMP_DIR=/app/static/runs` (the EFS mount), and for the spawned CLI `DISABLE_AUTOUPDATER=1`, `CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC=1`, `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1`, `USE_BUILTIN_RIPGREP=0` (Alpine needs the system ripgrep); `LLM_CHOICE=claude-bedrock`, the committed `config/llm/claude-bedrock.json` the loop runs on — Sonnet 4.6 and Haiku 4.5 through Bedrock's `us.` inference profiles in the task's region, with the task role's credentials — read from the image's `config/`                                                                                                         | `OPENAI_API_KEY` ← `/sysdesign/prod/OPENAI_API_KEY` when `DeployOpenAiKey=true`                                                                                                                                                                                                                                                   |
 | `govcon` (command `serve`)                               | `GOVCON_PORT=3004`, `NOTIFICATIONS_URL=http://localhost:3005`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          | `SAM_GOV_API_KEY` ← `/sysdesign/prod/SAM_GOV_API_KEY`, only when `DeploySamGovKey=true`                                                                                                                                                                                                                                           |
 | `notifications`                                          | `NOTIFICATIONS_PORT=3005`, `NOTIFICATIONS_CHANNELS=telegram-cloud`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | `GOVCON_TELEGRAM_API_KEY`, `GOVCON_TELEGRAM_BOT_ID`, `JOBAPPLICATION_TELEGRAM_API_KEY`, `JOBAPPLICATION_TELEGRAM_BOT_ID`, `TELEGRAM_CHAT_ID` ← `/sysdesign/prod/notifications/GOVCON_TELEGRAM_API_KEY`, `…/GOVCON_TELEGRAM_BOT_ID`, `…/JOBAPPLICATION_TELEGRAM_API_KEY`, `…/JOBAPPLICATION_TELEGRAM_BOT_ID`, `…/TELEGRAM_CHAT_ID` |
 | `job-application`                                        | `JOB_APPLICATION_PORT=3006`, `NOTIFICATIONS_URL=http://localhost:3005`                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 |                                                                                                                                                                                                                                                                                                                                   |
@@ -233,7 +237,10 @@ the memory tier is pgvector tables in Aurora, created by the services at boot af
 creates the `vector` extension, and the key is what embeds into them — with `DeployOpenAiKey=false`
 the embedding client is disabled, grading and coaching run, and only recall by meaning is off. No
 `QDRANT_URL` exists anywhere since the move. The guard rules and `CLOUD-3` hold the
-credential-named variables to `Secrets`, and `ANTHROPIC_API_KEY` to nowhere at all.
+credential-named variables to `Secrets`, and `ANTHROPIC_API_KEY` to nowhere at all. The loop's
+model is Bedrock's: `LLM_CHOICE` names the committed file, the platform stack's task role carries
+the permission, and no subscription token exists in the cloud — `CLOUD-7` holds the container, the
+file, the stack's two model parameters and the image's `config/` copy to each other.
 
 ### `edge.yaml` — the public hostname
 
@@ -336,6 +343,12 @@ would otherwise keep both tasks running.
 - **Secrets Manager**: its rotation would change the password under a long-running task that reads
   its secrets once, at start. The secrets are SSM SecureStrings the owner creates (setup step 2),
   and the database reads a named version of its password (Troubleshooting).
+- **A Claude subscription token and an Anthropic API key.** The cloud loop calls Claude through
+  Amazon Bedrock with the task role's credentials (`LLM_CHOICE=claude-bedrock`, the committed
+  `config/llm/claude-bedrock.json`), so model access is a permission on a role, not a secret: nothing
+  is hand-entered, nothing expires, and the subscription — its 5-hour and weekly limits with it —
+  stays this laptop's (`config/engine.json`). Until 2026-11-16 the loop ran on the subscription's
+  setup token read from SSM.
 - **A vector store of its own.** The memory tier is pgvector in the Aurora database — the same
   tables the adapters create on the laptop's compose database — so it is backed up with the rows
   it describes and needs no second store to host, pay for or restore; Qdrant, which its own docs
@@ -362,7 +375,7 @@ would otherwise keep both tasks running.
 | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | What is deployed: images, ports, routes, the scheduled job and its launches                                                                                           | `infra/aws/apps.json`; the image matrix both workflows build from, `infra/aws/bin/image-matrix.js`; the launch files, `packages/browser-session/launches/<name>.json`                                                                        |
 | The stacks                                                                                                                                                            | `infra/aws/{bootstrap,network,data,platform,app,edge}.yaml`, values in `infra/aws/params/prod/<stack>.json`                                                                                                                                  |
-| The invariants every template must keep                                                                                                                               | `infra/aws/guard/sysdesign.guard` (cfn-guard), `tooling/aws-deploy.spec.ts` and `tooling/aws-deploy-jobs.spec.ts` (`CLOUD-1`…`CLOUD-5`)                                                                                                      |
+| The invariants every template must keep                                                                                                                               | `infra/aws/guard/sysdesign.guard` (cfn-guard), `tooling/aws-deploy.spec.ts` and `tooling/aws-deploy-jobs.spec.ts` (`CLOUD-1`…`CLOUD-7`)                                                                                                      |
 | The one shell entry: lint, bootstrap, deploy-stack, migrate, wait-quiet, wake, sleep, status, exec, verify, session run/list/stop/logs, files push/list/rm, db-import | `infra/aws/bin/aws.sh` (+ `lib.sh`), wrapped by the root `aws:*` scripts (`aws:session`, `aws:files`, `aws:db-import` among them)                                                                                                            |
 | The images                                                                                                                                                            | `docker/nest-app.Dockerfile` (`APP=<nest app>`, `--target migrate`), `docker/next-app.Dockerfile` (`APP`, `BASE_PATH`, `PUBLIC_VAR`, `PUBLIC_URL`), `docker/playwright-app.Dockerfile` (`APP=browser-session`; Debian, the bundled Chromium) |
 | The edge, the idle check and the job function                                                                                                                         | `packages/app-gateway`                                                                                                                                                                                                                       |
@@ -416,7 +429,7 @@ job function at zero concurrency while it runs).
 ## One-time setup
 
 In order; each step says why. Steps 1 to 7 happen before anything is deployed, step 8 is the first
-deploy, steps 9 and 10 finish it, and step 11 is the reminder you will thank yourself for.
+deploy, steps 9 and 10 finish it, and step 11 is what still needs a hand later — less than it used to.
 
 ### 1. The account, the CLI and the region
 
@@ -438,12 +451,6 @@ runbook does with its token, and never put one on a command line that lands in s
 # The database master password: generated, never typed. The data stack reads version 1 of it.
 aws ssm put-parameter --name /sysdesign/prod/DB_PASSWORD --type SecureString \
   --value "$(openssl rand -hex 24)"
-
-# The Claude Code subscription token (step 3 says where it comes from).
-read -rs CLAUDE_TOKEN
-aws ssm put-parameter --name /sysdesign/prod/CLAUDE_CODE_OAUTH_TOKEN --type SecureString \
-  --value "$CLAUDE_TOKEN"
-unset CLAUDE_TOKEN
 
 # The OpenAI key the memory tier embeds with (the loop's lessons, the memory host's records); the
 # same key as the laptop's .env. Read only while the app stack is deployed with DeployOpenAiKey=true.
@@ -487,26 +494,60 @@ rotation is a deploy (Troubleshooting, "Rotating the database password"). A sess
 its values at every start. The task execution role may read only `/sysdesign/prod/*`, so a
 parameter under any other path is invisible to it.
 
-### 3. The subscription token
+### 3. Bedrock model access
 
-The quality loop reaches Claude only through the Claude Code subscription — the loop's boot check
-accepts the first-party provider with a machine login or a `claude setup-token` token and refuses
-everything else, and `ANTHROPIC_API_KEY` is withheld from every CLI process. A container has no
-`claude login`, so it runs on the token:
+The cloud loop reaches Claude through Amazon Bedrock, in the task's own region, with the task
+role's credentials: `LLM_CHOICE=claude-bedrock` in the quality-loop container names the committed
+`config/llm/claude-bedrock.json` (Sonnet 4.6 as `us.anthropic.claude-sonnet-4-6`, Haiku 4.5 as the
+CLI's small model, `us-east-1`), the image ships `config/`, and the platform stack's `TaskRole`
+carries `bedrock:InvokeModel` and `bedrock:InvokeModelWithResponseStream` on those two inference
+profiles and the foundation models they route to (`CLOUD-7` holds the file, the container and the
+stack's `BedrockModelId`/`BedrockSmallModelId` to each other). Nothing is hand-entered and nothing
+expires: no token, no key, no SSM parameter. `ANTHROPIC_API_KEY` is still withheld from every CLI
+process, and the loop's boot check accepts a CLI that reports the `bedrock` provider with no API
+key source — and refuses one that still reports `firstParty`, which means the Bedrock environment
+never reached it. The check proves the configuration, not the credentials: measured 2026-11-16 on
+this laptop, the CLI reports `bedrock` with no AWS credentials reachable at all, so a shell that
+sets `LLM_CHOICE=claude-bedrock` by mistake boots and then fails every model call until the
+variable is unset (Troubleshooting).
+
+The one thing to do once per AWS account, before the first call: Anthropic's use-case form. In the
+Bedrock console open the **Model catalog**, select an Anthropic model (Claude Sonnet 4.6) and submit
+the form; access is granted at once (the vendor: "Before you invoke an Anthropic model for the first
+time, submit use case details. You do this once per AWS account."). The CLI equivalent is
+`aws bedrock put-use-case-for-model-access`, which needs `bedrock:PutUseCaseForModelAccess` on the
+identity you run it as. Until it is in, every grade's recorded exchange carries an
+`AccessDeniedException` about the use case (Troubleshooting). Both models are already `ACTIVE` in
+the account, as inference profiles only (read 2026-11-16 with
+`aws bedrock list-foundation-models --by-provider anthropic --region us-east-1`:
+`anthropic.claude-sonnet-4-6` and `anthropic.claude-haiku-4-5-20251001-v1:0`, inference type
+`INFERENCE_PROFILE`).
+
+The same form from the CLI takes the console's six fields as base64 JSON (`intendedUsers`: `0`
+internal, `1` external, `2` both):
 
 ```bash
-claude setup-token   # prints a long-lived OAuth token (about a year); paste it into step 2
+aws bedrock put-use-case-for-model-access --region us-east-1 --form-data "$(printf '%s' \
+  '{"companyName":"<name>","companyWebsite":"<url>","intendedUsers":"0","industryOption":"<industry>","otherIndustryOption":"","useCases":"<what the models do here>"}' | base64)"
 ```
 
-The same token kind runs the Tilt pods and the CI review job. Two things to know before relying on
-it unattended: Anthropic's legal terms describe OAuth as for "ordinary use of Claude Code" and
-point products built on the Agent SDK at API keys — a single user running their own unmodified
-harness is the strongest case, and a server that sleeps when nobody uses it is the most defensible
-shape, but an always-on deployment is a grey area the documents do not settle; and the
-subscription's 5-hour and weekly limits apply to the cloud loop exactly as they do here, since it
-is the same account — a nightly browser session, which judges every form through the loop, draws
-on them too. Nothing on AWS makes model access cheaper: Bedrock and the Claude Platform on AWS
-bill per token, and the loop's boot gate refuses them on purpose.
+Then read the account's applied quotas for the two models. Before the form, on 2026-11-16, every
+one read 0 against defaults of 10,000 requests and 6,000,000 tokens per minute for Sonnet 4.6
+(5,000,000 for Haiku 4.5); a quota still at 0 after the form throttles every call
+(`ThrottlingException` in the recorded exchange), and the default is requested by quota code:
+
+```bash
+aws service-quotas list-service-quotas --service-code bedrock --region us-east-1 \
+  --query "Quotas[?contains(QuotaName, 'Sonnet 4.6') || contains(QuotaName, 'Haiku 4.5')].[QuotaCode, QuotaName, Value]" --output text
+aws service-quotas request-service-quota-increase --service-code bedrock --region us-east-1 \
+  --quota-code <code> --desired-value <default>
+```
+
+This laptop keeps the subscription: `config/engine.json` names `claude-subscription`, the Tilt pods
+and the CI review job still run on a `claude setup-token` token (in the gitignored `.env`, or the
+repository secret), and the subscription's 5-hour and weekly limits are no longer shared with the
+cloud or with the nightly sessions. Model access in the cloud is a per-token bill instead — Limits
+and costs gives the list prices and the arithmetic.
 
 ### 4. The two Telegram bots for the cloud
 
@@ -669,16 +710,23 @@ browser session cannot sign in to anything until its state is. The next section 
 in order; do it once, right after the first deploy, before the cloud is used in earnest — the
 import replaces every table's rows with the laptop's.
 
-### 11. The yearly reminder
+### 11. What still needs a hand later
 
-The setup token lasts about a year. Put a calendar reminder eleven months out with the three
-commands that renew it: `claude setup-token`, the `put-parameter --overwrite` from step 2, then
-`pnpm aws:sleep && pnpm aws:wake` so the next task reads the new value. What an expired token
-does to the running loop is not verified live: the loop's boot check proves a credential is present
-and is the subscription's, not that it is still valid, so expiry may show as every grade failing
-(the recorded exchange carries the CLI's reason, for example `authentication_failed`) rather than
-as a container that will not start — either way nothing grades until the token is renewed, and
-`/health` does not re-check it (see Troubleshooting).
+Nothing about model access expires any more: the cloud loop calls Bedrock with the task role's
+credentials, so there is no token to renew and no SSM value to rotate for it (before 2026-11-16 the
+subscription's setup token did, yearly). Once the first Bedrock grade is verified, delete the
+cloud's copy of that token, which nothing reads any more —
+`aws ssm delete-parameter --name /sysdesign/prod/CLAUDE_CODE_OAUTH_TOKEN --region us-east-1` — the
+token itself stays valid for the Tilt pods and the CI review secret. What remains is the ordinary
+rotation of the secrets step
+2 created, on your own schedule: `OPENAI_API_KEY` (the memory tier's embeddings), the two Telegram
+bot tokens and, when deployed, `SAM_GOV_API_KEY` — each the same `put-parameter --overwrite` from
+step 2, then `pnpm aws:sleep && pnpm aws:wake` so the next task reads the new value (the database
+password is a deploy, Troubleshooting). The thing to look at yearly is the Bedrock line of the bill
+against the budget alert (Limits and costs), and whether a newer Sonnet should replace the pinned
+model: that is one edit to `config/llm/claude-bedrock.json` and the matching values in
+`infra/aws/params/prod/platform.json` and the platform template's defaults, which `CLOUD-7` keeps
+in step.
 
 ## Moving the laptop's data and lanes to the cloud
 
@@ -983,8 +1031,11 @@ Then in a browser, signed in as the user from setup step 9:
   desired 1, running 0, then 1.
 - **A real grade.** Pick a prompt, sketch, submit: the feedback tab polls the run and shows the
   model calls as they are attributed, minutes per submission as locally. This is the check that the
-  token in SSM is the subscription's and that the CLI runs on Alpine as `node` (ripgrep from the
-  system, a writable `/home/node`). Then `/inspector` — the run's dump is on EFS, so it is there
+  task role may invoke the two Bedrock inference profiles and that the use-case form is in (an
+  `AccessDeniedException` in the recorded exchange says it is not), that the loop's boot line named
+  `config/llm/claude-bedrock.json (LLM_CHOICE)` (the `quality-loop` stream under
+  `/sysdesign/prod/app`), and that the CLI runs on Alpine as `node` (ripgrep from the system, a
+  writable `/home/node`). Then `/inspector` — the run's dump is on EFS, so it is there
   after the task has slept and woken again. A coaching run after the import lists recalled lessons
   in its panel: the memory tier is reading its pgvector table.
 - **A session by hand.** `pnpm aws:session run builtin`, then its log (the section above says what
@@ -1173,14 +1224,27 @@ loop reported a run in flight; a failed loop call or task listing keeps the task
 `aws ssm get-parameter --name /sysdesign/prod/idle-state` shows the pending observation. The
 `idle-errors` alarm fires when a run itself fails.
 
-**Every grade fails, or the loop container restarts.** The subscription token: the loop's boot check
-accepts a token that is present and the subscription's; an expired or revoked one fails the first
-model call instead, with the CLI's reason in the recorded exchange (RUNBOOK, "Grading needs a
-model"), and nothing re-checks it. Renew it (setup step 11). A container that exits at boot has
-the loop's own message in its log stream: no token in the environment (the secret's parameter is
-missing), or a model config the provider refused. The health check gives 90 s before it counts;
-three failures stop the task and ECS starts another, so a boot failure shows as a restart loop in
-the service's events.
+**Every grade fails, or the loop container restarts.** Read the recorded exchange of a failed call
+first (RUNBOOK, "Grading needs a model"); nothing re-checks model access after boot, so the first
+call is where Bedrock answers. `AccessDeniedException` that mentions a use case or model access:
+Anthropic's use-case form has not been submitted in this account — setup step 3, once, in the
+console's Model catalog; access is immediate. `AccessDeniedException` naming `bedrock:InvokeModel`
+on an ARN: the task role's grant and the model do not match — `BedrockModelId`/`BedrockSmallModelId`
+must equal `config/llm/claude-bedrock.json`, which `CLOUD-7` checks, so this means a deploy of one
+without the other. `ThrottlingException`: the account's Bedrock quotas for the model (requests and
+tokens per minute, Service Quotas → Amazon Bedrock); the seam retries a strained provider with
+backoff, so an occasional one costs an attempt and a steady one costs the run — lower `maxInFlight`
+in the config file or ask for the quota. A container that exits at boot has the loop's own message
+in its log stream: `no model provider (provider firstParty …)` means the CLI never saw the Bedrock
+environment (an image without `config/`, or `LLM_CHOICE` naming a file that is not the Bedrock
+one); `could not check the model provider` means the CLI itself did not start or answer within
+30 s. Missing AWS credentials are neither (measured 2026-11-16: the CLI reports `bedrock` with none
+reachable, so the boot gate passes): they show on the first call, in the recorded exchange, as the
+CLI's AWS credential error — in the cloud a task run without a task role
+(`AWS_CONTAINER_CREDENTIALS_RELATIVE_URI` is set by Fargate when there is one), on this laptop a
+shell with `LLM_CHOICE=claude-bedrock` set and no AWS credentials: unset it, and the laptop runs on
+the subscription. The health check gives 90 s before it counts; three failures stop the task and
+ECS starts another, so a boot failure shows as a restart loop in the service's events.
 
 **The migrate task failed.** `aws.sh migrate` prints the exit code, the stopped reason and the log
 tail from `/sysdesign/prod/migrate`: a migration that cannot apply (fix it forward; `migration:up`
@@ -1342,7 +1406,7 @@ it on the PATH.
 | Rollback reach             | The last three tagged images per ECR repository                                                                                                                                                                                                                                                                                                                         |
 | The memory tier            | On, as pgvector in Aurora, embedding through `OPENAI_API_KEY`; with `DeployOpenAiKey=false` recall by meaning and the digests that feed it are off and grading, coaching and prompt generation still run                                                                                                                                                                |
 | Spot                       | `CapacityProvider=FARGATE_SPOT` (the app task) and `JobCapacityProvider=FARGATE_SPOT` (a session task) are about 36 % of on-demand (the vendor's figure); an interruption fails the run, or ends the session mid-form; neither is the default                                                                                                                           |
-| Model access               | The subscription's own 5-hour and weekly limits, shared with this machine and now with the nightly sessions; see the policy note in setup step 3                                                                                                                                                                                                                        |
+| Model access               | Bedrock's per-account quotas for each model (requests and tokens per minute; `ThrottlingException` past them), independent of the laptop's subscription limits, which the cloud no longer draws on; the bill is per token — the paragraph after the cost table                                                                                                          |
 
 Monthly cost, us-east-1, ARM on-demand, 0.5 ACU while awake, as the plan computed it from the
 vendor's prices on 2026-11-10/11 (Spot in parentheses); none of it measured on a bill yet:
@@ -1369,6 +1433,20 @@ Aurora $0.12 per ACU-hour). Two sessions a night of 1.5–2 hours each (the lapt
 use lands near $35, over the $15 budget: raise `MonthlyBudgetUsd` with the bootstrap command when
 the schedules are flipped. Always-on for reference: about $49/month (RDS `db.t4g.micro` plus
 Fargate on-demand) or $28 on Spot. The $15 budget alerts at 80 % actual and 100 % forecast.
+
+**Model calls** are the line the cost table above does not carry (it predates the move to Bedrock):
+Bedrock bills per token, and nothing is measured yet. The list prices for the two models, read on
+2026-11-16 from Anthropic's pricing page (`platform.claude.com/docs/en/about-claude/pricing`), which
+says partner-operated platforms such as Bedrock have independent regional pricing — the Bedrock
+table at `aws.amazon.com/bedrock/pricing/` did not render as text that day, so confirm it there in
+a browser: Sonnet 4.6 $3 per million input tokens, $15 per million output, $0.30 per million cache
+reads and $3.75 per million 5-minute cache writes; Haiku 4.5 $1 / $5 / $0.10 / $1.25. A call's cost
+is four terms per million tokens: uncached input × 3 + 5-minute cache writes × 3.75 + cache reads
+× 0.30 + output × 15. The run dump's `usage` carries only the uncached input and the output
+(`PLAT-20`), so until that lands read the four counts from Bedrock's CloudWatch metrics (namespace
+`AWS/Bedrock`, by `ModelId`: `InputTokenCount`, `OutputTokenCount`, `CacheReadInputTokenCount`,
+`CacheWriteInputTokenCount`) or from the bill itself; the cost table's rows are unchanged by the
+move.
 
 **What later phases hold**, each a change of its own: the rubric derivation as 202 start-then-poll
 (`PLAT-10`, which also reopens API Gateway as an option); a persisted last-run time for govcon's

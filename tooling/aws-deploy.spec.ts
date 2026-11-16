@@ -20,9 +20,11 @@ import {
 import {
   containers,
   containersNamed,
+  environmentValue,
   escapeRegExp,
   namesIn,
   namesWhole,
+  parameterDefault,
   prefixedNames,
   read,
   workflowJob,
@@ -46,11 +48,14 @@ import {
  * workflows' image matrices (through infra/aws/bin/image-matrix.js), the
  * templates' containers, the gateway's routes and the edge's cached paths
  * must all agree with it, or a deploy ships something the declaration never
- * said. The templates must also keep the model on the subscription (no API
- * key anywhere) and every secret-shaped variable a secret, and every name a
- * deploy reads from SSM must be in the setup document, so the owner's
- * one-time setup is complete by construction. The scheduled browser session
- * has a spec of its own, tooling/aws-deploy-jobs.spec.ts.
+ * said. The templates must also keep the model off any API key — the cloud
+ * loop calls Claude through Amazon Bedrock with the task role's credentials,
+ * on the committed config/llm file the quality-loop container names by
+ * LLM_CHOICE, and the subscription's token stays on the laptop — and every
+ * secret-shaped variable a secret, and every name a deploy reads from SSM
+ * must be in the setup document, so the owner's one-time setup is complete by
+ * construction. The scheduled browser session has a spec of its own,
+ * tooling/aws-deploy-jobs.spec.ts.
  */
 const CI = join(WORKFLOWS, 'ci.yml');
 const DEPLOY = join(WORKFLOWS, 'deploy-aws.yml');
@@ -61,6 +66,27 @@ const GUARD_RULES = join(INFRA, 'guard');
 const IMAGE_MATRIX_SCRIPT = join(INFRA, 'bin', 'image-matrix.js');
 const SHELL_LIBRARY = join(INFRA, 'bin', 'lib.sh');
 const DEPLOYMENT_DOC = join(REPO, 'docs', 'aws', 'deployment.md');
+const PLATFORM_TEMPLATE = join(INFRA, 'platform.yaml');
+const PLATFORM_PARAMS = join(INFRA, 'params', 'prod', 'platform.json');
+const NEST_DOCKERFILE = join(REPO, 'docker', 'nest-app.Dockerfile');
+/** Where the committed model choices live; `LLM_CHOICE` names one by file name. */
+const LLM_CONFIGS = join(REPO, 'config', 'llm');
+
+/** The variable packages/llm reads a deployment's choice of config/llm file from. */
+const LLM_CHOICE = 'LLM_CHOICE';
+/** The provider the cloud loop runs on, and the platform parameters that pin its two models to the file's fields. */
+const CLOUD_PROVIDER = 'claude-bedrock';
+const MODEL_PARAMETERS = { BedrockModelId: 'model', BedrockSmallModelId: 'smallModel' } as const;
+
+/** One statement of a role's inline policy, as text: from its Sid to the next Sid, or to the role's end. */
+const statementOf = (role: string, sid: string): string => {
+  const start = role.indexOf(`Sid: ${sid}`);
+  if (start < 0) return '';
+  const next = role.indexOf('Sid: ', start + sid.length + 5);
+  return role.slice(start, next < 0 ? undefined : next);
+};
+/** The subscription's own token: the laptop's, and since 2026-11-16 in no task definition. */
+const SUBSCRIPTION_TOKEN = 'CLAUDE_CODE_OAUTH_TOKEN';
 
 /** The one API path a deploy reads without a session; every other public route is a web app's static assets. */
 const HEALTH_ROUTE = '/api/health';
@@ -341,5 +367,62 @@ describe('the AWS deployment is made from infra/aws/apps.json', () => {
       names.filter((name) => !namesWhole(doc, name)),
       'name it in the setup document',
     ).toEqual([]);
+  });
+
+  it('[CLOUD-7] the cloud loop runs on the committed Bedrock choice: LLM_CHOICE names a claude-bedrock file the image carries, the platform stack pins and may invoke that file’s models, and no task carries the subscription token', () => {
+    const loop = containerNamed('quality-loop');
+    const choice = environmentValue(loop, LLM_CHOICE);
+    expect(choice, `quality-loop declares ${LLM_CHOICE}`).toBeDefined();
+    const file = join(LLM_CONFIGS, `${choice}.json`);
+    expect(existsSync(file), `${relative(REPO, file)} is a committed choice`).toBe(true);
+    const config = JSON.parse(read(file)) as Record<string, unknown>;
+    expect(config['provider']).toBe(CLOUD_PROVIDER);
+
+    // The role's grant names the same two models the file does, through the
+    // stack's parameters, so the file can never pin a model the task may not call.
+    const platform = read(PLATFORM_TEMPLATE);
+    // The grant is read inside the TaskRole's own Bedrock statement, never anywhere in the file.
+    const taskRole = platform.slice(
+      platform.indexOf('\n  TaskRole:'),
+      platform.indexOf('\n  SessionTaskRole:'),
+    );
+    const invokeStatement = statementOf(taskRole, 'InvokeClaudeOnBedrock');
+    expect(invokeStatement, 'the TaskRole has an InvokeClaudeOnBedrock statement').not.toBe('');
+    const params = JSON.parse(read(PLATFORM_PARAMS)) as {
+      ParameterKey: string;
+      ParameterValue: string;
+    }[];
+    for (const [parameter, field] of Object.entries(MODEL_PARAMETERS)) {
+      const pinned = config[field];
+      expect(pinned, `${relative(REPO, file)} declares ${field}`).toEqual(expect.any(String));
+      expect(parameterDefault(platform, parameter), `${parameter} defaults to the file's`).toBe(
+        pinned,
+      );
+      expect(
+        params.find(({ ParameterKey }) => ParameterKey === parameter)?.ParameterValue,
+        `${parameter} in params/prod/platform.json`,
+      ).toBe(pinned);
+      expect(invokeStatement, `the task role's statement is granted on \${${parameter}}`).toContain(
+        `\${${parameter}}`,
+      );
+    }
+    for (const action of ['bedrock:InvokeModel', 'bedrock:InvokeModelWithResponseStream']) {
+      expect(invokeStatement, `the task role may ${action}`).toContain(action);
+    }
+
+    // The subscription's token is this machine's: no task, in any template, reads it.
+    const carrying = containers().flatMap((container) =>
+      [
+        ...namesIn(blockOf(container, 'Environment') ?? []),
+        ...namesIn(blockOf(container, 'Secrets') ?? []),
+      ].includes(SUBSCRIPTION_TOKEN)
+        ? [scalarOf(container, 'Name')]
+        : [],
+    );
+    expect(carrying, `${SUBSCRIPTION_TOKEN} belongs to the laptop`).toEqual([]);
+
+    // The image ships the choice files, or LLM_CHOICE would name a file the task cannot read.
+    const runner = read(NEST_DOCKERFILE).split(/^FROM .+ AS runner$/m)[1] ?? '';
+    expect(runner, 'the runner stage copies config/').toMatch(/^COPY config \.\/config$/m);
   });
 });

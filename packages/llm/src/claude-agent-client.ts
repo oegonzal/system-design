@@ -34,12 +34,12 @@ export const SUBSCRIPTION_MODEL_LABEL = 'claude-code/subscription';
 const DEFAULT_MAX_TOKENS = 4096;
 
 /**
- * Structured calls through the Claude Code subscription login — the loop's
- * one model route. The Agent SDK spawns a tool-less, settings-less,
- * single-turn agent using the credentials `claude login` stored, or the
- * `CLAUDE_CODE_OAUTH_TOKEN` a container is given; an API key in the
- * environment is withheld from it, so nothing is ever billed outside the
- * subscription.
+ * Structured calls through the Claude Code CLI — the loop's one model route,
+ * on the subscription login or on Amazon Bedrock. The Agent SDK spawns a
+ * tool-less, settings-less, single-turn agent using the credentials `claude
+ * login` stored, the `CLAUDE_CODE_OAUTH_TOKEN` a container is given, or the
+ * AWS credentials the provider's `env` points it at; an API key in the
+ * environment is withheld from it, so nothing is ever billed to one.
  *
  * There is no server-side output constraint, so the schema rides in the
  * prompt as JSON Schema — every bound at its target, from `modelSchema` —
@@ -56,6 +56,8 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable, LlmDetail
 
   /** Only set when the caller pinned one; otherwise the CLI's default rules. */
   private readonly requestedModel: string | undefined;
+  /** The provider's variables for the spawned CLI, from its configuration file; empty on the subscription. */
+  private readonly env: Readonly<Record<string, string>>;
   private readonly sink: LlmCallSink | null;
   /** The SDK's `query`; injectable so a spec never spawns the CLI. */
   private readonly run: ClaudeQuery | undefined;
@@ -72,6 +74,7 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable, LlmDetail
   constructor(
     options: {
       model?: string;
+      env?: Readonly<Record<string, string>>;
       sink?: LlmCallSink;
       query?: ClaudeQuery;
       gate?: InFlightGate;
@@ -82,6 +85,7 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable, LlmDetail
     } = {},
   ) {
     this.requestedModel = options.model;
+    this.env = options.env ?? {};
     this.model = options.model ?? SUBSCRIPTION_MODEL_LABEL;
     this.sink = options.sink ?? null;
     this.run = options.query;
@@ -97,6 +101,7 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable, LlmDetail
   withRecorder(sink: LlmCallSink): ClaudeAgentLlmClient {
     return new ClaudeAgentLlmClient({
       model: this.requestedModel,
+      env: this.env,
       sink,
       query: this.run,
       gate: this.gate,
@@ -211,6 +216,7 @@ export class ClaudeAgentLlmClient implements LlmClient, LlmRecordable, LlmDetail
             system: request.system,
             model: this.requestedModel,
             effort: request.effort,
+            env: this.env,
             abort,
           }),
         });

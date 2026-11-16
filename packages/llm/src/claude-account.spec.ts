@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   AccountCheckTimeout,
+  onBedrock,
   readClaudeAccount,
   signedIn,
   subscriptionEnv,
@@ -53,6 +54,20 @@ describe('the subscription login check', () => {
     expect(
       signedIn(account({ subscriptionType: 'Claude Max', tokenSource: 'ANTHROPIC_AUTH_TOKEN' })),
     ).toBe(false);
+  });
+
+  it('[QL-22] Bedrock is the one other account accepted, by its own predicate: the bedrock provider and no API key', () => {
+    expect(onBedrock(account({ apiProvider: 'bedrock' }))).toBe(true);
+    // Whatever the CLI says of a subscription beside it, Bedrock is what it will bill.
+    expect(onBedrock(account({ apiProvider: 'bedrock', subscriptionType: 'Claude Max' }))).toBe(
+      true,
+    );
+    expect(onBedrock(account({}))).toBe(false);
+    expect(onBedrock(account({ apiProvider: 'vertex' }))).toBe(false);
+    expect(onBedrock(account({ apiProvider: null }))).toBe(false);
+    expect(onBedrock(account({ apiProvider: 'bedrock', apiKeySource: 'ANTHROPIC_API_KEY' }))).toBe(
+      false,
+    );
   });
 
   it('[QL-22] withholds every non-subscription credential from the CLI and keeps the rest', () => {

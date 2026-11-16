@@ -217,3 +217,66 @@ regression fixture or runs in CI.
 
 **Verify.** The regression suite runs in CI without a model login; the live
 harness writes its table to `docs/pipelines`.
+
+---
+
+### SEAM-7 · The cloud loop calls Claude through Amazon Bedrock; the laptop keeps the subscription
+
+**Status** watch (built 2026-11-16, not yet run live) · **Where** `packages/llm/src/{llm-config,create-client,claude-account,claude-turn,claude-agent-client}.ts`, `config/llm/claude-bedrock.json`, `infra/aws/{app,platform}.yaml`, `docker/nest-app.Dockerfile`
+
+**What.** Until 2026-11-16 every model call, the cloud's included, was the
+bundled Claude Code CLI on the subscription's `CLAUDE_CODE_OAUTH_TOKEN`, read
+from SSM: a token that expires yearly, draws on the same 5-hour and weekly
+limits as this machine, and sits in a grey area of the vendor's terms for an
+unattended server. The owner's decision (2026-11-16): the cloud deployment's
+calls go to Amazon Bedrock, Sonnet 4.6, billed per token to the AWS account;
+the laptop stays on the subscription.
+
+**How.** A third provider row, `claude-bedrock`, in `packages/llm`. The
+committed `config/llm/claude-bedrock.json` pins the model
+(`us.anthropic.claude-sonnet-4-6`), the small model
+(`us.anthropic.claude-haiku-4-5-20251001-v1:0`) and the region; `providerEnv`
+turns the file into the CLI's environment (`CLAUDE_CODE_USE_BEDROCK=1`,
+`AWS_REGION`, `ANTHROPIC_MODEL`, `ANTHROPIC_DEFAULT_HAIKU_MODEL`), which
+`turnOptions` lays over the process's; the readiness check asks the CLI under
+that environment and accepts `apiProvider: 'bedrock'` with no API key source
+(`onBedrock`), while `signedIn`, the subscription predicate, is untouched, so
+a Bedrock-configured CLI is still refused on the laptop. The choice reaches a
+deployment by name: `LLM_CHOICE=claude-bedrock` in the quality-loop container
+selects the file over `config/engine.json` (which stays `claude-subscription`),
+the image now ships `config/`, and the task role carries `bedrock:InvokeModel`
+and `bedrock:InvokeModelWithResponseStream` on the two inference profiles and
+the foundation models they route to. `NON_SUBSCRIPTION_CREDENTIALS` is
+stripped for every provider: an `ANTHROPIC_API_KEY` still reaches no CLI.
+
+**Evidence.** The account's foundation models `anthropic.claude-sonnet-4-6`
+and `anthropic.claude-haiku-4-5-20251001-v1:0`, both `ACTIVE` in us-east-1
+with inference type `INFERENCE_PROFILE` alone (`aws bedrock
+list-foundation-models --by-provider anthropic`, 2026-11-16); the vendor page
+`code.claude.com/docs/en/amazon-bedrock`, read the same day, for every variable
+name and the IAM policy; `docs/aws/deployment.md`, setup step 3 and
+Troubleshooting, for what the owner still does by hand.
+
+**To watch.** The first cloud deploy's boot line should read
+`quality-loop model: us.anthropic.claude-sonnet-4-6 — from
+config/llm/claude-bedrock.json (LLM_CHOICE)`; the first grade's recorded
+exchanges (`AccessDeniedException` means the use-case form, submitted once per
+account in the console, is still missing; `ThrottlingException` means the
+account's Bedrock quotas); and the per-grade token bill, unmeasured until a
+run's dump is read against the list prices in `docs/aws/deployment.md`.
+
+**Measured 2026-11-16, on this laptop.** Asked over the control channel with
+`CLAUDE_CODE_USE_BEDROCK=1`, `AWS_REGION` and `ANTHROPIC_MODEL` set and no
+AWS credentials reachable (every `AWS_*` variable dropped, the SDK's config
+files pointed at `/dev/null`, the metadata endpoint disabled), the CLI
+reported `{"apiProvider":"bedrock","subscriptionType":null,"tokenSource":null,"apiKeySource":null}`
+without a model call. So `onBedrock` holds whether or not credentials exist:
+the boot gate proves the configuration reached the CLI, and a missing
+credential or permission shows on the first call, in the recorded exchange —
+the same shape as the subscription check, which proves a token is present and
+not that it is valid. A laptop shell that sets `LLM_CHOICE=claude-bedrock` by
+mistake therefore boots and grades nothing until the variable is unset.
+
+**Verify.** `[QL-22]` in `packages/llm/src/{llm-config,create-client,claude-account,claude-turn}.spec.ts`
+and `packages/quality-loop/src/boot.spec.ts`; `[CLOUD-7]` in
+`tooling/aws-deploy.spec.ts`.

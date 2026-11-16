@@ -21,11 +21,34 @@ import { OMITTABLE_KEYWORDS } from './strict-schema';
  *
  * A checkout that chooses nothing runs on the Claude Code subscription: what
  * every run before any of this existed used.
+ *
+ * One deployment may run a file the checked-in choice does not name: the
+ * cloud task calls Claude through Amazon Bedrock while this laptop stays on
+ * the subscription, and both read the same repository. So a process may be
+ * told the NAME of a `config/llm/` file through `LLM_CHOICE` — the one
+ * environment variable this package reads, declared in `LLM_ENV` — and that
+ * name wins over `config/engine.json` for the model alone. It is still a
+ * choice between committed files, never a configuration of its own: the
+ * environment says which file, and the file says everything else.
  */
 export const LLM_KIND = 'llm';
 
-export const LLM_PROVIDERS = ['claude-subscription', 'openai-compatible'] as const;
+export const LLM_PROVIDERS = [
+  'claude-subscription',
+  'claude-bedrock',
+  'openai-compatible',
+] as const;
 export type LlmProvider = (typeof LLM_PROVIDERS)[number];
+
+/**
+ * The environment this package reads, declared as the other packages declare
+ * theirs: one row, the deployment's choice of file. Unset or blank is no
+ * choice and `config/engine.json` decides; a name with no file behind it is
+ * config-kit's refusal, never a quiet run on something else.
+ */
+export const LLM_ENV = {
+  choice: { name: 'LLM_CHOICE', fallback: undefined },
+} as const;
 
 /**
  * Which of OpenAI's two shapes an endpoint is asked through.
@@ -41,10 +64,24 @@ export type LlmProvider = (typeof LLM_PROVIDERS)[number];
 export const LLM_APIS = ['chat', 'responses'] as const;
 export type LlmApi = (typeof LLM_APIS)[number];
 
-export const llmConfigSchema = z.strictObject({
+/** The fields a `config/llm/` file may carry; `llmConfigSchema` adds what each provider requires of them. */
+const llmFileShape = z.strictObject({
   provider: z.enum(LLM_PROVIDERS),
-  /** The model id as the provider spells it; absent lets the provider choose. */
+  /**
+   * The model id as the provider spells it; absent lets the provider choose.
+   * `claude-bedrock` requires it, as an inference profile id.
+   */
   model: z.string().min(1).optional(),
+  /**
+   * The model the CLI runs its own small asks on, for `claude-bedrock` alone
+   * and in inference-profile form; absent leaves the CLI's default for it.
+   */
+  smallModel: z.string().min(1).optional(),
+  /**
+   * The AWS region Bedrock is called in; `claude-bedrock` requires it and no
+   * other provider reads it.
+   */
+  region: z.string().min(1).optional(),
   /** Where an OpenAI-compatible endpoint lives — the API itself, or a local server serving its shape. */
   baseUrl: z.string().url().optional(),
   /** Which OpenAI shape that endpoint is asked through. */
@@ -76,6 +113,29 @@ export const llmConfigSchema = z.strictObject({
   attempts: z.number().int().min(1).default(DEFAULT_RETRY_POLICY.attempts),
   timeoutAttempts: z.number().int().min(1).default(DEFAULT_RETRY_POLICY.timeoutAttempts),
 });
+
+/** What a `claude-bedrock` file must say, each refused by name when it does not. */
+const BEDROCK_PINS = ['model', 'region'] as const;
+
+/**
+ * A file read against what its provider requires. Bedrock has no "the
+ * provider's choice": an unpinned CLI runs the vendor's default there — an
+ * Opus, billed at the Opus rate — and the region is where the bill lands, so
+ * a Bedrock file names both or is refused by field. The subscription row
+ * keeps `model` optional, as every checkout without a file relies on.
+ */
+export const llmConfigSchema = llmFileShape.superRefine((config, ctx) => {
+  if (config.provider !== 'claude-bedrock') return;
+  for (const field of BEDROCK_PINS) {
+    if (config[field] === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [field],
+        message: `a claude-bedrock configuration must declare its ${field}`,
+      });
+    }
+  }
+});
 export type LlmConfig = z.infer<typeof llmConfigSchema>;
 
 /** What a checkout with no file runs on: the subscription, exactly as before the file existed. */
@@ -83,14 +143,25 @@ export const DEFAULT_LLM_CONFIG: LlmConfig = llmConfigSchema.parse({
   provider: 'claude-subscription',
 });
 
-/** The configuration in force, and the file it came from — null where nothing was chosen. */
+/** What named the file in force: the deployment's `LLM_CHOICE`, else `config/engine.json`. */
+type LlmChooser = typeof LLM_ENV.choice.name | typeof ENGINE_FILE;
+
+/** The configuration in force, the file it came from and what chose it — null where nothing was chosen. */
 export interface ChosenLlmConfig {
   config: LlmConfig;
   source: string | null;
+  chosenBy: LlmChooser | null;
 }
 
+/** The deployment's own choice of file, trimmed; unset or blank is none, and the engine file decides. */
+const envChoice = (env: NodeJS.ProcessEnv): string | undefined => {
+  const named = env[LLM_ENV.choice.name]?.trim();
+  return named === undefined || named === '' ? undefined : named;
+};
+
 /**
- * The chosen configuration, read once.
+ * The chosen configuration, read once: the file `LLM_CHOICE` names in `env`,
+ * else the one `config/engine.json` names.
  *
  * A file that is present and wrong is a refusal naming the field, never a
  * quiet fallback onto a provider nobody chose — the whole point of writing the
@@ -102,22 +173,29 @@ export interface ChosenLlmConfig {
 export function readChosenLlmConfig(
   root: string = process.cwd(),
   read?: ReadFile,
+  env: NodeJS.ProcessEnv = process.env,
 ): ChosenLlmConfig {
-  return (
-    readChosen(LLM_KIND, llmConfigSchema, root, read) ?? {
-      config: DEFAULT_LLM_CONFIG,
-      source: null,
-    }
-  );
+  const choice = envChoice(env);
+  const chosen = readChosen(LLM_KIND, llmConfigSchema, root, read, choice);
+  if (chosen === null) return { config: DEFAULT_LLM_CONFIG, source: null, chosenBy: null };
+  return { ...chosen, chosenBy: choice === undefined ? ENGINE_FILE : LLM_ENV.choice.name };
 }
 
 /** The chosen configuration alone, for a caller with no use for where it came from. */
-export const readLlmConfig = (root?: string, read?: ReadFile): LlmConfig =>
-  readChosenLlmConfig(root, read).config;
+export const readLlmConfig = (root?: string, read?: ReadFile, env?: NodeJS.ProcessEnv): LlmConfig =>
+  readChosenLlmConfig(root, read, env).config;
 
-/** What a boot announces: the model, and the file that chose it. */
-export const describeLlmSource = (chosen: ChosenLlmConfig): string =>
-  chosen.source ?? `no ${CONFIG_DIR}/${ENGINE_FILE} choice — the default`;
+/**
+ * What a boot announces: the file that chose the model, and `LLM_CHOICE` when
+ * the deployment named it over the engine file — the one case where the
+ * checked-in choice and the running one differ, so the line must say so.
+ */
+export const describeLlmSource = (chosen: ChosenLlmConfig): string => {
+  if (chosen.source === null) return `no ${CONFIG_DIR}/${ENGINE_FILE} choice — the default`;
+  return chosen.chosenBy === LLM_ENV.choice.name
+    ? `${chosen.source} (${LLM_ENV.choice.name})`
+    : chosen.source;
+};
 
 /** The key the config points at, or null where it names none; the value is never logged or returned elsewhere. */
 export function apiKeyFor(config: LlmConfig, env: NodeJS.ProcessEnv = process.env): string | null {

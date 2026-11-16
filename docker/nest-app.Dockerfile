@@ -103,6 +103,14 @@ ENV USE_BUILTIN_RIPGREP=0
 COPY docker/rds-global-bundle.pem /etc/ssl/certs/rds-global-bundle.pem
 COPY --from=prod-deps /repo/node_modules ./node_modules
 COPY --from=build /repo/packages/${APP} ./packages/${APP}
+# The committed configuration choices — `config/engine.json` and the
+# `config/llm/*.json` it chooses between; no secret is in them — so a task
+# can run the file `LLM_CHOICE` names (the cloud loop's Bedrock one) from the
+# repository's own declaration rather than from its environment. Until
+# 2026-11-16 the image shipped no config/, and every cloud process ran the
+# compiled-in default whatever the checkout chose. Every Tiltfile that builds
+# this file lists `./config` in its context for the same reason.
+COPY config ./config
 # The process runs as the image's unprivileged `node` user (uid 1000). It
 # owns `static/`, where the loop's dump directory defaults to
 # `<cwd>/static/runs`, and a home of its own, where the Claude CLI keeps its

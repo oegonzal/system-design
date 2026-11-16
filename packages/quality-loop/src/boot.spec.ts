@@ -14,6 +14,7 @@ const noLogin = () => Promise.reject(new MissingModelProviderError());
 const chose = (overrides: Record<string, unknown> = {}, source = 'config/llm/spec.json') => ({
   config: llmConfigSchema.parse({ provider: 'claude-subscription', ...overrides }),
   source,
+  chosenBy: 'engine.json' as const,
 });
 
 describe('the preflight', () => {
@@ -39,6 +40,22 @@ describe('the preflight', () => {
       // Announced with the file that chose it: a choice read once at boot is
       // invisible afterwards, and an edited file looks like an ignored one.
       source: 'config/llm/pinned.json',
+    });
+    // A deployment that chose by LLM_CHOICE — the cloud, on Bedrock — announces
+    // the file and that the variable chose it, since the engine file says otherwise.
+    const cloud = {
+      config: llmConfigSchema.parse({
+        provider: 'claude-bedrock',
+        model: 'us.anthropic.claude-sonnet-4-6',
+        region: 'us-east-1',
+      }),
+      source: 'config/llm/claude-bedrock.json',
+      chosenBy: 'LLM_CHOICE' as const,
+    };
+    await expect(preflight(['serve'], {}, loggedIn, cloud)).resolves.toEqual({
+      command: 'serve',
+      model: { model: 'us.anthropic.claude-sonnet-4-6' },
+      source: 'config/llm/claude-bedrock.json (LLM_CHOICE)',
     });
     const checkLogin = vi.fn(loggedIn);
     await expect(
