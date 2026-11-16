@@ -1,5 +1,10 @@
 import { functionUrlEvent, recordedLog } from './testing';
-import { createWake, RETRY_AFTER_SECONDS, WAKE_CODES, type ServiceControl } from './wake';
+import {
+  createWake,
+  KNOWN_UNREACHABLE_CODES,
+  RETRY_AFTER_SECONDS,
+  type ServiceControl,
+} from './wake';
 
 /** A service at a desired count, remembering what it is set to; `undefined` is a service not found. */
 function service(desired: number | undefined, failing = false) {
@@ -15,8 +20,8 @@ function service(desired: number | undefined, failing = false) {
 }
 
 describe('the wake path', () => {
-  it('names the failures that mean nobody is listening', () => {
-    expect([...WAKE_CODES]).toEqual([
+  it('names the failures a stopped task is known to produce', () => {
+    expect([...KNOWN_UNREACHABLE_CODES]).toEqual([
       'ENOTFOUND',
       'EAI_AGAIN',
       'ECONNREFUSED',

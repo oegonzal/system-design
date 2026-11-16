@@ -256,10 +256,11 @@ describe('the proxy handler', () => {
   });
 
   it('wakes the stack when nobody is listening, and answers "starting" for the route kind', async () => {
-    const { send, woken } = handler({ answer: new UpstreamUnreachable('ECONNREFUSED') });
+    const { send, woken, lines } = handler({ answer: new UpstreamUnreachable('ECONNREFUSED') });
     expect(await send({ path: '/' })).toEqual({ statusCode: 503, body: 'html' });
     expect(await send({ path: '/api/x' })).toEqual({ statusCode: 503, body: 'json' });
     expect(woken).toHaveLength(2);
+    expect(lines).toEqual([]);
   });
 
   it('answers a public route "starting" without waking: only a request that passed the gate wakes', async () => {
@@ -284,11 +285,13 @@ describe('the proxy handler', () => {
     ]);
   });
 
-  it('answers 502 for an upstream that failed another way', async () => {
-    const failed = handler({ answer: new UpstreamUnreachable('EPIPE') });
-    expect((await failed.send({ path: '/' })).statusCode).toBe(502);
-    expect(failed.woken).toEqual([]);
-    expect(failed.lines[0]?.message).toBe('upstream failed');
+  it('reads an upstream that failed another way as nobody listening too, and logs the code', async () => {
+    const failed = handler({ answer: new UpstreamUnreachable('EBUSY') });
+    expect(await failed.send({ path: '/' })).toEqual({ statusCode: 503, body: 'html' });
+    expect(failed.woken).toEqual([1]);
+    expect(failed.lines).toEqual([
+      { message: 'upstream unreachable', detail: { code: 'EBUSY', path: '/' } },
+    ]);
   });
 
   it('answers 404 when no declared prefix covers the path', async () => {

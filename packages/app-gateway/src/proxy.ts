@@ -21,7 +21,7 @@ import {
   UpstreamUnreachable,
   type Upstream,
 } from './upstream';
-import { WAKE_CODES, type Wake } from './wake';
+import { KNOWN_UNREACHABLE_CODES, type Wake } from './wake';
 
 /**
  * The proxy handler: one request in, one answer out, in this order — the
@@ -95,13 +95,12 @@ export function createProxyHandler({
       }
       return withCookies(result, gate.cookies);
     } catch (error) {
-      if (error instanceof UpstreamUnreachable && WAKE_CODES.has(error.code)) {
+      if (error instanceof UpstreamUnreachable) {
+        if (!KNOWN_UNREACHABLE_CODES.has(error.code)) {
+          log('upstream unreachable', { code: error.code, path: request.path });
+        }
         if (!isPublic) await wake.ensureAwake();
         return withCookies(wake.starting(event, api), gate.cookies);
-      }
-      if (error instanceof UpstreamUnreachable) {
-        log('upstream failed', { code: error.code, path: request.path });
-        return jsonResult(502, { error: 'bad gateway' }, NO_STORE);
       }
       if (error instanceof UpstreamTimedOut) {
         log('upstream timed out', { path: request.path, timeoutMs: request.timeoutMs });

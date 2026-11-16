@@ -28,8 +28,14 @@ export interface DatabaseTouch {
   touch(): void;
 }
 
-/** The failure codes that mean nobody is listening, as opposed to an upstream that answered badly. */
-export const WAKE_CODES: ReadonlySet<string> = new Set([
+/**
+ * The failure codes a stopped task is known to produce. Every unreachable
+ * upstream is read as nobody listening and wakes the stack; a code outside
+ * this set is logged with its path so a new cause stays visible, and answered
+ * "starting" like the rest — an `EBUSY` was seen while the task came up
+ * (2026-11-15), and a wake when the task already runs changes nothing.
+ */
+export const KNOWN_UNREACHABLE_CODES: ReadonlySet<string> = new Set([
   'ENOTFOUND',
   'EAI_AGAIN',
   'ECONNREFUSED',

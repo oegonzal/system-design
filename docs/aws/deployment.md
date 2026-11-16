@@ -266,10 +266,13 @@ https` are added (`x-forwarded-host` is dropped: nothing reads it, and its value
 function URL's host); the answer's `set-cookie` headers become the function URL's cookie list, and a
 body that is not text, JSON, JavaScript, CSS, SVG or XML — or that is content-encoded, as Next's
 gzipped HTML is — travels as base64. An answer over 6 MB after that inflation (the function URL's
-limit) is `502`, logged with its path and size. A connection failure (`ENOTFOUND`, `EAI_AGAIN`,
-`ECONNREFUSED`, `ETIMEDOUT` before the socket connected, `ECONNRESET`) is the wake signal (see
-Wake and sleep); any other unreachable code is `502`, and a timeout after the socket connected is
-`504` — a slow derivation on a running task never shows the "starting" page. Any unexpected error
+limit) is `502`, logged with its path and size. An upstream that could not be reached is the wake
+signal (see Wake and sleep), whatever the code: `ENOTFOUND`, `EAI_AGAIN`, `ECONNREFUSED`,
+`ETIMEDOUT` before the socket connected and `ECONNRESET` are the ones a stopped task is known to
+produce; any other is logged with its path (an `EBUSY` was seen while the task came up, 2026-11-15)
+and answered the same way, since a wake when the task already runs changes nothing. A timeout after
+the socket connected is `504` — a slow derivation on a running task never shows the "starting"
+page. Any unexpected error
 at a handler's boundary is logged with the path, the method and the error, and answered `500` JSON
 with `Cache-Control: no-store`.
 
@@ -1009,7 +1012,8 @@ task definition), and how long a session's restore and archive take against the 
 
 **Waking.** The service sits at desired count 0 and the Cloud Map record has no address. The first
 request that passed the session gate fails to connect (`ENOTFOUND`, `EAI_AGAIN`, `ECONNREFUSED`,
-`ETIMEDOUT` within the 5 s connect budget, `ECONNRESET`), and the gateway: opens and at once
+`ETIMEDOUT` within the 5 s connect budget, `ECONNRESET` — or any other code, which the gateway logs
+as `upstream unreachable`; an `EBUSY` was seen while the first task came up), and the gateway: opens and at once
 closes one TCP connection to the database endpoint (`GATEWAY_DB_HOST:GATEWAY_DB_PORT`,
 fire-and-forget), so a paused cluster starts resuming while the task starts; asks ECS for the
 service's desired count and sets it to 1 when it is 0 (already 1 means already waking; a failure
@@ -1118,6 +1122,11 @@ log stream under `/sysdesign/prod/app`); running 1 but still 503 means the gatew
 task: the Cloud Map record (`app.sysdesign.internal`) is written by ECS once the task runs, and the
 app security group admits only the gateway group. After a circuit-breaker rollback the service
 runs the previous revision and the stack is in a `ROLLBACK` state.
+
+**`upstream unreachable` in the gateway log.** A connection failed with a code outside the five a
+stopped task is known to produce; the request was still answered the starting page and the wake
+still happened (before 2026-11-15 such a code was a `502`, and the first wake produced one, an
+`EBUSY`). A code that keeps appearing while the task runs is a new cause worth reading.
 
 **The sign-in page answers "set the password permanent" (`NEW_PASSWORD_REQUIRED`).** The user was
 created with a temporary password, which the gateway's page cannot change. Run the
